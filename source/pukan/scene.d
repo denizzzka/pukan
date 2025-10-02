@@ -97,8 +97,6 @@ class Scene
     {
         import pukan.exceptions: PukanExceptionWithCode;
 
-        swapChain.currSync.inFlightFence.wait();
-
         swapChain.oldSwapchainsMaintenance();
 
         uint imageIndex;
@@ -117,8 +115,6 @@ class Scene
                     throw new PukanExceptionWithCode(ret, "failed to acquire swap chain image");
             }
         }
-
-        swapChain.currSync.inFlightFence.reset();
 
         dg(swapChain.frames[imageIndex]);
 

@@ -79,6 +79,14 @@ class LogicalDevice
         return ret;
     }
 
+    ///
+    auto createSyncQueue()
+    {
+        import pukan.vulkan.queue: Queue;
+
+        return new Queue(this);
+    }
+
     auto create(alias ClassType, A...)(A a)
     {
         return new ClassType(this, a);
