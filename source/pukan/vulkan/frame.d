@@ -4,6 +4,7 @@ module pukan.vulkan.frame;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
+import pukan.vulkan.queue;
 
 //TODO: can LogicalDevice be alias to instanced object?
 class FrameBuilder
@@ -12,14 +13,14 @@ class FrameBuilder
     VkQueue graphicsQueue;
     VkQueue presentQueue;
     TransferBuffer uniformBuffer;
-    private Fence queueSync;
+    private Queue commandsQueue; // for each frame builder thread can be used dedicated thread-safe queue
 
     this(LogicalDevice dev, VkQueue graphics, VkQueue present)
     {
         device = dev;
         graphicsQueue = graphics;
         presentQueue = present;
-        queueSync = device.create!Fence;
+        commandsQueue = device.createSyncQueue;
 
         // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
@@ -58,9 +59,7 @@ class FrameBuilder
             pSignalSemaphores: sync.signalSemaphores.ptr,
         };
 
-        queueSync.wait();
-        queueSync.reset();
-        vkQueueSubmit(device.getQueue(), 1, &submitInfo, queueSync).vkCheck;
+        commandsQueue.syncSubmit(submitInfo);
     }
 
     VkResult queueImageForPresentation(SwapChain swapChain, ref uint imageIndex)
