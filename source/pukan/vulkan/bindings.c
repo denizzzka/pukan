@@ -5,7 +5,8 @@
 #ifdef WIN32
     #include <vulkan/vulkan_win32.h>
 #else
-    // X11
+    // Posix
     #include <xcb/xcb.h>
     #include <vulkan/vulkan_xcb.h>
+    #include <vulkan/vulkan_wayland.h>
 #endif

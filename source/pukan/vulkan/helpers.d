@@ -75,8 +75,7 @@ void vkCall(T...)(T a)
 
     debug
     {
-        auto ref createInfo = a[createInfoIdx];
-        createInfo.sType = sTypeMustBe;
+        a[createInfoIdx].sType = sTypeMustBe;
     }
 
     mixin("VkResult r = "~ctorName~"(a);");
@@ -99,8 +98,7 @@ class VkObj(T...)
 
         debug
         {
-            auto ref createInfo = a[createInfoIdx];
-            createInfo.sType = sTypeMustBe;
+            a[createInfoIdx].sType = sTypeMustBe;
         }
 
         static if(methodsHaveThisPtr)

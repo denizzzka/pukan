@@ -15,7 +15,7 @@ class Texture
     VkImageView imageView;
     VkSampler sampler;
 
-    this(CP)(LogicalDevice device, CP commandPool)
+    this(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf)
     {
         this.device = device;
 
@@ -59,7 +59,8 @@ class Texture
             textureImageMemory = device.create!ImageMemory(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         }
 
-        textureImageMemory.copyFromBuffer(commandPool, buf.buf);
+        // TODO: fix ugly args naming
+        textureImageMemory.copyFromBuffer(commandPool, commandBuf, buf.buf);
 
         createImageView(imageView, device, VK_FORMAT_R8G8B8A8_SRGB, textureImageMemory.image);
 

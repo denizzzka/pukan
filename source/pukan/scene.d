@@ -15,6 +15,7 @@ class Scene
     SwapChain swapChain;
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
+    CommandPool commandPool;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -40,7 +41,10 @@ class Scene
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
         scope(failure) destroy(renderPass);
 
-        swapChain = new SwapChain(device, surface, renderPass, null);
+        commandPool = device.createCommandPool();
+        scope(failure) destroy(commandPool);
+
+        swapChain = new SwapChain(device, commandPool, surface, renderPass, null);
         scope(failure) destroy(swapChain);
 
         graphicsQueue = device.getQueue();
@@ -79,16 +83,19 @@ class Scene
         descriptorSets = descriptorPool.allocateDescriptorSets([descriptorPool.descriptorSetLayout]);
     }
 
+    ~this()
+    {
+        destroy(swapChain);
+    }
+
     void recreateSwapChain()
     {
-        swapChain = new SwapChain(device, surface, renderPass, swapChain);
+        swapChain = new SwapChain(device, commandPool, surface, renderPass, swapChain);
     }
 
     void drawNextFrame(void delegate(ref Frame frame) dg)
     {
         import pukan.exceptions: PukanExceptionWithCode;
-
-        swapChain.currSync.inFlightFence.wait();
 
         swapChain.oldSwapchainsMaintenance();
 
@@ -109,10 +116,7 @@ class Scene
             }
         }
 
-        swapChain.currSync.inFlightFence.reset();
-
-        ref currFrame = swapChain.frames[imageIndex];
-        dg(currFrame);
+        dg(swapChain.frames[imageIndex]);
 
         {
             frameBuilder.queueSubmit(swapChain);

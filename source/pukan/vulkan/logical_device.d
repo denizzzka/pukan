@@ -79,6 +79,14 @@ class LogicalDevice
         return ret;
     }
 
+    ///
+    auto createSyncQueue()
+    {
+        import pukan.vulkan.queue: Queue;
+
+        return new Queue(this);
+    }
+
     auto create(alias ClassType, A...)(A a)
     {
         return new ClassType(this, a);
@@ -102,6 +110,7 @@ class LogicalDevice
 
 class Semaphore
 {
+    ubyte[70000] FIXME_druntime_issue_REMOVE_ME;
     LogicalDevice device;
     VkSemaphore semaphore;
     alias this = semaphore;
@@ -126,6 +135,7 @@ class Semaphore
 
 class Fence
 {
+    //~ ubyte[70000] FIXME_druntime_issue_REMOVE_ME;
     LogicalDevice device;
     VkFence fence;
     alias this = fence;

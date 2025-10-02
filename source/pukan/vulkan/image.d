@@ -79,7 +79,7 @@ class ImageMemory : MemoryBufferBase
         );
     }
 
-    void copyFromBuffer(CommandPool commandPool, VkBuffer srcBuffer)
+    void copyFromBuffer(CommandPool commandPool, VkCommandBuffer buf, VkBuffer srcBuffer)
     {
         VkBufferImageCopy region;
         region.bufferOffset = 0;
@@ -94,11 +94,11 @@ class ImageMemory : MemoryBufferBase
         region.imageOffset = VkOffset3D(0, 0, 0);
         region.imageExtent = imageExtent;
 
-        commandPool.oneTimeBufferRun((buf){
+        commandPool.recordOneTimeAndSubmit(buf, (buf){
             addPipelineBarrier(buf, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
             vkCmdCopyBufferToImage(
-                commandPool.buf,
+                buf,
                 srcBuffer,
                 image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

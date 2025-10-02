@@ -40,12 +40,46 @@ void main() {
     // Print needed extensions
     uint ext_count;
     const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
+    const(char*)[] extension_list = extensions[0 .. ext_count];
 
-    writeln("glfw needed extensions:");
-    foreach(i; 0 .. ext_count)
-        writeln(extensions[i].to!string);
+    version(none)
+    {
+        // Additional "heuristic": someday we'll refuse to give up on glfw
+        import pukan.vulkan.bindings;
 
-    auto vk = new Instance(name, makeApiVersion(1,2,3,4), extensions[0 .. ext_count]);
+        //~ extension_list ~= "unknown extesnsion";
+        extension_list ~= VK_KHR_SURFACE_EXTENSION_NAME.ptr;
+        const(char)* surfaceName;
+
+        version(Windows)
+        {
+            surfaceName = VK_KHR_WIN32_SURFACE_EXTENSION_NAME.ptr;
+        }
+        else //version(Posix)
+        {
+            import std.process: environment;
+
+            const st = environment.get("XDG_SESSION_TYPE");
+
+            if(st == "x11")
+                surfaceName = VK_KHR_XCB_SURFACE_EXTENSION_NAME.ptr;
+            else if(st == "wayland")
+                surfaceName = VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME.ptr;
+            else
+                assert(false, "Surface not supported");
+        }
+
+        extension_list ~= surfaceName;
+    }
+
+    debug
+    {
+        writeln("Needed extensions:");
+        foreach(i; extension_list)
+            writeln(i.to!string);
+    }
+
+    auto vk = new Instance(name, makeApiVersion(1,2,3,4), extension_list);
     scope(exit) destroy(vk);
 
     //~ vk.printAllDevices();
@@ -126,11 +160,11 @@ void main() {
     scope(exit) destroy(scene);
 
     //FIXME: remove refs
-    ref swapChain = scene.swapChain;
-    ref frameBuilder = scene.frameBuilder;
-    ref pipelineInfoCreator = scene.pipelineInfoCreator;
-    ref graphicsPipelines = scene.graphicsPipelines;
-    ref descriptorSets = scene.descriptorSets;
+    auto swapChain = &scene.swapChain;
+    auto frameBuilder = &scene.frameBuilder;
+    //~ ref pipelineInfoCreator = scene.pipelineInfoCreator;
+    //~ ref graphicsPipelines = scene.graphicsPipelines;
+    auto descriptorSets = &scene.descriptorSets;
 
     auto vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     scope(exit) destroy(vertexBuffer);
@@ -138,14 +172,17 @@ void main() {
     auto indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     scope(exit) destroy(indicesBuffer);
 
+    // Using any (first) buffer as buffer for initial loading
+    auto initBuf = &swapChain.currSync.commandBuf;
+
     // Copy vertices to mapped memory
     vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
     indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
 
-    vertexBuffer.upload(frameBuilder.commandPool);
-    indicesBuffer.upload(frameBuilder.commandPool);
+    vertexBuffer.uploadImmediate(swapChain.commandPool, *initBuf);
+    indicesBuffer.uploadImmediate(swapChain.commandPool, *initBuf);
 
-    scope texture = device.create!Texture(frameBuilder.commandPool);
+    scope texture = device.create!Texture(swapChain.commandPool, *initBuf);
     scope(exit) destroy(texture);
 
     VkWriteDescriptorSet[] descriptorWrites;
@@ -166,7 +203,7 @@ void main() {
         descriptorWrites = [
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0 /*TODO: frame number*/],
+                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
                 dstBinding: 0,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -175,7 +212,7 @@ void main() {
             ),
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0 /*TODO: frame number*/],
+                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
                 dstBinding: 1,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -199,21 +236,23 @@ void main() {
         scene.drawNextFrame((cur) {
             updateUniformBuffer(frameBuilder, sw, swapChain.imageExtent);
 
-            frameBuilder.commandPool.recordOneTime((commandBuffer) {
-                frameBuilder.uniformBuffer.recordUpload(commandBuffer);
+            swapChain.recToCurrOneTimeBuffer(
+                (commandBuffer) {
+                    frameBuilder.uniformBuffer.recordUpload(commandBuffer);
 
-                scene.renderPass.updateData(scene.renderPass.VariableData(
-                    swapChain.imageExtent,
-                    cur.frameBuffer,
-                    vertexBuffer.gpuBuffer.buf,
-                    indicesBuffer.gpuBuffer.buf,
-                    descriptorSets,
-                    pipelineInfoCreator.pipelineLayout,
-                    graphicsPipelines.pipelines[0]
-                ));
+                    scene.renderPass.updateData(scene.renderPass.VariableData(
+                        swapChain.imageExtent,
+                        cur.frameBuffer,
+                        vertexBuffer.gpuBuffer.buf,
+                        indicesBuffer.gpuBuffer.buf,
+                        *descriptorSets,
+                        scene.pipelineInfoCreator.pipelineLayout,
+                        scene.graphicsPipelines.pipelines[0]
+                    ));
 
-                scene.renderPass.recordCommandBuffer(commandBuffer);
-            });
+                    scene.renderPass.recordCommandBuffer(commandBuffer);
+                }
+            );
         });
 
         {
@@ -224,7 +263,7 @@ void main() {
             static size_t fps;
 
             frameNum++;
-            writeln("FPS: ", fps, " frame: ", frameNum);
+            writeln("FPS: ", fps, ", frame: ", frameNum, ", currentFrameSyncIdx: ", swapChain.currentFrameSyncIdx);
 
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
@@ -240,8 +279,8 @@ void main() {
 
             auto remaining = frameDuration - (curr - prevTime);
 
-            if(!remaining.isNegative)
-                Thread.sleep(remaining);
+            //~ if(!remaining.isNegative)
+                //~ Thread.sleep(remaining);
 
             prevTime = curr;
         }

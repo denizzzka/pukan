@@ -47,11 +47,6 @@ class Instance
         info.pApplicationName = appName.toStringz;
         info.applicationVersion = appVer;
 
-        version(Windows)
-            extension_list ~= VK_KHR_WIN32_SURFACE_EXTENSION_NAME.ptr;
-        else
-            extension_list ~= VK_KHR_XCB_SURFACE_EXTENSION_NAME.ptr; //X11
-
         debug extension_list ~= [
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME.ptr,
             //~ VK_EXT_LAYER_SETTINGS_EXTENSION_NAME.ptr, //no effect
@@ -66,6 +61,11 @@ class Instance
 
         debug auto settings = [
             VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "validate_best_practices", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
+            VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "validate_sync", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
+            //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "gpuav_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
+            //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "gpuav_safe_mode", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
+            //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "gpuav_force_on_robustness", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
+            //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "validate_best_practices_nvidia", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
             //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "gpuav_reserve_binding_slot", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
             //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "gpuav_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
             //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "printf_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
@@ -331,7 +331,7 @@ class FlightRecorder(TBackend)
         import std.conv: to;
         import std.stdio: writeln;
 
-        writeln(pCallbackData.pMessage.to!string);
+        writeln("Severity: ", messageSeverity, ", type: ", messageType, ", ", pCallbackData.pMessage.to!string);
 
         if(messageSeverity == VkDebugUtilsMessageSeverityFlagBitsEXT.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {

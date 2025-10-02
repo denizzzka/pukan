@@ -14,7 +14,7 @@ mixin template SurfaceMethods()
     void printPresentModes(VkPhysicalDevice pd, VkSurfaceKHR surface)
     {
         auto modes = getArrayFrom!vkGetPhysicalDeviceSurfacePresentModesKHR(pd, surface);
-        log_info(modes.toPrettyString);
+        //~ log_info(modes.toPrettyString);
     }
 
     auto getSurfaceCapabilities(VkPhysicalDevice pd, VkSurfaceKHR surface)

@@ -4,6 +4,7 @@ module pukan.vulkan.frame;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
+import pukan.vulkan.queue;
 
 //TODO: can LogicalDevice be alias to instanced object?
 class FrameBuilder
@@ -11,17 +12,15 @@ class FrameBuilder
     LogicalDevice device;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
-    CommandPool commandPool;
     TransferBuffer uniformBuffer;
+    private Queue commandsQueue; // for each frame builder thread can be used dedicated thread-safe queue
 
     this(LogicalDevice dev, VkQueue graphics, VkQueue present)
     {
         device = dev;
         graphicsQueue = graphics;
         presentQueue = present;
-
-        commandPool = device.createCommandPool();
-        scope(failure) destroy(commandPool);
+        commandsQueue = device.createSyncQueue;
 
         // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
@@ -31,7 +30,6 @@ class FrameBuilder
     ~this()
     {
         destroy(uniformBuffer);
-        destroy(commandPool);
     }
 
     VkResult acquireNextImage(SwapChain swapChain, out uint imageIndex)
@@ -39,9 +37,10 @@ class FrameBuilder
         return vkAcquireNextImageKHR(device, swapChain.swapchain, ulong.max /* timeout */, swapChain.currSync.imageAvailable, null /* fence */, &imageIndex);
     }
 
+    //TODO: move to swapchain?
     void queueSubmit(SwapChain swapChain)
     {
-        ref sync = swapChain.currSync;
+        auto sync = swapChain.currSync;
 
         auto waitStages = cast(uint) VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
@@ -53,19 +52,19 @@ class FrameBuilder
             waitSemaphoreCount: cast(uint) sync.waitSemaphores.length,
             pWaitSemaphores: sync.waitSemaphores.ptr,
 
-            commandBufferCount: cast(uint) commandPool.commandBuffers.length,
-            pCommandBuffers: commandPool.commandBuffers.ptr,
+            commandBufferCount: 1,
+            pCommandBuffers: &sync.commandBuf,
 
             signalSemaphoreCount: cast(uint) sync.signalSemaphores.length,
             pSignalSemaphores: sync.signalSemaphores.ptr,
         };
 
-        vkQueueSubmit(device.getQueue(), 1, &submitInfo, sync.inFlightFence).vkCheck;
+        commandsQueue.syncSubmit(submitInfo);
     }
 
     VkResult queueImageForPresentation(SwapChain swapChain, ref uint imageIndex)
     {
-        ref sync = swapChain.currSync;
+        auto sync = swapChain.currSync;
 
         VkSwapchainKHR[1] swapChains = [swapChain.swapchain];
 
