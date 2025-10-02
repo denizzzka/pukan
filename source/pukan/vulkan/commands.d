@@ -52,18 +52,16 @@ class CommandPool
     }
 
     VkCommandBuffer[] allocateBuffers(uint count)
+    in(count > 0)
     {
         VkCommandBuffer[] ret;
         ret.length = count;
 
-        foreach(i, ref buf; ret)
-        {
-            auto allocInfo = defaultBufferAllocateInfo;
-            allocInfo.commandPool = commandPool;
-            allocInfo.commandBufferCount = count;
+        auto allocInfo = defaultBufferAllocateInfo;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = count;
 
-            vkAllocateCommandBuffers(device.device, &allocInfo, &buf).vkCheck;
-        }
+        vkAllocateCommandBuffers(device.device, &allocInfo, &ret[0]).vkCheck;
 
         return ret;
     }
