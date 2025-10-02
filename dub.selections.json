@@ -6,10 +6,10 @@
 		"glfw-d": "1.1.1",
 		"intel-intrinsics": "1.12.0",
 		"miniz": "0.0.2",
-		"mir-algorithm": "3.22.3",
-		"mir-core": "1.7.1",
+		"mir-algorithm": "3.22.4",
+		"mir-core": "1.7.3",
 		"mir-cpuid": "1.2.11",
-		"mir-ion": "2.3.3",
+		"mir-ion": "2.3.4",
 		"silly": "1.1.1"
 	}
 }
