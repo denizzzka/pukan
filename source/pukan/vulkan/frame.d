@@ -12,12 +12,14 @@ class FrameBuilder
     VkQueue graphicsQueue;
     VkQueue presentQueue;
     TransferBuffer uniformBuffer;
+    private Fence queueSync;
 
     this(LogicalDevice dev, VkQueue graphics, VkQueue present)
     {
         device = dev;
         graphicsQueue = graphics;
         presentQueue = present;
+        queueSync = device.create!Fence;
 
         // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
@@ -56,7 +58,9 @@ class FrameBuilder
             pSignalSemaphores: sync.signalSemaphores.ptr,
         };
 
-        vkQueueSubmit(device.getQueue(), 1, &submitInfo, sync.inFlightFence).vkCheck;
+        queueSync.wait();
+        queueSync.reset();
+        vkQueueSubmit(device.getQueue(), 1, &submitInfo, queueSync).vkCheck;
     }
 
     VkResult queueImageForPresentation(SwapChain swapChain, ref uint imageIndex)

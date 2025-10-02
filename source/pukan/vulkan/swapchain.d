@@ -144,7 +144,6 @@ class SyncFramesInFlight
 {
     Semaphore imageAvailable;
     Semaphore renderFinished;
-    Fence inFlightFence;
 
     VkSemaphore[] waitSemaphores;
     VkSemaphore[] signalSemaphores;
@@ -160,7 +159,6 @@ class SyncFramesInFlight
 
         imageAvailable = device.create!Semaphore;
         renderFinished = device.create!Semaphore;
-        inFlightFence = device.create!Fence;
 
         waitSemaphores = [imageAvailable.semaphore];
         signalSemaphores = [renderFinished.semaphore];
