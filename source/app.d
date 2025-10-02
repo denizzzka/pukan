@@ -42,10 +42,12 @@ void main() {
     const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
     const(char*)[] extension_list = extensions[0 .. ext_count];
 
+    version(none)
     {
         // Additional "heuristic": someday we'll refuse to give up on glfw
         import pukan.vulkan.bindings;
 
+        //~ extension_list ~= "unknown extesnsion";
         extension_list ~= VK_KHR_SURFACE_EXTENSION_NAME.ptr;
         const(char)* surfaceName;
 
