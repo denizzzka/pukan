@@ -47,7 +47,6 @@ void main() {
         // Additional "heuristic": someday we'll refuse to give up on glfw
         import pukan.vulkan.bindings;
 
-        //~ extension_list ~= "unknown extesnsion";
         extension_list ~= VK_KHR_SURFACE_EXTENSION_NAME.ptr;
         const(char)* surfaceName;
 
