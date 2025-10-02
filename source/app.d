@@ -40,12 +40,44 @@ void main() {
     // Print needed extensions
     uint ext_count;
     const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
+    const(char*)[] extension_list = extensions[0 .. ext_count];
 
-    writeln("glfw needed extensions:");
-    foreach(i; 0 .. ext_count)
-        writeln(extensions[i].to!string);
+    {
+        // Additional "heuristic": someday we'll refuse to give up on glfw
+        import pukan.vulkan.bindings;
 
-    auto vk = new Instance(name, makeApiVersion(1,2,3,4), extensions[0 .. ext_count]);
+        extension_list ~= VK_KHR_SURFACE_EXTENSION_NAME.ptr;
+        const(char)* surfaceName;
+
+        version(Windows)
+        {
+            surfaceName = VK_KHR_WIN32_SURFACE_EXTENSION_NAME.ptr;
+        }
+        else //version(Posix)
+        {
+            import std.process: environment;
+
+            const st = environment.get("XDG_SESSION_TYPE");
+
+            if(st == "x11")
+                surfaceName = VK_KHR_XCB_SURFACE_EXTENSION_NAME.ptr;
+            else if(st == "wayland")
+                surfaceName = VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME.ptr;
+            else
+                assert(false, "Surface not supported");
+        }
+
+        extension_list ~= surfaceName;
+    }
+
+    debug
+    {
+        writeln("Needed extensions:");
+        foreach(i; extension_list)
+            writeln(i.to!string);
+    }
+
+    auto vk = new Instance(name, makeApiVersion(1,2,3,4), extension_list);
     scope(exit) destroy(vk);
 
     //~ vk.printAllDevices();
