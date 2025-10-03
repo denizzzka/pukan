@@ -10,3 +10,5 @@ dependency "mir-ion" version="~>2.3.3"
 dflags "-preview=in"
 #"-preview=dip1021" #disabled due to incompatibility with mir-ion json serializer
 libs "vulkan"
+libs `$VULKAN_SDK\Lib\vulkan-1` system="windows"
+cImportPaths "$VULKAN_SDK\\Include" system="windows"
