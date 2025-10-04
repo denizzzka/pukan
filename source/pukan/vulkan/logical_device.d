@@ -41,10 +41,10 @@ class LogicalDevice
             samplerAnisotropy: VK_TRUE,
         };
 
-        VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeatures = {
-            sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT,
-            shaderObject: VK_TRUE,
-        };
+        //~ VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeatures = {
+            //~ sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT,
+            //~ shaderObject: VK_TRUE,
+        //~ };
 
         VkDeviceCreateInfo createInfo = {
             sType: VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -53,7 +53,7 @@ class LogicalDevice
             pEnabledFeatures: &deviceFeatures,
             ppEnabledExtensionNames: extension_list.ptr,
             enabledExtensionCount: cast(uint) extension_list.length,
-            pNext: &shaderObjectFeatures,
+            //~ pNext: &shaderObjectFeatures,
         };
 
         debug
