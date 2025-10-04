@@ -114,17 +114,17 @@ class Frame
                 layers: 1,
             };
 
-            vkCreateFramebuffer(device, &frameBufferInfo, device.backend.allocator, &frameBuffer).vkCheck;
+            vkCreateFramebuffer(device, &frameBufferInfo, device.alloc, &frameBuffer).vkCheck;
         }
     }
 
     ~this()
     {
         if(frameBuffer)
-            vkDestroyFramebuffer(device, frameBuffer, device.backend.allocator);
+            vkDestroyFramebuffer(device, frameBuffer, device.alloc);
 
         if(imageView)
-            vkDestroyImageView(device, imageView, device.backend.allocator);
+            vkDestroyImageView(device, imageView, device.alloc);
     }
 }
 
@@ -150,7 +150,7 @@ void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat ima
         image: image,
     };
 
-    vkCreateImageView(device, &cinf, device.backend.allocator, &imgView).vkCheck;
+    vkCreateImageView(device, &cinf, device.alloc, &imgView).vkCheck;
 }
 
 struct DepthBuf
@@ -194,13 +194,13 @@ struct DepthBuf
             image: depthImage,
         };
 
-        vkCreateImageView(device, &cinf, device.backend.allocator, &depthView).vkCheck;
+        vkCreateImageView(device, &cinf, device.alloc, &depthView).vkCheck;
     }
 
     ~this()
     {
         if(depthView)
-            vkDestroyImageView(device, depthView, device.backend.allocator);
+            vkDestroyImageView(device, depthView, device.alloc);
 
         destroy(depthImage);
     }

@@ -36,7 +36,7 @@ class Scene
         surface = surf;
         windowSizeChanged = wsc;
 
-        device.backend.useSurface(surface);
+        device.physicalDevice.instance.useSurface(surface);
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
         scope(failure) destroy(renderPass);

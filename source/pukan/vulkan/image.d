@@ -13,7 +13,7 @@ class ImageMemory : MemoryBufferBase
 
     this(LogicalDevice device, ref VkImageCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
     {
-        vkCall(device.device, &createInfo, device.backend.allocator, &image);
+        vkCall(device.device, &createInfo, device.alloc, &image);
 
         imageExtent = createInfo.extent;
 
@@ -28,7 +28,7 @@ class ImageMemory : MemoryBufferBase
     ~this()
     {
         if(image)
-            vkDestroyImage(device, image, device.backend.allocator);
+            vkDestroyImage(device, image, device.alloc);
     }
 
     void addPipelineBarrier(VkCommandBuffer buf, VkImageLayout oldLayout, VkImageLayout newLayout)

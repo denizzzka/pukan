@@ -81,16 +81,16 @@ class Texture
             samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         }
 
-        vkCall(device.device, &samplerInfo, device.backend.allocator, &sampler);
+        vkCall(device.device, &samplerInfo, device.alloc, &sampler);
     }
 
     ~this()
     {
         if(sampler)
-            vkDestroySampler(device, sampler, device.backend.allocator);
+            vkDestroySampler(device, sampler, device.alloc);
 
         if(imageView)
-            vkDestroyImageView(device, imageView, device.backend.allocator);
+            vkDestroyImageView(device, imageView, device.alloc);
 
         destroy(textureImageMemory);
     }

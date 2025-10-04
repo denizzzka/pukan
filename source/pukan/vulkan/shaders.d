@@ -33,13 +33,13 @@ class ShaderModule
             pCode: code.ptr,
         };
 
-        vkCreateShaderModule(dev.device, &cinf, dev.backend.allocator, &shaderModule).vkCheck;
+        vkCreateShaderModule(dev.device, &cinf, dev.alloc, &shaderModule).vkCheck;
     }
 
     ~this()
     {
         if(device && shaderModule)
-            vkDestroyShaderModule(device.device, shaderModule, device.backend.allocator);
+            vkDestroyShaderModule(device.device, shaderModule, device.alloc);
     }
 
     auto createShaderStageInfo(VkShaderStageFlagBits stage)
@@ -79,13 +79,13 @@ class CompilableShaderModule
             pCode: code.ptr,
         };
 
-        vkCreateShaderModule(dev.device, &cinf, dev.backend.allocator, &shaderModule).vkCheck;
+        vkCreateShaderModule(dev.device, &cinf, dev.alloc, &shaderModule).vkCheck;
     }
 
     /// VK_EXT_shader_object extension
     void compileShader(VkShaderStageFlagBits stage)
     {
-        auto vkCreateShadersEXT = cast(PFN_vkCreateShadersEXT) vkGetInstanceProcAddr(device.backend.instance, "vkCreateShadersEXT");
+        auto vkCreateShadersEXT = cast(PFN_vkCreateShadersEXT) vkGetInstanceProcAddr(device.physicalDevice.instance.instance, "vkCreateShadersEXT");
 
         const code = cast(uint[]) data;
 
@@ -98,7 +98,7 @@ class CompilableShaderModule
             stage: stage,
         };
 
-        vkCreateShadersEXT(device, 1, &createInfoEXT, device.backend.allocator, &ext).vkCheck;
+        vkCreateShadersEXT(device, 1, &createInfoEXT, device.alloc, &ext).vkCheck;
     }
 
     ~this()
@@ -107,12 +107,12 @@ class CompilableShaderModule
 
         if(ext)
         {
-            auto vkDestroyShaderEXT = cast(PFN_vkDestroyShaderEXT) vkGetInstanceProcAddr(device.backend.instance, "vkDestroyShaderEXT");
-            vkDestroyShaderEXT(device, ext, device.backend.allocator);
+            auto vkDestroyShaderEXT = cast(PFN_vkDestroyShaderEXT) vkGetInstanceProcAddr(device.physicalDevice.instance.instance, "vkDestroyShaderEXT");
+            vkDestroyShaderEXT(device, ext, device.alloc);
         }
 
         if(shaderModule)
-            vkDestroyShaderModule(device.device, shaderModule, device.backend.allocator);
+            vkDestroyShaderModule(device.device, shaderModule, device.alloc);
     }
 
     auto createShaderStageInfo(VkShaderStageFlagBits stage)

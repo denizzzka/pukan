@@ -10,7 +10,7 @@ import pukan: toPrettyString;
 ///
 class PhysicalDevice
 {
-    package Instance instance;
+    Instance instance;
     package VkPhysicalDevice physicalDevice;
 
     ///
@@ -82,7 +82,7 @@ class PhysicalDevice
     ///
     LogicalDevice createLogicalDevice(const(char*)[] extension_list)
     {
-        return new LogicalDevice(instance, this, extension_list);
+        return new LogicalDevice(this, extension_list);
     }
 
     /**

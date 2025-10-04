@@ -39,7 +39,7 @@ class MemoryBuffer : MemoryBufferBase
 
     this(LogicalDevice device, ref VkBufferCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
     {
-        vkCall(device.device, &createInfo, device.backend.allocator, &buf);
+        vkCall(device.device, &createInfo, device.alloc, &buf);
 
         VkMemoryRequirements memRequirements;
         vkGetBufferMemoryRequirements(device.device, buf, &memRequirements);
@@ -52,7 +52,7 @@ class MemoryBuffer : MemoryBufferBase
     ~this()
     {
         if(buf)
-            vkDestroyBuffer(device.device, buf, device.backend.allocator);
+            vkDestroyBuffer(device.device, buf, device.alloc);
     }
 
     //TODO: static?
@@ -87,16 +87,16 @@ class MemoryBufferBase
 
         VkMemoryAllocateInfo allocInfo = {
             allocationSize: memRequirements.size,
-            memoryTypeIndex: device.backend.findMemoryType(memRequirements.memoryTypeBits, propFlags),
+            memoryTypeIndex: device.physicalDevice.findMemoryType(memRequirements.memoryTypeBits, propFlags),
         };
 
-        vkCall(device.device, &allocInfo, device.backend.allocator, &deviceMemory);
+        vkCall(device.device, &allocInfo, device.alloc, &deviceMemory);
     }
 
     ~this()
     {
         if(deviceMemory)
-            vkFreeMemory(device.device, deviceMemory, device.backend.allocator);
+            vkFreeMemory(device.device, deviceMemory, device.alloc);
     }
 }
 

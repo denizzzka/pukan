@@ -22,7 +22,7 @@ class SwapChain
 
     this(LogicalDevice device, CommandPool cPool, VkSurfaceKHR surface, RenderPass renderPass, SwapChain old)
     {
-        auto ins = device.backend;
+        auto ins = device.physicalDevice.instance;
 
         auto physDev = ins.findSuitablePhysicalDevice;
         const capab = ins.getSurfaceCapabilities(physDev.physicalDevice, surface);
@@ -42,7 +42,7 @@ class SwapChain
 
         VkSwapchainCreateInfoKHR cinf = {
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            surface: device.backend.surface,
+            surface: device.physicalDevice.instance.surface,
             imageFormat: renderPass.imageFormat,
             imageColorSpace: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
             imageExtent: capabilities.currentExtent,
@@ -76,7 +76,7 @@ class SwapChain
                 assert(old.swapchain == cinf.oldSwapchain);
         }
 
-        vkCreateSwapchainKHR(d.device, &cinf, d.backend.allocator, &swapchain).vkCheck;
+        vkCreateSwapchainKHR(d.device, &cinf, d.alloc, &swapchain).vkCheck;
         //TODO: need scope(failure) guard for swapchain?
 
         images = getArrayFrom!vkGetSwapchainImagesKHR(device.device, swapchain);
@@ -104,7 +104,7 @@ class SwapChain
         destroy(oldSwapChain);
 
         if(swapchain)
-            vkDestroySwapchainKHR(device.device, swapchain, device.backend.allocator);
+            vkDestroySwapchainKHR(device.device, swapchain, device.alloc);
     }
 
     auto ref currSync()

@@ -10,16 +10,14 @@ import std.string: toStringz;
 
 class LogicalDevice
 {
-    Backend backend; // TODO: remove
     PhysicalDevice physicalDevice;
     VkDevice device;
     alias this = device;
 
     const uint familyIdx;
 
-    package this(Backend b, PhysicalDevice pd, const(char*)[] extension_list)
+    package this(PhysicalDevice pd, const(char*)[] extension_list)
     {
-        backend = b;
         physicalDevice = pd;
 
         VkPhysicalDeviceFeatures supportedFeatures;
@@ -58,14 +56,16 @@ class LogicalDevice
             pNext: &shaderObjectFeatures,
         };
 
-        vkCreateDevice(pd.physicalDevice, &createInfo, b.allocator, &device).vkCheck;
+        vkCreateDevice(pd.physicalDevice, &createInfo, alloc, &device).vkCheck;
     }
 
     ~this()
     {
         if(device)
-            vkDestroyDevice(device, backend.allocator);
+            vkDestroyDevice(device, alloc);
     }
+
+    auto alloc() => physicalDevice.instance.allocator;
 
     //TODO: remove
     auto getQueue()
@@ -126,13 +126,13 @@ class Semaphore
             sType: VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
 
-        vkCreateSemaphore(device.device, &cinf, device.backend.allocator, &semaphore).vkCheck;
+        vkCreateSemaphore(device.device, &cinf, device.alloc, &semaphore).vkCheck;
     }
 
     ~this()
     {
         if(semaphore)
-            vkDestroySemaphore(device.device, semaphore, device.backend.allocator);
+            vkDestroySemaphore(device.device, semaphore, device.alloc);
     }
 }
 
@@ -152,13 +152,13 @@ class Fence
             flags: VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        vkCreateFence(device.device, &cinf, device.backend.allocator, &fence).vkCheck;
+        vkCreateFence(device.device, &cinf, device.alloc, &fence).vkCheck;
     }
 
     ~this()
     {
         if(fence)
-            vkDestroyFence(device.device, fence, device.backend.allocator);
+            vkDestroyFence(device.device, fence, device.alloc);
     }
 
     void wait()

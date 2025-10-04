@@ -64,13 +64,13 @@ class DefaultRenderPass : RenderPass
             pDependencies: &dependency,
         };
 
-        vkCall(device, &renderPassInfo, device.backend.allocator, &vkRenderPass);
+        vkCall(device, &renderPassInfo, device.alloc, &vkRenderPass);
     }
 
     ~this()
     {
         if(vkRenderPass)
-            vkDestroyRenderPass(device, vkRenderPass, device.backend.allocator);
+            vkDestroyRenderPass(device, vkRenderPass, device.alloc);
     }
 
     enum VkAttachmentDescription defaultColorAttachment = {

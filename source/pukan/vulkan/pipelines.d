@@ -30,7 +30,7 @@ class DefaultPipelineInfoCreator
     ~this()
     {
         if(pipelineLayout)
-            vkDestroyPipelineLayout(device, pipelineLayout, device.backend.allocator);
+            vkDestroyPipelineLayout(device, pipelineLayout, device.alloc);
     }
 
     VkPipelineDepthStencilStateCreateInfo depthStencil;
@@ -134,7 +134,7 @@ abstract class Pipelines
     ~this()
     {
         foreach(ref p; pipelines)
-            vkDestroyPipeline(device.device, p, device.backend.allocator);
+            vkDestroyPipeline(device.device, p, device.alloc);
     }
 }
 
@@ -154,7 +154,7 @@ class GraphicsPipelines : Pipelines
             null, // pipelineCache
             cast(uint) infos.length,
             infos.ptr,
-            device.backend.allocator,
+            device.alloc,
             pipelines.ptr
         ).vkCheck;
     }
@@ -171,7 +171,7 @@ auto createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptor
     };
 
     VkPipelineLayout pipelineLayout;
-    vkCall(device, &pipelineLayoutCreateInfo, device.backend.allocator, &pipelineLayout);
+    vkCall(device, &pipelineLayoutCreateInfo, device.alloc, &pipelineLayout);
 
     return pipelineLayout;
 }

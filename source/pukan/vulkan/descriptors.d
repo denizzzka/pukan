@@ -24,7 +24,7 @@ class DescriptorPool
                 pBindings: descriptorSetLayoutBindings.ptr,
             };
 
-            vkCall(device.device, &descrLayoutCreateInfo, device.backend.allocator, &descriptorSetLayout);
+            vkCall(device.device, &descrLayoutCreateInfo, device.alloc, &descriptorSetLayout);
         }
 
         {
@@ -43,17 +43,17 @@ class DescriptorPool
                 maxSets: 1, // TODO: number of frames
             };
 
-            vkCall(device.device, &descriptorPoolInfo, device.backend.allocator, &descriptorPool);
+            vkCall(device.device, &descriptorPoolInfo, device.alloc, &descriptorPool);
         }
     }
 
     ~this()
     {
         if(descriptorPool)
-            vkDestroyDescriptorPool(device, descriptorPool, device.backend.allocator);
+            vkDestroyDescriptorPool(device, descriptorPool, device.alloc);
 
         if(descriptorSetLayout)
-            vkDestroyDescriptorSetLayout(device, descriptorSetLayout, device.backend.allocator);
+            vkDestroyDescriptorSetLayout(device, descriptorSetLayout, device.alloc);
     }
 
     auto allocateDescriptorSets(VkDescriptorSetLayout[] layouts)
