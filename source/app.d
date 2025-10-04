@@ -84,7 +84,7 @@ void main() {
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
-    auto physDevice = vk.physDevice;
+    auto physDevice = vk.findSuitablePhysicalDevice;
 
     const(char*)[] dev_extension_list = [
         VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
@@ -115,8 +115,8 @@ void main() {
         cast(ulong*) &surface
     );
 
-    vk.printSurfaceFormats(vk.devices[vk.deviceIdx], surface);
-    vk.printPresentModes(vk.devices[vk.deviceIdx], surface);
+    //~ vk.printSurfaceFormats(vk.devices[vk.deviceIdx], surface);
+    //~ vk.printPresentModes(vk.devices[vk.deviceIdx], surface);
 
     import pukan.vulkan.bindings;
 

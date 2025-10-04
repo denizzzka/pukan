@@ -24,7 +24,8 @@ class SwapChain
     {
         auto ins = device.backend;
 
-        const capab = ins.getSurfaceCapabilities(ins.devices[ins.deviceIdx], surface);
+        auto physDev = ins.findSuitablePhysicalDevice;
+        const capab = ins.getSurfaceCapabilities(physDev.physicalDevice, surface);
 
         this(device, cPool, capab, renderPass, old);
     }

@@ -2,6 +2,7 @@ module pukan.vulkan.logical_device;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.physical_device: PhysicalDevice;
 import pukan.exceptions;
 import log = std.logger;
 import std.exception: enforce;
@@ -9,20 +10,22 @@ import std.string: toStringz;
 
 class LogicalDevice
 {
-    Backend backend; // TODO: rewrite to "Instance instance"
+    Backend backend; // TODO: remove
+    PhysicalDevice physicalDevice;
     VkDevice device;
     alias this = device;
 
     const uint familyIdx;
 
-    package this(Backend b, VkPhysicalDevice physicalDevice, const(char*)[] extension_list)
+    package this(Backend b, PhysicalDevice pd, const(char*)[] extension_list)
     {
         backend = b;
+        physicalDevice = pd;
 
         VkPhysicalDeviceFeatures supportedFeatures;
-        vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
+        vkGetPhysicalDeviceFeatures(pd.physicalDevice, &supportedFeatures);
 
-        const fqIdxs = b.findSuitableQueueFamilies();
+        const fqIdxs = pd.findSuitableQueueFamilies();
         enforce(fqIdxs.length > 0);
         familyIdx = cast(uint) fqIdxs[0];
 
@@ -55,7 +58,7 @@ class LogicalDevice
             pNext: &shaderObjectFeatures,
         };
 
-        vkCreateDevice(physicalDevice, &createInfo, b.allocator, &device).vkCheck;
+        vkCreateDevice(pd.physicalDevice, &createInfo, b.allocator, &device).vkCheck;
     }
 
     ~this()

@@ -82,7 +82,7 @@ class PhysicalDevice
     ///
     LogicalDevice createLogicalDevice(const(char*)[] extension_list)
     {
-        return new LogicalDevice(instance, physicalDevice, extension_list);
+        return new LogicalDevice(instance, this, extension_list);
     }
 
     /**

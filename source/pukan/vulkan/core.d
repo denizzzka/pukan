@@ -132,7 +132,7 @@ class Instance
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
     {
-        return physDevice.findMemoryType(memoryTypeBitFilter, properties);
+        return findSuitablePhysicalDevice.findMemoryType(memoryTypeBitFilter, properties);
     }
 
     /// Must be called after logical device creation, otherwise mutex deadlock occurs
@@ -149,16 +149,12 @@ class Instance
         return d;
     }
 
-    //TODO: remove, devices should be selectable
-    auto physDevice() => new PhysicalDevice(this, devices[0]);
-
-    //TODO: remove
-    immutable deviceIdx = 0;
-
+    //TODO: remove or add heuristics
+    ///
     auto findSuitablePhysicalDevice()
     {
         if(devices.length > 0)
-            return devices[deviceIdx];
+            return new PhysicalDevice(this, devices[0]);
 
         throw new PukanException("appropriate device not found");
     }
@@ -166,24 +162,7 @@ class Instance
     /// Returns: family indices
     auto findSuitableQueueFamilies()
     {
-        return findSuitableQueueFamilies(
-            findSuitablePhysicalDevice()
-        );
-    }
-
-    /// ditto
-    static auto findSuitableQueueFamilies(VkPhysicalDevice dev)
-    {
-        auto qFamilyProps = getArrayFrom!vkGetPhysicalDeviceQueueFamilyProperties(dev);
-        size_t[] apprIndices;
-
-        foreach(i, qfp; qFamilyProps)
-        {
-            if (qfp.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-               apprIndices ~= i;
-        }
-
-        return apprIndices;
+        return findSuitablePhysicalDevice.findSuitableQueueFamilies();
     }
 }
 
