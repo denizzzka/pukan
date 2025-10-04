@@ -102,7 +102,6 @@ void main() {
 
     const(char*)[] dev_extension_list = [
         VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
-        VK_EXT_SHADER_OBJECT_EXTENSION_NAME.ptr,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME.ptr,
     ];
 
