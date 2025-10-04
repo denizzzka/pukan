@@ -141,6 +141,7 @@ class SwapChain
 }
 
 //TODO: struct?
+//TODO: move to frame module?
 class SyncFramesInFlight
 {
     Semaphore imageAvailable;
