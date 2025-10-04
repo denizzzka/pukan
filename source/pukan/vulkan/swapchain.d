@@ -16,7 +16,7 @@ class SwapChain
     enum maxFramesInFlight = 3;
     Frame[] frames; //TODO: rename to frameBuffers
     SyncFramesInFlight[maxFramesInFlight] syncPrimitives;
-    int currentFrameSyncIdx;
+    int currentFrameIdx;
 
     private ubyte framesSinceSwapchainReplacement = 0;
 
@@ -109,12 +109,12 @@ class SwapChain
 
     auto ref currSync()
     {
-        return syncPrimitives[currentFrameSyncIdx];
+        return syncPrimitives[currentFrameIdx];
     }
 
     void toNextFrame()
     {
-        currentFrameSyncIdx = (currentFrameSyncIdx + 1) % maxFramesInFlight;
+        currentFrameIdx = (currentFrameIdx + 1) % maxFramesInFlight;
     }
 
     void oldSwapchainsMaintenance()
