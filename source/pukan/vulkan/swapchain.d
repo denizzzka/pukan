@@ -79,8 +79,8 @@ class SwapChain
         vkCreateSwapchainKHR(d.device, &cinf, d.alloc, &swapchain).vkCheck;
         //TODO: need scope(failure) guard for swapchain?
 
-        images = getArrayFrom!vkGetSwapchainImagesKHR(device.device, swapchain);
-        enforce(images.length >= 3);
+        images = getArrayFrom!(vkGetSwapchainImagesKHR, maxFramesInFlight)(device.device, swapchain);
+        assert(images.length == maxFramesInFlight);
 
         frames.length = images.length;
 

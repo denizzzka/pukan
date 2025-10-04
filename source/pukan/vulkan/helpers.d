@@ -142,16 +142,22 @@ auto create(T...)(T s)
 }
 
 /// Special helper to fetch values using methods like vkEnumeratePhysicalDevices
-auto getArrayFrom(alias func, T...)(T obj)
+auto getArrayFrom(alias func, uint count = 0, T...)(T obj)
 {
     import std.traits;
 
-    uint count;
-
-    static if(is(ReturnType!func == void))
-        func(obj, &count, null);
+    static if(count != 0)
+        uint count = count;
     else
-        func(obj, &count, null).vkCheck;
+    {
+        // First func call used to obtain count value
+        uint count;
+
+        static if(is(ReturnType!func == void))
+            func(obj, &count, null);
+        else
+            func(obj, &count, null).vkCheck;
+    }
 
     enum len = Parameters!func.length;
     alias Tptr = Parameters!func[len-1];
