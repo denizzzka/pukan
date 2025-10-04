@@ -7,6 +7,7 @@ import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
 import pukan: toPrettyString;
+import std.conv: to;
 import std.exception: enforce;
 import std.string: toStringz;
 
@@ -175,6 +176,20 @@ class Instance
     {
         return findSuitablePhysicalDevice.findSuitableQueueFamilies();
     }
+
+    /// Throw exception if extension is not supported
+    void checkExtensionSupportedEx(in char* extensionName, string file = __FILE__, size_t line = __LINE__)
+    {
+        const toFind = extensionName.to!string;
+
+        foreach(e; extensions)
+        {
+            if(e.extensionName.to!string == extensionName.to!string)
+                return;
+        }
+
+        throw new PukanException("Extension "~toFind~" is not supported by Vulkan instance");
+    }
 }
 
 //TODO: remove or rename Instance to appropriate name
@@ -216,7 +231,6 @@ class FlightRecorder(TBackend)
     ) //FIXME: nothrow
     {
         //TODO: move out from renderer package
-        import std.conv: to;
         import std.stdio: writeln;
 
         writeln("Severity: ", messageSeverity, ", type: ", messageType, ", ", pCallbackData.pMessage.to!string);
