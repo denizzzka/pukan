@@ -13,8 +13,8 @@ class SwapChain
     VkImage[] images;
     VkFormat imageFormat;
     VkExtent2D imageExtent;
+    enum maxFramesInFlight = 3;
     Frame[] frames; //TODO: rename to frameBuffers
-    enum maxFramesInFlight = 3; // not same as frames.length
     SyncFramesInFlight[maxFramesInFlight] syncPrimitives;
     int currentFrameSyncIdx;
 
