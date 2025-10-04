@@ -1,5 +1,7 @@
 module pukan.vulkan;
 
+//TODO: remove all these lines?
+
 public import pukan.vulkan.commands;
 public import pukan.vulkan.core;
 public import pukan.vulkan.descriptors;

@@ -4,6 +4,8 @@ import pukan.exceptions;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
+public import pukan.vulkan.helpers; //TODO: remove public
+import pukan.vulkan.physical_device: PhysicalDevice;
 import pukan: toPrettyString;
 import std.exception: enforce;
 import std.string: toStringz;
@@ -130,53 +132,7 @@ class Instance
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
     {
-        return findMemoryType(devices[0], memoryTypeBitFilter, properties);
-    }
-
-    static uint findMemoryType(VkPhysicalDevice physicalDevice, uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
-    {
-        VkPhysicalDeviceMemoryProperties memProperties;
-        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
-
-        for(uint i = 0; i < memProperties.memoryTypeCount; i++)
-        {
-            if ((memoryTypeBitFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-                return i;
-        }
-
-        throw new PukanException("failed to find suitable memory type");
-    }
-
-    void printAllDevices()
-    {
-        foreach(d; devices)
-            printDevice(d);
-    }
-
-    static void printDevice(VkPhysicalDevice d)
-    {
-        VkPhysicalDeviceProperties props;
-        vkGetPhysicalDeviceProperties(d, &props);
-
-        VkPhysicalDeviceProperties2 props2 = {
-            sType: VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2
-        };
-        vkGetPhysicalDeviceProperties2(d, &props2);
-
-        VkPhysicalDeviceMemoryProperties mem;
-        vkGetPhysicalDeviceMemoryProperties(d, &mem);
-
-        VkPhysicalDeviceFeatures features;
-        vkGetPhysicalDeviceFeatures(d, &features);
-
-        log_info("Properties:");
-        log_info(props.toPrettyString);
-        log_info("Properties 2:");
-        log_info(props2);
-        log_info("Memory:");
-        log_info(mem.toPrettyString);
-        log_info("Features:");
-        log_info(features.toPrettyString);
+        return physDevice.findMemoryType(memoryTypeBitFilter, properties);
     }
 
     /// Must be called after logical device creation, otherwise mutex deadlock occurs
@@ -194,6 +150,8 @@ class Instance
     }
 
     //TODO: remove, devices should be selectable
+    auto physDevice() => new PhysicalDevice(this, devices[0]);
+
     immutable deviceIdx = 0;
 
     auto findSuitablePhysicalDevice()
@@ -231,11 +189,8 @@ class Instance
     {
         enforce(devices.length > 0, "no devices found");
 
-        return createLogicalDevice(devices[0]);
-    }
+        auto phys = new PhysicalDevice(this, devices[0]);
 
-    auto createLogicalDevice(VkPhysicalDevice d)
-    {
         //TODO: get extension_list from arguments
         const(char*)[] extension_list = [
             VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
@@ -243,52 +198,12 @@ class Instance
             VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME.ptr,
         ];
 
-        return new LogicalDevice(this, d, extension_list);
+        return phys.createLogicalDevice(extension_list);
     }
 }
 
 //TODO: remove or rename Instance to appropriate name
 alias Backend = Instance;
-
-//TODO: do not display __FUNCTION__ on release builds
-auto vkCheck(VkResult ret, string err_descr = __FUNCTION__, string file = __FILE__, size_t line = __LINE__)
-{
-    if(ret != VkResult.VK_SUCCESS)
-        throw new PukanExceptionWithCode(ret, err_descr, file, line);
-
-    return ret;
-}
-
-//TODO: move to misc module
-/// Special helper to fetch values using methods like vkEnumeratePhysicalDevices
-auto getArrayFrom(alias func, T...)(T obj)
-{
-    import std.traits;
-
-    uint count;
-
-    static if(is(ReturnType!func == void))
-        func(obj, &count, null);
-    else
-        func(obj, &count, null).vkCheck;
-
-    enum len = Parameters!func.length;
-    alias Tptr = Parameters!func[len-1];
-
-    PointerTarget!Tptr[] ret;
-
-    if(count > 0)
-    {
-        ret.length = count;
-
-        static if(is(ReturnType!func == void))
-            func(obj, &count, ret.ptr);
-        else
-            func(obj, &count, ret.ptr).vkCheck;
-    }
-
-    return ret;
-}
 
 class FlightRecorder(TBackend)
 {

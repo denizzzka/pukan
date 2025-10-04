@@ -1,9 +1,18 @@
 module pukan.vulkan.helpers;
 
+import pukan.exceptions: PukanExceptionWithCode;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 public import pukan.vulkan.stype_list: ResultType, getCreateInfoStructureType;
 import std.traits: PointerTarget;
+
+auto vkCheck(VkResult ret, string err_descr = __FUNCTION__, string file = __FILE__, size_t line = __LINE__)
+{
+    if(ret != VkResult.VK_SUCCESS)
+        throw new PukanExceptionWithCode(ret, err_descr, file, line);
+
+    return ret;
+}
 
 private mixin template PrepareSettings(T...)
 {
@@ -130,4 +139,34 @@ class VkObj(T...)
 auto create(T...)(T s)
 {
     return new VkObj!T(s);
+}
+
+/// Special helper to fetch values using methods like vkEnumeratePhysicalDevices
+auto getArrayFrom(alias func, T...)(T obj)
+{
+    import std.traits;
+
+    uint count;
+
+    static if(is(ReturnType!func == void))
+        func(obj, &count, null);
+    else
+        func(obj, &count, null).vkCheck;
+
+    enum len = Parameters!func.length;
+    alias Tptr = Parameters!func[len-1];
+
+    PointerTarget!Tptr[] ret;
+
+    if(count > 0)
+    {
+        ret.length = count;
+
+        static if(is(ReturnType!func == void))
+            func(obj, &count, ret.ptr);
+        else
+            func(obj, &count, ret.ptr).vkCheck;
+    }
+
+    return ret;
 }
