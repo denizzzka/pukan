@@ -94,6 +94,7 @@ void main() {
     auto physDevice = vk.findSuitablePhysicalDevice;
     //~ debug
     //~ {
+        //~ writeln("");
         //~ writeln("Device supported extensions:");
         //~ foreach(s; physDevice.extensions)
             //~ s.extensionName.to!string.writeln;

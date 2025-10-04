@@ -4,16 +4,19 @@ import dlib.math;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.exceptions;
-import std.file: read;
 import std.exception: enforce;
 
+///
 class ShaderModule
 {
     LogicalDevice device;
     VkShaderModule shaderModule;
 
+    //TODO: remove?
     this(LogicalDevice dev, string filename)
     {
+        import std.file: read;
+
         auto code = cast(ubyte[]) read(filename);
 
         enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
@@ -21,7 +24,7 @@ class ShaderModule
         this(dev, code);
     }
 
-    this(LogicalDevice dev, ubyte[] sprivCode)
+    this(LogicalDevice dev, ubyte[] sprivCode) // TODO: rename to sprivBinary
     in(sprivCode.length % 4 == 0)
     {
         device = dev;
@@ -39,79 +42,6 @@ class ShaderModule
     ~this()
     {
         if(device && shaderModule)
-            vkDestroyShaderModule(device.device, shaderModule, device.alloc);
-    }
-
-    auto createShaderStageInfo(VkShaderStageFlagBits stage)
-    {
-        VkPipelineShaderStageCreateInfo cinf = {
-            sType: VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            stage: stage,
-            pName: "main", // shader entry point
-        };
-
-        __traits(getMember, cinf, "module") = shaderModule;
-
-        return cinf;
-    }
-}
-
-class CompilableShaderModule
-{
-    LogicalDevice device;
-    VkShaderModule shaderModule;
-    VkShaderEXT ext; /// Used by VK_EXT_shader_object
-    private void[] data;
-
-    this(LogicalDevice dev, string filename)
-    {
-        device = dev;
-
-        data = read(filename);
-
-        enforce!PukanException(data.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
-
-        const code = cast(uint[]) data;
-
-        VkShaderModuleCreateInfo cinf = {
-            sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            codeSize: data.length,
-            pCode: code.ptr,
-        };
-
-        vkCreateShaderModule(dev.device, &cinf, dev.alloc, &shaderModule).vkCheck;
-    }
-
-    /// VK_EXT_shader_object extension
-    void compileShader(VkShaderStageFlagBits stage)
-    {
-        auto vkCreateShadersEXT = cast(PFN_vkCreateShadersEXT) vkGetInstanceProcAddr(device.physicalDevice.instance.instance, "vkCreateShadersEXT");
-
-        const code = cast(uint[]) data;
-
-        VkShaderCreateInfoEXT createInfoEXT = {
-            sType: VK_STRUCTURE_TYPE_SHADER_CREATE_INFO_EXT,
-            codeType: VK_SHADER_CODE_TYPE_SPIRV_EXT,
-            codeSize: data.length,
-            pCode: code.ptr,
-            pName: "main",
-            stage: stage,
-        };
-
-        vkCreateShadersEXT(device, 1, &createInfoEXT, device.alloc, &ext).vkCheck;
-    }
-
-    ~this()
-    {
-        assert(device.device);
-
-        if(ext)
-        {
-            auto vkDestroyShaderEXT = cast(PFN_vkDestroyShaderEXT) vkGetInstanceProcAddr(device.physicalDevice.instance.instance, "vkDestroyShaderEXT");
-            vkDestroyShaderEXT(device, ext, device.alloc);
-        }
-
-        if(shaderModule)
             vkDestroyShaderModule(device.device, shaderModule, device.alloc);
     }
 
