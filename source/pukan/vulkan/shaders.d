@@ -24,16 +24,15 @@ class ShaderModule
         this(dev, code);
     }
 
-    this(LogicalDevice dev, ubyte[] sprivCode) // TODO: rename to sprivBinary
-    in(sprivCode.length % 4 == 0)
+    this(LogicalDevice dev, ubyte[] sprivBinary)
+    in(sprivBinary.length % 4 == 0)
     {
         device = dev;
-        const code = cast(uint[]) sprivCode;
 
         VkShaderModuleCreateInfo cinf = {
             sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            codeSize: sprivCode.length,
-            pCode: code.ptr,
+            codeSize: sprivBinary.length,
+            pCode: cast(uint*) sprivBinary.ptr,
         };
 
         vkCreateShaderModule(dev.device, &cinf, dev.alloc, &shaderModule).vkCheck;
