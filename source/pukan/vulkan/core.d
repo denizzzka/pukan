@@ -166,7 +166,10 @@ class Instance
     auto findSuitablePhysicalDevice()
     {
         if(devices.length > 0)
-            return new PhysicalDevice(this, devices[0]);
+        {
+            const idx = 0;
+            return new PhysicalDevice(this, devices[idx], idx);
+        }
 
         throw new PukanException("appropriate device not found");
     }
@@ -180,15 +183,15 @@ class Instance
     /// Throw exception if extension is not supported
     void checkExtensionSupportedEx(in char* extensionName, string file = __FILE__, size_t line = __LINE__)
     {
-        const toFind = extensionName.to!string;
+        import core.stdc.string: strcmp;
 
         foreach(e; extensions)
         {
-            if(e.extensionName.to!string == extensionName.to!string)
+            if(strcmp(&e.extensionName[0], extensionName) == 0)
                 return;
         }
 
-        throw new PukanException("Extension "~toFind~" is not supported by Vulkan instance");
+        throw new PukanException("Extension "~extensionName.to!string~" is not supported by Vulkan instance", file, line);
     }
 }
 

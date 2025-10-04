@@ -6,18 +6,21 @@ import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
 import pukan: toPrettyString;
+import std.conv: to;
 
 ///
 class PhysicalDevice
 {
     Instance instance;
     package VkPhysicalDevice physicalDevice;
+    /* TODO: "debug" */ private size_t devIdx;
 
     ///
-    this(Instance inst, VkPhysicalDevice dev)
+    this(Instance inst, VkPhysicalDevice dev, size_t idx)
     {
         instance = inst;
         physicalDevice = dev;
+        devIdx = idx;
     }
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
@@ -94,5 +97,19 @@ class PhysicalDevice
     VkExtensionProperties[] extensions(const(char*) layerName = null)
     {
         return getArrayFrom!vkEnumerateDeviceExtensionProperties(physicalDevice, layerName);
+    }
+
+    /// Throw exception if extension is not supported
+    void checkExtensionSupportedEx(in char* extensionName, string file = __FILE__, size_t line = __LINE__)
+    {
+        import core.stdc.string: strcmp;
+
+        foreach(e; extensions)
+        {
+            if(strcmp(&e.extensionName[0], extensionName) == 0)
+                return;
+        }
+
+        throw new PukanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
     }
 }
