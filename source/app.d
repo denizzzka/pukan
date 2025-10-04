@@ -1,4 +1,5 @@
 import pukan;
+import pukan.vulkan.bindings;
 import glfw3.api;
 import std.conv: to;
 import std.datetime.stopwatch;
@@ -45,7 +46,6 @@ void main() {
     version(none)
     {
         // Additional "heuristic": someday we'll refuse to give up on glfw
-        import pukan.vulkan.bindings;
 
         extension_list ~= VK_KHR_SURFACE_EXTENSION_NAME.ptr;
         const(char)* surfaceName;
@@ -84,7 +84,15 @@ void main() {
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
-    auto device = vk.createLogicalDevice();
+    auto physDevice = vk.physDevice;
+
+    const(char*)[] dev_extension_list = [
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
+        VK_EXT_SHADER_OBJECT_EXTENSION_NAME.ptr,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME.ptr,
+    ];
+
+    auto device =  physDevice.createLogicalDevice(dev_extension_list);
     scope(exit)
     {
         import core.memory: GC;

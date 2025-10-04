@@ -152,6 +152,7 @@ class Instance
     //TODO: remove, devices should be selectable
     auto physDevice() => new PhysicalDevice(this, devices[0]);
 
+    //TODO: remove
     immutable deviceIdx = 0;
 
     auto findSuitablePhysicalDevice()
@@ -183,22 +184,6 @@ class Instance
         }
 
         return apprIndices;
-    }
-
-    auto createLogicalDevice()
-    {
-        enforce(devices.length > 0, "no devices found");
-
-        auto phys = new PhysicalDevice(this, devices[0]);
-
-        //TODO: get extension_list from arguments
-        const(char*)[] extension_list = [
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
-            VK_EXT_SHADER_OBJECT_EXTENSION_NAME.ptr,
-            VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME.ptr,
-        ];
-
-        return phys.createLogicalDevice(extension_list);
     }
 }
 
