@@ -11,6 +11,55 @@ class ShaderModule
 {
     LogicalDevice device;
     VkShaderModule shaderModule;
+
+    this(LogicalDevice dev, string filename)
+    {
+        auto code = cast(ubyte[]) read(filename);
+
+        enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
+
+        this(dev, code);
+    }
+
+    this(LogicalDevice dev, ubyte[] sprivCode)
+    in(sprivCode.length % 4 == 0)
+    {
+        device = dev;
+        const code = cast(uint[]) sprivCode;
+
+        VkShaderModuleCreateInfo cinf = {
+            sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            codeSize: sprivCode.length,
+            pCode: code.ptr,
+        };
+
+        vkCreateShaderModule(dev.device, &cinf, dev.backend.allocator, &shaderModule).vkCheck;
+    }
+
+    ~this()
+    {
+        if(device && shaderModule)
+            vkDestroyShaderModule(device.device, shaderModule, device.backend.allocator);
+    }
+
+    auto createShaderStageInfo(VkShaderStageFlagBits stage)
+    {
+        VkPipelineShaderStageCreateInfo cinf = {
+            sType: VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            stage: stage,
+            pName: "main", // shader entry point
+        };
+
+        __traits(getMember, cinf, "module") = shaderModule;
+
+        return cinf;
+    }
+}
+
+class CompilableShaderModule
+{
+    LogicalDevice device;
+    VkShaderModule shaderModule;
     VkShaderEXT ext; /// Used by VK_EXT_shader_object
     private void[] data;
 
