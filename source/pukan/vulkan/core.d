@@ -149,6 +149,17 @@ class Instance
         return d;
     }
 
+    /**
+        When layerName parameter is null, only extensions provided by the
+        Vulkan implementation or by implicitly enabled layers are returned.
+        When layerName is the name of a layer, the instance extensions
+        provided by that layer are returned.
+    */
+    VkExtensionProperties[] extensions(const(char*) layerName = null)
+    {
+        return getArrayFrom!vkEnumerateInstanceExtensionProperties(layerName);
+    }
+
     //TODO: remove or add heuristics
     ///
     auto findSuitablePhysicalDevice()

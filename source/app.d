@@ -81,10 +81,23 @@ void main() {
     auto vk = new Instance(name, makeApiVersion(1,2,3,4), extension_list);
     scope(exit) destroy(vk);
 
+    debug
+    {
+        writeln("Vulkan instance supported extensions:");
+        foreach(s; vk.extensions)
+            s.extensionName.to!string.writeln;
+    }
+
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
     auto physDevice = vk.findSuitablePhysicalDevice;
+    //~ debug
+    //~ {
+        //~ writeln("Device supported extensions:");
+        //~ foreach(s; physDevice.extensions)
+            //~ s.extensionName.to!string.writeln;
+    //~ }
 
     const(char*)[] dev_extension_list = [
         VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
