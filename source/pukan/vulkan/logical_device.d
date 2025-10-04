@@ -56,6 +56,29 @@ class LogicalDevice
             pNext: &shaderObjectFeatures,
         };
 
+        debug
+        {
+            import std.algorithm;
+            import std.array;
+            import std.conv: to;
+
+            const avail_on_dflt_layer = pd.extensions
+                .map!((e) => e.extensionName.ptr.to!string)
+                .array;
+
+            const need = extension_list
+                .map!((e) => e.to!string)
+                .array;
+
+            foreach(e; need)
+            {
+                const ext = e.to!string;
+
+                if(!avail_on_dflt_layer.canFind(e))
+                    Instance.log_info(">>> Necessary extension "~ext~" not supported!");
+            }
+        }
+
         vkCreateDevice(pd.physicalDevice, &createInfo, alloc, &device).vkCheck;
     }
 

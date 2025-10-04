@@ -81,12 +81,12 @@ void main() {
     auto vk = new Instance(name, makeApiVersion(1,2,3,4), extension_list);
     scope(exit) destroy(vk);
 
-    debug
-    {
-        writeln("Vulkan instance supported extensions:");
-        foreach(s; vk.extensions)
-            s.extensionName.to!string.writeln;
-    }
+    //~ debug
+    //~ {
+        //~ writeln("Vulkan instance supported extensions:");
+        //~ foreach(s; vk.extensions)
+            //~ s.extensionName.to!string.writeln;
+    //~ }
 
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
