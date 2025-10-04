@@ -72,10 +72,8 @@ class LogicalDevice
 
             foreach(e; need)
             {
-                const ext = e.to!string;
-
                 if(!avail_on_dflt_layer.canFind(e))
-                    Instance.log_info(">>> Necessary extension "~ext~" not supported!");
+                    Instance.log_info(">>> Necessary extension "~e~" not supported!");
             }
         }
 
