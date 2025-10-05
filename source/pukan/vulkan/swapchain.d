@@ -14,7 +14,7 @@ class SwapChain
     VkFormat imageFormat;
     VkExtent2D imageExtent;
     enum maxFramesInFlight = 3;
-    Frame[] frames; //TODO: rename to frameBuffers
+    Frame[] frames;
     int currentFrameIdx;
 
     private ubyte framesSinceSwapchainReplacement = 0;
