@@ -104,7 +104,7 @@ class Scene
         dg(frame);
 
         {
-            frameBuilder.queueSubmit(frame);
+            frameBuilder.placeDrawnFrameToGraphicsQueue(frame);
 
             auto ret = swapChain.queueImageForPresentation(frame, imageIndex);
 

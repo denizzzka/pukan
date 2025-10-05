@@ -32,8 +32,8 @@ class FrameBuilder
         destroy(uniformBuffer);
     }
 
-    /// Submit frame after draw
-    void queueSubmit(Frame frame)
+    ///
+    void placeDrawnFrameToGraphicsQueue(Frame frame)
     {
         auto sync = frame.syncPrimitives;
 
