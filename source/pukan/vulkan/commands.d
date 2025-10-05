@@ -93,6 +93,11 @@ class CommandPool
             pCommandBuffers: commandBuffers.ptr,
         };
 
+        submit(submitInfo);
+    }
+
+    void submit(ref VkSubmitInfo submitInfo)
+    {
         auto fence = device.createFence;
         scope(exit) destroy(fence);
 
