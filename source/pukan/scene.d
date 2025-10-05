@@ -39,50 +39,36 @@ class Scene
         device.physicalDevice.instance.useSurface(surface);
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
-        scope(failure) destroy(renderPass);
-
         commandPool = device.createCommandPool();
-        scope(failure) destroy(commandPool);
-
         frameBuilder = device.create!FrameBuilder;
-        scope(failure) destroy(frameBuilder);
-
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
-        scope(failure) destroy(swapChain);
-
         vertShader = device.create!ShaderModule("vert.spv");
-        scope(failure) destroy(vertShader);
-
         fragShader = device.create!ShaderModule("frag.spv");
-        scope(failure) destroy(fragShader);
 
         shaderStages = [
             vertShader.createShaderStageInfo(VK_SHADER_STAGE_VERTEX_BIT),
             fragShader.createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT),
         ];
 
-        // Not used, just for testing:
-        //TODO: fix compilation
-        //~ vertShader.compileShader(VK_SHADER_STAGE_VERTEX_BIT);
-        //~ fragShader.compileShader(VK_SHADER_STAGE_FRAGMENT_BIT);
-
         descriptorPool = device.create!DescriptorPool(descriptorSetLayoutBindings);
-        scope(failure) destroy(descriptorPool);
-
         pipelineInfoCreator = new DefaultPipelineInfoCreator(device, descriptorPool.descriptorSetLayout, shaderStages);
-        scope(failure) destroy(pipelineInfoCreator);
-
         VkGraphicsPipelineCreateInfo[] infos = [pipelineInfoCreator.pipelineCreateInfo];
-
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
-        scope(failure) destroy(graphicsPipelines);
 
         descriptorSets = descriptorPool.allocateDescriptorSets([descriptorPool.descriptorSetLayout]);
     }
 
     ~this()
     {
-        destroy(swapChain);
+        destr(graphicsPipelines);
+        destr(pipelineInfoCreator);
+        destr(descriptorPool);
+        destr(fragShader);
+        destr(vertShader);
+        destr(swapChain);
+        destr(frameBuilder);
+        destr(commandPool);
+        destr(renderPass);
     }
 
     void recreateSwapChain()
