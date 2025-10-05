@@ -71,19 +71,6 @@ class CommandPool
         vkFreeCommandBuffers(device, commandPool, cast(uint) buffs.length, &buffs[0]);
     }
 
-    void recordCommands(VkCommandBufferBeginInfo beginInfo, VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
-    {
-        vkBeginCommandBuffer(buf, &beginInfo).vkCheck;
-        dg(buf);
-        vkEndCommandBuffer(buf).vkCheck("failed to record command buffer");
-    }
-
-    void recordOneTime(VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
-    {
-        auto cinf = defaultOneTimeBufferBeginInfo;
-        recordCommands(cinf, buf, dg);
-    }
-
     void recordOneTimeAndSubmit(VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
     {
         recordOneTime(buf, dg);
@@ -110,4 +97,17 @@ class CommandPool
         vkQueueSubmit(device.getQueue(), 1, &submitInfo, fence).vkCheck;
         vkWaitForFences(device.device, 1, &fence.fence, VK_TRUE, uint.max).vkCheck;
     }
+}
+
+void recordCommands(VkCommandBufferBeginInfo beginInfo, VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
+{
+    vkBeginCommandBuffer(buf, &beginInfo).vkCheck;
+    dg(buf);
+    vkEndCommandBuffer(buf).vkCheck("failed to record command buffer");
+}
+
+void recordOneTime(VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
+{
+    auto cinf = CommandPool.defaultOneTimeBufferBeginInfo;
+    recordCommands(cinf, buf, dg);
 }
