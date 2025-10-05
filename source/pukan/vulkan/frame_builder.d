@@ -11,7 +11,7 @@ class FrameBuilder
     LogicalDevice device;
     private Queue graphicsQueue;
     TransferBuffer uniformBuffer;
-    /* TODO:private */ CommandPool commandPool; //ditto
+    /* TODO:private */ CommandPool commandPool;
 
     this(LogicalDevice dev)
     {
