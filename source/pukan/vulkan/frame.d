@@ -32,6 +32,7 @@ class FrameBuilder
 
     ~this()
     {
+        destroy(commandPool);
         destroy(uniformBuffer);
     }
 

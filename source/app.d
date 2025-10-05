@@ -193,7 +193,8 @@ void main() {
     scope(exit) destroy(indicesBuffer);
 
     // Using any (first) buffer as buffer for initial loading
-    auto initBuf = &frameBuilder.commandBuffer;
+    //TODO: destory buffer after use
+    auto initBuf = &frameBuilder.commandPool.allocateBuffers(1)[0];
 
     // Copy vertices to mapped memory
     vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
