@@ -111,7 +111,7 @@ class SwapChain
         currentFrameIdx = (currentFrameIdx + 1) % maxFramesInFlight;
     }
 
-    //TODO: rename to acquireNextImageIndex?
+    /// imageIndex result is "random" index value, not related to currentFrameIdx
     VkResult acquireNextImage(out uint imageIndex)
     {
         return vkAcquireNextImageKHR(device, swapchain, ulong.max /* timeout */, currSync.imageAvailable, null /* fence */, &imageIndex);
