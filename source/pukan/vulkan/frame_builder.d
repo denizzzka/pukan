@@ -6,6 +6,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;
 
+// This class should gradually become shared thread-safe
 class FrameBuilder
 {
     LogicalDevice device;
