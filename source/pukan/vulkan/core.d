@@ -195,9 +195,6 @@ class Instance
     }
 }
 
-//TODO: remove or rename Instance to appropriate name
-alias Backend = Instance;
-
 class FlightRecorder(TBackend)
 {
     TBackend backend;
