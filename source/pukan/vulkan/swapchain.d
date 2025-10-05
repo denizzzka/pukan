@@ -15,7 +15,6 @@ class SwapChain
     VkExtent2D imageExtent;
     enum maxFramesInFlight = 3;
     Frame[] frames; //TODO: rename to frameBuffers
-    SyncFramesInFlight[maxFramesInFlight] syncPrimitives;
     int currentFrameIdx;
 
     private ubyte framesSinceSwapchainReplacement = 0;
@@ -85,17 +84,11 @@ class SwapChain
         frames.length = images.length;
 
         foreach(i, ref frame; frames)
-            frame = new Frame(device, images[i], imageExtent, imageFormat, renderPass);
-
-        foreach(i, ref s; syncPrimitives)
-            s = new SyncFramesInFlight(frameBuilder);
+            frame = new Frame(frameBuilder, images[i], imageExtent, imageFormat, renderPass);
     }
 
     ~this()
     {
-        foreach(ref s; syncPrimitives)
-            destroy(s);
-
         foreach(ref frame; frames)
             destroy(frame);
 
@@ -105,9 +98,10 @@ class SwapChain
             vkDestroySwapchainKHR(device.device, swapchain, device.alloc);
     }
 
+    //TODO: remove?
     auto ref currSync()
     {
-        return syncPrimitives[currentFrameIdx];
+        return frames[currentFrameIdx].syncPrimitives;
     }
 
     void toNextFrame()

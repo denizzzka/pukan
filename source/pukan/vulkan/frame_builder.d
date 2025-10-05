@@ -87,10 +87,12 @@ class Frame
     VkImageView imageView;
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
+    SyncFramesInFlight syncPrimitives;
 
-    this(LogicalDevice dev, VkImage image, VkExtent2D imageExtent, VkFormat imageFormat, VkRenderPass renderPass)
+    this(FrameBuilder fb, VkImage image, VkExtent2D imageExtent, VkFormat imageFormat, VkRenderPass renderPass)
     {
-        device = dev;
+        device = fb.device;
+        syncPrimitives = new SyncFramesInFlight(fb);
 
         createImageView(imageView, device, imageFormat, image);
         depthBuf = DepthBuf(device, imageExtent);
@@ -117,6 +119,9 @@ class Frame
 
     ~this()
     {
+        if(syncPrimitives)
+            destroy(syncPrimitives);
+
         if(frameBuffer)
             vkDestroyFramebuffer(device, frameBuffer, device.alloc);
 
