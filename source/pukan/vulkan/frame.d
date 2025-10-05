@@ -44,14 +44,14 @@ class FrameBuilder
 
             pWaitDstStageMask: &waitStages,
 
-            waitSemaphoreCount: cast(uint) sync.waitSemaphores.length,
-            pWaitSemaphores: sync.waitSemaphores.ptr,
+            waitSemaphoreCount: cast(uint) sync.imageAvailableSemaphores.length,
+            pWaitSemaphores: sync.imageAvailableSemaphores.ptr,
 
             commandBufferCount: 1,
             pCommandBuffers: &sync.commandBuf,
 
-            signalSemaphoreCount: cast(uint) sync.signalSemaphores.length,
-            pSignalSemaphores: sync.signalSemaphores.ptr,
+            signalSemaphoreCount: cast(uint) sync.renderFinishedSemaphores.length,
+            pSignalSemaphores: sync.renderFinishedSemaphores.ptr,
         };
 
         commandsQueue.syncSubmit(submitInfo);
@@ -68,8 +68,8 @@ class FrameBuilder
 
             pImageIndices: &imageIndex,
 
-            waitSemaphoreCount: cast(uint) sync.signalSemaphores.length,
-            pWaitSemaphores: sync.signalSemaphores.ptr,
+            waitSemaphoreCount: cast(uint) sync.renderFinishedSemaphores.length,
+            pWaitSemaphores: sync.renderFinishedSemaphores.ptr,
 
             swapchainCount: cast(uint) swapChains.length,
             pSwapchains: swapChains.ptr,

@@ -152,8 +152,8 @@ class SyncFramesInFlight
     Semaphore imageAvailable;
     Semaphore renderFinished;
 
-    VkSemaphore[] waitSemaphores;
-    VkSemaphore[] signalSemaphores;
+    VkSemaphore[] imageAvailableSemaphores;
+    VkSemaphore[] renderFinishedSemaphores;
 
     VkCommandBuffer commandBuf;
 
@@ -164,7 +164,7 @@ class SyncFramesInFlight
         imageAvailable = device.create!Semaphore;
         renderFinished = device.create!Semaphore;
 
-        waitSemaphores = [imageAvailable.semaphore];
-        signalSemaphores = [renderFinished.semaphore];
+        imageAvailableSemaphores = [imageAvailable.semaphore];
+        renderFinishedSemaphores = [renderFinished.semaphore];
     }
 }
