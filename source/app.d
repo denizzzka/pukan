@@ -180,7 +180,6 @@ void main() {
     scope(exit) destroy(scene);
 
     //FIXME: remove refs
-    auto swapChain = &scene.swapChain;
     auto frameBuilder = &scene.frameBuilder;
     //~ ref pipelineInfoCreator = scene.pipelineInfoCreator;
     //~ ref graphicsPipelines = scene.graphicsPipelines;
@@ -193,7 +192,7 @@ void main() {
     scope(exit) destroy(indicesBuffer);
 
     // Using any (first) buffer as buffer for initial loading
-    auto initBuf = &swapChain.frames[0].commandBuffer;
+    auto initBuf = &scene.swapChain.frames[0].commandBuffer;
 
     // Copy vertices to mapped memory
     vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
@@ -254,14 +253,14 @@ void main() {
         glfwPollEvents();
 
         scene.drawNextFrame((cur) {
-            updateUniformBuffer(frameBuilder, sw, swapChain.imageExtent);
+            updateUniformBuffer(frameBuilder, sw, scene.swapChain.imageExtent);
 
-            swapChain.recToCurrOneTimeBuffer(
+            scene.swapChain.recToCurrOneTimeBuffer(
                 (commandBuffer) {
                     frameBuilder.uniformBuffer.recordUpload(commandBuffer);
 
                     scene.renderPass.updateData(scene.renderPass.VariableData(
-                        swapChain.imageExtent,
+                        scene.swapChain.imageExtent,
                         cur.frameBuffer,
                         vertexBuffer.gpuBuffer.buf,
                         indicesBuffer.gpuBuffer.buf,
@@ -283,7 +282,7 @@ void main() {
             static size_t fps;
 
             frameNum++;
-            writeln("FPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", swapChain.currentFrameIdx);
+            writeln("FPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx);
 
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
