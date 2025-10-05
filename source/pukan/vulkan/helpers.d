@@ -183,3 +183,16 @@ void destr(T)(ref T obj)
     if(obj !is null)
         destroy(obj);
 }
+
+/// Print current stack trace
+void printStackTrace()
+{
+    import core.runtime;
+
+    scope trace = defaultTraceHandler(null);
+
+    foreach (line; trace)
+        Instance.log_info(line);
+
+    defaultTraceDeallocator(trace);
+}
