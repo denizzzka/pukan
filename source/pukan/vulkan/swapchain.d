@@ -145,11 +145,12 @@ class SwapChain
 
     void oldSwapchainsMaintenance()
     {
-        enum framesToOldSwapchainsDestory = 30;
+        // To ensure that all buffers and queues are no longer in use
+        enum framesToOldSwapchainsDestroy = 30;
 
         if(oldSwapChain !is null)
         {
-            if(framesSinceSwapchainReplacement < framesToOldSwapchainsDestory)
+            if(framesSinceSwapchainReplacement < framesToOldSwapchainsDestroy)
                 framesSinceSwapchainReplacement++;
             else
             {
