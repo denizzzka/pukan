@@ -252,26 +252,29 @@ void main() {
     {
         glfwPollEvents();
 
-        scene.drawNextFrame((cur) {
+        scene.drawNextFrame((ref Frame currFrame) {
+            // Applies motion to objects in the scene
             updateUniformBuffer(frameBuilder, sw, scene.swapChain.imageExtent);
 
-            scene.swapChain.recToCurrOneTimeBuffer(
-                (commandBuffer) {
-                    frameBuilder.uniformBuffer.recordUpload(commandBuffer);
+            auto cb = currFrame.commandBuffer;
 
-                    scene.renderPass.updateData(scene.renderPass.VariableData(
-                        scene.swapChain.imageExtent,
-                        cur.frameBuffer,
-                        vertexBuffer.gpuBuffer.buf,
-                        indicesBuffer.gpuBuffer.buf,
-                        *descriptorSets,
-                        scene.pipelineInfoCreator.pipelineLayout,
-                        scene.graphicsPipelines.pipelines[0]
-                    ));
+            cb.beginOneTimeCommandBuffer;
 
-                    scene.renderPass.recordCommandBuffer(commandBuffer);
-                }
-            );
+            frameBuilder.uniformBuffer.recordUpload(cb);
+
+            scene.renderPass.updateData(scene.renderPass.VariableData(
+                scene.swapChain.imageExtent,
+                currFrame.frameBuffer,
+                vertexBuffer.gpuBuffer.buf,
+                indicesBuffer.gpuBuffer.buf,
+                *descriptorSets,
+                scene.pipelineInfoCreator.pipelineLayout,
+                scene.graphicsPipelines.pipelines[0]
+            ));
+
+            scene.renderPass.recordCommandBuffer(cb);
+
+            cb.endCommandBuffer;
         });
 
         {

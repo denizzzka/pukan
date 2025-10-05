@@ -160,9 +160,4 @@ class SwapChain
             }
         }
     }
-
-    void recToCurrOneTimeBuffer(void delegate(VkCommandBuffer) dg)
-    {
-        recordOneTime(currFrame.commandBuffer, dg);
-    }
 }
