@@ -44,14 +44,15 @@ class Scene
         commandPool = device.createCommandPool();
         scope(failure) destroy(commandPool);
 
-        swapChain = new SwapChain(device, commandPool, surface, renderPass, null);
-        scope(failure) destroy(swapChain);
-
+        //TODO: move to FrameBuilder?
         graphicsQueue = device.getQueue();
         presentQueue = device.getQueue();
 
         frameBuilder = device.create!FrameBuilder(graphicsQueue, presentQueue);
         scope(failure) destroy(frameBuilder);
+
+        swapChain = new SwapChain(device, commandPool, surface, renderPass, null);
+        scope(failure) destroy(swapChain);
 
         vertShader = device.create!ShaderModule("vert.spv");
         scope(failure) destroy(vertShader);
