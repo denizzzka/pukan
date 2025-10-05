@@ -35,9 +35,9 @@ class FrameBuilder
     }
 
     //TODO: move to swapchain?
-    void queueSubmit(SwapChain swapChain)
+    void queueSubmit(Frame frame)
     {
-        auto sync = swapChain.currSync;
+        auto sync = frame.syncPrimitives;
 
         auto waitStages = cast(uint) VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 

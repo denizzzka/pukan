@@ -117,10 +117,12 @@ class Scene
             }
         }
 
-        dg(swapChain.frames[imageIndex]);
+        auto frame = swapChain.frames[imageIndex];
+
+        dg(frame);
 
         {
-            frameBuilder.queueSubmit(swapChain);
+            frameBuilder.queueSubmit(frame);
 
             auto ret = frameBuilder.queueImageForPresentation(swapChain, imageIndex);
 
