@@ -51,7 +51,7 @@ class Scene
         frameBuilder = device.create!FrameBuilder(graphicsQueue, presentQueue);
         scope(failure) destroy(frameBuilder);
 
-        swapChain = new SwapChain(device, commandPool, surface, renderPass, null);
+        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
         scope(failure) destroy(swapChain);
 
         vertShader = device.create!ShaderModule("vert.spv");
@@ -91,7 +91,7 @@ class Scene
 
     void recreateSwapChain()
     {
-        swapChain = new SwapChain(device, commandPool, surface, renderPass, swapChain);
+        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain);
     }
 
     void drawNextFrame(void delegate(ref Frame frame) dg)

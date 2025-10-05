@@ -9,7 +9,7 @@ class SwapChain
     LogicalDevice device;
     VkSwapchainKHR swapchain;
     SwapChain oldSwapChain;
-    CommandPool commandPool;
+    FrameBuilder frameBuilder;
     VkImage[] images;
     VkFormat imageFormat;
     VkExtent2D imageExtent;
@@ -20,17 +20,20 @@ class SwapChain
 
     private ubyte framesSinceSwapchainReplacement = 0;
 
-    this(LogicalDevice device, CommandPool cPool, VkSurfaceKHR surface, RenderPass renderPass, SwapChain old)
+    //FIXME: remove
+    CommandPool commandPool() => frameBuilder.commandPool;
+
+    this(LogicalDevice device, FrameBuilder fb, VkSurfaceKHR surface, RenderPass renderPass, SwapChain old)
     {
         auto ins = device.physicalDevice.instance;
 
         auto physDev = ins.findSuitablePhysicalDevice;
         const capab = ins.getSurfaceCapabilities(physDev.physicalDevice, surface);
 
-        this(device, cPool, capab, renderPass, old);
+        this(device, fb, capab, renderPass, old);
     }
 
-    this(LogicalDevice device, CommandPool cPool, VkSurfaceCapabilitiesKHR capabilities, RenderPass renderPass, SwapChain old)
+    this(LogicalDevice device, FrameBuilder fb, VkSurfaceCapabilitiesKHR capabilities, RenderPass renderPass, SwapChain old)
     {
         import std.conv: to;
 
@@ -57,13 +60,13 @@ class SwapChain
             oldSwapchain: (old is null) ? null : old.swapchain,
         };
 
-        this(device, cPool, cinf, renderPass, old);
+        this(device, fb, cinf, renderPass, old);
     }
 
-    this(LogicalDevice d, CommandPool cPool, VkSwapchainCreateInfoKHR cinf, RenderPass renderPass, SwapChain old)
+    this(LogicalDevice d, FrameBuilder fb, VkSwapchainCreateInfoKHR cinf, RenderPass renderPass, SwapChain old)
     {
         device = d;
-        commandPool = cPool;
+        frameBuilder = fb;
         oldSwapChain = old;
         imageFormat = cinf.imageFormat;
         imageExtent = cinf.imageExtent;
@@ -155,6 +158,7 @@ class SyncFramesInFlight
     VkSemaphore[] imageAvailableSemaphores;
     VkSemaphore[] renderFinishedSemaphores;
 
+    //TODO: remove
     VkCommandBuffer commandBuf;
 
     this(LogicalDevice device, VkCommandBuffer cb)
