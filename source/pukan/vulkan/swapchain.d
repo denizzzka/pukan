@@ -100,8 +100,7 @@ class SwapChain
             vkDestroySwapchainKHR(device.device, swapchain, device.alloc);
     }
 
-    //TODO: remove?
-    auto ref currSync()
+    private auto ref currSync()
     {
         return frames[currentFrameIdx].syncPrimitives;
     }
