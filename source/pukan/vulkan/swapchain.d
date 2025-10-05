@@ -142,27 +142,3 @@ class SwapChain
         frameBuilder.commandPool.recordOneTime(currSync.commandBuf, dg);
     }
 }
-
-//TODO: struct?
-//TODO: move to frame module?
-class SyncFramesInFlight
-{
-    Semaphore imageAvailable;
-    Semaphore renderFinished;
-
-    VkSemaphore[] imageAvailableSemaphores;
-    VkSemaphore[] renderFinishedSemaphores;
-
-    VkCommandBuffer commandBuf;
-
-    this(LogicalDevice device, FrameBuilder frameBuilder)
-    {
-        commandBuf = frameBuilder.commandPool.allocateBuffers(1)[0];
-
-        imageAvailable = device.create!Semaphore;
-        renderFinished = device.create!Semaphore;
-
-        imageAvailableSemaphores = [imageAvailable.semaphore];
-        renderFinishedSemaphores = [renderFinished.semaphore];
-    }
-}

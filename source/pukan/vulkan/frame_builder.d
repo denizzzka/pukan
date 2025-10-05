@@ -125,6 +125,29 @@ class Frame
     }
 }
 
+//TODO: struct?
+class SyncFramesInFlight
+{
+    Semaphore imageAvailable;
+    Semaphore renderFinished;
+
+    VkSemaphore[] imageAvailableSemaphores;
+    VkSemaphore[] renderFinishedSemaphores;
+
+    VkCommandBuffer commandBuf;
+
+    this(LogicalDevice device, FrameBuilder frameBuilder)
+    {
+        commandBuf = frameBuilder.commandPool.allocateBuffers(1)[0];
+
+        imageAvailable = device.create!Semaphore;
+        renderFinished = device.create!Semaphore;
+
+        imageAvailableSemaphores = [imageAvailable.semaphore];
+        renderFinishedSemaphores = [renderFinished.semaphore];
+    }
+}
+
 void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat imageFormat, VkImage image)
 {
     VkImageViewCreateInfo cinf = {
