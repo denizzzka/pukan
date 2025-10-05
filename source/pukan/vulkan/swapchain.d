@@ -20,9 +20,6 @@ class SwapChain
 
     private ubyte framesSinceSwapchainReplacement = 0;
 
-    //FIXME: remove
-    CommandPool commandPool() => frameBuilder.commandPool;
-
     this(LogicalDevice device, FrameBuilder fb, VkSurfaceKHR surface, RenderPass renderPass, SwapChain old)
     {
         auto ins = device.physicalDevice.instance;
@@ -90,7 +87,7 @@ class SwapChain
         foreach(i, ref frame; frames)
             frame = new Frame(device, images[i], imageExtent, imageFormat, renderPass);
 
-        auto commandBuffers = commandPool.allocateBuffers(syncPrimitives.length);
+        auto commandBuffers = frameBuilder.commandPool.allocateBuffers(syncPrimitives.length);
 
         foreach(i, ref s; syncPrimitives)
             s = new SyncFramesInFlight(device, commandBuffers[i]);
@@ -144,7 +141,7 @@ class SwapChain
 
     void recToCurrOneTimeBuffer(void delegate(VkCommandBuffer) dg)
     {
-        commandPool.recordOneTime(currSync.commandBuf, dg);
+        frameBuilder.commandPool.recordOneTime(currSync.commandBuf, dg);
     }
 }
 

@@ -193,16 +193,16 @@ void main() {
     scope(exit) destroy(indicesBuffer);
 
     // Using any (first) buffer as buffer for initial loading
-    auto initBuf = &swapChain.currSync.commandBuf;
+    auto initBuf = &frameBuilder.commandBuffer;
 
     // Copy vertices to mapped memory
     vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
     indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
 
-    vertexBuffer.uploadImmediate(swapChain.commandPool, *initBuf);
-    indicesBuffer.uploadImmediate(swapChain.commandPool, *initBuf);
+    vertexBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
+    indicesBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
 
-    scope texture = device.create!Texture(swapChain.commandPool, *initBuf);
+    scope texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
     scope(exit) destroy(texture);
 
     VkWriteDescriptorSet[] descriptorWrites;
