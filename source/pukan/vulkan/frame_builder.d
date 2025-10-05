@@ -1,4 +1,4 @@
-module pukan.vulkan.frame;
+module pukan.vulkan.frame_builder;
 
 //~ import pukan.exceptions;
 import pukan.vulkan;
