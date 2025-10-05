@@ -87,10 +87,8 @@ class SwapChain
         foreach(i, ref frame; frames)
             frame = new Frame(device, images[i], imageExtent, imageFormat, renderPass);
 
-        auto commandBuffers = frameBuilder.commandPool.allocateBuffers(syncPrimitives.length);
-
         foreach(i, ref s; syncPrimitives)
-            s = new SyncFramesInFlight(device, commandBuffers[i]);
+            s = new SyncFramesInFlight(device, frameBuilder);
     }
 
     ~this()
@@ -155,12 +153,11 @@ class SyncFramesInFlight
     VkSemaphore[] imageAvailableSemaphores;
     VkSemaphore[] renderFinishedSemaphores;
 
-    //TODO: remove
     VkCommandBuffer commandBuf;
 
-    this(LogicalDevice device, VkCommandBuffer cb)
+    this(LogicalDevice device, FrameBuilder frameBuilder)
     {
-        commandBuf = cb;
+        commandBuf = frameBuilder.commandPool.allocateBuffers(1)[0];
 
         imageAvailable = device.create!Semaphore;
         renderFinished = device.create!Semaphore;
