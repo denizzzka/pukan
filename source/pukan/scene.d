@@ -44,10 +44,7 @@ class Scene
         commandPool = device.createCommandPool();
         scope(failure) destroy(commandPool);
 
-        //TODO: move to FrameBuilder?
-        graphicsQueue = device.getQueue();
-
-        frameBuilder = device.create!FrameBuilder(graphicsQueue);
+        frameBuilder = device.create!FrameBuilder;
         scope(failure) destroy(frameBuilder);
 
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);

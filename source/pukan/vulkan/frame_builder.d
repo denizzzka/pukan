@@ -9,15 +9,14 @@ import pukan.vulkan.queue;
 class FrameBuilder
 {
     LogicalDevice device;
-    VkQueue graphicsQueue;
+    //VkQueue graphicsQueue; // Actually, there should be one, but for now used the same queue for everything (see CommandPool.submitBuffers)
     TransferBuffer uniformBuffer;
     private Queue commandsQueue; // for each frame builder thread can be used dedicated thread-safe queue
     /* TODO:private */ CommandPool commandPool; //ditto
 
-    this(LogicalDevice dev, VkQueue graphics)
+    this(LogicalDevice dev)
     {
         device = dev;
-        graphicsQueue = graphics;
         commandsQueue = device.createSyncQueue;
         commandPool = device.createCommandPool();
 
