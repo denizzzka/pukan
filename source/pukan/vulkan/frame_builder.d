@@ -9,12 +9,15 @@ import pukan.vulkan.queue;
 class FrameBuilder
 {
     LogicalDevice device;
+    private Queue graphicsQueue;
     TransferBuffer uniformBuffer;
     /* TODO:private */ CommandPool commandPool;
 
     this(LogicalDevice dev)
     {
         device = dev;
+        //TODO: implement method to acquire graphics queue
+        graphicsQueue = device.createSyncQueue;
         commandPool = device.createCommandPool();
 
         // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -50,8 +53,7 @@ class FrameBuilder
             pSignalSemaphores: sync.renderFinishedSemaphores.ptr,
         };
 
-        //TODO: implement method to acquire dedicated graphics queue
-        commandPool.submit(submitInfo);
+        graphicsQueue.syncSubmit(submitInfo);
     }
 }
 
