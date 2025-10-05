@@ -6,7 +6,6 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;
 
-//TODO: can LogicalDevice be alias to instanced object?
 class FrameBuilder
 {
     LogicalDevice device;
