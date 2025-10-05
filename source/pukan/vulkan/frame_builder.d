@@ -141,7 +141,7 @@ class SyncFramesInFlight
 
     VkCommandBuffer commandBuf;
 
-    this(FrameBuilder fb)
+    private this(FrameBuilder fb)
     {
         commandBuf = fb.commandPool.allocateBuffers(1)[0];
 
