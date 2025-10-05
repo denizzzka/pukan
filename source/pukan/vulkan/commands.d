@@ -103,11 +103,22 @@ void recordCommands(VkCommandBufferBeginInfo beginInfo, VkCommandBuffer buf, voi
 {
     vkBeginCommandBuffer(buf, &beginInfo).vkCheck;
     dg(buf);
-    vkEndCommandBuffer(buf).vkCheck("failed to record command buffer");
+    endCommandBuffer(buf);
 }
 
 void recordOneTime(VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
 {
     auto cinf = CommandPool.defaultOneTimeBufferBeginInfo;
     recordCommands(cinf, buf, dg);
+}
+
+void beginOneTimeCommandBuffer(VkCommandBuffer buf)
+{
+    auto cinf = CommandPool.defaultOneTimeBufferBeginInfo;
+    vkBeginCommandBuffer(buf, &cinf).vkCheck;
+}
+
+void endCommandBuffer(VkCommandBuffer buf)
+{
+    vkEndCommandBuffer(buf).vkCheck("failed to record command buffer");
 }
