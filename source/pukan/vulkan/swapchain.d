@@ -16,6 +16,7 @@ class SwapChain
     enum maxFramesInFlight = 3;
     Frame[] frames;
     int currentFrameIdx;
+    VkQueue presentQueue;
 
     private ubyte framesSinceSwapchainReplacement = 0;
 
@@ -64,6 +65,7 @@ class SwapChain
         device = d;
         frameBuilder = fb;
         oldSwapChain = old;
+        presentQueue = device.getQueue();
         imageFormat = cinf.imageFormat;
         imageExtent = cinf.imageExtent;
 
@@ -109,9 +111,32 @@ class SwapChain
         currentFrameIdx = (currentFrameIdx + 1) % maxFramesInFlight;
     }
 
+    //TODO: rename to acquireNextImageIndex?
     VkResult acquireNextImage(out uint imageIndex)
     {
         return vkAcquireNextImageKHR(device, swapchain, ulong.max /* timeout */, currSync.imageAvailable, null /* fence */, &imageIndex);
+    }
+
+    /// Starts displaying frame on the screen
+    VkResult queueImageForPresentation(Frame frame, ref uint imageIndex)
+    {
+        auto sync = frame.syncPrimitives;
+
+        VkSwapchainKHR[1] swapChains = [swapchain];
+
+        VkPresentInfoKHR presentInfo = {
+            sType: VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+
+            pImageIndices: &imageIndex,
+
+            waitSemaphoreCount: cast(uint) sync.renderFinishedSemaphores.length,
+            pWaitSemaphores: sync.renderFinishedSemaphores.ptr,
+
+            swapchainCount: cast(uint) swapChains.length,
+            pSwapchains: swapChains.ptr,
+        };
+
+        return vkQueuePresentKHR(presentQueue, &presentInfo);
     }
 
     void oldSwapchainsMaintenance()

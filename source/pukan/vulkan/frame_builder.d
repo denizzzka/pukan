@@ -10,16 +10,14 @@ class FrameBuilder
 {
     LogicalDevice device;
     VkQueue graphicsQueue;
-    VkQueue presentQueue;
     TransferBuffer uniformBuffer;
     private Queue commandsQueue; // for each frame builder thread can be used dedicated thread-safe queue
     /* TODO:private */ CommandPool commandPool; //ditto
 
-    this(LogicalDevice dev, VkQueue graphics, VkQueue present)
+    this(LogicalDevice dev, VkQueue graphics)
     {
         device = dev;
         graphicsQueue = graphics;
-        presentQueue = present;
         commandsQueue = device.createSyncQueue;
         commandPool = device.createCommandPool();
 
@@ -57,27 +55,6 @@ class FrameBuilder
         };
 
         commandsQueue.syncSubmit(submitInfo);
-    }
-
-    VkResult queueImageForPresentation(SwapChain swapChain, ref uint imageIndex)
-    {
-        auto sync = swapChain.currSync;
-
-        VkSwapchainKHR[1] swapChains = [swapChain.swapchain];
-
-        VkPresentInfoKHR presentInfo = {
-            sType: VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-
-            pImageIndices: &imageIndex,
-
-            waitSemaphoreCount: cast(uint) sync.renderFinishedSemaphores.length,
-            pWaitSemaphores: sync.renderFinishedSemaphores.ptr,
-
-            swapchainCount: cast(uint) swapChains.length,
-            pSwapchains: swapChains.ptr,
-        };
-
-        return vkQueuePresentKHR(presentQueue, &presentInfo);
     }
 }
 

@@ -46,9 +46,8 @@ class Scene
 
         //TODO: move to FrameBuilder?
         graphicsQueue = device.getQueue();
-        presentQueue = device.getQueue();
 
-        frameBuilder = device.create!FrameBuilder(graphicsQueue, presentQueue);
+        frameBuilder = device.create!FrameBuilder(graphicsQueue);
         scope(failure) destroy(frameBuilder);
 
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
@@ -124,7 +123,7 @@ class Scene
         {
             frameBuilder.queueSubmit(frame);
 
-            auto ret = frameBuilder.queueImageForPresentation(swapChain, imageIndex);
+            auto ret = swapChain.queueImageForPresentation(frame, imageIndex);
 
             if (ret == VK_ERROR_OUT_OF_DATE_KHR || ret == VK_SUBOPTIMAL_KHR)
             {
