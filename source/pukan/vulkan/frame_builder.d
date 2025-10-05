@@ -83,7 +83,7 @@ class FrameBuilder
 
 class Frame
 {
-    LogicalDevice device;
+    LogicalDevice device; //TODO: store frame builder instead
     VkImageView imageView;
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
