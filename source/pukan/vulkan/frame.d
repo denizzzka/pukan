@@ -32,11 +32,6 @@ class FrameBuilder
         destroy(uniformBuffer);
     }
 
-    VkResult acquireNextImage(SwapChain swapChain, out uint imageIndex)
-    {
-        return vkAcquireNextImageKHR(device, swapChain.swapchain, ulong.max /* timeout */, swapChain.currSync.imageAvailable, null /* fence */, &imageIndex);
-    }
-
     //TODO: move to swapchain?
     void queueSubmit(SwapChain swapChain)
     {

@@ -102,7 +102,7 @@ class Scene
         uint imageIndex;
 
         {
-            auto ret = frameBuilder.acquireNextImage(swapChain, imageIndex);
+            auto ret = swapChain.acquireNextImage(imageIndex);
 
             if(ret == VK_ERROR_OUT_OF_DATE_KHR)
             {

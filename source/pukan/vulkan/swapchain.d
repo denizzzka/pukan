@@ -117,6 +117,11 @@ class SwapChain
         currentFrameIdx = (currentFrameIdx + 1) % maxFramesInFlight;
     }
 
+    VkResult acquireNextImage(out uint imageIndex)
+    {
+        return vkAcquireNextImageKHR(device, swapchain, ulong.max /* timeout */, currSync.imageAvailable, null /* fence */, &imageIndex);
+    }
+
     void oldSwapchainsMaintenance()
     {
         enum framesToOldSwapchainsDestory = 30;
