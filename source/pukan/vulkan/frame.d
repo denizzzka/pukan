@@ -14,7 +14,6 @@ class FrameBuilder
     TransferBuffer uniformBuffer;
     private Queue commandsQueue; // for each frame builder thread can be used dedicated thread-safe queue
     /* TODO:private */ CommandPool commandPool; //ditto
-    /* TODO:private */ VkCommandBuffer commandBuffer; //ditto
 
     this(LogicalDevice dev, VkQueue graphics, VkQueue present)
     {
@@ -23,7 +22,6 @@ class FrameBuilder
         presentQueue = present;
         commandsQueue = device.createSyncQueue;
         commandPool = device.createCommandPool();
-        commandBuffer = commandPool.allocateBuffers(1)[0];
 
         // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
