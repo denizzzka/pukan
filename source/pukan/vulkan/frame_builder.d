@@ -9,15 +9,15 @@ import pukan.vulkan.queue;
 class FrameBuilder
 {
     LogicalDevice device;
-    //VkQueue graphicsQueue; // Actually, there should be one, but for now used the same queue for everything (see CommandPool.submitBuffers)
+    private Queue graphicsQueue;
     TransferBuffer uniformBuffer;
-    private Queue commandsQueue; // for each frame builder thread can be used dedicated thread-safe queue
     /* TODO:private */ CommandPool commandPool; //ditto
 
     this(LogicalDevice dev)
     {
         device = dev;
-        commandsQueue = device.createSyncQueue;
+        //TODO: implement method to acquire graphics queue
+        graphicsQueue = device.createSyncQueue;
         commandPool = device.createCommandPool();
 
         // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -53,7 +53,7 @@ class FrameBuilder
             pSignalSemaphores: sync.renderFinishedSemaphores.ptr,
         };
 
-        commandsQueue.syncSubmit(submitInfo);
+        graphicsQueue.syncSubmit(submitInfo);
     }
 }
 
