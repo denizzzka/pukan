@@ -136,12 +136,12 @@ class SyncFramesInFlight
 
     VkCommandBuffer commandBuf;
 
-    this(LogicalDevice device, FrameBuilder frameBuilder)
+    this(FrameBuilder fb)
     {
-        commandBuf = frameBuilder.commandPool.allocateBuffers(1)[0];
+        commandBuf = fb.commandPool.allocateBuffers(1)[0];
 
-        imageAvailable = device.create!Semaphore;
-        renderFinished = device.create!Semaphore;
+        imageAvailable = fb.device.create!Semaphore;
+        renderFinished = fb.device.create!Semaphore;
 
         imageAvailableSemaphores = [imageAvailable.semaphore];
         renderFinishedSemaphores = [renderFinished.semaphore];

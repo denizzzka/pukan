@@ -88,7 +88,7 @@ class SwapChain
             frame = new Frame(device, images[i], imageExtent, imageFormat, renderPass);
 
         foreach(i, ref s; syncPrimitives)
-            s = new SyncFramesInFlight(device, frameBuilder);
+            s = new SyncFramesInFlight(frameBuilder);
     }
 
     ~this()
