@@ -176,3 +176,10 @@ auto getArrayFrom(alias func, uint count = 0, T...)(T obj)
 
     return ret;
 }
+
+/// Destroys objects if ot null
+void destr(T)(ref T obj)
+{
+    if(obj !is null)
+        destroy(obj);
+}
