@@ -57,7 +57,7 @@ class FrameBuilder
 
 class Frame
 {
-    LogicalDevice device; //TODO: store frame builder instead
+    FrameBuilder fb;
     VkImageView imageView;
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
@@ -66,12 +66,12 @@ class Frame
 
     this(FrameBuilder fb, VkImage image, VkExtent2D imageExtent, VkFormat imageFormat, VkRenderPass renderPass)
     {
-        device = fb.device;
+        this.fb = fb;
         syncPrimitives = new SyncFramesInFlight(fb);
         commandBuffer = fb.commandPool.allocateBuffers(1)[0];
 
-        createImageView(imageView, device, imageFormat, image);
-        depthBuf = DepthBuf(device, imageExtent);
+        createImageView(imageView, fb.device, imageFormat, image);
+        depthBuf = DepthBuf(fb.device, imageExtent);
 
         {
             VkImageView[2] attachments = [
@@ -89,20 +89,22 @@ class Frame
                 layers: 1,
             };
 
-            vkCreateFramebuffer(device, &frameBufferInfo, device.alloc, &frameBuffer).vkCheck;
+            vkCreateFramebuffer(fb.device, &frameBufferInfo, fb.device.alloc, &frameBuffer).vkCheck;
         }
     }
 
     ~this()
     {
+        fb.commandPool.freeBuffers([commandBuffer]);
+
         if(syncPrimitives)
             destroy(syncPrimitives);
 
         if(frameBuffer)
-            vkDestroyFramebuffer(device, frameBuffer, device.alloc);
+            vkDestroyFramebuffer(fb.device, frameBuffer, fb.device.alloc);
 
         if(imageView)
-            vkDestroyImageView(device, imageView, device.alloc);
+            vkDestroyImageView(fb.device, imageView, fb.device.alloc);
     }
 }
 

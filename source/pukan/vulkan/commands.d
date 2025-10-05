@@ -66,6 +66,11 @@ class CommandPool
         return ret;
     }
 
+    void freeBuffers(VkCommandBuffer[] buffs)
+    {
+        vkFreeCommandBuffers(device, commandPool, cast(uint) buffs.length, &buffs[0]);
+    }
+
     void recordCommands(VkCommandBufferBeginInfo beginInfo, VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
     {
         vkBeginCommandBuffer(buf, &beginInfo).vkCheck;
