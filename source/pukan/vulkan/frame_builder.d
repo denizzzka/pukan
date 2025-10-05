@@ -47,7 +47,7 @@ class FrameBuilder
             pWaitSemaphores: sync.imageAvailableSemaphores.ptr,
 
             commandBufferCount: 1,
-            pCommandBuffers: &sync.commandBuf,
+            pCommandBuffers: &frame.commandBuffer,
 
             signalSemaphoreCount: cast(uint) sync.renderFinishedSemaphores.length,
             pSignalSemaphores: sync.renderFinishedSemaphores.ptr,
@@ -64,11 +64,13 @@ class Frame
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
     SyncFramesInFlight syncPrimitives;
+    VkCommandBuffer commandBuffer;
 
     this(FrameBuilder fb, VkImage image, VkExtent2D imageExtent, VkFormat imageFormat, VkRenderPass renderPass)
     {
         device = fb.device;
         syncPrimitives = new SyncFramesInFlight(fb);
+        commandBuffer = fb.commandPool.allocateBuffers(1)[0];
 
         createImageView(imageView, device, imageFormat, image);
         depthBuf = DepthBuf(device, imageExtent);
@@ -115,12 +117,8 @@ class SyncFramesInFlight
     VkSemaphore[] imageAvailableSemaphores;
     VkSemaphore[] renderFinishedSemaphores;
 
-    VkCommandBuffer commandBuf;
-
     private this(FrameBuilder fb)
     {
-        commandBuf = fb.commandPool.allocateBuffers(1)[0];
-
         imageAvailable = fb.device.create!Semaphore;
         renderFinished = fb.device.create!Semaphore;
 

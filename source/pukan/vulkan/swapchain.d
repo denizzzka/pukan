@@ -102,7 +102,12 @@ class SwapChain
 
     private auto ref currSync()
     {
-        return frames[currentFrameIdx].syncPrimitives;
+        return currFrame.syncPrimitives;
+    }
+
+    private auto ref currFrame()
+    {
+        return frames[currentFrameIdx];
     }
 
     void toNextFrame()
@@ -157,6 +162,6 @@ class SwapChain
 
     void recToCurrOneTimeBuffer(void delegate(VkCommandBuffer) dg)
     {
-        frameBuilder.commandPool.recordOneTime(currSync.commandBuf, dg);
+        frameBuilder.commandPool.recordOneTime(currFrame.commandBuffer, dg);
     }
 }
