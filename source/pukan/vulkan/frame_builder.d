@@ -34,7 +34,7 @@ class FrameBuilder
         destroy(uniformBuffer);
     }
 
-    //TODO: move to swapchain?
+    /// Submit frame after draw
     void queueSubmit(Frame frame)
     {
         auto sync = frame.syncPrimitives;
