@@ -308,11 +308,11 @@ void main() {
     vkDeviceWaitIdle(device.device);
 }
 
+import dlib.math;
+
 void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
-
-    import dlib.math;
 
     auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
 
@@ -334,7 +334,6 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
 }
 
 // Display data:
-import dlib.math;
 
 const Vertex[] vertices = [
     Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
