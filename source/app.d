@@ -252,7 +252,7 @@ void main() {
     {
         glfwPollEvents();
 
-        updateWorldTransformations(scene.frameBuilder, sw, scene.swapChain.imageExtent);
+        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
             auto cb = frame.commandBuffer;
@@ -306,7 +306,7 @@ void main() {
     vkDeviceWaitIdle(device.device);
 }
 
-void updateWorldTransformations(V)(ref FrameBuilder frameBuilder, ref StopWatch sw, V imageExtent)
+void updateWorldTransformations(V)(ref TransferBuffer uniformBuffer, ref StopWatch sw, V imageExtent)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
@@ -315,9 +315,9 @@ void updateWorldTransformations(V)(ref FrameBuilder frameBuilder, ref StopWatch 
     auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
 
     WorldTransformationUniformBuffer* wtb;
-    assert(frameBuilder.uniformBuffer.cpuBuf.length == WorldTransformationUniformBuffer.sizeof);
+    assert(uniformBuffer.cpuBuf.length == WorldTransformationUniformBuffer.sizeof);
 
-    wtb = cast(WorldTransformationUniformBuffer*) frameBuilder.uniformBuffer.cpuBuf.ptr;
+    wtb = cast(WorldTransformationUniformBuffer*) uniformBuffer.cpuBuf.ptr;
     wtb.model = rotation.toMatrix4x4;
     wtb.view = lookAtMatrix(
         Vector3f(1, 1, 1), // camera position

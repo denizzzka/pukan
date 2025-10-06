@@ -14,7 +14,7 @@ class FrameBuilder
     TransferBuffer uniformBuffer;
     /* TODO:private */ CommandPool commandPool;
 
-    this(LogicalDevice dev, size_t size)
+    this(LogicalDevice dev, size_t uniformBufferSize)
     {
         device = dev;
         //TODO: implement method to acquire graphics queue
@@ -23,7 +23,7 @@ class FrameBuilder
 
         // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
-        uniformBuffer = device.create!TransferBuffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        uniformBuffer = device.create!TransferBuffer(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
 
     ~this()
