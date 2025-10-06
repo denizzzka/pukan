@@ -60,7 +60,7 @@ class Scene
     ~this()
     {
         //TODO: remove
-        destr(graphicsPipelines);
+        graphicsPipelines.destroy;
     }
 
     void recreateSwapChain()
