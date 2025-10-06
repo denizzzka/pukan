@@ -60,8 +60,6 @@ class Scene
     ~this()
     {
         destr(graphicsPipelines);
-        destr(fragShader);
-        destr(vertShader);
     }
 
     void recreateSwapChain()
