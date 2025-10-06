@@ -247,6 +247,14 @@ void main() {
 
     auto sw = StopWatch(AutoStart.yes);
 
+    auto renderData = DefaultRenderPass.VariableData(
+        vertexBuffer: vertexBuffer.gpuBuffer.buf,
+        indexBuffer: indicesBuffer.gpuBuffer.buf,
+        descriptorSets: *descriptorSets,
+        pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
+        graphicsPipeline: scene.graphicsPipelines.pipelines[0],
+    );
+
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -259,16 +267,9 @@ void main() {
 
             fb.uniformBuffer.recordUpload(cb);
 
-            scene.renderPass.updateData(scene.renderPass.VariableData(
-                scene.swapChain.imageExtent,
-                frame.frameBuffer,
-                vertexBuffer.gpuBuffer.buf,
-                indicesBuffer.gpuBuffer.buf,
-                *descriptorSets,
-                scene.pipelineInfoCreator.pipelineLayout,
-                scene.graphicsPipelines.pipelines[0]
-            ));
-
+            renderData.imageExtent = scene.swapChain.imageExtent,
+            renderData.frameBuffer = frame.frameBuffer;
+            scene.renderPass.updateData(renderData);
             scene.renderPass.recordCommandBuffer(cb);
         });
 
