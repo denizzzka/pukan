@@ -59,6 +59,7 @@ class Scene
 
     ~this()
     {
+        //TODO: remove
         destr(graphicsPipelines);
     }
 
