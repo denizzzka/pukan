@@ -15,7 +15,6 @@ class Scene
     SwapChain swapChain;
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
-    CommandPool commandPool;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -40,7 +39,6 @@ class Scene
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
 
-        commandPool = device.createCommandPool();
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
         vertShader = device.create!ShaderModule("vert.spv");
@@ -68,7 +66,6 @@ class Scene
         destr(vertShader);
         destr(swapChain);
         destr(frameBuilder);
-        destr(commandPool);
         destr(renderPass);
     }
 
