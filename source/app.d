@@ -252,18 +252,18 @@ void main() {
     {
         glfwPollEvents();
 
-        scene.drawNextFrame((ref Frame currFrame) {
-            updateWorldTransformations(*frameBuilder, sw, scene.swapChain.imageExtent);
+        updateWorldTransformations(scene.frameBuilder, sw, scene.swapChain.imageExtent);
 
-            auto cb = currFrame.commandBuffer;
+        scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
+            auto cb = frame.commandBuffer;
 
             cb.beginOneTimeCommandBuffer;
 
-            frameBuilder.uniformBuffer.recordUpload(cb);
+            fb.uniformBuffer.recordUpload(cb);
 
             scene.renderPass.updateData(scene.renderPass.VariableData(
                 scene.swapChain.imageExtent,
-                currFrame.frameBuffer,
+                frame.frameBuffer,
                 vertexBuffer.gpuBuffer.buf,
                 indicesBuffer.gpuBuffer.buf,
                 *descriptorSets,

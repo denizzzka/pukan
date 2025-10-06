@@ -78,7 +78,7 @@ class Scene
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain);
     }
 
-    void drawNextFrame(void delegate(ref Frame frame) dg)
+    void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
     {
         import pukan.exceptions: PukanExceptionWithCode;
 
@@ -103,7 +103,7 @@ class Scene
 
         auto frame = swapChain.frames[imageIndex];
 
-        dg(frame);
+        dg(frameBuilder, frame);
 
         {
             frameBuilder.placeDrawnFrameToGraphicsQueue(frame);
