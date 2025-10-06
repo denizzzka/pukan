@@ -19,7 +19,6 @@ class DefaultRenderPass : RenderPass
     enum VkFormat depthFormat = DepthBuf.format;
     VariableData data;
     alias this = data;
-    ushort[] indices;
 
     this(LogicalDevice dev, VkFormat imageFormat)
     {
@@ -109,6 +108,7 @@ class DefaultRenderPass : RenderPass
         VkFramebuffer frameBuffer;
         VkBuffer vertexBuffer;
         VkBuffer indexBuffer;
+        uint indicesNum;
         VkDescriptorSet[] descriptorSets;
         VkPipelineLayout pipelineLayout;
         VkPipeline graphicsPipeline;
@@ -145,7 +145,7 @@ class DefaultRenderPass : RenderPass
         vkCmdBindIndexBuffer(buf, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
-        vkCmdDrawIndexed(buf, cast(uint) indices.length, 1, 0, 0, 0);
+        vkCmdDrawIndexed(buf, data.indicesNum, 1, 0, 0, 0);
     }
 
     override void recordCommandBuffer(VkCommandBuffer commandBuffer)

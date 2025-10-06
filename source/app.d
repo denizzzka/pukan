@@ -179,8 +179,6 @@ void main() {
     scope scene = new Scene(device, surface, descriptorSetLayoutBindings, &windowSizeChanged);
     scope(exit) destroy(scene);
 
-    scene.renderPass.indices = indices;
-
     //FIXME: remove refs
     auto frameBuilder = &scene.frameBuilder;
     //~ ref pipelineInfoCreator = scene.pipelineInfoCreator;
@@ -252,6 +250,7 @@ void main() {
     auto renderData = DefaultRenderPass.VariableData(
         vertexBuffer: vertexBuffer.gpuBuffer.buf,
         indexBuffer: indicesBuffer.gpuBuffer.buf,
+        indicesNum: cast(uint) indices.length,
         descriptorSets: *descriptorSets,
         pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
