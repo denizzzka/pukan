@@ -319,21 +319,18 @@ void updateUniformBuffer(T, V)(T frameBuilder, ref StopWatch sw, V imageExtent)
 
     auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
 
-    static union U {
-        UniformBufferObject ubo;
-        ubyte[UniformBufferObject.sizeof] binary;
-    }
-
+    //TODO: rename to WorldCoordsUniformBuffer or something like
+    UniformBufferObject* ubo;
     assert(frameBuilder.uniformBuffer.cpuBuf.length == UniformBufferObject.sizeof);
 
-    U* u = cast(U*) frameBuilder.uniformBuffer.cpuBuf.ptr;
-    u.ubo.model = rotation.toMatrix4x4;
-    u.ubo.view = lookAtMatrix(
+    ubo = cast(UniformBufferObject*) frameBuilder.uniformBuffer.cpuBuf.ptr;
+    ubo.model = rotation.toMatrix4x4;
+    ubo.view = lookAtMatrix(
         Vector3f(1, 1, 1), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
         Vector3f(0, 0, -1), // upward direction in World coordinates
     );
-    u.ubo.proj = perspectiveMatrix(
+    ubo.proj = perspectiveMatrix(
         45.0f /* FOV */,
         cast(float) imageExtent.width / imageExtent.height,
         0.1f /* zNear */, 10.0f /* zFar */
