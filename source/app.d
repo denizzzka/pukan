@@ -179,6 +179,8 @@ void main() {
     scope scene = new Scene(device, surface, descriptorSetLayoutBindings, &windowSizeChanged);
     scope(exit) destroy(scene);
 
+    scene.renderPass.indices = indices;
+
     //FIXME: remove refs
     auto frameBuilder = &scene.frameBuilder;
     //~ ref pipelineInfoCreator = scene.pipelineInfoCreator;
@@ -331,3 +333,23 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
         0.1f /* zNear */, 10.0f /* zFar */
     );
 }
+
+// Display data:
+import dlib.math;
+
+const Vertex[] vertices = [
+    Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+    Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+    Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+    Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+
+    Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+    Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+    Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+    Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+];
+
+ushort[] indices = [
+    0, 1, 2, 2, 3, 0,
+    4, 5, 6, 6, 7, 4,
+];
