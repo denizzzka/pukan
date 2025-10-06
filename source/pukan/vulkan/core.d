@@ -137,8 +137,10 @@ class Instance
     }
 
     /// Must be called after logical device creation, otherwise mutex deadlock occurs
-    debug scope attachFlightRecorder()
+    debug scope attachFlightRecorder(in LogicalDevice ld)
     {
+        assert(ld.physicalDevice.instance == this, "Wrong LogicalDevice provided");
+
         auto d = new FlightRecorder!Instance(this);
 
         // Extension commands that are not core or WSI have to be loaded
