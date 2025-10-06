@@ -114,7 +114,7 @@ void main() {
         destroy(device);
     }
 
-    debug auto dbg = vk.attachFlightRecorder();
+    debug auto dbg = vk.attachFlightRecorder(device);
     debug scope(exit) destroy(dbg);
 
     import pukan.vulkan.bindings: VkSurfaceKHR;
