@@ -59,6 +59,10 @@ class Scene
 
     ~this()
     {
+        // swapChain.frames should be destroyed before frameBuider
+        swapChain.destroy;
+        frameBuilder.destroy;
+
         //TODO: remove
         graphicsPipelines.destroy;
     }
