@@ -306,7 +306,7 @@ void main() {
     vkDeviceWaitIdle(device.device);
 }
 
-void updateWorldTransformations(V)(ref TransferBuffer uniformBuffer, ref StopWatch sw, V imageExtent)
+void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
