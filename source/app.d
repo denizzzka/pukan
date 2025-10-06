@@ -257,8 +257,6 @@ void main() {
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
             auto cb = frame.commandBuffer;
 
-            cb.beginOneTimeCommandBuffer;
-
             fb.uniformBuffer.recordUpload(cb);
 
             scene.renderPass.updateData(scene.renderPass.VariableData(
@@ -272,8 +270,6 @@ void main() {
             ));
 
             scene.renderPass.recordCommandBuffer(cb);
-
-            cb.endCommandBuffer;
         });
 
         {

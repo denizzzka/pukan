@@ -103,7 +103,9 @@ class Scene
 
         auto frame = swapChain.frames[imageIndex];
 
+        frame.commandBuffer.beginOneTimeCommandBuffer;
         dg(frameBuilder, frame);
+        frame.commandBuffer.endCommandBuffer;
 
         {
             frameBuilder.placeDrawnFrameToGraphicsQueue(frame);
