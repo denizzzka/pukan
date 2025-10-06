@@ -4,7 +4,7 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 
-class DefaultPipelineInfoCreator
+class DefaultPipelineInfoCreator(Vertex)
 {
     LogicalDevice device;
     VkPipelineLayout pipelineLayout;

@@ -27,7 +27,7 @@ class Scene
     DescriptorPool descriptorPool;
     VkDescriptorSet[] descriptorSets;
 
-    DefaultPipelineInfoCreator pipelineInfoCreator;
+    DefaultPipelineInfoCreator!Vertex pipelineInfoCreator;
     GraphicsPipelines graphicsPipelines;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, WindowSizeChangeDetectedCallback wsc)
@@ -39,6 +39,8 @@ class Scene
         device.physicalDevice.instance.useSurface(surface);
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
+        renderPass.indices = indices;
+
         commandPool = device.createCommandPool();
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
@@ -51,7 +53,7 @@ class Scene
         ];
 
         descriptorPool = device.create!DescriptorPool(descriptorSetLayoutBindings);
-        pipelineInfoCreator = new DefaultPipelineInfoCreator(device, descriptorPool.descriptorSetLayout, shaderStages);
+        pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, descriptorPool.descriptorSetLayout, shaderStages);
         VkGraphicsPipelineCreateInfo[] infos = [pipelineInfoCreator.pipelineCreateInfo];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
 
@@ -134,3 +136,65 @@ struct WorldTransformationUniformBuffer
     Matrix4f view; /// World to view (to camera)
     Matrix4f proj; /// view to projection (to projective/homogeneous coordinates)
 }
+
+///
+struct Vertex {
+    Vector3f pos;
+    Vector3f color;
+    Vector2f texCoord;
+
+    static auto getBindingDescription() {
+        VkVertexInputBindingDescription r = {
+            binding: 0,
+            stride: this.sizeof,
+            inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+        };
+
+        return r;
+    }
+
+    static auto getAttributeDescriptions()
+    {
+        VkVertexInputAttributeDescription[3] ad;
+
+        ad[0] = VkVertexInputAttributeDescription(
+            binding: 0,
+            location: 0,
+            format: VK_FORMAT_R32G32B32_SFLOAT,
+            offset: pos.offsetof,
+        );
+
+        ad[1] = VkVertexInputAttributeDescription(
+            binding: 0,
+            location: 1,
+            format: VK_FORMAT_R32G32B32_SFLOAT,
+            offset: color.offsetof,
+        );
+
+        ad[2] = VkVertexInputAttributeDescription(
+            binding: 0,
+            location: 2,
+            format: VK_FORMAT_R32G32_SFLOAT,
+            offset: texCoord.offsetof,
+        );
+
+        return ad;
+    }
+};
+
+const Vertex[] vertices = [
+    Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+    Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+    Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+    Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+
+    Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+    Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+    Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+    Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+];
+
+ushort[] indices = [
+    0, 1, 2, 2, 3, 0,
+    4, 5, 6, 6, 7, 4,
+];

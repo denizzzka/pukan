@@ -19,6 +19,7 @@ class DefaultRenderPass : RenderPass
     enum VkFormat depthFormat = DepthBuf.format;
     VariableData data;
     alias this = data;
+    ushort[] indices;
 
     this(LogicalDevice dev, VkFormat imageFormat)
     {
