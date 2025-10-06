@@ -210,7 +210,7 @@ void main() {
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
             offset: 0,
-            range: UniformBufferObject.sizeof,
+            range: WorldTransformationUniformBuffer.sizeof,
         };
 
         VkDescriptorImageInfo imageInfo = {
@@ -253,8 +253,7 @@ void main() {
         glfwPollEvents();
 
         scene.drawNextFrame((ref Frame currFrame) {
-            // Applies motion to objects in the scene
-            updateUniformBuffer(frameBuilder, sw, scene.swapChain.imageExtent);
+            updateWorldTransformations(*frameBuilder, sw, scene.swapChain.imageExtent);
 
             auto cb = currFrame.commandBuffer;
 
@@ -311,7 +310,7 @@ void main() {
     vkDeviceWaitIdle(device.device);
 }
 
-void updateUniformBuffer(T, V)(T frameBuilder, ref StopWatch sw, V imageExtent)
+void updateWorldTransformations(V)(ref FrameBuilder frameBuilder, ref StopWatch sw, V imageExtent)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
@@ -319,18 +318,17 @@ void updateUniformBuffer(T, V)(T frameBuilder, ref StopWatch sw, V imageExtent)
 
     auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
 
-    //TODO: rename to WorldCoordsUniformBuffer or something like
-    UniformBufferObject* ubo;
-    assert(frameBuilder.uniformBuffer.cpuBuf.length == UniformBufferObject.sizeof);
+    WorldTransformationUniformBuffer* wtb;
+    assert(frameBuilder.uniformBuffer.cpuBuf.length == WorldTransformationUniformBuffer.sizeof);
 
-    ubo = cast(UniformBufferObject*) frameBuilder.uniformBuffer.cpuBuf.ptr;
-    ubo.model = rotation.toMatrix4x4;
-    ubo.view = lookAtMatrix(
+    wtb = cast(WorldTransformationUniformBuffer*) frameBuilder.uniformBuffer.cpuBuf.ptr;
+    wtb.model = rotation.toMatrix4x4;
+    wtb.view = lookAtMatrix(
         Vector3f(1, 1, 1), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
         Vector3f(0, 0, -1), // upward direction in World coordinates
     );
-    ubo.proj = perspectiveMatrix(
+    wtb.proj = perspectiveMatrix(
         45.0f /* FOV */,
         cast(float) imageExtent.width / imageExtent.height,
         0.1f /* zNear */, 10.0f /* zFar */

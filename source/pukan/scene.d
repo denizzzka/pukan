@@ -40,7 +40,7 @@ class Scene
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
         commandPool = device.createCommandPool();
-        frameBuilder = device.create!FrameBuilder;
+        frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
         vertShader = device.create!ShaderModule("vert.spv");
         fragShader = device.create!ShaderModule("frag.spv");
@@ -123,4 +123,14 @@ class Scene
 
         swapChain.toNextFrame();
     }
+}
+
+import dlib.math;
+
+///
+struct WorldTransformationUniformBuffer
+{
+    Matrix4f model; /// model to World
+    Matrix4f view; /// World to view (to camera)
+    Matrix4f proj; /// view to projection (to projective/homogeneous coordinates)
 }

@@ -1,6 +1,6 @@
 module pukan.vulkan.shaders;
 
-import dlib.math;
+import dlib.math; //TODO: remove
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.exceptions;
@@ -101,13 +101,6 @@ struct Vertex {
         return ad;
     }
 };
-
-struct UniformBufferObject
-{
-    Matrix4f model; /// model to World
-    Matrix4f view; /// World to view (to camera)
-    Matrix4f proj; /// view to projection (to projective/homogeneous coordinates)
-}
 
 const Vertex[] vertices = [
     Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
