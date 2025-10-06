@@ -59,14 +59,8 @@ class Scene
 
     ~this()
     {
-        destr(graphicsPipelines);
-        destr(pipelineInfoCreator);
-        destr(descriptorPool);
-        destr(fragShader);
-        destr(vertShader);
-        destr(swapChain);
-        destr(frameBuilder);
-        destr(renderPass);
+        //TODO: remove
+        graphicsPipelines.destroy;
     }
 
     void recreateSwapChain()

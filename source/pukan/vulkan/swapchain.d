@@ -8,7 +8,7 @@ class SwapChain
 {
     LogicalDevice device;
     VkSwapchainKHR swapchain;
-    SwapChain oldSwapChain;
+    private SwapChain oldSwapChain;
     FrameBuilder frameBuilder;
     VkImage[] images;
     VkFormat imageFormat;
