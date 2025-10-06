@@ -48,7 +48,7 @@ class FrameBuilder
             pWaitSemaphores: sync.imageAvailableSemaphores.ptr,
 
             commandBufferCount: 1,
-            pCommandBuffers: &frame.commandBuffer,
+            pCommandBuffers: &(frame.commandBuffer()),
 
             signalSemaphoreCount: cast(uint) sync.renderFinishedSemaphores.length,
             pSignalSemaphores: sync.renderFinishedSemaphores.ptr,
@@ -64,14 +64,16 @@ class Frame
     VkImageView imageView;
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
-    SyncFramesInFlight syncPrimitives;
-    VkCommandBuffer commandBuffer;
+    package SyncFramesInFlight syncPrimitives;
+    VkCommandBuffer[] _commandBuffer; // array used for distinction if not initialized
+
+    ref VkCommandBuffer commandBuffer() => _commandBuffer[0];
 
     this(FrameBuilder fb, VkImage image, VkExtent2D imageExtent, VkFormat imageFormat, VkRenderPass renderPass)
     {
         this.fb = fb;
         syncPrimitives = new SyncFramesInFlight(fb);
-        commandBuffer = fb.commandPool.allocateBuffers(1)[0];
+        _commandBuffer = fb.commandPool.allocateBuffers(1);
 
         createImageView(imageView, fb.device, imageFormat, image);
         depthBuf = DepthBuf(fb.device, imageExtent);
@@ -98,7 +100,7 @@ class Frame
 
     ~this()
     {
-        fb.commandPool.freeBuffers([commandBuffer]);
+        fb.commandPool.freeBuffers(_commandBuffer);
 
         if(syncPrimitives)
             destroy(syncPrimitives);

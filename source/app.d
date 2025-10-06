@@ -192,7 +192,7 @@ void main() {
     scope(exit) destroy(indicesBuffer);
 
     // Using any (first) buffer as buffer for initial loading
-    auto initBuf = &scene.swapChain.frames[0].commandBuffer;
+    auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
     // Copy vertices to mapped memory
     vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
