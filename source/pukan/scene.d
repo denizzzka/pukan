@@ -68,8 +68,8 @@ class Scene
         destr(vertShader);
         destr(swapChain);
         destr(frameBuilder);
-        destr(commandPool);
-        destr(renderPass);
+        //~ destr(commandPool);
+        //~ destr(renderPass);
     }
 
     void recreateSwapChain()
