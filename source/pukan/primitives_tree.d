@@ -23,6 +23,7 @@ class PrimitivesTree
 /// Represents the translation of an node relative to the ancestor bone node
 alias Bone = Matrix4x4f;
 
+//TODO: implement class for non-textured meshes
 class Mesh
 {
     import pukan.scene: Scene;
@@ -32,26 +33,37 @@ class Mesh
 
     Vertex[] vertices;
     ushort[] indices;
+    //TODO: move to mesh-in-GPU descriptor
+    Texture texture;
+
+    ~this()
+    {
+        texture.destroy;
+    }
 
     static struct VerticesGPUBuffer
     {
         TransferBuffer vertexBuffer;
         TransferBuffer indicesBuffer;
+        //TODO: add uint indices.length?
+
+        @disable
+        this(ref return scope VerticesGPUBuffer rhs) {}
 
         ~this()
         {
-            //~ vertexBuffer.destroy;
-            //~ indicesBuffer.destroy;
+            vertexBuffer.destroy;
+            indicesBuffer.destroy;
         }
     }
 
     ///
-    scope VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
 
-        scope VerticesGPUBuffer r;
+        VerticesGPUBuffer r;
 
         r.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         r.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
@@ -70,7 +82,7 @@ class Mesh
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 
-        auto texture = device.create!Texture(commandPool, commandBuffer);
+        texture = device.create!Texture(commandPool, commandBuffer);
 
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,

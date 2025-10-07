@@ -185,8 +185,11 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    auto mesh = createDemoMesh();
-    scope vertDescr = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+    scope mesh = createDemoMesh();
+    scope(exit) mesh.destroy;
+
+    /// Vertices descriptor
+    scope vd = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
     mesh.setTextureDescriptors(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene);
 
     import pukan.exceptions;
@@ -194,13 +197,15 @@ void main() {
     auto sw = StopWatch(AutoStart.yes);
 
     auto renderData = DefaultRenderPass.VariableData(
-        vertexBuffer: vertDescr.vertexBuffer.gpuBuffer.buf,
-        indexBuffer: vertDescr.indicesBuffer.gpuBuffer.buf,
+        vertexBuffer: vd.vertexBuffer.gpuBuffer.buf,
+        indexBuffer: vd.indicesBuffer.gpuBuffer.buf,
         indicesNum: cast(uint) mesh.indices.length,
         descriptorSets: *descriptorSets,
         pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
     );
+
+    writeln(); // empty line for FPS counter
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -228,7 +233,7 @@ void main() {
             static size_t fps;
 
             frameNum++;
-            write("FPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx, "\r");
+            write("\rFPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx);
 
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
