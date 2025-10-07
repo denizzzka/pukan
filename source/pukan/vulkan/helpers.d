@@ -181,11 +181,12 @@ auto getArrayFrom(alias func, uint count = 0, T...)(T obj)
 void printStackTrace()
 {
     import core.runtime;
+    import std.stdio;
 
     scope trace = defaultTraceHandler(null);
 
     foreach (line; trace)
-        Instance.log_info(line);
+        line.writeln;
 
     defaultTraceDeallocator(trace);
 }
