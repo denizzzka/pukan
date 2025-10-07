@@ -184,8 +184,6 @@ void main() {
 
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
-    //~ scope initBuf = frameBuilder.commandPool.allocateBuffers(1)[0];
-    writeln(">>>> BUF:", initBuf);
 
     auto mesh = createDemoMesh();
     scope vertDescr = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
