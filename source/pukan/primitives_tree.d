@@ -40,7 +40,7 @@ class Mesh
     }
 
     ///
-    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, ref VkCommandBuffer commandBuffer)
+    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
@@ -60,7 +60,7 @@ class Mesh
         return r;
     }
 
-    void setTextureDescriptors(LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, ref VkCommandBuffer commandBuffer, Scene scene)
+    void setTextureDescriptors(LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, scope VkCommandBuffer commandBuffer, Scene scene)
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 
