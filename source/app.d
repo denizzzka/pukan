@@ -176,11 +176,8 @@ void main() {
     scope scene = new Scene(device, surface, descriptorSetLayoutBindings, &windowSizeChanged);
     scope(exit) destroy(scene);
 
-    //FIXME: remove refs
+    //TODO: remove
     auto frameBuilder = &scene.frameBuilder;
-    //~ ref pipelineInfoCreator = scene.pipelineInfoCreator;
-    //~ ref graphicsPipelines = scene.graphicsPipelines;
-    auto descriptorSets = &scene.descriptorSets;
 
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
@@ -200,7 +197,7 @@ void main() {
         vertexBuffer: vd.vertexBuffer.gpuBuffer.buf,
         indexBuffer: vd.indicesBuffer.gpuBuffer.buf,
         indicesNum: vd.indicesNum,
-        descriptorSets: *descriptorSets,
+        descriptorSets: scene.descriptorSets,
         pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
     );
