@@ -23,6 +23,7 @@ class PrimitivesTree
 /// Represents the translation of an node relative to the ancestor bone node
 alias Bone = Matrix4x4f;
 
+//TODO: implement class for non-textured meshes
 class Mesh
 {
     import pukan.scene: Scene;
@@ -32,12 +33,19 @@ class Mesh
 
     Vertex[] vertices;
     ushort[] indices;
+    //TODO: move to mesh-in-GPU descriptor
+    Texture texture;
+
+    ~this()
+    {
+        texture.destroy;
+    }
 
     static struct VerticesGPUBuffer
     {
         TransferBuffer vertexBuffer;
         TransferBuffer indicesBuffer;
-        //TODO: add uint indices.length
+        //TODO: add uint indices.length?
 
         @disable
         this(ref return scope VerticesGPUBuffer rhs) {}

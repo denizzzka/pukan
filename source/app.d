@@ -189,11 +189,12 @@ void main() {
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
     scope mesh = createDemoMesh();
+    scope(exit) mesh.destroy;
+
     /// Vertices descriptor
     scope vd = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
-    scope texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
-    scope(exit) destroy(texture);
+    mesh.texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
 
     VkWriteDescriptorSet[] descriptorWrites;
 
@@ -206,8 +207,8 @@ void main() {
 
         VkDescriptorImageInfo imageInfo = {
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            imageView: texture.imageView,
-            sampler: texture.sampler,
+            imageView: mesh.texture.imageView,
+            sampler: mesh.texture.sampler,
         };
 
         descriptorWrites = [
