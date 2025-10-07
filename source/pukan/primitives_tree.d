@@ -78,7 +78,7 @@ class Mesh
         return r;
     }
 
-    void setTextureDescriptors(LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, scope VkCommandBuffer commandBuffer, Scene scene)
+    void setTextureDescriptors(Scene scene, LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 

@@ -190,7 +190,7 @@ void main() {
 
     /// Vertices descriptor
     scope vd = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    mesh.setTextureDescriptors(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene);
+    mesh.setTextureDescriptors(scene, device, *frameBuilder, frameBuilder.commandPool, *initBuf);
 
     import pukan.exceptions;
 
