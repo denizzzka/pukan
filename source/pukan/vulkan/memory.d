@@ -130,7 +130,7 @@ class TransferBuffer
 
     auto ref cpuBuf() => cpuBuffer.cpuBuf;
 
-    void uploadImmediate(CommandPool commandPool, VkCommandBuffer buf)
+    void uploadImmediate(CommandPool commandPool, ref VkCommandBuffer buf)
     {
         // Copy host RAM buffer to GPU RAM
         gpuBuffer.copyBufferImmediateSubmit(commandPool, buf, cpuBuffer.buf, gpuBuffer.buf, cpuBuf.length);

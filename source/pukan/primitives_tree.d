@@ -40,7 +40,7 @@ class Mesh
     }
 
     ///
-    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuffer)
+    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, ref VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
