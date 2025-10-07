@@ -185,21 +185,20 @@ void main() {
     //~ ref graphicsPipelines = scene.graphicsPipelines;
     auto descriptorSets = &scene.descriptorSets;
 
-    auto vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    scope(exit) destroy(vertexBuffer);
-
-    auto indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    scope(exit) destroy(indicesBuffer);
-
     // Using any (first) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    // Copy vertices to mapped memory
-    vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
-    indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
+    /// Vertices descriptor
+    scope Mesh.VerticesGPUBuffer vd;
+    vd.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    vd.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-    vertexBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
-    indicesBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
+    // Copy vertices to mapped memory
+    vd.vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
+    vd.indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
+
+    vd.vertexBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
+    vd.indicesBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
 
     scope texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
     scope(exit) destroy(texture);
@@ -248,13 +247,15 @@ void main() {
     auto sw = StopWatch(AutoStart.yes);
 
     auto renderData = DefaultRenderPass.VariableData(
-        vertexBuffer: vertexBuffer.gpuBuffer.buf,
-        indexBuffer: indicesBuffer.gpuBuffer.buf,
+        vertexBuffer: vd.vertexBuffer.gpuBuffer.buf,
+        indexBuffer: vd.indicesBuffer.gpuBuffer.buf,
         indicesNum: cast(uint) indices.length,
         descriptorSets: *descriptorSets,
         pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
     );
+
+    writeln(); // empty line for FPS counter
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -282,7 +283,7 @@ void main() {
             static size_t fps;
 
             frameNum++;
-            write("FPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx, "\r");
+            write("\rFPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx);
 
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);

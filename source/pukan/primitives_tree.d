@@ -37,6 +37,7 @@ class Mesh
     {
         TransferBuffer vertexBuffer;
         TransferBuffer indicesBuffer;
+        //TODO: add uint indices.length
 
         ~this()
         {
