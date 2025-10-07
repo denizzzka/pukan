@@ -25,6 +25,67 @@ alias Bone = Matrix4x4f;
 
 class Mesh
 {
+    import pukan.scene: Scene;
+    import pukan.vulkan;
+    import pukan.vulkan.bindings;
+    import pukan.vulkan.textures: Texture;
+
     Vertex[] vertices;
     ushort[] indices;
+
+    ///
+    void uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuffer)
+    {
+        auto vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        auto indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+        // Copy vertices to mapped memory
+        vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
+        indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
+
+        vertexBuffer.uploadImmediate(commandPool, commandBuffer);
+        indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+    }
+
+    void setTextureDescriptors(LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, VkCommandBuffer commandBuffer, Scene scene)
+    {
+        import pukan.scene: WorldTransformationUniformBuffer;
+
+        auto texture = device.create!Texture(commandPool, commandBuffer);
+
+        VkDescriptorBufferInfo bufferInfo = {
+            buffer: frameBuilder.uniformBuffer.gpuBuffer,
+            offset: 0,
+            range: WorldTransformationUniformBuffer.sizeof,
+        };
+
+        VkDescriptorImageInfo imageInfo = {
+            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            imageView: texture.imageView,
+            sampler: texture.sampler,
+        };
+
+        VkWriteDescriptorSet[] descriptorWrites = [
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: scene.descriptorSets[0 /*TODO: frame number*/],
+                dstBinding: 0,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                pBufferInfo: &bufferInfo,
+            ),
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: scene.descriptorSets[0 /*TODO: frame number*/],
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: &imageInfo,
+            )
+        ];
+
+        scene.descriptorPool.updateSets(descriptorWrites);
+    }
 }
