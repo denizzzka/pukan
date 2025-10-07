@@ -72,7 +72,7 @@ class DescriptorPool
         return descriptorSets;
     }
 
-    void updateSets(VkWriteDescriptorSet[] writeDescriptorSets)
+    void updateSets(ref scope VkWriteDescriptorSet[] writeDescriptorSets)
     {
         vkUpdateDescriptorSets(device, cast(uint) writeDescriptorSets.length, writeDescriptorSets.ptr, 0, null);
     }

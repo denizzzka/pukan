@@ -58,7 +58,7 @@ class Mesh
     }
 
     ///
-    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer) const
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
@@ -79,7 +79,14 @@ class Mesh
         return r;
     }
 
-    void setTextureDescriptors(Scene scene, LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    void updateTextureDescriptorSet(
+        LogicalDevice device,
+        FrameBuilder frameBuilder,
+        CommandPool commandPool,
+        scope VkCommandBuffer commandBuffer,
+        DescriptorPool descriptorPool,
+        VkDescriptorSet dstDescriptorSet,
+    ) //TODO: const
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 
@@ -100,7 +107,7 @@ class Mesh
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: scene.descriptorSets[0 /*TODO: frame number*/],
+                dstSet: dstDescriptorSet,
                 dstBinding: 0,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -109,7 +116,7 @@ class Mesh
             ),
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: scene.descriptorSets[0 /*TODO: frame number*/],
+                dstSet: dstDescriptorSet,
                 dstBinding: 1,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -118,6 +125,6 @@ class Mesh
             )
         ];
 
-        scene.descriptorPool.updateSets(descriptorWrites);
+        descriptorPool.updateSets(descriptorWrites);
     }
 }
