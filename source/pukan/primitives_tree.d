@@ -82,7 +82,7 @@ class Mesh
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 
-        auto texture = device.create!Texture(commandPool, commandBuffer);
+        texture = device.create!Texture(commandPool, commandBuffer);
 
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,

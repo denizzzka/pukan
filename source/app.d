@@ -193,47 +193,7 @@ void main() {
 
     /// Vertices descriptor
     scope vd = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-
-    mesh.texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
-
-    VkWriteDescriptorSet[] descriptorWrites;
-
-    {
-        VkDescriptorBufferInfo bufferInfo = {
-            buffer: frameBuilder.uniformBuffer.gpuBuffer,
-            offset: 0,
-            range: WorldTransformationUniformBuffer.sizeof,
-        };
-
-        VkDescriptorImageInfo imageInfo = {
-            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            imageView: mesh.texture.imageView,
-            sampler: mesh.texture.sampler,
-        };
-
-        descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &bufferInfo,
-            ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &imageInfo,
-            )
-        ];
-
-        scene.descriptorPool.updateSets(descriptorWrites);
-    }
+    mesh.setTextureDescriptors(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene);
 
     import pukan.exceptions;
 
