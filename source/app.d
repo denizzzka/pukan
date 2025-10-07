@@ -188,17 +188,9 @@ void main() {
     // Using any (first) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
+    scope mesh = createDemoMesh();
     /// Vertices descriptor
-    scope Mesh.VerticesGPUBuffer vd;
-    vd.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    vd.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
-    // Copy vertices to mapped memory
-    vd.vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
-    vd.indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
-
-    vd.vertexBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
-    vd.indicesBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
+    scope vd = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
     scope texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
     scope(exit) destroy(texture);
@@ -249,7 +241,7 @@ void main() {
     auto renderData = DefaultRenderPass.VariableData(
         vertexBuffer: vd.vertexBuffer.gpuBuffer.buf,
         indexBuffer: vd.indicesBuffer.gpuBuffer.buf,
-        indicesNum: cast(uint) indices.length,
+        indicesNum: cast(uint) mesh.indices.length,
         descriptorSets: *descriptorSets,
         pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
@@ -334,21 +326,25 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-// Display data:
+/// Displaying data
+auto createDemoMesh()
+{
+    auto r = new Mesh;
+    r.vertices = [
+        Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+        Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+        Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+        Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
 
-const Vertex[] vertices = [
-    Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
-    Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
-    Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
-    Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+        Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+        Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+        Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+        Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+    ];
+    r.indices = [
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4,
+    ];
 
-    Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
-    Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
-    Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
-    Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
-];
-
-ushort[] indices = [
-    0, 1, 2, 2, 3, 0,
-    4, 5, 6, 6, 7, 4,
-];
+    return r;
+}

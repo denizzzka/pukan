@@ -39,6 +39,9 @@ class Mesh
         TransferBuffer indicesBuffer;
         //TODO: add uint indices.length
 
+        @disable
+        this(ref return scope VerticesGPUBuffer rhs) {}
+
         ~this()
         {
             vertexBuffer.destroy;
@@ -47,12 +50,12 @@ class Mesh
     }
 
     ///
-    scope VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
 
-        scope VerticesGPUBuffer r;
+        VerticesGPUBuffer r;
 
         r.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         r.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
