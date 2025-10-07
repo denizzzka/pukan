@@ -117,7 +117,6 @@ void main() {
     debug auto dbg = vk.attachFlightRecorder(device);
     debug scope(exit) destroy(dbg);
 
-    import pukan.vulkan.bindings: VkSurfaceKHR;
     static import glfw3.internal;
 
     VkSurfaceKHR surface;
@@ -130,8 +129,6 @@ void main() {
 
     //~ vk.printSurfaceFormats(vk.devices[vk.deviceIdx], surface);
     //~ vk.printPresentModes(vk.devices[vk.deviceIdx], surface);
-
-    import pukan.vulkan.bindings;
 
     VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
     {
@@ -185,72 +182,21 @@ void main() {
     //~ ref graphicsPipelines = scene.graphicsPipelines;
     auto descriptorSets = &scene.descriptorSets;
 
-    auto vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    scope(exit) destroy(vertexBuffer);
-
-    auto indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    scope(exit) destroy(indicesBuffer);
-
     // Using any (first) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    // Copy vertices to mapped memory
-    vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
-    indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
-
-    vertexBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
-    indicesBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
-
-    scope texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
-    scope(exit) destroy(texture);
-
-    VkWriteDescriptorSet[] descriptorWrites;
-
-    {
-        VkDescriptorBufferInfo bufferInfo = {
-            buffer: frameBuilder.uniformBuffer.gpuBuffer,
-            offset: 0,
-            range: WorldTransformationUniformBuffer.sizeof,
-        };
-
-        VkDescriptorImageInfo imageInfo = {
-            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            imageView: texture.imageView,
-            sampler: texture.sampler,
-        };
-
-        descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &bufferInfo,
-            ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &imageInfo,
-            )
-        ];
-
-        scene.descriptorPool.updateSets(descriptorWrites);
-    }
+    auto mesh = createDemoMesh();
+    auto vertDescr = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+    mesh.setTextureDescriptors(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene);
 
     import pukan.exceptions;
 
     auto sw = StopWatch(AutoStart.yes);
 
     auto renderData = DefaultRenderPass.VariableData(
-        vertexBuffer: vertexBuffer.gpuBuffer.buf,
-        indexBuffer: indicesBuffer.gpuBuffer.buf,
-        indicesNum: cast(uint) indices.length,
+        vertexBuffer: vertDescr.vertexBuffer.gpuBuffer.buf,
+        indexBuffer: vertDescr.indicesBuffer.gpuBuffer.buf,
+        indicesNum: cast(uint) mesh.indices.length,
         descriptorSets: *descriptorSets,
         pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
@@ -333,21 +279,25 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-// Display data:
+/// Displaying data
+auto createDemoMesh()
+{
+    auto r = new Mesh;
+    r.vertices = [
+        Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+        Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+        Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+        Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
 
-const Vertex[] vertices = [
-    Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
-    Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
-    Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
-    Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+        Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+        Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+        Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+        Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+    ];
+    r.indices = [
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4,
+    ];
 
-    Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
-    Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
-    Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
-    Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
-];
-
-ushort[] indices = [
-    0, 1, 2, 2, 3, 0,
-    4, 5, 6, 6, 7, 4,
-];
+    return r;
+}

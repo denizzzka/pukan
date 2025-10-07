@@ -33,21 +33,34 @@ class Mesh
     Vertex[] vertices;
     ushort[] indices;
 
-    ///
-    void uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuffer)
+    static struct VerticesGPUBuffer
     {
-        auto vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        auto indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
-        // Copy vertices to mapped memory
-        vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
-        indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
-
-        vertexBuffer.uploadImmediate(commandPool, commandBuffer);
-        indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+        TransferBuffer vertexBuffer;
+        TransferBuffer indicesBuffer;
     }
 
-    void setTextureDescriptors(LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, VkCommandBuffer commandBuffer, Scene scene)
+    ///
+    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuffer)
+    {
+        assert(vertices.length > 0);
+        assert(indices.length > 0);
+
+        VerticesGPUBuffer r;
+
+        r.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        r.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+        // Copy vertices to mapped memory
+        r.vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
+        r.indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
+
+        r.vertexBuffer.uploadImmediate(commandPool, commandBuffer);
+        r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+
+        return r;
+    }
+
+    void setTextureDescriptors(LogicalDevice device, FrameBuilder frameBuilder, CommandPool commandPool, ref VkCommandBuffer commandBuffer, Scene scene)
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 
