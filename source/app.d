@@ -182,13 +182,13 @@ void main() {
     //~ ref graphicsPipelines = scene.graphicsPipelines;
     auto descriptorSets = &scene.descriptorSets;
 
-    // Using any (first) buffer as buffer for initial loading
-    scope initBuf = &scene.swapChain.frames[0].commandBuffer();
-    //~ writeln(">>>> BUF:", *initBuf);
+    // Using any (of first frame, for example) buffer as buffer for initial loading
+    auto initBuf = &scene.swapChain.frames[0].commandBuffer();
+    //~ scope initBuf = frameBuilder.commandPool.allocateBuffers(1)[0];
+    writeln(">>>> BUF:", initBuf);
 
     auto mesh = createDemoMesh();
-    auto vertDescr = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    scope(exit) vertDescr.destroy;
+    scope vertDescr = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
     mesh.setTextureDescriptors(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene);
 
     import pukan.exceptions;
@@ -230,7 +230,7 @@ void main() {
             static size_t fps;
 
             frameNum++;
-            writeln("FPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx);
+            write("FPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx, "\r");
 
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
