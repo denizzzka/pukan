@@ -183,12 +183,12 @@ void main() {
     auto descriptorSets = &scene.descriptorSets;
 
     // Using any (first) buffer as buffer for initial loading
-    auto initBuf = &scene.swapChain.frames[0].commandBuffer();
+    scope initBuf = &scene.swapChain.frames[0].commandBuffer();
     //~ writeln(">>>> BUF:", *initBuf);
 
     auto mesh = createDemoMesh();
     auto vertDescr = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    //~ scope(exit) destroy(vertDescr);
+    scope(exit) vertDescr.destroy;
     mesh.setTextureDescriptors(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene);
 
     import pukan.exceptions;
