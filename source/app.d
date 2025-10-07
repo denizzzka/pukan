@@ -199,7 +199,7 @@ void main() {
     auto renderData = DefaultRenderPass.VariableData(
         vertexBuffer: vd.vertexBuffer.gpuBuffer.buf,
         indexBuffer: vd.indicesBuffer.gpuBuffer.buf,
-        indicesNum: cast(uint) mesh.indices.length,
+        indicesNum: vd.indicesNum,
         descriptorSets: *descriptorSets,
         pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],

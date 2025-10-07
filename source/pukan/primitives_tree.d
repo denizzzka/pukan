@@ -45,7 +45,7 @@ class Mesh
     {
         TransferBuffer vertexBuffer;
         TransferBuffer indicesBuffer;
-        //TODO: add uint indices.length?
+        uint indicesNum;
 
         @disable
         this(ref return scope VerticesGPUBuffer rhs) {}
@@ -67,6 +67,7 @@ class Mesh
 
         r.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         r.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+        r.indicesNum = cast(uint) indices.length;
 
         // Copy vertices to mapped memory
         r.vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
