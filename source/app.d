@@ -308,22 +308,22 @@ auto createCubeDemoMesh()
 
     auto r = new ColoredMesh;
     r.vertices = [
-        Vertex(Vector3f(-0.2, -0.2, -0.2), red),
-        Vertex(Vector3f( 0.2, -0.2, -0.2), green),
-        Vertex(Vector3f( 0.2,  0.2, -0.2), red),
-        Vertex(Vector3f(-0.2,  0.2, -0.2), green),
-        Vertex(Vector3f(-0.2, -0.2,  0.2), blue),
-        Vertex(Vector3f( 0.2, -0.2,  0.2), red),
-        Vertex(Vector3f( 0.2,  0.2,  0.2), green),
-        Vertex(Vector3f(-0.2,  0.2,  0.2), red),
+        Vertex(Vector3f(-0.2, -0.2, -0.2), red),    // 0
+        Vertex(Vector3f(-0.2, -0.2,  0.2), blue),   // 1
+        Vertex(Vector3f( 0.2, -0.2, -0.2), green),  // 2
+        Vertex(Vector3f( 0.2, -0.2,  0.2), red),    // 3
+        Vertex(Vector3f( 0.2,  0.2, -0.2), red),    // 4
+        Vertex(Vector3f( 0.2,  0.2,  0.2), green),  // 5
+        Vertex(Vector3f(-0.2,  0.2,  0.2), red),    // 6
+        Vertex(Vector3f(-0.2,  0.2, -0.2), green),  // 7
     ];
     r.indices = [
-        0, 1, 3, 3, 1, 2,
-        1, 5, 2, 2, 5, 6,
-        5, 4, 6, 6, 4, 7,
-        4, 0, 7, 7, 0, 3,
-        3, 2, 7, 7, 2, 6,
-        4, 5, 0, 0, 5, 1
+        2, 1, 0, 1, 2, 3,   // 1
+        2, 4, 3, 3, 4, 5,   // 2
+        3, 5, 6, 1, 3, 6,   // 3
+        4, 7, 6, 4, 6, 5,   // 4
+        0, 1, 6, 0, 6 ,7,   // 5
+        0, 7, 2, 2, 7, 4,   // 6
     ];
 
     return r;
