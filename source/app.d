@@ -298,17 +298,18 @@ auto createCubeDemoMesh()
 {
     auto red = Vector3f(1.0f, 0.0f, 0.0f);
     auto green = Vector3f(0.0f, 1.0f, 0.0f);
+    auto blue = Vector3f(0.0f, 0.0f, 1.0f);
 
     auto r = new ColoredMesh;
     r.vertices = [
-        Vertex(Vector3f(-0.5, -0.5, -0.5), red),
-        Vertex(Vector3f( 0.5, -0.5, -0.5), green),
-        Vertex(Vector3f( 0.5,  0.5, -0.5), red),
-        Vertex(Vector3f(-0.5,  0.5, -0.5), green),
-        Vertex(Vector3f(-0.5, -0.5,  0.5), green),
-        Vertex(Vector3f( 0.5, -0.5,  0.5), red),
-        Vertex(Vector3f( 0.5,  0.5,  0.5), green),
-        Vertex(Vector3f(-0.5,  0.5,  0.5), red),
+        Vertex(Vector3f(-0.2, -0.2, -0.2), red),
+        Vertex(Vector3f( 0.2, -0.2, -0.2), green),
+        Vertex(Vector3f( 0.2,  0.2, -0.2), red),
+        Vertex(Vector3f(-0.2,  0.2, -0.2), green),
+        Vertex(Vector3f(-0.2, -0.2,  0.2), blue),
+        Vertex(Vector3f( 0.2, -0.2,  0.2), red),
+        Vertex(Vector3f( 0.2,  0.2,  0.2), green),
+        Vertex(Vector3f(-0.2,  0.2,  0.2), red),
     ];
     r.indices = [
         0, 1, 3, 3, 1, 2,
