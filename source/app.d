@@ -164,7 +164,7 @@ void main() {
     scope(exit) cube.destroy;
 
     cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    cube.updateDescriptorSet(*frameBuilder, scene.descriptorsPool[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
+    cube.updateDescriptorSet(*frameBuilder, scene.descriptorPools[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
 
     scope mesh = createDemoMesh();
     scope(exit) mesh.destroy;
@@ -174,7 +174,7 @@ void main() {
 
     // Texture descriptor set:
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
-    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorsPool[1], textureDstSet);
+    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet);
 
     import pukan.exceptions;
 

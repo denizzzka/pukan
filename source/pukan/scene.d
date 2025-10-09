@@ -23,7 +23,7 @@ class Scene
     ShaderModule coloredFragShader;
     ShaderModule texturedFragShader;
 
-    DescriptorPool[2] descriptorsPool;
+    DescriptorPool[2] descriptorPools;
     VkDescriptorSet[][2] descriptorsSets;
 
     DefaultPipelineInfoCreator!Vertex[2] pipelineInfoCreators;
@@ -84,11 +84,11 @@ class Scene
             ];
         }
 
-        descriptorsPool[0] = device.create!DescriptorPool(coloredLayoutBindings);
-        descriptorsPool[1] = device.create!DescriptorPool(texturedLayoutBindings);
+        descriptorPools[0] = device.create!DescriptorPool(coloredLayoutBindings);
+        descriptorPools[1] = device.create!DescriptorPool(texturedLayoutBindings);
 
-        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, descriptorsPool[0].descriptorSetLayout, coloredShaderStages);
-        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, descriptorsPool[1].descriptorSetLayout, texturedShaderStages);
+        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, descriptorPools[0].descriptorSetLayout, coloredShaderStages);
+        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, descriptorPools[1].descriptorSetLayout, texturedShaderStages);
 
         VkGraphicsPipelineCreateInfo[] infos = [
             pipelineInfoCreators[0].pipelineCreateInfo, //colored
@@ -96,8 +96,8 @@ class Scene
         ];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
 
-        descriptorsSets[0] = descriptorsPool[0].allocateDescriptorSets(1);
-        descriptorsSets[1] = descriptorsPool[1].allocateDescriptorSets(1);
+        descriptorsSets[0] = descriptorPools[0].allocateDescriptorSets(1);
+        descriptorsSets[1] = descriptorPools[1].allocateDescriptorSets(1);
     }
 
     ~this()
