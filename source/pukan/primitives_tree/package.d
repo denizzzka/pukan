@@ -22,4 +22,5 @@ class PrimitivesTree
 }
 
 /// Represents the translation of an node relative to the ancestor bone node
+//TODO: 4x3 should be enough
 alias Bone = Matrix4x4f;
