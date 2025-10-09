@@ -142,19 +142,4 @@ class TexturedMesh : ColoredMesh
 
         descriptorPool.updateSets(descriptorWrites);
     }
-
-    //TODO: remove?
-    override void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
-    {
-        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-        auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
-        VkDeviceSize[] offsets = [VkDeviceSize(0)];
-
-        vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
-
-        vkCmdDrawIndexed(buf, indicesNum, 1, 0, 0, 0);
-    }
 }
