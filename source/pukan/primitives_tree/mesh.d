@@ -13,7 +13,6 @@ class ColoredMesh : DrawableByVulkan
     {
         TransferBuffer vertexBuffer;
         TransferBuffer indicesBuffer;
-        uint indicesNum; //TODO: remove
 
         @disable
         this(ref return scope VerticesGPUBuffer rhs) {}
@@ -36,7 +35,6 @@ class ColoredMesh : DrawableByVulkan
 
         r.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         r.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-        r.indicesNum = cast(uint) indices.length;
 
         // Copy vertices to mapped memory
         r.vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
@@ -80,7 +78,7 @@ class ColoredMesh : DrawableByVulkan
         vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
-        vkCmdDrawIndexed(buf, indicesNum, 1, 0, 0, 0);
+        vkCmdDrawIndexed(buf, cast(uint) indices.length, 1, 0, 0, 0);
     }
 }
 
