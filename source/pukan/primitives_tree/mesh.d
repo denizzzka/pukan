@@ -7,7 +7,7 @@ import pukan.vulkan.bindings;
 //TODO: remove
 alias Mesh = TexturedMesh;
 
-abstract class ColoredMesh : DrawableByVulkan
+class ColoredMesh : DrawableByVulkan
 {
     Vertex[] vertices;
     ushort[] indices;
@@ -47,6 +47,41 @@ abstract class ColoredMesh : DrawableByVulkan
 
         r.vertexBuffer.uploadImmediate(commandPool, commandBuffer);
         r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+    }
+
+    void updateDescriptorSet(FrameBuilder frameBuilder, DescriptorPool descriptorPool, VkDescriptorSet dstDescriptorSet)
+    {
+        VkDescriptorBufferInfo bufferInfo = {
+            buffer: frameBuilder.uniformBuffer.gpuBuffer,
+            offset: 0,
+            range: WorldTransformationUniformBuffer.sizeof,
+        };
+
+        VkWriteDescriptorSet[] descriptorWrites = [
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: dstDescriptorSet,
+                dstBinding: 0,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                pBufferInfo: &bufferInfo,
+            ),
+        ];
+
+        descriptorPool.updateSets(descriptorWrites);
+    }
+
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
+    {
+        auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
+        VkDeviceSize[] offsets = [VkDeviceSize(0)];
+
+        vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
+
+        vkCmdDrawIndexed(buf, indicesNum, 1, 0, 0, 0);
     }
 }
 
@@ -109,8 +144,8 @@ class TexturedMesh : ColoredMesh
         descriptorPool.updateSets(descriptorWrites);
     }
 
-    ///
-    void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
+    //TODO: remove?
+    override void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
     {
         auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
         VkDeviceSize[] offsets = [VkDeviceSize(0)];

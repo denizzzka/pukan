@@ -160,14 +160,20 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
+    scope cube = createCubeDemoMesh();
+    scope(exit) cube.destroy;
+
+    cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+
     scope mesh = createDemoMesh();
     scope(exit) mesh.destroy;
 
     /// Vertices descriptor
     mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+    mesh.updateDescriptorSet(*frameBuilder, scene.descriptorsPool[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
 
     // Texture descriptor set:
-    scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number*/];
+    scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorsPool[1], textureDstSet);
 
     import pukan.exceptions;
@@ -175,8 +181,6 @@ void main() {
     auto sw = StopWatch(AutoStart.yes);
 
     auto renderData = DefaultRenderPass.VariableData(
-        descriptorSets: scene.descriptorsSets[1],
-        pipelineLayout: scene.pipelineInfoCreators[1].pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
     );
 
@@ -196,8 +200,16 @@ void main() {
 
             renderData.imageExtent = scene.swapChain.imageExtent,
             renderData.frameBuffer = frame.frameBuffer;
+
+            renderData.descriptorSets = scene.descriptorsSets[0];
+            renderData.pipelineLayout = scene.pipelineInfoCreators[0].pipelineLayout;
             scene.renderPass.updateData(renderData);
-            scene.renderPass.recordCommandBuffer(cb, mesh);
+            scene.renderPass.recordCommandBuffer(cb, cube);
+
+            //~ renderData.descriptorSets = scene.descriptorsSets[1];
+            //~ renderData.pipelineLayout = scene.pipelineInfoCreators[1].pipelineLayout;
+            //~ scene.renderPass.updateData(renderData);
+            //~ scene.renderPass.recordCommandBuffer(cb, mesh);
         });
 
         {
@@ -262,7 +274,7 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
 /// Displaying data
 auto createDemoMesh()
 {
-    auto r = new Mesh;
+    auto r = new TexturedMesh;
     r.vertices = [
         Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
         Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
@@ -277,6 +289,34 @@ auto createDemoMesh()
     r.indices = [
         0, 1, 2, 2, 3, 0,
         4, 5, 6, 6, 7, 4,
+    ];
+
+    return r;
+}
+
+auto createCubeDemoMesh()
+{
+    auto red = Vector3f(1.0f, 0.0f, 0.0f);
+    auto green = Vector3f(0.0f, 1.0f, 0.0f);
+
+    auto r = new ColoredMesh;
+    r.vertices = [
+        Vertex(Vector3f(-0.5, -0.5, -0.5), red),
+        Vertex(Vector3f( 0.5, -0.5, -0.5), green),
+        Vertex(Vector3f( 0.5,  0.5, -0.5), red),
+        Vertex(Vector3f(-0.5,  0.5, -0.5), green),
+        Vertex(Vector3f(-0.5, -0.5,  0.5), green),
+        Vertex(Vector3f( 0.5, -0.5,  0.5), red),
+        Vertex(Vector3f( 0.5,  0.5,  0.5), green),
+        Vertex(Vector3f(-0.5,  0.5,  0.5), red),
+    ];
+    r.indices = [
+        0, 1, 3, 3, 1, 2,
+        1, 5, 2, 2, 5, 6,
+        5, 4, 6, 6, 4, 7,
+        4, 0, 7, 7, 0, 3,
+        3, 2, 7, 7, 2, 6,
+        4, 5, 0, 0, 5, 1
     ];
 
     return r;
