@@ -49,7 +49,7 @@ class Scene
             fragShader.createShaderStageInfo,
         ];
 
-        VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
+        VkDescriptorSetLayoutBinding[] texturedLayoutBindings;
         {
             VkDescriptorSetLayoutBinding uboLayoutBinding = {
                 binding: 0,
@@ -65,13 +65,13 @@ class Scene
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             };
 
-            descriptorSetLayoutBindings = [
+            texturedLayoutBindings = [
                 uboLayoutBinding,
                 samplerLayoutBinding,
             ];
         }
 
-        descriptorPool = device.create!DescriptorPool(descriptorSetLayoutBindings);
+        descriptorPool = device.create!DescriptorPool(texturedLayoutBindings);
         pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, descriptorPool.descriptorSetLayout, shaderStages);
         VkGraphicsPipelineCreateInfo[] infos = [pipelineInfoCreator.pipelineCreateInfo];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
