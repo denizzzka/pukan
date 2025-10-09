@@ -167,8 +167,8 @@ void main() {
     scope vd = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
     // Texture descriptor set:
-    scope textureDstSet = scene.descriptorSets[0 /*TODO: frame number*/];
-    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPool, textureDstSet);
+    scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number*/];
+    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorsPool[1], textureDstSet);
 
     import pukan.exceptions;
 
@@ -178,8 +178,8 @@ void main() {
         vertexBuffer: vd.vertexBuffer.gpuBuffer.buf,
         indexBuffer: vd.indicesBuffer.gpuBuffer.buf,
         indicesNum: vd.indicesNum,
-        descriptorSets: scene.descriptorSets,
-        pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
+        descriptorSets: scene.descriptorsSets[1],
+        pipelineLayout: scene.pipelineInfoCreators[1].pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
     );
 

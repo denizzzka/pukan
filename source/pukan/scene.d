@@ -23,10 +23,10 @@ class Scene
     ShaderModule fragShader;
     VkPipelineShaderStageCreateInfo[] shaderStages;
 
-    DescriptorPool descriptorPool;
-    VkDescriptorSet[] descriptorSets;
+    DescriptorPool[2] descriptorsPool;
+    VkDescriptorSet[][2] descriptorsSets;
 
-    DefaultPipelineInfoCreator!Vertex pipelineInfoCreator;
+    DefaultPipelineInfoCreator!Vertex[2] pipelineInfoCreators;
     GraphicsPipelines graphicsPipelines;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
@@ -49,7 +49,9 @@ class Scene
             fragShader.createShaderStageInfo,
         ];
 
+        VkDescriptorSetLayoutBinding[] coloredLayoutBindings;
         VkDescriptorSetLayoutBinding[] texturedLayoutBindings;
+
         {
             VkDescriptorSetLayoutBinding uboLayoutBinding = {
                 binding: 0,
@@ -65,18 +67,31 @@ class Scene
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             };
 
+            coloredLayoutBindings = [
+                uboLayoutBinding,
+                samplerLayoutBinding,
+            ];
+
             texturedLayoutBindings = [
                 uboLayoutBinding,
                 samplerLayoutBinding,
             ];
         }
 
-        descriptorPool = device.create!DescriptorPool(texturedLayoutBindings);
-        pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, descriptorPool.descriptorSetLayout, shaderStages);
-        VkGraphicsPipelineCreateInfo[] infos = [pipelineInfoCreator.pipelineCreateInfo];
+        descriptorsPool[0] = device.create!DescriptorPool(coloredLayoutBindings);
+        descriptorsPool[1] = device.create!DescriptorPool(texturedLayoutBindings);
+
+        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, descriptorsPool[0].descriptorSetLayout, shaderStages);
+        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, descriptorsPool[1].descriptorSetLayout, shaderStages);
+
+        VkGraphicsPipelineCreateInfo[] infos = [
+            pipelineInfoCreators[0].pipelineCreateInfo,
+            pipelineInfoCreators[1].pipelineCreateInfo,
+        ];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
 
-        descriptorSets = descriptorPool.allocateDescriptorSets(1);
+        descriptorsSets[0] = descriptorsPool[0].allocateDescriptorSets(1);
+        descriptorsSets[1] = descriptorsPool[1].allocateDescriptorSets(1);
     }
 
     ~this()
