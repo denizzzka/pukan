@@ -180,18 +180,6 @@ void main() {
 
     auto sw = StopWatch(AutoStart.yes);
 
-    auto coloredRenderData = DefaultRenderPass.VariableData(
-        descriptorSets: scene.descriptorsSets[0],
-        pipelineLayout: scene.pipelineInfoCreators[0].pipelineLayout,
-        graphicsPipeline: scene.graphicsPipelines.pipelines[0],
-    );
-
-    auto texturedRenderData = DefaultRenderPass.VariableData(
-        descriptorSets: scene.descriptorsSets[1],
-        pipelineLayout: scene.pipelineInfoCreators[1].pipelineLayout,
-        graphicsPipeline: scene.graphicsPipelines.pipelines[1],
-    );
-
     writeln(); // empty line for FPS counter
 
     // Main loop
@@ -202,20 +190,32 @@ void main() {
         updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
-            coloredRenderData.common.imageExtent = scene.swapChain.imageExtent;
-            coloredRenderData.common.frameBuffer = frame.frameBuffer;
 
-            texturedRenderData.common = coloredRenderData.common;
+            {
+                DefaultRenderPass.VariableData renderData;
+                renderData.common.imageExtent = scene.swapChain.imageExtent;
+                renderData.common.frameBuffer = frame.frameBuffer;
+                scene.renderPass.updateData(renderData);
+            }
 
             auto cb = frame.commandBuffer;
-
             fb.uniformBuffer.recordUpload(cb);
 
-            scene.renderPass.updateData(coloredRenderData);
-            scene.renderPass.recordCommandBuffer(cb, cube);
+            scene.renderPass.recordCommandBuffer(cb, (buf){
+                cube.drawingBufferFilling(
+                    buf,
+                    scene.graphicsPipelines.pipelines[0],
+                    scene.pipelineInfoCreators[0].pipelineLayout,
+                    scene.descriptorsSets[0],
+                );
 
-            scene.renderPass.updateData(texturedRenderData);
-            scene.renderPass.recordCommandBuffer(cb, mesh);
+                mesh.drawingBufferFilling(
+                    buf,
+                    scene.graphicsPipelines.pipelines[1],
+                    scene.pipelineInfoCreators[1].pipelineLayout,
+                    scene.descriptorsSets[1],
+                );
+            });
         });
 
         {

@@ -10,7 +10,6 @@ abstract class RenderPass
     alias this = vkRenderPass;
 
     VkFormat imageFormat;
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, DrawableByVulkan drawable);
 }
 
 class DefaultRenderPass : RenderPass
@@ -112,10 +111,6 @@ class DefaultRenderPass : RenderPass
     {
         CommonData common;
         alias this = common;
-
-        VkDescriptorSet[] descriptorSets;
-        VkPipelineLayout pipelineLayout;
-        VkPipeline graphicsPipeline;
     }
 
     VkViewport viewport;
@@ -140,7 +135,7 @@ class DefaultRenderPass : RenderPass
         );
     }
 
-    override void recordCommandBuffer(VkCommandBuffer commandBuffer, DrawableByVulkan drawable)
+    void recordCommandBuffer(VkCommandBuffer commandBuffer,  void delegate(ref VkCommandBuffer) fillBufferDg)
     {
         VkRenderPassBeginInfo renderPassInfo;
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -163,13 +158,11 @@ class DefaultRenderPass : RenderPass
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        drawable.drawingBufferFilling(commandBuffer, pipelineLayout, descriptorSets);
+        fillBufferDg(commandBuffer);
 
         vkCmdEndRenderPass(commandBuffer);
     }
@@ -179,5 +172,5 @@ class DefaultRenderPass : RenderPass
 interface DrawableByVulkan
 {
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
-    void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets);
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets);
 }

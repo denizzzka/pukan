@@ -69,8 +69,10 @@ class ColoredMesh : DrawableByVulkan
         descriptorPool.updateSets(descriptorWrites);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
     {
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
         auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
         VkDeviceSize[] offsets = [VkDeviceSize(0)];
 
@@ -142,8 +144,10 @@ class TexturedMesh : ColoredMesh
     }
 
     //TODO: remove?
-    override void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
+    override void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
     {
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
         auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
         VkDeviceSize[] offsets = [VkDeviceSize(0)];
 
