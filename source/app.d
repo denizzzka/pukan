@@ -180,7 +180,16 @@ void main() {
 
     auto sw = StopWatch(AutoStart.yes);
 
-    auto renderData = DefaultRenderPass.VariableData(
+    auto coloredRenderData = DefaultRenderPass.VariableData(
+        descriptorSets: scene.descriptorsSets[0],
+        pipelineLayout: scene.pipelineInfoCreators[0].pipelineLayout,
+        graphicsPipeline: scene.graphicsPipelines.pipelines[0],
+    );
+
+    auto texturedRenderData = DefaultRenderPass.VariableData(
+        descriptorSets: scene.descriptorsSets[1],
+        pipelineLayout: scene.pipelineInfoCreators[1].pipelineLayout,
+        graphicsPipeline: scene.graphicsPipelines.pipelines[1],
     );
 
     writeln(); // empty line for FPS counter
@@ -193,23 +202,19 @@ void main() {
         updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
-            renderData.imageExtent = scene.swapChain.imageExtent,
-            renderData.frameBuffer = frame.frameBuffer;
+            coloredRenderData.common.imageExtent = scene.swapChain.imageExtent;
+            coloredRenderData.common.frameBuffer = frame.frameBuffer;
+
+            texturedRenderData.common = coloredRenderData.common;
 
             auto cb = frame.commandBuffer;
 
             fb.uniformBuffer.recordUpload(cb);
 
-            renderData.descriptorSets = scene.descriptorsSets[0];
-            renderData.pipelineLayout = scene.pipelineInfoCreators[0].pipelineLayout;
-            renderData.graphicsPipeline = scene.graphicsPipelines.pipelines[0];
-            scene.renderPass.updateData(renderData);
+            scene.renderPass.updateData(coloredRenderData);
             scene.renderPass.recordCommandBuffer(cb, cube);
 
-            renderData.descriptorSets = scene.descriptorsSets[1];
-            renderData.pipelineLayout = scene.pipelineInfoCreators[1].pipelineLayout;
-            renderData.graphicsPipeline = scene.graphicsPipelines.pipelines[1];
-            scene.renderPass.updateData(renderData);
+            scene.renderPass.updateData(texturedRenderData);
             scene.renderPass.recordCommandBuffer(cb, mesh);
         });
 

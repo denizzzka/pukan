@@ -102,10 +102,17 @@ class DefaultRenderPass : RenderPass
         dstAccessMask: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     };
 
-    static struct VariableData
+    static struct CommonData
     {
         VkExtent2D imageExtent;
         VkFramebuffer frameBuffer;
+    }
+
+    static struct VariableData
+    {
+        CommonData common;
+        alias this = common;
+
         VkDescriptorSet[] descriptorSets;
         VkPipelineLayout pipelineLayout;
         VkPipeline graphicsPipeline;
