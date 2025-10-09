@@ -40,7 +40,7 @@ class DescriptorPool
             VkDescriptorPoolCreateInfo descriptorPoolInfo = {
                 poolSizeCount: cast(uint) poolSizes.length,
                 pPoolSizes: poolSizes.ptr,
-                maxSets: 1, // TODO: number of frames
+                maxSets: 1,
             };
 
             vkCall(device.device, &descriptorPoolInfo, device.alloc, &descriptorPool);
@@ -56,20 +56,20 @@ class DescriptorPool
             vkDestroyDescriptorSetLayout(device, descriptorSetLayout, device.alloc);
     }
 
-    auto allocateDescriptorSets(VkDescriptorSetLayout[] layouts)
+    auto allocateDescriptorSets(uint count)
     {
         VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
             sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
             descriptorPool: descriptorPool,
-            descriptorSetCount: cast(uint) layouts.length,
-            pSetLayouts: layouts.ptr,
+            descriptorSetCount: count,
+            pSetLayouts: &descriptorSetLayout,
         };
 
-        VkDescriptorSet[] descriptorSets;
-        descriptorSets.length = cast(uint) layouts.length;
-        vkAllocateDescriptorSets(device.device, &descriptorSetAllocateInfo, descriptorSets.ptr).vkCheck;
+        VkDescriptorSet[] ret;
+        ret.length = count;
+        vkAllocateDescriptorSets(device.device, &descriptorSetAllocateInfo, ret.ptr).vkCheck;
 
-        return descriptorSets;
+        return ret;
     }
 
     void updateSets(ref scope VkWriteDescriptorSet[] writeDescriptorSets)

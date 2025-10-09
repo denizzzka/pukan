@@ -76,7 +76,7 @@ class Scene
         VkGraphicsPipelineCreateInfo[] infos = [pipelineInfoCreator.pipelineCreateInfo];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
 
-        descriptorSets = descriptorPool.allocateDescriptorSets([descriptorPool.descriptorSetLayout]);
+        descriptorSets = descriptorPool.allocateDescriptorSets(1);
     }
 
     ~this()
