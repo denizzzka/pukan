@@ -10,7 +10,7 @@ abstract class RenderPass
     alias this = vkRenderPass;
 
     VkFormat imageFormat;
-    void recordCommandBuffer(VkCommandBuffer commandBuffer);
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, DrawableByVulkan drawable);
 }
 
 class DefaultRenderPass : RenderPass
@@ -106,9 +106,6 @@ class DefaultRenderPass : RenderPass
     {
         VkExtent2D imageExtent;
         VkFramebuffer frameBuffer;
-        VkBuffer vertexBuffer;
-        VkBuffer indexBuffer;
-        uint indicesNum;
         VkDescriptorSet[] descriptorSets;
         VkPipelineLayout pipelineLayout;
         VkPipeline graphicsPipeline;
@@ -136,19 +133,7 @@ class DefaultRenderPass : RenderPass
         );
     }
 
-    void drawIndexed(VkCommandBuffer buf)
-    {
-        auto vertexBuffers = [vertexBuffer];
-        VkDeviceSize[] offsets = [VkDeviceSize(0)];
-
-        vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
-        vkCmdBindIndexBuffer(buf, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
-
-        vkCmdDrawIndexed(buf, data.indicesNum, 1, 0, 0, 0);
-    }
-
-    override void recordCommandBuffer(VkCommandBuffer commandBuffer)
+    override void recordCommandBuffer(VkCommandBuffer commandBuffer, DrawableByVulkan drawable)
     {
         VkRenderPassBeginInfo renderPassInfo;
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -177,8 +162,15 @@ class DefaultRenderPass : RenderPass
 
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        drawIndexed(commandBuffer);
+        drawable.drawingBufferFilling(commandBuffer, pipelineLayout, descriptorSets);
 
         vkCmdEndRenderPass(commandBuffer);
     }
+}
+
+///
+interface DrawableByVulkan
+{
+    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets);
 }

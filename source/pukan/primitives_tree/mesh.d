@@ -7,12 +7,7 @@ import pukan.vulkan.bindings;
 //TODO: remove
 alias Mesh = TexturedMesh;
 
-interface DrawableByVulkan
-{
-    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
-}
-
-class ColoredMesh : DrawableByVulkan
+abstract class ColoredMesh : DrawableByVulkan
 {
     Vertex[] vertices;
     ushort[] indices;
@@ -112,5 +107,18 @@ class TexturedMesh : ColoredMesh
         ];
 
         descriptorPool.updateSets(descriptorWrites);
+    }
+
+    ///
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
+    {
+        auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
+        VkDeviceSize[] offsets = [VkDeviceSize(0)];
+
+        vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
+
+        vkCmdDrawIndexed(buf, indicesNum, 1, 0, 0, 0);
     }
 }

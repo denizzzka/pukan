@@ -175,9 +175,6 @@ void main() {
     auto sw = StopWatch(AutoStart.yes);
 
     auto renderData = DefaultRenderPass.VariableData(
-        vertexBuffer: mesh.vertexBuffer.gpuBuffer.buf,
-        indexBuffer: mesh.indicesBuffer.gpuBuffer.buf,
-        indicesNum: mesh.indicesNum,
         descriptorSets: scene.descriptorsSets[1],
         pipelineLayout: scene.pipelineInfoCreators[1].pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],
@@ -200,7 +197,7 @@ void main() {
             renderData.imageExtent = scene.swapChain.imageExtent,
             renderData.frameBuffer = frame.frameBuffer;
             scene.renderPass.updateData(renderData);
-            scene.renderPass.recordCommandBuffer(cb);
+            scene.renderPass.recordCommandBuffer(cb, mesh);
         });
 
         {
