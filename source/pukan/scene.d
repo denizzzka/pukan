@@ -102,6 +102,8 @@ class Scene
 
     ~this()
     {
+        descriptorPools.destroy;
+
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
         frameBuilder.destroy;
