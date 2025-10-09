@@ -91,8 +91,8 @@ class Scene
         pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, descriptorsPool[1].descriptorSetLayout, texturedShaderStages);
 
         VkGraphicsPipelineCreateInfo[] infos = [
-            //~ pipelineInfoCreators[0].pipelineCreateInfo,
-            pipelineInfoCreators[1].pipelineCreateInfo,
+            //~ pipelineInfoCreators[0].pipelineCreateInfo, //colored
+            pipelineInfoCreators[1].pipelineCreateInfo, //textured
         ];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
 
