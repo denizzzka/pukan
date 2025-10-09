@@ -164,7 +164,7 @@ void main() {
     scope(exit) mesh.destroy;
 
     /// Vertices descriptor
-    scope vd = mesh.uploadMeshToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+    mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
     // Texture descriptor set:
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number*/];
@@ -175,9 +175,9 @@ void main() {
     auto sw = StopWatch(AutoStart.yes);
 
     auto renderData = DefaultRenderPass.VariableData(
-        vertexBuffer: vd.vertexBuffer.gpuBuffer.buf,
-        indexBuffer: vd.indicesBuffer.gpuBuffer.buf,
-        indicesNum: vd.indicesNum,
+        vertexBuffer: mesh.vertexBuffer.gpuBuffer.buf,
+        indexBuffer: mesh.indicesBuffer.gpuBuffer.buf,
+        indicesNum: mesh.indicesNum,
         descriptorSets: scene.descriptorsSets[1],
         pipelineLayout: scene.pipelineInfoCreators[1].pipelineLayout,
         graphicsPipeline: scene.graphicsPipelines.pipelines[0],

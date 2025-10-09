@@ -4,9 +4,15 @@ import pukan.scene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
+//TODO: remove
 alias Mesh = TexturedMesh;
 
-class ColoredMesh
+interface DrawableByVulkan
+{
+    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
+}
+
+class ColoredMesh : DrawableByVulkan
 {
     Vertex[] vertices;
     ushort[] indices;
@@ -15,7 +21,7 @@ class ColoredMesh
     {
         TransferBuffer vertexBuffer;
         TransferBuffer indicesBuffer;
-        uint indicesNum;
+        uint indicesNum; //TODO: remove
 
         @disable
         this(ref return scope VerticesGPUBuffer rhs) {}
@@ -27,13 +33,14 @@ class ColoredMesh
         }
     }
 
+    VerticesGPUBuffer r;
+    alias this = r;
+
     ///
-    VerticesGPUBuffer uploadMeshToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer) const
+    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
-
-        VerticesGPUBuffer r;
 
         r.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         r.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
@@ -45,8 +52,6 @@ class ColoredMesh
 
         r.vertexBuffer.uploadImmediate(commandPool, commandBuffer);
         r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
-
-        return r;
     }
 }
 
