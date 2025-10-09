@@ -29,7 +29,7 @@ class Scene
     DefaultPipelineInfoCreator!Vertex pipelineInfoCreator;
     GraphicsPipelines graphicsPipelines;
 
-    this(LogicalDevice dev, VkSurfaceKHR surf, VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, WindowSizeChangeDetectedCallback wsc)
+    this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
         device = dev;
         surface = surf;
@@ -48,6 +48,28 @@ class Scene
             vertShader.createShaderStageInfo,
             fragShader.createShaderStageInfo,
         ];
+
+        VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
+        {
+            VkDescriptorSetLayoutBinding uboLayoutBinding = {
+                binding: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            };
+
+            VkDescriptorSetLayoutBinding samplerLayoutBinding = {
+                binding: 1,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            };
+
+            descriptorSetLayoutBindings = [
+                uboLayoutBinding,
+                samplerLayoutBinding,
+            ];
+        }
 
         descriptorPool = device.create!DescriptorPool(descriptorSetLayoutBindings);
         pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, descriptorPool.descriptorSetLayout, shaderStages);

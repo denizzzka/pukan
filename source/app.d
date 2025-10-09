@@ -130,28 +130,6 @@ void main() {
     //~ vk.printSurfaceFormats(vk.devices[vk.deviceIdx], surface);
     //~ vk.printPresentModes(vk.devices[vk.deviceIdx], surface);
 
-    VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
-    {
-        VkDescriptorSetLayoutBinding uboLayoutBinding = {
-            binding: 0,
-            descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-        };
-
-        VkDescriptorSetLayoutBinding samplerLayoutBinding = {
-            binding: 1,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        };
-
-        descriptorSetLayoutBindings = [
-            uboLayoutBinding,
-            samplerLayoutBinding,
-        ];
-    }
-
     void windowSizeChanged()
     {
         int width;
@@ -173,7 +151,7 @@ void main() {
         }
     }
 
-    scope scene = new Scene(device, surface, descriptorSetLayoutBindings, &windowSizeChanged);
+    scope scene = new Scene(device, surface, &windowSizeChanged);
     scope(exit) destroy(scene);
 
     //TODO: remove
