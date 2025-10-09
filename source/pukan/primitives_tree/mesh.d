@@ -4,7 +4,9 @@ import pukan.scene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
-class MonochromeMesh
+alias Mesh = TexturedMesh;
+
+class ColoredMesh
 {
     Vertex[] vertices;
     ushort[] indices;
@@ -48,7 +50,7 @@ class MonochromeMesh
     }
 }
 
-class Mesh : MonochromeMesh
+class TexturedMesh : ColoredMesh
 {
     //TODO: move to mesh-in-GPU descriptor
     Texture texture;
