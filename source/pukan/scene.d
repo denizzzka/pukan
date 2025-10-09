@@ -42,7 +42,7 @@ class Scene
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
         vertShader = device.create!ShaderModule(VK_SHADER_STAGE_VERTEX_BIT, "vert.spv");
-        fragShader = device.create!ShaderModule(VK_SHADER_STAGE_FRAGMENT_BIT, "frag.spv");
+        fragShader = device.create!ShaderModule(VK_SHADER_STAGE_FRAGMENT_BIT, "colored_frag.spv");
 
         shaderStages = [
             vertShader.createShaderStageInfo,
