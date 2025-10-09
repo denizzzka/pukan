@@ -1,6 +1,6 @@
 module pukan.primitives_tree;
 
-import pukan.primitives_tree.mesh: Mesh;
+import pukan.primitives_tree.mesh;
 import pukan.scene: Vertex;
 import std.variant: Algebraic;
 import dlib.math: Matrix4x4f;
@@ -9,7 +9,7 @@ struct Node
 {
     Algebraic!(
         Bone,
-        Mesh,
+        ColoredMesh,
         PrimitivesTree,
     ) payload;
 

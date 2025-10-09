@@ -4,9 +4,6 @@ import pukan.scene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
-//TODO: remove
-alias Mesh = TexturedMesh;
-
 class ColoredMesh : DrawableByVulkan
 {
     Vertex[] vertices;

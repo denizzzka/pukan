@@ -164,13 +164,13 @@ void main() {
     scope(exit) cube.destroy;
 
     cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+    cube.updateDescriptorSet(*frameBuilder, scene.descriptorsPool[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
 
     scope mesh = createDemoMesh();
     scope(exit) mesh.destroy;
 
     /// Vertices descriptor
     mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    mesh.updateDescriptorSet(*frameBuilder, scene.descriptorsPool[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
 
     // Texture descriptor set:
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
@@ -181,7 +181,6 @@ void main() {
     auto sw = StopWatch(AutoStart.yes);
 
     auto renderData = DefaultRenderPass.VariableData(
-        graphicsPipeline: scene.graphicsPipelines.pipelines[0],
     );
 
     writeln(); // empty line for FPS counter
@@ -194,22 +193,24 @@ void main() {
         updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
+            renderData.imageExtent = scene.swapChain.imageExtent,
+            renderData.frameBuffer = frame.frameBuffer;
+
             auto cb = frame.commandBuffer;
 
             fb.uniformBuffer.recordUpload(cb);
 
-            renderData.imageExtent = scene.swapChain.imageExtent,
-            renderData.frameBuffer = frame.frameBuffer;
-
             renderData.descriptorSets = scene.descriptorsSets[0];
             renderData.pipelineLayout = scene.pipelineInfoCreators[0].pipelineLayout;
+            renderData.graphicsPipeline = scene.graphicsPipelines.pipelines[0];
             scene.renderPass.updateData(renderData);
             scene.renderPass.recordCommandBuffer(cb, cube);
 
-            //~ renderData.descriptorSets = scene.descriptorsSets[1];
-            //~ renderData.pipelineLayout = scene.pipelineInfoCreators[1].pipelineLayout;
-            //~ scene.renderPass.updateData(renderData);
-            //~ scene.renderPass.recordCommandBuffer(cb, mesh);
+            renderData.descriptorSets = scene.descriptorsSets[1];
+            renderData.pipelineLayout = scene.pipelineInfoCreators[1].pipelineLayout;
+            renderData.graphicsPipeline = scene.graphicsPipelines.pipelines[1];
+            scene.renderPass.updateData(renderData);
+            scene.renderPass.recordCommandBuffer(cb, mesh);
         });
 
         {

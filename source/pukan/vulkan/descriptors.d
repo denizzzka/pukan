@@ -78,6 +78,7 @@ class DescriptorPool
     }
 }
 
+//TODO: unused, remove
 VkDescriptorSetLayoutBinding[] createLayoutBinding(DescriptorSet)(DescriptorSet[] descriptorSets, VkShaderStageFlagBits[] stageFlags)
 in(descriptorSets.length == stageFlags.length)
 {
