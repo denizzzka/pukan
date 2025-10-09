@@ -41,12 +41,12 @@ class Scene
 
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
-        vertShader = device.create!ShaderModule("vert.spv");
-        fragShader = device.create!ShaderModule("frag.spv");
+        vertShader = device.create!ShaderModule(VK_SHADER_STAGE_VERTEX_BIT, "vert.spv");
+        fragShader = device.create!ShaderModule(VK_SHADER_STAGE_FRAGMENT_BIT, "frag.spv");
 
         shaderStages = [
-            vertShader.createShaderStageInfo(VK_SHADER_STAGE_VERTEX_BIT),
-            fragShader.createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT),
+            vertShader.createShaderStageInfo,
+            fragShader.createShaderStageInfo,
         ];
 
         descriptorPool = device.create!DescriptorPool(descriptorSetLayoutBindings);

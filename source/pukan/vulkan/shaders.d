@@ -10,9 +10,10 @@ class ShaderModule
 {
     LogicalDevice device;
     VkShaderModule shaderModule;
+    VkShaderStageFlagBits stage;
 
     //TODO: remove?
-    this(LogicalDevice dev, string filename)
+    this(LogicalDevice dev, VkShaderStageFlagBits stage, string filename)
     {
         import std.file: read;
 
@@ -20,10 +21,10 @@ class ShaderModule
 
         enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
-        this(dev, code);
+        this(dev, stage, code);
     }
 
-    this(LogicalDevice dev, ubyte[] sprivBinary)
+    this(LogicalDevice dev, VkShaderStageFlagBits stage, ubyte[] sprivBinary)
     in(sprivBinary.length % 4 == 0)
     {
         device = dev;
@@ -35,6 +36,8 @@ class ShaderModule
         };
 
         vkCreateShaderModule(dev.device, &cinf, dev.alloc, &shaderModule).vkCheck;
+
+        this.stage = stage;
     }
 
     ~this()
@@ -43,7 +46,7 @@ class ShaderModule
             vkDestroyShaderModule(device.device, shaderModule, device.alloc);
     }
 
-    auto createShaderStageInfo(VkShaderStageFlagBits stage)
+    auto createShaderStageInfo()
     {
         VkPipelineShaderStageCreateInfo cinf = {
             sType: VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -51,6 +54,7 @@ class ShaderModule
             pName: "main", // shader entry point
         };
 
+        // "module" is D keyword, workaround:
         __traits(getMember, cinf, "module") = shaderModule;
 
         return cinf;
