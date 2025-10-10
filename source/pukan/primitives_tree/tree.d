@@ -2,6 +2,8 @@ module pukan.primitives_tree.tree;
 
 import pukan.primitives_tree;
 import pukan.vulkan.bindings;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
 class PrimitivesTree //TODO: DrawableByVulkan
@@ -10,6 +12,8 @@ class PrimitivesTree //TODO: DrawableByVulkan
 
     PipelineConfig[] pipelinesConfig;
     Node root;
+
+    TransferBuffer coordsTranslationMatrices;
 
     this(Scene scene)
     {
@@ -29,6 +33,17 @@ class PrimitivesTree //TODO: DrawableByVulkan
     }
 
     void forEachNode(void delegate(ref Node) dg) => root.traversal(dg);
+
+    void formTranslationBuffer(LogicalDevice device)
+    {
+        size_t nodesCount;
+        forEachNode((dg){ nodesCount++; });
+
+        const sz = Bone.sizeof * nodesCount;
+
+        coordsTranslationMatrices.destroy;
+        coordsTranslationMatrices = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    }
 
     void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets)
     {

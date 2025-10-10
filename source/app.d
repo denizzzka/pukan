@@ -179,8 +179,9 @@ void main() {
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet);
 
     auto tree = new PrimitivesTree(scene);
-
+    scope(exit) tree.destroy;
     tree.setPayload(tree.root, cube, 0);
+    tree.formTranslationBuffer(device);
 
     import pukan.exceptions;
 
