@@ -160,11 +160,11 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    scope cube = createCubeDemoMesh();
-    scope(exit) cube.destroy;
+    //~ scope cube = createCubeDemoMesh();
+    //~ scope(exit) cube.destroy;
 
-    cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    cube.updateDescriptorSet(*frameBuilder, scene.descriptorPools[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
+    //~ cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+    //~ cube.updateDescriptorSet(*frameBuilder, scene.descriptorPools[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
 
     scope mesh = createDemoMesh();
     scope(exit) mesh.destroy;
@@ -173,8 +173,11 @@ void main() {
     mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
     // Texture descriptor set:
+    //TODO: move descriptorsSets to drawable
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet);
+
+    auto tree = createDemoTree();
 
     import pukan.exceptions;
 
@@ -202,12 +205,12 @@ void main() {
             fb.uniformBuffer.recordUpload(cb);
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
-                cube.drawingBufferFilling(
-                    buf,
-                    scene.graphicsPipelines.pipelines[0],
-                    scene.pipelineInfoCreators[0].pipelineLayout,
-                    scene.descriptorsSets[0],
-                );
+                //~ cube.drawingBufferFilling(
+                    //~ buf,
+                    //~ scene.graphicsPipelines.pipelines[0],
+                    //~ scene.pipelineInfoCreators[0].pipelineLayout,
+                    //~ scene.descriptorsSets[0],
+                //~ );
 
                 mesh.drawingBufferFilling(
                     buf,
@@ -275,6 +278,14 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
         cast(float) imageExtent.width / imageExtent.height,
         0.1f /* zNear */, 10.0f /* zFar */
     );
+}
+
+auto createDemoTree()
+{
+    auto tree = new PrimitivesTree;
+    //~ tree.root.payload = createCubeDemoMesh();
+
+    return tree;
 }
 
 /// Displaying data
