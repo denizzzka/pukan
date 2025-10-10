@@ -214,12 +214,7 @@ void main() {
             fb.uniformBuffer.recordUpload(cb);
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
-                //~ cube.drawingBufferFilling(
-                    //~ buf,
-                    //~ scene.graphicsPipelines.pipelines[0],
-                    //~ scene.pipelineInfoCreators[0].pipelineLayout,
-                    //~ scene.descriptorsSets[0],
-                //~ );
+                tree.drawingBufferFilling(buf, scene.descriptorsSets[0]);
 
                 mesh.drawingBufferFilling(
                     buf,

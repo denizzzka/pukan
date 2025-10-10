@@ -42,7 +42,7 @@ struct PipelineConfig
     VkPipelineLayout pipelineLayout;
 }
 
-class PrimitivesTree
+class PrimitivesTree //TODO: DrawableByVulkan
 {
     PipelineConfig[2] pipelinesConfig;
     Node root;
@@ -54,6 +54,19 @@ class PrimitivesTree
     }
 
     void forEachNode(void delegate(ref Node) dg) => root.traversal(dg);
+
+    void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets)
+    {
+        auto dr = root.payload.peek!Drawable;
+        auto pcfg = pipelinesConfig[dr.pipelineCfgIdx];
+
+        dr.drawingBufferFilling(
+            buf,
+            pcfg.graphicsPipeline,
+            pcfg.pipelineLayout,
+            descriptorSets,
+        );
+    }
 }
 
 /// Represents the translation of an node relative to the ancestor bone node
