@@ -311,7 +311,7 @@ auto createCubeDemoMesh()
         Vertex(Vector3f(-0.2, -0.2, -0.2), red),    // 0
         Vertex(Vector3f(-0.2, -0.2,  0.2), blue),   // 1
         Vertex(Vector3f( 0.2, -0.2, -0.2), green),  // 2
-        Vertex(Vector3f( 0.2, -0.2,  0.2), red),    // 3
+        Vertex(Vector3f( 0.2, -0.2,  0.2), green),  // 3
         Vertex(Vector3f( 0.2,  0.2, -0.2), red),    // 4
         Vertex(Vector3f( 0.2,  0.2,  0.2), green),  // 5
         Vertex(Vector3f(-0.2,  0.2,  0.2), red),    // 6
