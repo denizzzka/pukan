@@ -162,12 +162,19 @@ class GraphicsPipelines : Pipelines
 
 auto createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout)
 {
-    // pipeline layout can be used to pass uniform vars into shaders
+    import pukan.primitives_tree: Bone;
+
+    VkPushConstantRange range = {
+        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+        offset: 0,
+        size: Bone.mat.sizeof,
+    };
+
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         setLayoutCount: 1,
         pSetLayouts: &descriptorSetLayout,
-        pushConstantRangeCount: 0, // Optional
-        pPushConstantRanges: null, // Optional
+        pushConstantRangeCount: 1,
+        pPushConstantRanges: &range,
     };
 
     VkPipelineLayout pipelineLayout;

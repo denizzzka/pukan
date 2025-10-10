@@ -171,6 +171,8 @@ class DefaultRenderPass : RenderPass
 ///
 interface DrawableByVulkan
 {
+    import dlib.math: Matrix4x4f;
+
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
-    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets);
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets, ref Matrix4x4f trans);
 }

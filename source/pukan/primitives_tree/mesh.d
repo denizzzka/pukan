@@ -67,12 +67,16 @@ class ColoredMesh : DrawableByVulkan
         descriptorPool.updateSets(descriptorWrites);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets) //const
+    import dlib.math: Matrix4x4f;
+
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets, ref Matrix4x4f trans) //const
     {
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
         auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
         VkDeviceSize[] offsets = [VkDeviceSize(0)];
+
+        vkCmdPushConstants(buf, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
         vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
         vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);

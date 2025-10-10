@@ -211,11 +211,14 @@ void main() {
             scene.renderPass.recordCommandBuffer(cb, (buf){
                 tree.drawingBufferFilling(buf, scene.descriptorsSets[0]);
 
+                auto noTranslation = Matrix4f.identity;
+
                 mesh.drawingBufferFilling(
                     buf,
                     scene.graphicsPipelines.pipelines[1],
                     scene.pipelineInfoCreators[1].pipelineLayout,
                     scene.descriptorsSets[1],
+                    noTranslation,
                 );
             });
         });

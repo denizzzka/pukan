@@ -58,11 +58,16 @@ class PrimitivesTree //TODO: DrawableByVulkan
         auto dr = root.payload.peek!Drawable;
         auto pcfg = pipelinesConfig[dr.pipelineCfgIdx];
 
+        //FIXME: remove and use bone value
+        import dlib.math: Matrix4f;
+        auto noTrans = Matrix4f.identity;
+
         dr.drawingBufferFilling(
             buf,
             pcfg.graphicsPipeline,
             pcfg.pipelineLayout,
             descriptorSets,
+            noTrans,
         );
     }
 }
