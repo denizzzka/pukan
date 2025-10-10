@@ -47,7 +47,7 @@ class PrimitivesTree //TODO: DrawableByVulkan
         }
         else if(curr.payload.type == typeid(Drawable))
         {
-            auto dr = root.payload.peek!Drawable;
+            auto dr = curr.payload.peek!Drawable;
             auto pcfg = pipelinesConfig[dr.pipelineCfgIdx];
 
             dr.drawingBufferFilling(

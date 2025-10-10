@@ -160,12 +160,8 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    scope cube = createCubeDemoMesh();
-    scope(exit) cube.destroy;
-
-    cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    //TODO: move descriptorsSets to drawable
-    cube.updateDescriptorSet(*frameBuilder, scene.descriptorPools[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.descriptorPools[0]);
+    scope(exit) tree.destroy;
 
     scope mesh = createDemoMesh();
     scope(exit) mesh.destroy;
@@ -177,10 +173,6 @@ void main() {
     //TODO: move descriptorsSets to drawable
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet);
-
-    auto tree = new PrimitivesTree(scene);
-    scope(exit) tree.destroy;
-    tree.setPayload(tree.root, cube, 0);
 
     import pukan.exceptions;
 
@@ -281,11 +273,23 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-auto createDemoTree()
+auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, DescriptorPool descriptorPool)
 {
-    //~ tree.root.payload = createCubeDemoMesh();
+    auto cube = createCubeDemoMesh();
+    cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
-    //~ return tree;
+    //TODO: move descriptorsSets to drawable
+    cube.updateDescriptorSet(frameBuilder, descriptorPool, scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
+
+    auto tree = new PrimitivesTree(scene);
+    auto cubeNode = tree.root.addChildNode();
+
+    tree.setPayload(*cubeNode, cube, 0);
+
+    writeln(tree.root);
+    writeln(cubeNode);
+
+    return tree;
 }
 
 /// Displaying data

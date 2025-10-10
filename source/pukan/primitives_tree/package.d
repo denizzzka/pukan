@@ -28,6 +28,14 @@ struct Node
     Node[] children;
     package Payload payload;
 
+    Node* addChildNode()
+    {
+        parent = &this;
+        children.length++;
+
+        return &children[$-1];
+    }
+
     package void traversal(void delegate(ref Node) dg)
     {
         dg(this);
