@@ -160,11 +160,12 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    //~ scope cube = createCubeDemoMesh();
-    //~ scope(exit) cube.destroy;
+    scope cube = createCubeDemoMesh();
+    scope(exit) cube.destroy;
 
-    //~ cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-    //~ cube.updateDescriptorSet(*frameBuilder, scene.descriptorPools[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
+    cube.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+    //TODO: move descriptorsSets to drawable
+    cube.updateDescriptorSet(*frameBuilder, scene.descriptorPools[0], scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
 
     scope mesh = createDemoMesh();
     scope(exit) mesh.destroy;
@@ -178,10 +179,14 @@ void main() {
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet);
 
     auto tree = new PrimitivesTree;
-    tree.pipelinesConfig[0].pipelineLayout = scene.pipelineInfoCreators[0].pipelineLayout;
-    tree.pipelinesConfig[1].pipelineLayout = scene.pipelineInfoCreators[1].pipelineLayout;
-    tree.pipelinesConfig[0].graphicsPipeline = scene.graphicsPipelines.pipelines[0];
-    tree.pipelinesConfig[1].graphicsPipeline = scene.graphicsPipelines.pipelines[1];
+    {
+        tree.pipelinesConfig[0].pipelineLayout = scene.pipelineInfoCreators[0].pipelineLayout;
+        tree.pipelinesConfig[1].pipelineLayout = scene.pipelineInfoCreators[1].pipelineLayout;
+        tree.pipelinesConfig[0].graphicsPipeline = scene.graphicsPipelines.pipelines[0];
+        tree.pipelinesConfig[1].graphicsPipeline = scene.graphicsPipelines.pipelines[1];
+    }
+
+    tree.setPayload(tree.root, cube, 0);
 
     import pukan.exceptions;
 

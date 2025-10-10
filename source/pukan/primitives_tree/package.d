@@ -7,9 +7,17 @@ import pukan.vulkan.renderpass: DrawableByVulkan;
 import std.variant: Algebraic;
 import dlib.math: Matrix4x4f;
 
+struct Drawable
+{
+    ubyte pipelineCfgIdx;
+
+    DrawableByVulkan drawable;
+    alias this = drawable;
+}
+
 alias Payload = Algebraic!(
     Bone,
-    DrawableByVulkan,
+    Drawable,
     PrimitivesTree,
 );
 
@@ -31,8 +39,10 @@ class PrimitivesTree
     PipelineConfig[2] pipelinesConfig;
     Node root;
 
-    void setPayload(T)(Node* node, VkPipeline graphicsPipeline,)
+    void setPayload(ref Node node, DrawableByVulkan drawable, ubyte pipelineCfgIdx)
+    in(pipelineCfgIdx < pipelinesConfig.length)
     {
+        node.payload = Drawable(pipelineCfgIdx, drawable);
     }
 }
 
