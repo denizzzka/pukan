@@ -44,8 +44,21 @@ struct PipelineConfig
 
 class PrimitivesTree //TODO: DrawableByVulkan
 {
-    PipelineConfig[2] pipelinesConfig;
+    import pukan.scene: Scene;
+
+    PipelineConfig[] pipelinesConfig;
     Node root;
+
+    this(Scene scene)
+    {
+        pipelinesConfig.length = scene.pipelineInfoCreators.length;
+
+        foreach(i, ref cfg; pipelinesConfig)
+        {
+            cfg.graphicsPipeline = scene.graphicsPipelines.pipelines[i];
+            cfg.pipelineLayout = scene.pipelineInfoCreators[i].pipelineLayout;
+        }
+    }
 
     void setPayload(ref Node node, DrawableByVulkan drawable, ubyte pipelineCfgIdx)
     in(pipelineCfgIdx < pipelinesConfig.length)

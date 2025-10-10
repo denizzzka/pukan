@@ -178,13 +178,7 @@ void main() {
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet);
 
-    auto tree = new PrimitivesTree;
-    {
-        tree.pipelinesConfig[0].pipelineLayout = scene.pipelineInfoCreators[0].pipelineLayout;
-        tree.pipelinesConfig[1].pipelineLayout = scene.pipelineInfoCreators[1].pipelineLayout;
-        tree.pipelinesConfig[0].graphicsPipeline = scene.graphicsPipelines.pipelines[0];
-        tree.pipelinesConfig[1].graphicsPipeline = scene.graphicsPipelines.pipelines[1];
-    }
+    auto tree = new PrimitivesTree(scene);
 
     tree.setPayload(tree.root, cube, 0);
 
