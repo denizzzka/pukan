@@ -28,7 +28,7 @@ struct PipelineConfig
 
 class PrimitivesTree
 {
-    PipelineConfig[2] pipelinesConfigs;
+    PipelineConfig[2] pipelinesConfig;
     Node root;
 
     void setPayload(T)(Node* node, VkPipeline graphicsPipeline,)
