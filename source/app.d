@@ -181,7 +181,6 @@ void main() {
     auto tree = new PrimitivesTree(scene);
     scope(exit) tree.destroy;
     tree.setPayload(tree.root, cube, 0);
-    tree.formTranslationBuffer(device);
 
     import pukan.exceptions;
 
