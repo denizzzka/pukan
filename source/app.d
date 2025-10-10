@@ -289,9 +289,6 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
     tree.setPayload(*cubeNode, cube, 0);
 
-    writeln(tree.root);
-    writeln(cubeNode);
-
     return tree;
 }
 
