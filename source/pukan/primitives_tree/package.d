@@ -26,6 +26,14 @@ struct Node
     Node* parent;
     Node[] children;
     package Payload payload;
+
+    private void traversal(void delegate(ref Node) dg)
+    {
+        dg(this);
+
+        foreach(ref c; children)
+            c.traversal(dg);
+    }
 }
 
 struct PipelineConfig
@@ -44,6 +52,8 @@ class PrimitivesTree
     {
         node.payload = Drawable(pipelineCfgIdx, drawable);
     }
+
+    void forEachNode(void delegate(ref Node) dg) => root.traversal(dg);
 }
 
 /// Represents the translation of an node relative to the ancestor bone node
