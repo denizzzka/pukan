@@ -9,6 +9,12 @@ class ColoredMesh : DrawableByVulkan
     Vertex[] vertices;
     ushort[] indices;
 
+    this(Vertex[] vertices, ushort[] indices)
+    {
+        this.vertices = vertices;
+        this.indices = indices;
+    }
+
     static struct VerticesGPUBuffer
     {
         TransferBuffer vertexBuffer;
@@ -90,6 +96,11 @@ class TexturedMesh : ColoredMesh
 {
     //TODO: move to mesh-in-GPU descriptor
     Texture texture;
+
+    this(Vertex[] vertices, ushort[] indices)
+    {
+        super(vertices, indices);
+    }
 
     ~this()
     {

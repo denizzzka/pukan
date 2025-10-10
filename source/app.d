@@ -295,8 +295,8 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 /// Displaying data
 auto createDemoMesh()
 {
-    auto r = new TexturedMesh;
-    r.vertices = [
+    return new TexturedMesh(
+    [
         Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
         Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
         Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
@@ -306,23 +306,20 @@ auto createDemoMesh()
         Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
         Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
         Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
-    ];
-    r.indices = [
+    ],
+    [
         0, 1, 2, 2, 3, 0,
         4, 5, 6, 6, 7, 4,
-    ];
-
-    return r;
+    ]);
 }
 
-auto createCubeDemoMesh()
+auto createCubeVertices()
 {
     auto red = Vector3f(1.0f, 0.0f, 0.0f);
     auto green = Vector3f(0.0f, 1.0f, 0.0f);
     auto blue = Vector3f(0.0f, 0.0f, 1.0f);
 
-    auto r = new ColoredMesh;
-    r.vertices = [
+    auto vertices = [
         Vertex(Vector3f(-0.2, -0.2, -0.2), red),    // 0
         Vertex(Vector3f(-0.2, -0.2,  0.2), blue),   // 1
         Vertex(Vector3f( 0.2, -0.2, -0.2), green),  // 2
@@ -332,7 +329,8 @@ auto createCubeDemoMesh()
         Vertex(Vector3f(-0.2,  0.2,  0.2), red),    // 6
         Vertex(Vector3f(-0.2,  0.2, -0.2), green),  // 7
     ];
-    r.indices = [
+
+    ushort[] indices = [
         2, 1, 0, 1, 2, 3,   // 1
         2, 4, 3, 3, 4, 5,   // 2
         3, 5, 6, 1, 3, 6,   // 3
@@ -341,5 +339,12 @@ auto createCubeDemoMesh()
         0, 7, 2, 2, 7, 4,   // 6
     ];
 
-    return r;
+    import std.typecons;
+    return tuple(vertices, indices);
+}
+
+auto createCubeDemoMesh()
+{
+    auto v = createCubeVertices;
+    return new ColoredMesh(v[0], v[1]);
 }
