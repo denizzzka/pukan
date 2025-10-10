@@ -36,13 +36,21 @@ class PrimitivesTree //TODO: DrawableByVulkan
 
     void formTranslationBuffer(LogicalDevice device)
     {
-        size_t nodesCount;
-        forEachNode((dg){ nodesCount++; });
+        size_t bonesCount;
+        forEachNode((dg){
+            if(dg.payload.type == typeid(Bone))
+            {
+                dg.payload.peek!Bone.translationBufferIdx = cast(uint) bonesCount;
+                bonesCount++;
+            }
+        });
 
-        const sz = Bone.sizeof * nodesCount;
+        const sz = Bone.sizeof * bonesCount;
 
         coordsTranslationMatrices.destroy;
-        coordsTranslationMatrices = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+        if(sz > 0)
+            coordsTranslationMatrices = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets)

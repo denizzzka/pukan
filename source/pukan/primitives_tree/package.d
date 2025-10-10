@@ -44,5 +44,11 @@ struct PipelineConfig
 }
 
 /// Represents the translation of an node relative to the ancestor bone node
-//TODO: 4x3 should be enough
-alias Bone = Matrix4x4f;
+struct Bone
+{
+    //TODO: 4x3 should be enough
+    Matrix4x4f mat;
+    alias this = mat;
+
+    uint translationBufferIdx;
+}
