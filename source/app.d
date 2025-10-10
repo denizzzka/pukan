@@ -185,7 +185,7 @@ void main() {
     {
         glfwPollEvents();
 
-        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent);
+        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent, tree);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
 
@@ -250,11 +250,14 @@ void main() {
 
 import dlib.math;
 
-void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent)
+void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent, ref PrimitivesTree tree)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
     auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
+    auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
+
+    tree.root.payload = Bone(cubeRotation.toMatrix4x4);
 
     WorldTransformationUniformBuffer* wtb;
     assert(uniformBuffer.cpuBuf.length == WorldTransformationUniformBuffer.sizeof);

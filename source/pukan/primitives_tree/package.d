@@ -26,7 +26,7 @@ struct Node
 {
     Node* parent;
     Node[] children;
-    package Payload payload;
+    /*package*/ Payload payload;
 
     Node* addChildNode()
     {
