@@ -172,7 +172,7 @@ void main() {
     // Texture descriptor set:
     //TODO: move descriptorsSets to drawable
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
-    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet);
+    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet, "demo/assets/texture.jpeg");
 
     import pukan.exceptions;
 

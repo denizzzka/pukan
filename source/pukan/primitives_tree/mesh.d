@@ -114,11 +114,12 @@ class TexturedMesh : ColoredMesh
         scope VkCommandBuffer commandBuffer,
         DescriptorPool descriptorPool,
         VkDescriptorSet dstDescriptorSet,
+        string filename,
     ) //TODO: const
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 
-        texture = device.create!Texture(commandPool, commandBuffer);
+        texture = device.create!Texture(commandPool, commandBuffer, filename);
 
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
