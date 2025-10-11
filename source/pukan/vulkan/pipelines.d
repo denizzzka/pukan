@@ -9,15 +9,22 @@ class DefaultPipelineInfoCreator(Vertex)
     LogicalDevice device;
     VkPipelineLayout pipelineLayout;
     VkPipelineShaderStageCreateInfo[] shaderStages;
+    VkPushConstantRange[] pushConstantRanges;
 
-    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, VkPipelineShaderStageCreateInfo[] shads, VkPushConstantRange[] pushConstantRanges = null)
+    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, ShaderInfo[] shads)
     {
         device = dev;
 
+        foreach(ref s; shads)
+        {
+            shaderStages ~= s.createShaderStageInfo;
+
+            if(s.pushConstantRange.stageFlags)
+                pushConstantRanges ~= s.pushConstantRange;
+        }
+
         pipelineLayout = createPipelineLayout(device, descriptorSetLayout, pushConstantRanges); //TODO: move out from this class?
         scope(failure) destroy(pipelineLayout);
-
-        shaderStages = shads;
 
         initDepthStencil();
         initDynamicStates();

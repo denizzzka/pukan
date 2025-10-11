@@ -5,7 +5,12 @@ package mixin template Shaders()
     import std.container.slist;
     private SList!ShaderInfo loadedShaders;
 
-    ref ShaderInfo uploadShaderToGPU(VkShaderStageFlagBits stage, VkDescriptorSetLayoutBinding[] layoutBindings, ubyte[] sprivBinary)
+    ref ShaderInfo uploadShaderToGPU(
+        VkShaderStageFlagBits stage,
+        VkDescriptorSetLayoutBinding[] layoutBindings,
+        VkPushConstantRange pushConstant = VkPushConstantRange.init,
+        ubyte[] sprivBinary
+    )
     in(sprivBinary.length % 4 == 0)
     {
         VkShaderModuleCreateInfo cinf = {
@@ -18,6 +23,7 @@ package mixin template Shaders()
         vkCreateShaderModule(device, &cinf, this.alloc, &add.shaderModule).vkCheck;
         add.stage = stage;
         add.layoutBindings = layoutBindings;
+        add.pushConstantRange = pushConstant;
 
         loadedShaders.insert(add);
 
@@ -25,7 +31,12 @@ package mixin template Shaders()
     }
 
     //TODO: remove?
-    auto uploadShaderFromFileToGPU(string filename, VkShaderStageFlagBits stage, VkDescriptorSetLayoutBinding[] layoutBindings)
+    auto uploadShaderFromFileToGPU(
+        string filename,
+        VkShaderStageFlagBits stage,
+        VkDescriptorSetLayoutBinding[] layoutBindings,
+        VkPushConstantRange pushConstant = VkPushConstantRange.init
+    )
     {
         import std.file: read;
 
@@ -33,7 +44,7 @@ package mixin template Shaders()
 
         enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
-        return uploadShaderToGPU(stage, layoutBindings, code);
+        return uploadShaderToGPU(stage, layoutBindings, pushConstant, code);
     }
 
     private void shadersDtor()
@@ -50,6 +61,7 @@ struct ShaderInfo
     VkShaderModule shaderModule;
     VkShaderStageFlagBits stage;
     VkDescriptorSetLayoutBinding[] layoutBindings;
+    VkPushConstantRange pushConstantRange;
 
     auto createShaderStageInfo()
     {
