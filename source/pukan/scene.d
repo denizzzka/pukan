@@ -88,19 +88,19 @@ class Scene
         auto coloredLayoutBindings = createLayoutBinding([vertShader, /*coloredFragShader* /* bindings empty and can be ignored */]);
         auto texturedLayoutBindings = createLayoutBinding([vertShader, texturedFragShader]);
 
-        dbl[0].poolAndLayout = device.createDescriptorPool(coloredLayoutBindings);
-        dbl[1].poolAndLayout = device.createDescriptorPool(texturedLayoutBindings);
+        VkGraphicsPipelineCreateInfo[] infos;
 
-        dbl[0].descriptorsSet = device.allocateDescriptorSets(dbl[0].poolAndLayout, 1);
-        dbl[1].descriptorsSet = device.allocateDescriptorSets(dbl[1].poolAndLayout, 1);
+        void initPoolAndPipelineInfo(B, S)(size_t i, B bindings, S shaderStages)
+        {
+            dbl[i].poolAndLayout = device.createDescriptorPool(bindings);
+            dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
+            dbl[i].pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, dbl[i].poolAndLayout.descriptorSetLayout, shaderStages);
+            infos ~= dbl[i].pipelineInfoCreator.pipelineCreateInfo;
+        }
 
-        dbl[0].pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, dbl[0].poolAndLayout.descriptorSetLayout, coloredShaderStages);
-        dbl[1].pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, dbl[1].poolAndLayout.descriptorSetLayout, texturedShaderStages);
+        initPoolAndPipelineInfo(0, coloredLayoutBindings, coloredShaderStages);
+        initPoolAndPipelineInfo(1, texturedLayoutBindings, texturedShaderStages);
 
-        VkGraphicsPipelineCreateInfo[] infos = [
-            dbl[0].pipelineInfoCreator.pipelineCreateInfo, //colored
-            dbl[1].pipelineInfoCreator.pipelineCreateInfo, //textured
-        ];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
     }
 
