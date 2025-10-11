@@ -85,9 +85,6 @@ class Scene
             texturedFragShader,
         ];
 
-        auto coloredLayoutBindings = createLayoutBinding([vertShader, /*coloredFragShader* /* bindings empty and can be ignored */]);
-        auto texturedLayoutBindings = createLayoutBinding([vertShader, texturedFragShader]);
-
         VkGraphicsPipelineCreateInfo[] infos;
 
         void initPoolAndPipelineInfo(S)(size_t i, S shaderStages)
