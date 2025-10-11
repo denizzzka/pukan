@@ -7,6 +7,29 @@ import std.exception: enforce;
 
 package mixin template Shaders()
 {
+    private ShaderInfo[] loadedShaders;
+
+    void uploadShaderToGPU(VkShaderStageFlagBits stage, ubyte[] sprivBinary)
+    in(sprivBinary.length % 4 == 0)
+    {
+        loadedShaders.length++;
+        auto added = &loadedShaders[$-1];
+
+        VkShaderModuleCreateInfo cinf = {
+            sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            codeSize: sprivBinary.length,
+            pCode: cast(uint*) sprivBinary.ptr,
+        };
+
+        vkCreateShaderModule(device, &cinf, this.alloc, &added.shaderModule).vkCheck;
+        added.stage = stage;
+    }
+}
+
+struct ShaderInfo
+{
+    VkShaderModule shaderModule;
+    VkShaderStageFlagBits stage;
 }
 
 ///
