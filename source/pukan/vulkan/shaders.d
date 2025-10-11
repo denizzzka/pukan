@@ -1,10 +1,5 @@
 module pukan.vulkan.shaders;
 
-import pukan.vulkan;
-import pukan.vulkan.bindings;
-import pukan.exceptions;
-import std.exception: enforce;
-
 package mixin template Shaders()
 {
     /*FIXME private*/ ShaderInfo[] loadedShaders;
@@ -43,6 +38,8 @@ package mixin template Shaders()
             vkDestroyShaderModule(device, e.shaderModule, alloc);
     }
 }
+
+import pukan.vulkan.bindings;
 
 struct ShaderInfo
 {
