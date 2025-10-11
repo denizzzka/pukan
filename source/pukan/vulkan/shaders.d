@@ -8,7 +8,7 @@ package mixin template Shaders()
     ref ShaderInfo uploadShaderToGPU(VkShaderStageFlagBits stage, ubyte[] sprivBinary)
     in(sprivBinary.length % 4 == 0)
     {
-        ShaderInfo added;
+        loadedShaders.insert = ShaderInfo();
 
         VkShaderModuleCreateInfo cinf = {
             sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -16,10 +16,8 @@ package mixin template Shaders()
             pCode: cast(uint*) sprivBinary.ptr,
         };
 
-        vkCreateShaderModule(device, &cinf, this.alloc, &added.shaderModule).vkCheck;
-        added.stage = stage;
-
-        loadedShaders.insert(added);
+        vkCreateShaderModule(device, &cinf, this.alloc, &loadedShaders.front.shaderModule).vkCheck;
+        loadedShaders.front.stage = stage;
 
         return loadedShaders.front;
     }
