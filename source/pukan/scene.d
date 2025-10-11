@@ -24,11 +24,11 @@ class Scene
         PoolAndLayoutInfo poolAndLayout;
         VkDescriptorSet[] descriptorsSet;
         DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
+        VkGraphicsPipelineCreateInfo pipelineCreateInfo;
+        VkPipeline graphicsPipeline;
     }
 
     Doubled[2] dbl;
-
-    VkPipeline[] graphicsPipelines;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
@@ -85,21 +85,18 @@ class Scene
             texturedFragShader,
         ];
 
-        VkGraphicsPipelineCreateInfo[] infos;
-
         void initPoolAndPipelineInfo(S)(size_t i, S shaderStages)
         {
             auto layoutBindings = createLayoutBinding(shaderStages);
             dbl[i].poolAndLayout = device.createDescriptorPool(layoutBindings);
             dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
             dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, dbl[i].poolAndLayout.descriptorSetLayout, shaderStages, renderPass);
-            infos ~= dbl[i].pipelineInfoCreator.pipelineCreateInfo;
+            dbl[i].pipelineCreateInfo = dbl[i].pipelineInfoCreator.pipelineCreateInfo;
+            dbl[i].graphicsPipeline = device.createGraphicsPipelines([dbl[i].pipelineCreateInfo])[0];
         }
 
         initPoolAndPipelineInfo(0, coloredShaderStages);
         initPoolAndPipelineInfo(1, texturedShaderStages);
-
-        graphicsPipelines = device.createGraphicsPipelines(infos);
     }
 
     ~this()
@@ -107,9 +104,6 @@ class Scene
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
         frameBuilder.destroy;
-
-        //TODO: remove
-        graphicsPipelines.destroy;
     }
 
     void recreateSwapChain()

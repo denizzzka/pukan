@@ -139,9 +139,10 @@ package mixin template Pipelines()
     }
 
     VkPipeline[] createGraphicsPipelines(VkGraphicsPipelineCreateInfo[] infos)
+    out(r; r.length == infos.length)
     {
         size_t prevLen = pipelines.length;
-        pipelines.length = infos.length;
+        pipelines.length += infos.length;
 
         vkCreateGraphicsPipelines(
             this.device,
@@ -149,7 +150,7 @@ package mixin template Pipelines()
             cast(uint) infos.length,
             infos.ptr,
             this.alloc,
-            pipelines.ptr
+            &pipelines[prevLen]
         ).vkCheck;
 
         return pipelines[prevLen .. $];

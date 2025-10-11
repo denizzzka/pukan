@@ -19,7 +19,7 @@ class PrimitivesTree //TODO: DrawableByVulkan
 
         foreach(i, ref cfg; pipelinesConfig)
         {
-            cfg.graphicsPipeline = scene.graphicsPipelines[i];
+            cfg.graphicsPipeline = scene.dbl[i].graphicsPipeline;
             cfg.pipelineLayout = scene.dbl[i].pipelineInfoCreator.pipelineLayout;
         }
     }
