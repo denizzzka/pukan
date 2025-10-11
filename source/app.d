@@ -160,7 +160,7 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.poolsAndLayouts[0].descriptorPool);
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool);
     scope(exit) tree.destroy;
 
     scope mesh = createDemoMesh();
@@ -171,7 +171,7 @@ void main() {
 
     // Texture descriptor set:
     //TODO: move descriptorsSets to drawable
-    scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
+    scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, textureDstSet, "demo/assets/texture.jpeg");
 
     import pukan.exceptions;
@@ -200,15 +200,15 @@ void main() {
             fb.uniformBuffer.recordUpload(cb);
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
-                tree.drawingBufferFilling(buf, scene.descriptorsSets[0]);
+                tree.drawingBufferFilling(buf, scene.dbl[0].descriptorsSet);
 
                 auto noTranslation = Matrix4f.identity;
 
                 mesh.drawingBufferFilling(
                     buf,
                     scene.graphicsPipelines.pipelines[1],
-                    scene.pipelineInfoCreators[1].pipelineLayout,
-                    scene.descriptorsSets[1],
+                    scene.dbl[1].pipelineInfoCreator.pipelineLayout,
+                    scene.dbl[1].descriptorsSet,
                     noTranslation,
                 );
             });
@@ -282,7 +282,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
     //TODO: move descriptorsSets to drawable
-    cube.updateDescriptorSet(device, frameBuilder, scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
+    cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
 
     auto tree = new PrimitivesTree(scene);
     auto cubeNode = tree.root.addChildNode();

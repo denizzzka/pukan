@@ -15,12 +15,12 @@ class PrimitivesTree //TODO: DrawableByVulkan
 
     this(Scene scene)
     {
-        pipelinesConfig.length = scene.pipelineInfoCreators.length;
+        pipelinesConfig.length = scene.dbl.length;
 
         foreach(i, ref cfg; pipelinesConfig)
         {
             cfg.graphicsPipeline = scene.graphicsPipelines.pipelines[i];
-            cfg.pipelineLayout = scene.pipelineInfoCreators[i].pipelineLayout;
+            cfg.pipelineLayout = scene.dbl[i].pipelineInfoCreator.pipelineLayout;
         }
     }
 

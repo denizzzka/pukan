@@ -19,10 +19,15 @@ class Scene
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    PoolAndLayoutInfo[2] poolsAndLayouts;
-    VkDescriptorSet[][2] descriptorsSets;
+    static struct Doubled
+    {
+        PoolAndLayoutInfo poolAndLayout;
+        VkDescriptorSet[] descriptorsSet;
+        DefaultPipelineInfoCreator!Vertex pipelineInfoCreator;
+    }
 
-    DefaultPipelineInfoCreator!Vertex[2] pipelineInfoCreators;
+    Doubled[2] dbl;
+
     GraphicsPipelines graphicsPipelines;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
@@ -83,18 +88,18 @@ class Scene
         auto coloredLayoutBindings = createLayoutBinding([vertShader, /*coloredFragShader* /* bindings empty and can be ignored */]);
         auto texturedLayoutBindings = createLayoutBinding([vertShader, texturedFragShader]);
 
-        poolsAndLayouts[0] = device.createDescriptorPool(coloredLayoutBindings);
-        poolsAndLayouts[1] = device.createDescriptorPool(texturedLayoutBindings);
+        dbl[0].poolAndLayout = device.createDescriptorPool(coloredLayoutBindings);
+        dbl[1].poolAndLayout = device.createDescriptorPool(texturedLayoutBindings);
 
-        descriptorsSets[0] = device.allocateDescriptorSets(poolsAndLayouts[0], 1);
-        descriptorsSets[1] = device.allocateDescriptorSets(poolsAndLayouts[1], 1);
+        dbl[0].descriptorsSet = device.allocateDescriptorSets(dbl[0].poolAndLayout, 1);
+        dbl[1].descriptorsSet = device.allocateDescriptorSets(dbl[1].poolAndLayout, 1);
 
-        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[0].descriptorSetLayout, coloredShaderStages);
-        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[1].descriptorSetLayout, texturedShaderStages);
+        dbl[0].pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, dbl[0].poolAndLayout.descriptorSetLayout, coloredShaderStages);
+        dbl[1].pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, dbl[1].poolAndLayout.descriptorSetLayout, texturedShaderStages);
 
         VkGraphicsPipelineCreateInfo[] infos = [
-            pipelineInfoCreators[0].pipelineCreateInfo, //colored
-            pipelineInfoCreators[1].pipelineCreateInfo, //textured
+            dbl[0].pipelineInfoCreator.pipelineCreateInfo, //colored
+            dbl[1].pipelineInfoCreator.pipelineCreateInfo, //textured
         ];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
     }
