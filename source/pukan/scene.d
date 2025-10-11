@@ -20,6 +20,7 @@ class Scene
     VkQueue presentQueue;
 
     DescriptorPool[2] descriptorPools;
+    VkDescriptorPool[2] _descriptorPools; //TODO: rename to descriptorPools
     VkDescriptorSet[][2] descriptorsSets;
 
     DefaultPipelineInfoCreator!Vertex[2] pipelineInfoCreators;
@@ -76,6 +77,9 @@ class Scene
 
         auto coloredLayoutBindings = createLayoutBinding([vertShader, /*coloredFragShader*/ /* TODO: empty and can be ignored */]);
         auto texturedLayoutBindings = createLayoutBinding([vertShader, texturedFragShader]);
+
+        _descriptorPools[0] = device.createDescriptorPool();
+        _descriptorPools[1] = device.createDescriptorPool();
 
         descriptorPools[0] = device.create!DescriptorPool(coloredLayoutBindings);
         descriptorPools[1] = device.create!DescriptorPool(texturedLayoutBindings);

@@ -78,8 +78,6 @@ class LogicalDevice
         }
 
         vkCreateDevice(pd.physicalDevice, &createInfo, alloc, &device).vkCheck;
-
-        createDescriptorPool();
     }
 
     ~this()
