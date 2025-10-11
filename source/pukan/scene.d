@@ -74,33 +74,8 @@ class Scene
             texturedFragShader.createShaderStageInfo,
         ];
 
-        VkDescriptorSetLayoutBinding[] coloredLayoutBindings;
-        VkDescriptorSetLayoutBinding[] texturedLayoutBindings;
-
-        {
-            VkDescriptorSetLayoutBinding uboLayoutBinding = {
-                binding: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-            };
-
-            VkDescriptorSetLayoutBinding samplerLayoutBinding = {
-                binding: 1,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            };
-
-            coloredLayoutBindings = [
-                uboLayoutBinding,
-            ];
-
-            texturedLayoutBindings = [
-                uboLayoutBinding,
-                samplerLayoutBinding,
-            ];
-        }
+        auto coloredLayoutBindings = createLayoutBinding([vertShader, coloredFragShader]);
+        auto texturedLayoutBindings = createLayoutBinding([vertShader, texturedFragShader]);
 
         descriptorPools[0] = device.create!DescriptorPool(coloredLayoutBindings);
         descriptorPools[1] = device.create!DescriptorPool(texturedLayoutBindings);
