@@ -20,7 +20,7 @@ class Scene
     VkQueue presentQueue;
 
     DescriptorPool[2] descriptorPools;
-    DescriptorPoolInfo[2] _descriptorPools; //TODO: rename to descriptorPools
+    PoolAndLayoutInfo[2] _descriptorPools; //TODO: rename to poolAndLayoutsInfo
     VkDescriptorSet[][2] descriptorsSets;
 
     DefaultPipelineInfoCreator!Vertex[2] pipelineInfoCreators;

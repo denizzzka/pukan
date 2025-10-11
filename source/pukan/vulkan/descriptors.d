@@ -5,7 +5,7 @@ import pukan.vulkan.bindings;
 package mixin template DescriptorPools()
 {
     import std.container.slist;
-    /* private FIXME*/ SList!DescriptorPoolInfo descriptorPools;
+    /* private FIXME*/ SList!PoolAndLayoutInfo descriptorPools;
 
     ref auto createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
@@ -18,7 +18,7 @@ package mixin template DescriptorPools()
                 pBindings: descriptorSetLayoutBindings.ptr,
             };
 
-            DescriptorPoolInfo add;
+            PoolAndLayoutInfo add;
             vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &add.descriptorSetLayout);
             descriptorPools.insert(add);
         }
@@ -58,9 +58,25 @@ package mixin template DescriptorPools()
                 vkDestroyDescriptorPool(this.device, e.descriptorPool, this.alloc);
         }
     }
+
+    auto allocateDescriptorSets(ref PoolAndLayoutInfo layout, uint count)
+    {
+        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+            sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            descriptorPool: layout.descriptorPool,
+            descriptorSetCount: count,
+            pSetLayouts: &layout.descriptorSetLayout,
+        };
+
+        VkDescriptorSet[] ret;
+        ret.length = count;
+        vkAllocateDescriptorSets(this.device, &descriptorSetAllocateInfo, ret.ptr).vkCheck;
+
+        return ret;
+    }
 }
 
-struct DescriptorPoolInfo
+struct PoolAndLayoutInfo
 {
     VkDescriptorPool descriptorPool;
     VkDescriptorSetLayout descriptorSetLayout;
