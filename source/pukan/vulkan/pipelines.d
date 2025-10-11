@@ -10,11 +10,11 @@ class DefaultPipelineInfoCreator(Vertex)
     VkPipelineLayout pipelineLayout;
     VkPipelineShaderStageCreateInfo[] shaderStages;
 
-    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, VkPipelineShaderStageCreateInfo[] shads)
+    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, VkPipelineShaderStageCreateInfo[] shads, VkPushConstantRange[] pushConstantRanges = null)
     {
         device = dev;
 
-        pipelineLayout = createPipelineLayout(device, descriptorSetLayout); //TODO: move out from this class?
+        pipelineLayout = createPipelineLayout(device, descriptorSetLayout, pushConstantRanges); //TODO: move out from this class?
         scope(failure) destroy(pipelineLayout);
 
         shaderStages = shads;
@@ -160,22 +160,13 @@ class GraphicsPipelines : Pipelines
     }
 }
 
-VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout)
+VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout, VkPushConstantRange[] pushConstantRanges)
 {
-    import pukan.primitives_tree: Bone;
-
-    // TODO: add external argument pushConstantRanges[] = null
-    VkPushConstantRange range = {
-        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-        offset: 0,
-        size: Bone.mat.sizeof,
-    };
-
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         setLayoutCount: 1,
         pSetLayouts: &descriptorSetLayout,
-        pushConstantRangeCount: 1,
-        pPushConstantRanges: &range,
+        pushConstantRangeCount: cast(uint) pushConstantRanges.length,
+        pPushConstantRanges: pushConstantRanges.ptr,
     };
 
     VkPipelineLayout pipelineLayout;

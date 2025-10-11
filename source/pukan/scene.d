@@ -46,10 +46,18 @@ class Scene
                     binding: 0,
                     descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                     descriptorCount: 1,
-                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT, //TODO: assert compare with stage
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
                 ),
             ]
         );
+
+        // Vertex shader also uses push constant:
+        VkPushConstantRange vertShaderPushConstant = {
+            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            offset: 0,
+            size: Bone.mat.sizeof,
+        };
+
         auto coloredFragShader = device.uploadShaderFromFileToGPU("colored_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, null);
         auto texturedFragShader = device.uploadShaderFromFileToGPU(
             "textured_frag.spv",
@@ -83,8 +91,8 @@ class Scene
         descriptorsSets[0] = device.allocateDescriptorSets(poolsAndLayouts[0], 1);
         descriptorsSets[1] = device.allocateDescriptorSets(poolsAndLayouts[1], 1);
 
-        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[0].descriptorSetLayout, coloredShaderStages);
-        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[1].descriptorSetLayout, texturedShaderStages);
+        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[0].descriptorSetLayout, coloredShaderStages, [vertShaderPushConstant]);
+        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[1].descriptorSetLayout, texturedShaderStages, [vertShaderPushConstant]);
 
         VkGraphicsPipelineCreateInfo[] infos = [
             pipelineInfoCreators[0].pipelineCreateInfo, //colored
