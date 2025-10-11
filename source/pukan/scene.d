@@ -19,7 +19,7 @@ class Scene
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    DescriptorPool[2] descriptorPools;
+    //~ DescriptorPool[2] descriptorPools;
     PoolAndLayoutInfo[2] _descriptorPools; //TODO: rename to poolAndLayoutsInfo
     VkDescriptorSet[][2] descriptorsSets;
 
@@ -84,11 +84,11 @@ class Scene
         descriptorsSets[0] = device.allocateDescriptorSets(_descriptorPools[0], 1);
         descriptorsSets[1] = device.allocateDescriptorSets(_descriptorPools[1], 1);
 
-        descriptorPools[0] = device.create!DescriptorPool(coloredLayoutBindings);
-        descriptorPools[1] = device.create!DescriptorPool(texturedLayoutBindings);
+        //~ descriptorPools[0] = device.create!DescriptorPool(coloredLayoutBindings);
+        //~ descriptorPools[1] = device.create!DescriptorPool(texturedLayoutBindings);
 
-        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, descriptorPools[0].descriptorSetLayout, coloredShaderStages);
-        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, descriptorPools[1].descriptorSetLayout, texturedShaderStages);
+        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, _descriptorPools[0].descriptorSetLayout, coloredShaderStages);
+        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, _descriptorPools[1].descriptorSetLayout, texturedShaderStages);
 
         VkGraphicsPipelineCreateInfo[] infos = [
             pipelineInfoCreators[0].pipelineCreateInfo, //colored
@@ -99,7 +99,7 @@ class Scene
 
     ~this()
     {
-        descriptorPools.destroy;
+        //~ descriptorPools.destroy;
 
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;

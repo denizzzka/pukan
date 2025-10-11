@@ -160,7 +160,7 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.descriptorPools[0]);
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene._descriptorPools[0].descriptorPool);
     scope(exit) tree.destroy;
 
     scope mesh = createDemoMesh();
@@ -172,7 +172,7 @@ void main() {
     // Texture descriptor set:
     //TODO: move descriptorsSets to drawable
     scope textureDstSet = scene.descriptorsSets[1][0 /*TODO: frame number?*/];
-    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, scene.descriptorPools[1], textureDstSet, "demo/assets/texture.jpeg");
+    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, textureDstSet, "demo/assets/texture.jpeg");
 
     import pukan.exceptions;
 
@@ -276,13 +276,13 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, DescriptorPool descriptorPool)
+auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool)
 {
     auto cube = createCubeDemoMesh();
     cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
     //TODO: move descriptorsSets to drawable
-    cube.updateDescriptorSet(frameBuilder, descriptorPool, scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
+    cube.updateDescriptorSet(device, frameBuilder, scene.descriptorsSets[0][0 /*TODO: frame number?*/]);
 
     auto tree = new PrimitivesTree(scene);
     auto cubeNode = tree.root.addChildNode();

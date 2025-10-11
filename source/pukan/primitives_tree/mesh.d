@@ -50,7 +50,7 @@ class ColoredMesh : DrawableByVulkan
         r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
-    void updateDescriptorSet(FrameBuilder frameBuilder, DescriptorPool descriptorPool, VkDescriptorSet dstDescriptorSet)
+    void updateDescriptorSet(LogicalDevice device, FrameBuilder frameBuilder, VkDescriptorSet dstDescriptorSet)
     {
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
@@ -70,7 +70,7 @@ class ColoredMesh : DrawableByVulkan
             ),
         ];
 
-        descriptorPool.updateSets(descriptorWrites);
+        device.updateDescriptorSets(descriptorWrites);
     }
 
     import dlib.math: Matrix4x4f;
@@ -112,7 +112,6 @@ class TexturedMesh : ColoredMesh
         FrameBuilder frameBuilder,
         CommandPool commandPool,
         scope VkCommandBuffer commandBuffer,
-        DescriptorPool descriptorPool,
         VkDescriptorSet dstDescriptorSet,
         string filename,
     ) //TODO: const
@@ -154,6 +153,6 @@ class TexturedMesh : ColoredMesh
             )
         ];
 
-        descriptorPool.updateSets(descriptorWrites);
+        device.updateDescriptorSets(descriptorWrites);
     }
 }

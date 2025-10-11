@@ -7,7 +7,7 @@ package mixin template DescriptorPools()
     import std.container.slist;
     /* private FIXME*/ SList!PoolAndLayoutInfo descriptorPools;
 
-    ref auto createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
+    ref PoolAndLayoutInfo createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
         {
             // In general, VkDescriptorSetLayoutCreateInfo are not related to any pool.
@@ -73,6 +73,11 @@ package mixin template DescriptorPools()
         vkAllocateDescriptorSets(this.device, &descriptorSetAllocateInfo, ret.ptr).vkCheck;
 
         return ret;
+    }
+
+    void updateDescriptorSets(ref scope VkWriteDescriptorSet[] writeDescriptorSets)
+    {
+        vkUpdateDescriptorSets(device, cast(uint) writeDescriptorSets.length, writeDescriptorSets.ptr, 0, null);
     }
 }
 
