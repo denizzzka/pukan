@@ -7,7 +7,7 @@ import std.exception: enforce;
 
 package mixin template Shaders()
 {
-    private ShaderInfo[] loadedShaders;
+    /*FIXME private*/ ShaderInfo[] loadedShaders;
 
     void uploadShaderToGPU(VkShaderStageFlagBits stage, ubyte[] sprivBinary)
     in(sprivBinary.length % 4 == 0)
@@ -48,10 +48,24 @@ struct ShaderInfo
 {
     VkShaderModule shaderModule;
     VkShaderStageFlagBits stage;
+
+    auto createShaderStageInfo()
+    {
+        VkPipelineShaderStageCreateInfo cinf = {
+            sType: VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            stage: stage,
+            pName: "main", // shader entry point
+        };
+
+        // "module" is D keyword, workaround:
+        __traits(getMember, cinf, "module") = shaderModule;
+
+        return cinf;
+    }
 }
 
 ///
-class LoadedShaderModule
+class LoadedShaderModule_DELETE_ME
 {
     LogicalDevice device;
     VkShaderModule shaderModule;
