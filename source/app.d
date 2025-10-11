@@ -276,7 +276,7 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, VkDescriptorPool descriptorPool)
+auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, scope VkDescriptorPool descriptorPool)
 {
     auto cube = createCubeDemoMesh();
     cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
