@@ -8,17 +8,18 @@ package mixin template Shaders()
     ref ShaderInfo uploadShaderToGPU(VkShaderStageFlagBits stage, VkDescriptorSetLayoutBinding[] layoutBindings, ubyte[] sprivBinary)
     in(sprivBinary.length % 4 == 0)
     {
-        loadedShaders.insert = ShaderInfo();
-
         VkShaderModuleCreateInfo cinf = {
             sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             codeSize: sprivBinary.length,
             pCode: cast(uint*) sprivBinary.ptr,
         };
 
-        vkCreateShaderModule(device, &cinf, this.alloc, &loadedShaders.front.shaderModule).vkCheck;
-        loadedShaders.front.stage = stage;
-        loadedShaders.front.layoutBindings = layoutBindings;
+        ShaderInfo added;
+        vkCreateShaderModule(device, &cinf, this.alloc, &added.shaderModule).vkCheck;
+        added.stage = stage;
+        added.layoutBindings = layoutBindings;
+
+        loadedShaders.insert(added);
 
         return loadedShaders.front;
     }
