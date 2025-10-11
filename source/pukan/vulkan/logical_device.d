@@ -84,7 +84,7 @@ class LogicalDevice
     {
         if(device)
         {
-            descriptorsDtor();
+            descriptorPoolsDtor();
             shadersDtor();
             vkDestroyDevice(device, alloc);
         }
