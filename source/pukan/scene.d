@@ -90,16 +90,17 @@ class Scene
 
         VkGraphicsPipelineCreateInfo[] infos;
 
-        void initPoolAndPipelineInfo(B, S)(size_t i, B bindings, S shaderStages)
+        void initPoolAndPipelineInfo(S)(size_t i, S shaderStages)
         {
-            dbl[i].poolAndLayout = device.createDescriptorPool(bindings);
+            auto layoutBindings = createLayoutBinding(shaderStages);
+            dbl[i].poolAndLayout = device.createDescriptorPool(layoutBindings);
             dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
             dbl[i].pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, dbl[i].poolAndLayout.descriptorSetLayout, shaderStages);
             infos ~= dbl[i].pipelineInfoCreator.pipelineCreateInfo;
         }
 
-        initPoolAndPipelineInfo(0, coloredLayoutBindings, coloredShaderStages);
-        initPoolAndPipelineInfo(1, texturedLayoutBindings, texturedShaderStages);
+        initPoolAndPipelineInfo(0, coloredShaderStages);
+        initPoolAndPipelineInfo(1, texturedShaderStages);
 
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
     }
