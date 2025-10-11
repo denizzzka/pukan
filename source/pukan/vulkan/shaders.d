@@ -24,6 +24,12 @@ package mixin template Shaders()
         vkCreateShaderModule(device, &cinf, this.alloc, &added.shaderModule).vkCheck;
         added.stage = stage;
     }
+
+    private void shadersDtor()
+    {
+        foreach(e; loadedShaders)
+            vkDestroyShaderModule(device, e.shaderModule, alloc);
+    }
 }
 
 struct ShaderInfo

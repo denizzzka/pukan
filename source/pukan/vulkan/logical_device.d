@@ -83,7 +83,10 @@ class LogicalDevice
     ~this()
     {
         if(device)
+        {
+            shadersDtor();
             vkDestroyDevice(device, alloc);
+        }
     }
 
     auto alloc() => physicalDevice.instance.allocator;
