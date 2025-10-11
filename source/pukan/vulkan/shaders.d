@@ -74,7 +74,6 @@ VkDescriptorSetLayoutBinding[] createLayoutBinding(ShaderInfo[] shaders)
         foreach(ref b; shader.layoutBindings)
             assert(b.stageFlags == shader.stage);
 
-        //TODO: Add a check to ensure that already taken binding slots are not taken again
         ret ~= shader.layoutBindings;
     }
 
