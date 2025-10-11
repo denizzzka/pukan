@@ -4,14 +4,14 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 
-class DefaultPipelineInfoCreator(Vertex)
+class DefaultGraphicsPipelineInfoCreator(Vertex)
 {
     LogicalDevice device;
     VkPipelineLayout pipelineLayout;
     VkPipelineShaderStageCreateInfo[] shaderStages;
     VkPushConstantRange[] pushConstantRanges;
 
-    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, ShaderInfo[] shads)
+    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, ShaderInfo[] shads, RenderPass renderPass)
     {
         device = dev;
 
@@ -31,7 +31,7 @@ class DefaultPipelineInfoCreator(Vertex)
         initVertexInputStateCreateInfo();
         initViewportState();
 
-        fillPipelineInfo();
+        fillPipelineInfo(renderPass);
     }
 
     ~this()
@@ -102,7 +102,7 @@ class DefaultPipelineInfoCreator(Vertex)
 
     VkGraphicsPipelineCreateInfo pipelineCreateInfo;
 
-    void fillPipelineInfo()
+    void fillPipelineInfo(ref RenderPass renderPass)
     {
         import pukan.vulkan.defaults: colorBlending, inputAssembly, multisampling, rasterizer;
 
@@ -120,6 +120,7 @@ class DefaultPipelineInfoCreator(Vertex)
             pColorBlendState: &colorBlending,
             pDynamicState: &dynamicState,
             layout: pipelineLayout,
+            renderPass: renderPass.vkRenderPass,
             subpass: 0,
             basePipelineHandle: null, // Optional
             basePipelineIndex: -1, // Optional
@@ -129,13 +130,29 @@ class DefaultPipelineInfoCreator(Vertex)
 
 package mixin template Pipelines()
 {
-    import std.container.slist;
-    private SList!VkPipeline pipelines;
+    private VkPipeline[] pipelines;
 
     private void pipelinesDtor()
     {
         foreach(ref p; pipelines)
             vkDestroyPipeline(this.device, p, this.alloc);
+    }
+
+    VkPipeline[] createGraphicsPipelines(VkGraphicsPipelineCreateInfo[] infos)
+    {
+        size_t prevLen = pipelines.length;
+        pipelines.length = infos.length;
+
+        vkCreateGraphicsPipelines(
+            this.device,
+            null, // pipelineCache
+            cast(uint) infos.length,
+            infos.ptr,
+            this.alloc,
+            pipelines.ptr
+        ).vkCheck;
+
+        return pipelines[prevLen .. $];
     }
 }
 

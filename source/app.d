@@ -206,7 +206,7 @@ void main() {
 
                 mesh.drawingBufferFilling(
                     buf,
-                    scene.graphicsPipelines.pipelines[1],
+                    scene.graphicsPipelines[1],
                     scene.dbl[1].pipelineInfoCreator.pipelineLayout,
                     scene.dbl[1].descriptorsSet,
                     noTranslation,

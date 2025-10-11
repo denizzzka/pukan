@@ -23,12 +23,12 @@ class Scene
     {
         PoolAndLayoutInfo poolAndLayout;
         VkDescriptorSet[] descriptorsSet;
-        DefaultPipelineInfoCreator!Vertex pipelineInfoCreator;
+        DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
     }
 
     Doubled[2] dbl;
 
-    GraphicsPipelines graphicsPipelines;
+    VkPipeline[] graphicsPipelines;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
@@ -95,14 +95,14 @@ class Scene
             auto layoutBindings = createLayoutBinding(shaderStages);
             dbl[i].poolAndLayout = device.createDescriptorPool(layoutBindings);
             dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
-            dbl[i].pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, dbl[i].poolAndLayout.descriptorSetLayout, shaderStages);
+            dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, dbl[i].poolAndLayout.descriptorSetLayout, shaderStages, renderPass);
             infos ~= dbl[i].pipelineInfoCreator.pipelineCreateInfo;
         }
 
         initPoolAndPipelineInfo(0, coloredShaderStages);
         initPoolAndPipelineInfo(1, texturedShaderStages);
 
-        graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
+        graphicsPipelines = device.createGraphicsPipelines(infos);
     }
 
     ~this()
