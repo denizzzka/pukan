@@ -78,12 +78,15 @@ class LogicalDevice
         }
 
         vkCreateDevice(pd.physicalDevice, &createInfo, alloc, &device).vkCheck;
+
+        createDescriptorPool();
     }
 
     ~this()
     {
         if(device)
         {
+            descriptorsDtor();
             shadersDtor();
             vkDestroyDevice(device, alloc);
         }
@@ -136,6 +139,9 @@ class LogicalDevice
 
     import pukan.vulkan.shaders: Shaders;
     mixin Shaders;
+
+    import pukan.vulkan.descriptors: DescriptorPools;
+    mixin DescriptorPools;
 }
 
 class Semaphore

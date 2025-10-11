@@ -1,5 +1,25 @@
 module pukan.vulkan.descriptors;
 
+//TODO: rename to DescriptorPool
+package mixin template DescriptorPools()
+{
+    import std.container.slist;
+    private SList!VkDescriptorPool descriptorPools;
+
+    ref auto createDescriptorPool()
+    {
+        descriptorPools.insert = VkDescriptorPool();
+
+        return descriptorPools.front;
+    }
+
+    void descriptorsDtor()
+    {
+        foreach(e; descriptorPools)
+            vkDestroyDescriptorPool(this.device, e, this.alloc);
+    }
+}
+
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;

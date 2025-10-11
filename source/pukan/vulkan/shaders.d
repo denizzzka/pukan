@@ -38,7 +38,7 @@ package mixin template Shaders()
     private void shadersDtor()
     {
         foreach(e; loadedShaders)
-            vkDestroyShaderModule(device, e.shaderModule, alloc);
+            vkDestroyShaderModule(this.device, e.shaderModule, this.alloc);
     }
 }
 
