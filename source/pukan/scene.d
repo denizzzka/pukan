@@ -78,8 +78,8 @@ class Scene
         auto coloredLayoutBindings = createLayoutBinding([vertShader, /*coloredFragShader*/ /* TODO: empty and can be ignored */]);
         auto texturedLayoutBindings = createLayoutBinding([vertShader, texturedFragShader]);
 
-        _descriptorPools[0] = device.createDescriptorPool();
-        _descriptorPools[1] = device.createDescriptorPool();
+        _descriptorPools[0] = device.createDescriptorPool(coloredLayoutBindings);
+        _descriptorPools[1] = device.createDescriptorPool(texturedLayoutBindings);
 
         descriptorPools[0] = device.create!DescriptorPool(coloredLayoutBindings);
         descriptorPools[1] = device.create!DescriptorPool(texturedLayoutBindings);

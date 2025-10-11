@@ -1,14 +1,50 @@
 module pukan.vulkan.descriptors;
 
-//TODO: rename to DescriptorPool
+import pukan.vulkan.bindings;
+
 package mixin template DescriptorPools()
 {
     import std.container.slist;
     private SList!VkDescriptorPool descriptorPools;
 
-    ref auto createDescriptorPool()
+    ref auto createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
-        descriptorPools.insert = VkDescriptorPool();
+        VkDescriptorSetLayout descriptorSetLayout;
+
+        {
+            // In general, VkDescriptorSetLayoutCreateInfo are not related to any pool.
+            // But for now it is convenient to place it here
+
+            VkDescriptorSetLayoutCreateInfo descrLayoutCreateInfo = {
+                bindingCount: cast(uint) descriptorSetLayoutBindings.length,
+                pBindings: descriptorSetLayoutBindings.ptr,
+            };
+
+            vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &descriptorSetLayout);
+        }
+
+        VkDescriptorPool descriptorPool;
+
+        {
+            VkDescriptorPoolSize[] poolSizes;
+            poolSizes.length = descriptorSetLayoutBindings.length;
+
+            foreach(i, ref poolSize; poolSizes)
+            {
+                poolSize.type = descriptorSetLayoutBindings[i].descriptorType;
+                poolSize.descriptorCount = descriptorSetLayoutBindings[i].descriptorCount;
+            }
+
+            VkDescriptorPoolCreateInfo descriptorPoolInfo = {
+                poolSizeCount: cast(uint) poolSizes.length,
+                pPoolSizes: poolSizes.ptr,
+                maxSets: 1,
+            };
+
+            vkCall(this.device, &descriptorPoolInfo, this.alloc, &descriptorPool);
+        }
+
+        descriptorPools.insert = descriptorPool;
 
         return descriptorPools.front;
     }
@@ -21,7 +57,6 @@ package mixin template DescriptorPools()
 }
 
 import pukan.vulkan;
-import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 
 class DescriptorPool
