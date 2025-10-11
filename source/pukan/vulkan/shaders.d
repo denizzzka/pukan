@@ -5,7 +5,7 @@ package mixin template Shaders()
     import std.container.slist;
     private SList!ShaderInfo loadedShaders;
 
-    ref ShaderInfo uploadShaderToGPU(VkShaderStageFlagBits stage, ubyte[] sprivBinary)
+    ref ShaderInfo uploadShaderToGPU(VkShaderStageFlagBits stage, VkDescriptorSetLayoutBinding[] layoutBindings, ubyte[] sprivBinary)
     in(sprivBinary.length % 4 == 0)
     {
         loadedShaders.insert = ShaderInfo();
@@ -18,12 +18,13 @@ package mixin template Shaders()
 
         vkCreateShaderModule(device, &cinf, this.alloc, &loadedShaders.front.shaderModule).vkCheck;
         loadedShaders.front.stage = stage;
+        loadedShaders.front.layoutBindings = layoutBindings;
 
         return loadedShaders.front;
     }
 
     //TODO: remove?
-    auto uploadShaderFromFileToGPU(VkShaderStageFlagBits stage, string filename)
+    auto uploadShaderFromFileToGPU(string filename, VkShaderStageFlagBits stage, VkDescriptorSetLayoutBinding[] layoutBindings)
     {
         import std.file: read;
 
@@ -31,7 +32,7 @@ package mixin template Shaders()
 
         enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
-        return uploadShaderToGPU(stage, code);
+        return uploadShaderToGPU(stage, layoutBindings, code);
     }
 
     private void shadersDtor()
@@ -47,6 +48,7 @@ struct ShaderInfo
 {
     VkShaderModule shaderModule;
     VkShaderStageFlagBits stage;
+    VkDescriptorSetLayoutBinding[] layoutBindings;
 
     auto createShaderStageInfo()
     {
