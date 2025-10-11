@@ -160,10 +160,11 @@ class GraphicsPipelines : Pipelines
     }
 }
 
-auto createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout)
+VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout)
 {
     import pukan.primitives_tree: Bone;
 
+    // TODO: add external argument pushConstantRanges[] = null
     VkPushConstantRange range = {
         stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
         offset: 0,
