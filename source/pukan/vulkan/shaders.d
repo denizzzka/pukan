@@ -14,12 +14,12 @@ package mixin template Shaders()
             pCode: cast(uint*) sprivBinary.ptr,
         };
 
-        ShaderInfo added;
-        vkCreateShaderModule(device, &cinf, this.alloc, &added.shaderModule).vkCheck;
-        added.stage = stage;
-        added.layoutBindings = layoutBindings;
+        ShaderInfo add;
+        vkCreateShaderModule(device, &cinf, this.alloc, &add.shaderModule).vkCheck;
+        add.stage = stage;
+        add.layoutBindings = layoutBindings;
 
-        loadedShaders.insert(added);
+        loadedShaders.insert(add);
 
         return loadedShaders.front;
     }

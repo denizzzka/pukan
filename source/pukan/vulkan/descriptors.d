@@ -5,12 +5,10 @@ import pukan.vulkan.bindings;
 package mixin template DescriptorPools()
 {
     import std.container.slist;
-    private SList!VkDescriptorPool descriptorPools;
+    /* private FIXME*/ SList!DescriptorPoolInfo descriptorPools;
 
     ref auto createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
-        VkDescriptorSetLayout descriptorSetLayout;
-
         {
             // In general, VkDescriptorSetLayoutCreateInfo are not related to any pool.
             // But for now it is convenient to place it here
@@ -20,7 +18,9 @@ package mixin template DescriptorPools()
                 pBindings: descriptorSetLayoutBindings.ptr,
             };
 
-            vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &descriptorSetLayout);
+            DescriptorPoolInfo add;
+            vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &add.descriptorSetLayout);
+            descriptorPools.insert(add);
         }
 
         VkDescriptorPool descriptorPool;
@@ -41,19 +41,29 @@ package mixin template DescriptorPools()
                 maxSets: 1,
             };
 
-            vkCall(this.device, &descriptorPoolInfo, this.alloc, &descriptorPool);
+            vkCall(this.device, &descriptorPoolInfo, this.alloc, &descriptorPools.front.descriptorPool);
         }
-
-        descriptorPools.insert = descriptorPool;
 
         return descriptorPools.front;
     }
 
     void descriptorsDtor()
     {
-        foreach(e; descriptorPools)
-            vkDestroyDescriptorPool(this.device, e, this.alloc);
+        foreach(ref e; descriptorPools)
+        {
+            // always unconditionally exists
+            vkDestroyDescriptorSetLayout(this.device, e.descriptorSetLayout, this.alloc);
+
+            if(e.descriptorPool)
+                vkDestroyDescriptorPool(this.device, e.descriptorPool, this.alloc);
+        }
     }
+}
+
+struct DescriptorPoolInfo
+{
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSetLayout descriptorSetLayout;
 }
 
 import pukan.vulkan;
