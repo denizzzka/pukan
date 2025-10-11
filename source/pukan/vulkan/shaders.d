@@ -6,7 +6,7 @@ import pukan.exceptions;
 import std.exception: enforce;
 
 ///
-class ShaderModule
+class LoadedShaderModule
 {
     LogicalDevice device;
     VkShaderModule shaderModule;

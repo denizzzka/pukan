@@ -19,9 +19,9 @@ class Scene
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    ShaderModule vertShader;
-    ShaderModule coloredFragShader;
-    ShaderModule texturedFragShader;
+    LoadedShaderModule vertShader;
+    LoadedShaderModule coloredFragShader;
+    LoadedShaderModule texturedFragShader;
 
     DescriptorPool[2] descriptorPools;
     VkDescriptorSet[][2] descriptorsSets;
@@ -42,9 +42,9 @@ class Scene
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
 
-        vertShader = device.create!ShaderModule(VK_SHADER_STAGE_VERTEX_BIT, "vert.spv");
-        coloredFragShader = device.create!ShaderModule(VK_SHADER_STAGE_FRAGMENT_BIT, "colored_frag.spv");
-        texturedFragShader = device.create!ShaderModule(VK_SHADER_STAGE_FRAGMENT_BIT, "textured_frag.spv");
+        vertShader = device.create!LoadedShaderModule(VK_SHADER_STAGE_VERTEX_BIT, "vert.spv");
+        coloredFragShader = device.create!LoadedShaderModule(VK_SHADER_STAGE_FRAGMENT_BIT, "colored_frag.spv");
+        texturedFragShader = device.create!LoadedShaderModule(VK_SHADER_STAGE_FRAGMENT_BIT, "textured_frag.spv");
 
         auto coloredShaderStages = [
             vertShader.createShaderStageInfo,
