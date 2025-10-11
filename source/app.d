@@ -160,7 +160,7 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene._descriptorPools[0].descriptorPool);
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.poolsAndLayouts[0].descriptorPool);
     scope(exit) tree.destroy;
 
     scope mesh = createDemoMesh();

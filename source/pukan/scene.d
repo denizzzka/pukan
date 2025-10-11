@@ -19,7 +19,7 @@ class Scene
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    PoolAndLayoutInfo[2] _descriptorPools; //TODO: rename to poolAndLayoutsInfo
+    PoolAndLayoutInfo[2] poolsAndLayouts;
     VkDescriptorSet[][2] descriptorsSets;
 
     DefaultPipelineInfoCreator!Vertex[2] pipelineInfoCreators;
@@ -77,14 +77,14 @@ class Scene
         auto coloredLayoutBindings = createLayoutBinding([vertShader, /*coloredFragShader*/ /* TODO: empty and can be ignored */]);
         auto texturedLayoutBindings = createLayoutBinding([vertShader, texturedFragShader]);
 
-        _descriptorPools[0] = device.createDescriptorPool(coloredLayoutBindings);
-        _descriptorPools[1] = device.createDescriptorPool(texturedLayoutBindings);
+        poolsAndLayouts[0] = device.createDescriptorPool(coloredLayoutBindings);
+        poolsAndLayouts[1] = device.createDescriptorPool(texturedLayoutBindings);
 
-        descriptorsSets[0] = device.allocateDescriptorSets(_descriptorPools[0], 1);
-        descriptorsSets[1] = device.allocateDescriptorSets(_descriptorPools[1], 1);
+        descriptorsSets[0] = device.allocateDescriptorSets(poolsAndLayouts[0], 1);
+        descriptorsSets[1] = device.allocateDescriptorSets(poolsAndLayouts[1], 1);
 
-        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, _descriptorPools[0].descriptorSetLayout, coloredShaderStages);
-        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, _descriptorPools[1].descriptorSetLayout, texturedShaderStages);
+        pipelineInfoCreators[0] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[0].descriptorSetLayout, coloredShaderStages);
+        pipelineInfoCreators[1] = new DefaultPipelineInfoCreator!Vertex(device, poolsAndLayouts[1].descriptorSetLayout, texturedShaderStages);
 
         VkGraphicsPipelineCreateInfo[] infos = [
             pipelineInfoCreators[0].pipelineCreateInfo, //colored
