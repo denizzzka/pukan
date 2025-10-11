@@ -5,6 +5,10 @@ import pukan.vulkan.bindings;
 import pukan.exceptions;
 import std.exception: enforce;
 
+package mixin template Shaders()
+{
+}
+
 ///
 class LoadedShaderModule
 {

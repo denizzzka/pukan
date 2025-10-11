@@ -130,6 +130,9 @@ class LogicalDevice
     {
         return new CommandPool(this, familyIdx);
     }
+
+    import pukan.vulkan.shaders: Shaders; 
+    mixin Shaders;
 }
 
 class Semaphore
