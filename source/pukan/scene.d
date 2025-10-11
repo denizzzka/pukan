@@ -81,6 +81,9 @@ class Scene
         _descriptorPools[0] = device.createDescriptorPool(coloredLayoutBindings);
         _descriptorPools[1] = device.createDescriptorPool(texturedLayoutBindings);
 
+        descriptorsSets[0] = device.allocateDescriptorSets(_descriptorPools[0], 1);
+        descriptorsSets[1] = device.allocateDescriptorSets(_descriptorPools[1], 1);
+
         descriptorPools[0] = device.create!DescriptorPool(coloredLayoutBindings);
         descriptorPools[1] = device.create!DescriptorPool(texturedLayoutBindings);
 
@@ -92,9 +95,6 @@ class Scene
             pipelineInfoCreators[1].pipelineCreateInfo, //textured
         ];
         graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
-
-        descriptorsSets[0] = descriptorPools[0].allocateDescriptorSets(1);
-        descriptorsSets[1] = descriptorPools[1].allocateDescriptorSets(1);
     }
 
     ~this()
