@@ -38,18 +38,18 @@ class Scene
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
 
-        device.uploadShaderFromFileToGPU(VK_SHADER_STAGE_VERTEX_BIT, "vert.spv");
-        device.uploadShaderFromFileToGPU(VK_SHADER_STAGE_FRAGMENT_BIT, "colored_frag.spv");
-        device.uploadShaderFromFileToGPU(VK_SHADER_STAGE_FRAGMENT_BIT, "textured_frag.spv");
+        auto vertShader = device.uploadShaderFromFileToGPU(VK_SHADER_STAGE_VERTEX_BIT, "vert.spv");
+        auto coloredFragShader = device.uploadShaderFromFileToGPU(VK_SHADER_STAGE_FRAGMENT_BIT, "colored_frag.spv");
+        auto texturedFragShader = device.uploadShaderFromFileToGPU(VK_SHADER_STAGE_FRAGMENT_BIT, "textured_frag.spv");
 
         auto coloredShaderStages = [
-            device.loadedShaders[0].createShaderStageInfo, //vertShader
-            device.loadedShaders[1].createShaderStageInfo, //coloredFragShader
+            vertShader.createShaderStageInfo,
+            coloredFragShader.createShaderStageInfo,
         ];
 
         auto texturedShaderStages = [
-            device.loadedShaders[0].createShaderStageInfo, //vertShader
-            device.loadedShaders[2].createShaderStageInfo, //texturedFragShader
+            vertShader.createShaderStageInfo,
+            texturedFragShader.createShaderStageInfo,
         ];
 
         VkDescriptorSetLayoutBinding[] coloredLayoutBindings;

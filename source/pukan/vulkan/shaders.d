@@ -2,13 +2,13 @@ module pukan.vulkan.shaders;
 
 package mixin template Shaders()
 {
-    /*FIXME private*/ ShaderInfo[] loadedShaders;
+    import std.container.slist;
+    private SList!ShaderInfo loadedShaders;
 
-    void uploadShaderToGPU(VkShaderStageFlagBits stage, ubyte[] sprivBinary)
+    ref ShaderInfo uploadShaderToGPU(VkShaderStageFlagBits stage, ubyte[] sprivBinary)
     in(sprivBinary.length % 4 == 0)
     {
-        loadedShaders.length++;
-        auto added = &loadedShaders[$-1];
+        ShaderInfo added;
 
         VkShaderModuleCreateInfo cinf = {
             sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -18,10 +18,14 @@ package mixin template Shaders()
 
         vkCreateShaderModule(device, &cinf, this.alloc, &added.shaderModule).vkCheck;
         added.stage = stage;
+
+        loadedShaders.insert(added);
+
+        return loadedShaders.front;
     }
 
     //TODO: remove?
-    void uploadShaderFromFileToGPU(VkShaderStageFlagBits stage, string filename)
+    auto uploadShaderFromFileToGPU(VkShaderStageFlagBits stage, string filename)
     {
         import std.file: read;
 
@@ -29,7 +33,7 @@ package mixin template Shaders()
 
         enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
-        uploadShaderToGPU(stage, code);
+        return uploadShaderToGPU(stage, code);
     }
 
     private void shadersDtor()
