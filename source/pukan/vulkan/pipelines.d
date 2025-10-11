@@ -127,7 +127,19 @@ class DefaultPipelineInfoCreator(Vertex)
     }
 }
 
-abstract class Pipelines
+package mixin template Pipelines()
+{
+    import std.container.slist;
+    private SList!VkPipeline pipelines;
+
+    private void pipelinesDtor()
+    {
+        foreach(ref p; pipelines)
+            vkDestroyPipeline(this.device, p, this.alloc);
+    }
+}
+
+abstract class Pipelines_DELETE_ME
 {
     LogicalDevice device;
     VkPipeline[] pipelines;
@@ -145,7 +157,7 @@ abstract class Pipelines
     }
 }
 
-class GraphicsPipelines : Pipelines
+class GraphicsPipelines : Pipelines_DELETE_ME
 {
     this(LogicalDevice dev, VkGraphicsPipelineCreateInfo[] infos, RenderPass renderPass)
     {

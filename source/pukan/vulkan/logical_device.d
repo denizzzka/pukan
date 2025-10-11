@@ -84,6 +84,7 @@ class LogicalDevice
     {
         if(device)
         {
+            pipelinesDtor();
             descriptorPoolsDtor();
             shadersDtor();
             vkDestroyDevice(device, alloc);
@@ -140,6 +141,9 @@ class LogicalDevice
 
     import pukan.vulkan.descriptors: DescriptorPools;
     mixin DescriptorPools;
+
+    import pukan.vulkan.pipelines: Pipelines;
+    mixin Pipelines;
 }
 
 class Semaphore
