@@ -25,6 +25,18 @@ package mixin template Shaders()
         added.stage = stage;
     }
 
+    //TODO: remove?
+    void uploadShaderFromFileToGPU(VkShaderStageFlagBits stage, string filename)
+    {
+        import std.file: read;
+
+        auto code = cast(ubyte[]) read(filename);
+
+        enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
+
+        uploadShaderToGPU(stage, code);
+    }
+
     private void shadersDtor()
     {
         foreach(e; loadedShaders)
