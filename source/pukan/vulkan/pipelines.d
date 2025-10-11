@@ -157,46 +157,6 @@ package mixin template Pipelines()
     }
 }
 
-abstract class Pipelines_DELETE_ME
-{
-    LogicalDevice device;
-    VkPipeline[] pipelines;
-    alias this = pipelines;
-
-    this(LogicalDevice dev)
-    {
-        device = dev;
-    }
-
-    ~this()
-    {
-        foreach(ref p; pipelines)
-            vkDestroyPipeline(device.device, p, device.alloc);
-    }
-}
-
-class GraphicsPipelines : Pipelines_DELETE_ME
-{
-    this(LogicalDevice dev, VkGraphicsPipelineCreateInfo[] infos, RenderPass renderPass)
-    {
-        super(dev);
-
-        foreach(ref inf; infos)
-            inf.renderPass = renderPass.vkRenderPass;
-
-        pipelines.length = infos.length;
-
-        vkCreateGraphicsPipelines(
-            device.device,
-            null, // pipelineCache
-            cast(uint) infos.length,
-            infos.ptr,
-            device.alloc,
-            pipelines.ptr
-        ).vkCheck;
-    }
-}
-
 VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout, VkPushConstantRange[] pushConstantRanges)
 {
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
