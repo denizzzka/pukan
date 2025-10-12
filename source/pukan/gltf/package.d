@@ -1,5 +1,6 @@
 module pukan.gltf;
 
+import std.algorithm;
 import std.exception: enforce;
 static import std.file;
 static import std.path;
@@ -19,6 +20,15 @@ auto loadGlTF2(string filename)
     {
         const ver = json["asset"]["version"].get!string;
         enforce!PukanException(ver == "2.0", "glTF version "~ver~" unsupported");
+    }
+
+    const sceneIdx = json["scene"].get!int;
+    auto nodesIdxs = json["scenes"][sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
+    const nodes = json["nodes"];
+
+    foreach(i; nodesIdxs)
+    {
+        //~ nodes[i]
     }
 
     return 0;
