@@ -163,17 +163,6 @@ void main() {
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool);
     scope(exit) tree.destroy;
 
-    scope mesh = createTexturedDemoMesh();
-    scope(exit) mesh.destroy;
-
-    /// Vertices descriptor
-    mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
-
-    // Texture descriptor set:
-    //TODO: move descriptorsSets to drawable
-    scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
-    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, textureDstSet, "demo/assets/texture.jpeg");
-
     auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
 
     import pukan.exceptions;
@@ -204,19 +193,21 @@ void main() {
             scene.renderPass.recordCommandBuffer(cb, (buf){
                 auto noTranslation = Matrix4f.identity;
 
-                tree.drawingBufferFilling(
-                    buf,
-                    scene.dbl[0].graphicsPipelineCfg,
-                    scene.dbl[0].descriptorsSet,
-                    noTranslation,
-                );
+                tree.drawingBufferFilling(buf, scene.dbl[0].descriptorsSet);
 
-                mesh.drawingBufferFilling(
-                    buf,
-                    scene.dbl[1].graphicsPipelineCfg,
-                    scene.dbl[1].descriptorsSet,
-                    noTranslation,
-                );
+                //~ tree.drawingBufferFilling(
+                    //~ buf,
+                    //~ scene.dbl[0].graphicsPipelineCfg,
+                    //~ scene.dbl[0].descriptorsSet,
+                    //~ noTranslation,
+                //~ );
+
+                //~ mesh.drawingBufferFilling(
+                    //~ buf,
+                    //~ scene.dbl[1].graphicsPipelineCfg,
+                    //~ scene.dbl[1].descriptorsSet,
+                    //~ noTranslation,
+                //~ );
             });
         });
 
@@ -284,16 +275,35 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, scope VkDescriptorPool descriptorPool)
 {
-    auto cube = createCubeDemoMesh();
-    cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
-
-    //TODO: move descriptorsSets to drawable
-    cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
-
     auto tree = new DrawableTree;
-    auto cubeNode = tree.root.addChildNode();
 
-    tree.setPayload(*cubeNode, cube, scene.dbl[0].graphicsPipelineCfg);
+    auto coloredBranch = tree.root.addChildNode(scene.dbl[0].graphicsPipelineCfg);
+
+    {
+        auto cube = createCubeDemoMesh();
+        cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
+
+        //TODO: move descriptorsSets to drawable
+        cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
+
+        //TODO: get rid of this cast
+        coloredBranch.addChildNode(cast(DrawableByVulkan) cube);
+    }
+
+    auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);
+
+    {
+        auto mesh = createTexturedDemoMesh();
+        mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
+
+        // Texture descriptor set:
+        //TODO: move descriptorsSets to drawable
+        scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
+        mesh.updateTextureDescriptorSet(device, frameBuilder, frameBuilder.commandPool, commandBuffer, textureDstSet, "demo/assets/texture.jpeg");
+
+        //TODO: get rid of this cast
+        textureBranch.addChildNode(cast(DrawableByVulkan) mesh);
+    }
 
     return tree;
 }

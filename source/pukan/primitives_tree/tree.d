@@ -16,31 +16,23 @@ class PrimitivesTree
 
 class DrawableTree : PrimitivesTree, DrawableByVulkan
 {
-    import pukan.scene: Scene;
-
-    void setPayload(ref Node node, DrawableByVulkan drawable, GraphicsPipelineCfg cfg)
-    {
-        node.addChildNode(cfg).addChildNode(drawable);
-    }
-
     import dlib.math;
 
-    void drawingBufferFilling(VkCommandBuffer buf, ref GraphicsPipelineCfg pipelineCfg, VkDescriptorSet[] descriptorSets, Matrix4x4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets)
     {
-        drawingBufferFilling(buf, descriptorSets, root, trans, pipelineCfg);
+        //~ auto pipelineCfg = GraphicsPipelineCfg.init;
+
+        drawingBufferFilling(buf, GraphicsPipelineCfg.init, descriptorSets, Matrix4f.identity);
     }
 
-    private void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets, ref Node curr, Matrix4x4f trans, ref GraphicsPipelineCfg pipelineCfg)
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, VkDescriptorSet[] descriptorSets, Matrix4x4f trans)
     {
-        if(curr.payload.type == typeid(Bone))
-        {
-            trans *= curr.payload.peek!Bone.mat;
-        }
-        else if(curr.payload.type == typeid(GraphicsPipelineCfg))
-        {
-            pipelineCfg = *curr.payload.peek!GraphicsPipelineCfg;
-        }
-        else if(curr.payload.type == typeid(DrawableByVulkan))
+        drawingBufferFilling(buf, pipelineCfg, descriptorSets, trans, root);
+    }
+
+    private void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, VkDescriptorSet[] descriptorSets, Matrix4x4f trans, ref Node curr)
+    {
+        if(curr.payload.type == typeid(DrawableByVulkan))
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
 
@@ -51,8 +43,16 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
                 trans,
             );
         }
+        else if(curr.payload.type == typeid(Bone))
+        {
+            trans *= curr.payload.peek!Bone.mat;
+        }
+        else if(curr.payload.type == typeid(GraphicsPipelineCfg))
+        {
+            pipelineCfg = *curr.payload.peek!GraphicsPipelineCfg;
+        }
 
         foreach(ref c; curr.children)
-            drawingBufferFilling(buf, descriptorSets, c, trans, pipelineCfg);
+            drawingBufferFilling(buf, pipelineCfg, descriptorSets, trans, c);
     }
 }
