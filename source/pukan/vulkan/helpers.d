@@ -191,12 +191,12 @@ void printStackTrace()
     defaultTraceDeallocator(trace);
 }
 
-debug version = PukanSanitizer;
+debug version = PukanVulkanCodeSanitizer;
 
 /// Wrapper for a mixin template to prevent accessing external variables except .this
 package mixin template ScopedLogicalDeviceTemplateMixin(alias M)
 {
-    version(PukanSanitizer)
+    version(PukanVulkanCodeSanitizer)
     {
         // Just compile template mixin twice, once inside of the unused class:
         private static class Enclosure
