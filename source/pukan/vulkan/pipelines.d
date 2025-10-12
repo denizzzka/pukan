@@ -11,7 +11,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
     VkPipelineShaderStageCreateInfo[] shaderStages;
     VkPushConstantRange[] pushConstantRanges;
 
-    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, ShaderInfo[] shads, RenderPass renderPass)
+    this(LogicalDevice dev, VkDescriptorSetLayout[] descriptorSetLayouts, ShaderInfo[] shads, RenderPass renderPass)
     {
         device = dev;
 
@@ -23,7 +23,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
                 pushConstantRanges ~= s.pushConstantRange;
         }
 
-        pipelineLayout = createPipelineLayout(device, descriptorSetLayout, pushConstantRanges); //TODO: move out from this class?
+        pipelineLayout = createPipelineLayout(device, descriptorSetLayouts, pushConstantRanges); //TODO: move out from this class?
         scope(failure) destroy(pipelineLayout);
 
         initDepthStencil();
@@ -157,11 +157,11 @@ package mixin template Pipelines()
     }
 }
 
-VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout, VkPushConstantRange[] pushConstantRanges)
+VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout[] descriptorSetLayouts, VkPushConstantRange[] pushConstantRanges)
 {
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-        setLayoutCount: 1,
-        pSetLayouts: &descriptorSetLayout,
+        setLayoutCount: cast(uint) descriptorSetLayouts.length,
+        pSetLayouts: descriptorSetLayouts.ptr,
         pushConstantRangeCount: cast(uint) pushConstantRanges.length,
         pPushConstantRanges: pushConstantRanges.ptr,
     };

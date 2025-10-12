@@ -94,7 +94,7 @@ class Scene
             auto layoutBindings = createLayoutBinding(shaderStages);
             dbl[i].poolAndLayout = device.createDescriptorPool(layoutBindings);
             dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
-            dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, dbl[i].poolAndLayout.descriptorSetLayout, shaderStages, renderPass);
+            dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [dbl[i].poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
             dbl[i].pipelineCreateInfo = dbl[i].pipelineInfoCreator.pipelineCreateInfo;
             dbl[i].graphicsPipeline = device.createGraphicsPipelines([dbl[i].pipelineCreateInfo])[0];
         }
