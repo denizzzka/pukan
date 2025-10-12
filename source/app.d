@@ -208,8 +208,7 @@ void main() {
 
                 mesh.drawingBufferFilling(
                     buf,
-                    scene.dbl[1].graphicsPipelineCfg.graphicsPipeline,
-                    scene.dbl[1].graphicsPipelineCfg.pipelineLayout,
+                    scene.dbl[1].graphicsPipelineCfg,
                     scene.dbl[1].descriptorsSet,
                     noTranslation,
                 );

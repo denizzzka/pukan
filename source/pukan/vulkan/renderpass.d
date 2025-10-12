@@ -174,7 +174,7 @@ interface DrawableByVulkan
     import dlib.math: Matrix4x4f;
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
-    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets, ref Matrix4x4f trans);
+    void drawingBufferFilling(VkCommandBuffer buf, ref GraphicsPipelineCfg, VkDescriptorSet[] descriptorSets, ref Matrix4x4f trans);
 }
 
 struct GraphicsPipelineCfg
