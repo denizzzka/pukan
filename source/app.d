@@ -174,6 +174,8 @@ void main() {
     scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
     mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, textureDstSet, "demo/assets/texture.jpeg");
 
+    auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
+
     import pukan.exceptions;
 
     auto sw = StopWatch(AutoStart.yes);
