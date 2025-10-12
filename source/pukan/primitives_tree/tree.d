@@ -7,12 +7,18 @@ import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
-class PrimitivesTree //TODO: DrawableByVulkan
+class PrimitivesTree
+{
+    Node root;
+
+    void forEachNode(void delegate(ref Node) dg) => root.traversal(dg);
+}
+
+class DrawableTree : PrimitivesTree //TODO:, DrawableByVulkan
 {
     import pukan.scene: Scene;
 
     GraphicsPipelineCfg[] pipelinesConfig;
-    Node root;
 
     this(Scene scene)
     {
@@ -27,8 +33,6 @@ class PrimitivesTree //TODO: DrawableByVulkan
     {
         node.payload = Drawable(pipelineCfgIdx, drawable);
     }
-
-    void forEachNode(void delegate(ref Node) dg) => root.traversal(dg);
 
     import dlib.math;
 

@@ -251,7 +251,7 @@ void main() {
 
 import dlib.math;
 
-void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent, ref PrimitivesTree tree)
+void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent, PrimitivesTree tree)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
@@ -285,7 +285,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     //TODO: move descriptorsSets to drawable
     cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
 
-    auto tree = new PrimitivesTree(scene);
+    auto tree = new DrawableTree(scene);
     auto cubeNode = tree.root.addChildNode();
 
     tree.setPayload(*cubeNode, cube, 0);

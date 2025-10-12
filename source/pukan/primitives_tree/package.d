@@ -36,6 +36,14 @@ struct Node
         return &children[$-1];
     }
 
+    auto addChildNode(ref Payload p)
+    {
+        auto n = addChildNode();
+        n.payload = p;
+
+        return n;
+    }
+
     package void traversal(void delegate(ref Node) dg)
     {
         dg(this);
