@@ -18,10 +18,7 @@ class PrimitivesTree //TODO: DrawableByVulkan
         pipelinesConfig.length = scene.dbl.length;
 
         foreach(i, ref cfg; pipelinesConfig)
-        {
-            cfg.graphicsPipeline = scene.dbl[i].graphicsPipeline;
-            cfg.pipelineLayout = scene.dbl[i].pipelineInfoCreator.pipelineLayout;
-        }
+            cfg = scene.dbl[i].graphicsPipelineCfg;
     }
 
     void setPayload(ref Node node, DrawableByVulkan drawable, ubyte pipelineCfgIdx)

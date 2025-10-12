@@ -25,7 +25,7 @@ class Scene
         VkDescriptorSet[] descriptorsSet;
         DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
         VkGraphicsPipelineCreateInfo pipelineCreateInfo;
-        VkPipeline graphicsPipeline;
+        GraphicsPipelineCfg graphicsPipelineCfg;
     }
 
     Doubled[2] dbl;
@@ -96,7 +96,8 @@ class Scene
             dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
             dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [dbl[i].poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
             dbl[i].pipelineCreateInfo = dbl[i].pipelineInfoCreator.pipelineCreateInfo;
-            dbl[i].graphicsPipeline = device.createGraphicsPipelines([dbl[i].pipelineCreateInfo])[0];
+            dbl[i].graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([dbl[i].pipelineCreateInfo])[0];
+            dbl[i].graphicsPipelineCfg.pipelineLayout = dbl[i].pipelineInfoCreator.pipelineLayout;
         }
 
         initPoolAndPipelineInfo(0, coloredShaderStages);
