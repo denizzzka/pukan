@@ -9,18 +9,10 @@ import pukan.vulkan.renderpass: DrawableByVulkan;
 import std.variant: Algebraic;
 import dlib.math: Matrix4x4f;
 
-struct Drawable //TODO: remove
-{
-    GraphicsPipelineCfg cfg;
-
-    DrawableByVulkan drawable;
-    alias this = drawable;
-}
-
 alias Payload = Algebraic!(
     Bone,
-    Drawable,
     GraphicsPipelineCfg, // switches pipeline for children nodes
+    DrawableByVulkan,
     PrimitivesTree,
 );
 

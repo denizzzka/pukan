@@ -18,14 +18,9 @@ class DrawableTree : PrimitivesTree //TODO:, DrawableByVulkan
 {
     import pukan.scene: Scene;
 
-    //TODO: remove
-    this(Scene scene)
-    {
-    }
-
     void setPayload(ref Node node, DrawableByVulkan drawable, GraphicsPipelineCfg cfg)
     {
-        node.addChildNode(cfg).addChildNode(Drawable(cfg, drawable));
+        node.addChildNode(cfg).addChildNode(drawable);
     }
 
     import dlib.math;
@@ -45,9 +40,9 @@ class DrawableTree : PrimitivesTree //TODO:, DrawableByVulkan
         {
             pipelineCfg = curr.payload.peek!GraphicsPipelineCfg;
         }
-        else if(curr.payload.type == typeid(Drawable))
+        else if(curr.payload.type == typeid(DrawableByVulkan))
         {
-            auto dr = curr.payload.peek!Drawable;
+            auto dr = curr.payload.peek!DrawableByVulkan;
 
             dr.drawingBufferFilling(
                 buf,

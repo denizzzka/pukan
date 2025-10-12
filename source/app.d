@@ -285,7 +285,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     //TODO: move descriptorsSets to drawable
     cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
 
-    auto tree = new DrawableTree(scene);
+    auto tree = new DrawableTree;
     auto cubeNode = tree.root.addChildNode();
 
     tree.setPayload(*cubeNode, cube, scene.dbl[0].graphicsPipelineCfg);
