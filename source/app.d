@@ -202,9 +202,14 @@ void main() {
             fb.uniformBuffer.recordUpload(cb);
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
-                tree.drawingBufferFilling(buf, scene.dbl[0].descriptorsSet);
-
                 auto noTranslation = Matrix4f.identity;
+
+                tree.drawingBufferFilling(
+                    buf,
+                    scene.dbl[0].graphicsPipelineCfg,
+                    scene.dbl[0].descriptorsSet,
+                    noTranslation,
+                );
 
                 mesh.drawingBufferFilling(
                     buf,

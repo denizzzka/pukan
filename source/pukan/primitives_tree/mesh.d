@@ -75,7 +75,7 @@ class ColoredMesh : DrawableByVulkan
 
     import dlib.math: Matrix4x4f;
 
-    void drawingBufferFilling(VkCommandBuffer buf, ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] descriptorSets, ref Matrix4x4f trans) //const
+    void drawingBufferFilling(VkCommandBuffer buf, ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] descriptorSets, Matrix4x4f trans) //const
     {
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 

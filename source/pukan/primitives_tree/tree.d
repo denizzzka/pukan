@@ -14,7 +14,7 @@ class PrimitivesTree
     void forEachNode(void delegate(ref Node) dg) => root.traversal(dg);
 }
 
-class DrawableTree : PrimitivesTree //TODO:, DrawableByVulkan
+class DrawableTree : PrimitivesTree, DrawableByVulkan
 {
     import pukan.scene: Scene;
 
@@ -25,12 +25,12 @@ class DrawableTree : PrimitivesTree //TODO:, DrawableByVulkan
 
     import dlib.math;
 
-    void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets)
+    void drawingBufferFilling(VkCommandBuffer buf, ref GraphicsPipelineCfg pipelineCfg, VkDescriptorSet[] descriptorSets, Matrix4x4f trans)
     {
-        drawingBufferFilling(buf, descriptorSets, root, Matrix4f.identity, null);
+        drawingBufferFilling(buf, descriptorSets, root, trans, pipelineCfg);
     }
 
-    private void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets, ref Node curr, Matrix4x4f trans, GraphicsPipelineCfg* pipelineCfg)
+    private void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets, ref Node curr, Matrix4x4f trans, ref GraphicsPipelineCfg pipelineCfg)
     {
         if(curr.payload.type == typeid(Bone))
         {
@@ -38,7 +38,7 @@ class DrawableTree : PrimitivesTree //TODO:, DrawableByVulkan
         }
         else if(curr.payload.type == typeid(GraphicsPipelineCfg))
         {
-            pipelineCfg = curr.payload.peek!GraphicsPipelineCfg;
+            pipelineCfg = *curr.payload.peek!GraphicsPipelineCfg;
         }
         else if(curr.payload.type == typeid(DrawableByVulkan))
         {
@@ -46,7 +46,7 @@ class DrawableTree : PrimitivesTree //TODO:, DrawableByVulkan
 
             dr.drawingBufferFilling(
                 buf,
-                *pipelineCfg,
+                pipelineCfg,
                 descriptorSets,
                 trans,
             );
