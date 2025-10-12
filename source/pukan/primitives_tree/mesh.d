@@ -4,17 +4,26 @@ import pukan.scene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
-class ColoredMesh : DrawableByVulkan
+class Mesh
 {
     Vertex[] vertices;
     ushort[] indices;
+
+    this(Vertex[] vertices, ushort[] indices)
+    {
+        this.vertices = vertices;
+        this.indices = indices;
+    }
+}
+
+class ColoredMesh : Mesh, DrawableByVulkan
+{
     VkDescriptorSet[] descriptorSets;
 
     this(VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices)
     {
-        this.vertices = vertices;
-        this.indices = indices;
         descriptorSets = ds;
+        super(vertices, indices);
     }
 
     static struct VerticesGPUBuffer
