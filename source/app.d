@@ -160,7 +160,8 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool);
+    Bone* cubeRotator;
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool, cubeRotator);
     scope(exit) tree.destroy;
 
     auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
@@ -176,7 +177,7 @@ void main() {
     {
         glfwPollEvents();
 
-        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent, tree);
+        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent, tree, cubeRotator);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
 
@@ -231,14 +232,14 @@ void main() {
 
 import dlib.math;
 
-void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent, PrimitivesTree tree)
+void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent, PrimitivesTree tree, Bone* cubeRotator)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
     auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
     auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
 
-    tree.root.payload = Bone(cubeRotation.toMatrix4x4);
+    *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 
     WorldTransformationUniformBuffer* wtb;
     assert(uniformBuffer.cpuBuf.length == WorldTransformationUniformBuffer.sizeof);
@@ -257,7 +258,7 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, scope VkDescriptorPool descriptorPool)
+auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, scope VkDescriptorPool descriptorPool, out Bone* cubeRotator)
 {
     auto tree = new DrawableTree;
 
@@ -270,8 +271,11 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         //TODO: move descriptorsSets to drawable
         cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
 
+        auto n = coloredBranch.addChildNode(Bone());
+        cubeRotator = n.payload.peek!Bone;
+
         //TODO: get rid of this cast
-        coloredBranch.addChildNode(cast(DrawableByVulkan) cube);
+        n.addChildNode(cast(DrawableByVulkan) cube);
     }
 
     auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);
