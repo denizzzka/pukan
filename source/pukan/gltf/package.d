@@ -5,7 +5,6 @@ import std.array;
 import std.exception: enforce;
 static import std.file;
 static import std.path;
-import pukan.exceptions;
 import vibe.data.json;
 
 ///
@@ -20,12 +19,12 @@ auto loadGlTF2(string filename)
 
     {
         const ver = json["asset"]["version"].get!string;
-        enforce!PukanException(ver == "2.0", "glTF version "~ver~" unsupported");
+        enforce(ver == "2.0", "glTF version "~ver~" unsupported");
     }
 
     const sceneIdx = json["scene"].get!int;
     const scenes = json["scenes"].byValue.array;
-    enforce!PukanException(scenes.length <= 1);
+    enforce(scenes.length <= 1);
 
     auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
     const nodes = json["nodes"];
