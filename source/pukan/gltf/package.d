@@ -1,6 +1,7 @@
 module pukan.gltf;
 
 import std.algorithm;
+import std.array;
 import std.exception: enforce;
 static import std.file;
 static import std.path;
@@ -23,7 +24,10 @@ auto loadGlTF2(string filename)
     }
 
     const sceneIdx = json["scene"].get!int;
-    auto nodesIdxs = json["scenes"][sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
+    const scenes = json["scenes"].byValue.array;
+    enforce!PukanException(scenes.length <= 1);
+
+    auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
     const nodes = json["nodes"];
 
     foreach(i; nodesIdxs)
