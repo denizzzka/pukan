@@ -4,6 +4,7 @@ import pukan.primitives_tree.mesh;
 import pukan.primitives_tree.tree: PrimitivesTree;
 import pukan.scene: Vertex;
 import pukan.vulkan.bindings;
+import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 import std.variant: Algebraic;
 import dlib.math: Matrix4x4f;
@@ -19,6 +20,7 @@ struct Drawable
 alias Payload = Algebraic!(
     Bone,
     Drawable,
+    GraphicsPipelineCfg, // switches pipeline for children nodes
     PrimitivesTree,
 );
 
@@ -36,10 +38,10 @@ struct Node
         return &children[$-1];
     }
 
-    auto addChildNode(ref Payload p)
+    auto addChildNode(T)(T payload)
     {
         auto n = addChildNode();
-        n.payload = p;
+        n.payload = payload;
 
         return n;
     }
