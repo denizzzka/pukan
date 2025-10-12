@@ -47,7 +47,7 @@ package mixin template DescriptorPools()
         return descriptorPools.front;
     }
 
-    void descriptorPoolsDtor()
+    private void descriptorPoolsDtor()
     {
         foreach(ref e; descriptorPools)
         {
