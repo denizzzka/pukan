@@ -6,10 +6,10 @@ package mixin template Shaders()
     private SList!ShaderInfo loadedShaders;
 
     ref ShaderInfo uploadShaderToGPU(
+        ubyte[] sprivBinary,
         VkShaderStageFlagBits stage,
         VkDescriptorSetLayoutBinding[] layoutBindings,
         VkPushConstantRange pushConstant = VkPushConstantRange.init,
-        ubyte[] sprivBinary
     )
     in(sprivBinary.length % 4 == 0)
     {
@@ -44,7 +44,7 @@ package mixin template Shaders()
 
         enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
-        return uploadShaderToGPU(stage, layoutBindings, pushConstant, code);
+        return uploadShaderToGPU(code, stage, layoutBindings, pushConstant);
     }
 
     private void shadersDtor()
