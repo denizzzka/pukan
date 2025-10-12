@@ -4,13 +4,13 @@ import pukan.primitives_tree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: TransferBuffer;
-import pukan.vulkan.renderpass: DrawableByVulkan;
+import pukan.vulkan.renderpass: DrawableByVulkan, GraphicsPipelineCfg;
 
 class PrimitivesTree //TODO: DrawableByVulkan
 {
     import pukan.scene: Scene;
 
-    PipelineConfig[] pipelinesConfig;
+    GraphicsPipelineCfg[] pipelinesConfig;
     Node root;
 
     this(Scene scene)

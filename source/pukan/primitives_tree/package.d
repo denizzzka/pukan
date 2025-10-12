@@ -45,12 +45,6 @@ struct Node
     }
 }
 
-struct PipelineConfig
-{
-    VkPipeline graphicsPipeline;
-    VkPipelineLayout pipelineLayout;
-}
-
 /// Represents the translation of an node relative to the ancestor bone node
 struct Bone
 {
