@@ -176,9 +176,3 @@ interface DrawableByVulkan
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
     void drawingBufferFilling(VkCommandBuffer buf, ref GraphicsPipelineCfg, VkDescriptorSet[] descriptorSets, ref Matrix4x4f trans);
 }
-
-struct GraphicsPipelineCfg
-{
-    VkPipeline graphicsPipeline;
-    VkPipelineLayout pipelineLayout;
-}

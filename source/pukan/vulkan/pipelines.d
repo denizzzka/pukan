@@ -171,3 +171,9 @@ VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayou
 
     return pipelineLayout;
 }
+
+struct GraphicsPipelineCfg
+{
+    VkPipeline graphicsPipeline;
+    VkPipelineLayout pipelineLayout;
+}
