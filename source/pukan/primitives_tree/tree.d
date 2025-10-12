@@ -18,6 +18,14 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
 {
     import dlib.math;
 
+    ~this()
+    {
+        forEachNode((n){
+            if(n.payload.type == typeid(DrawableByVulkan))
+                n.payload.destroy;
+        });
+    }
+
     void drawingBufferFilling(VkCommandBuffer buf)
     {
         drawingBufferFilling(buf, GraphicsPipelineCfg.init, Matrix4f.identity);
