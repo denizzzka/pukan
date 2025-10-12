@@ -136,14 +136,16 @@ class LogicalDevice
         return new CommandPool(this, familyIdx);
     }
 
+    import pukan.vulkan.helpers: ScopedLogicalDeviceTemplateMixin;
+
     import pukan.vulkan.shaders: Shaders;
-    mixin Shaders;
+    mixin ScopedLogicalDeviceTemplateMixin!Shaders;
 
     import pukan.vulkan.descriptors: DescriptorPools;
-    mixin DescriptorPools;
+    mixin ScopedLogicalDeviceTemplateMixin!DescriptorPools;
 
     import pukan.vulkan.pipelines: Pipelines;
-    mixin Pipelines;
+    mixin ScopedLogicalDeviceTemplateMixin!Pipelines;
 }
 
 class Semaphore
