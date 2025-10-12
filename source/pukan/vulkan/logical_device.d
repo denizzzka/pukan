@@ -142,10 +142,10 @@ class LogicalDevice
     mixin ScopedLogicalDeviceTemplateMixin!Shaders;
 
     import pukan.vulkan.descriptors: DescriptorPools;
-    mixin DescriptorPools;
+    mixin ScopedLogicalDeviceTemplateMixin!DescriptorPools;
 
     import pukan.vulkan.pipelines: Pipelines;
-    mixin Pipelines;
+    mixin ScopedLogicalDeviceTemplateMixin!Pipelines;
 }
 
 class Semaphore
