@@ -117,7 +117,6 @@ void main() {
     debug auto dbg = vk.attachFlightRecorder(device);
     debug scope(exit) destroy(dbg);
 
-    import pukan.vulkan.bindings: VkSurfaceKHR;
     static import glfw3.internal;
 
     VkSurfaceKHR surface;
@@ -130,30 +129,6 @@ void main() {
 
     //~ vk.printSurfaceFormats(vk.devices[vk.deviceIdx], surface);
     //~ vk.printPresentModes(vk.devices[vk.deviceIdx], surface);
-
-    import pukan.vulkan.bindings;
-
-    VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings;
-    {
-        VkDescriptorSetLayoutBinding uboLayoutBinding = {
-            binding: 0,
-            descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-        };
-
-        VkDescriptorSetLayoutBinding samplerLayoutBinding = {
-            binding: 1,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        };
-
-        descriptorSetLayoutBindings = [
-            uboLayoutBinding,
-            samplerLayoutBinding,
-        ];
-    }
 
     void windowSizeChanged()
     {
@@ -176,102 +151,67 @@ void main() {
         }
     }
 
-    scope scene = new Scene(device, surface, descriptorSetLayoutBindings, &windowSizeChanged);
+    scope scene = new Scene(device, surface, &windowSizeChanged);
     scope(exit) destroy(scene);
 
-    //FIXME: remove refs
+    //TODO: remove
     auto frameBuilder = &scene.frameBuilder;
-    //~ ref pipelineInfoCreator = scene.pipelineInfoCreator;
-    //~ ref graphicsPipelines = scene.graphicsPipelines;
-    auto descriptorSets = &scene.descriptorSets;
 
-    auto vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    scope(exit) destroy(vertexBuffer);
-
-    auto indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    scope(exit) destroy(indicesBuffer);
-
-    // Using any (first) buffer as buffer for initial loading
+    // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    // Copy vertices to mapped memory
-    vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
-    indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool);
+    scope(exit) tree.destroy;
 
-    vertexBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
-    indicesBuffer.uploadImmediate(frameBuilder.commandPool, *initBuf);
+    scope mesh = createDemoMesh();
+    scope(exit) mesh.destroy;
 
-    scope texture = device.create!Texture(frameBuilder.commandPool, *initBuf);
-    scope(exit) destroy(texture);
+    /// Vertices descriptor
+    mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
-    VkWriteDescriptorSet[] descriptorWrites;
-
-    {
-        VkDescriptorBufferInfo bufferInfo = {
-            buffer: frameBuilder.uniformBuffer.gpuBuffer,
-            offset: 0,
-            range: WorldTransformationUniformBuffer.sizeof,
-        };
-
-        VkDescriptorImageInfo imageInfo = {
-            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            imageView: texture.imageView,
-            sampler: texture.sampler,
-        };
-
-        descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &bufferInfo,
-            ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: (*descriptorSets)[0 /*TODO: frame number*/],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &imageInfo,
-            )
-        ];
-
-        scene.descriptorPool.updateSets(descriptorWrites);
-    }
+    // Texture descriptor set:
+    //TODO: move descriptorsSets to drawable
+    scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
+    mesh.updateTextureDescriptorSet(device, *frameBuilder, frameBuilder.commandPool, *initBuf, textureDstSet, "demo/assets/texture.jpeg");
 
     import pukan.exceptions;
 
     auto sw = StopWatch(AutoStart.yes);
 
-    auto renderData = DefaultRenderPass.VariableData(
-        vertexBuffer: vertexBuffer.gpuBuffer.buf,
-        indexBuffer: indicesBuffer.gpuBuffer.buf,
-        indicesNum: cast(uint) indices.length,
-        descriptorSets: *descriptorSets,
-        pipelineLayout: scene.pipelineInfoCreator.pipelineLayout,
-        graphicsPipeline: scene.graphicsPipelines.pipelines[0],
-    );
+    writeln(); // empty line for FPS counter
 
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
 
-        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent);
+        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent, tree);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
-            auto cb = frame.commandBuffer;
 
+            {
+                DefaultRenderPass.VariableData renderData;
+                renderData.common.imageExtent = scene.swapChain.imageExtent;
+                renderData.common.frameBuffer = frame.frameBuffer;
+                scene.renderPass.updateData(renderData);
+            }
+
+            auto cb = frame.commandBuffer;
             fb.uniformBuffer.recordUpload(cb);
 
-            renderData.imageExtent = scene.swapChain.imageExtent,
-            renderData.frameBuffer = frame.frameBuffer;
-            scene.renderPass.updateData(renderData);
-            scene.renderPass.recordCommandBuffer(cb);
+            scene.renderPass.recordCommandBuffer(cb, (buf){
+                tree.drawingBufferFilling(buf, scene.dbl[0].descriptorsSet);
+
+                auto noTranslation = Matrix4f.identity;
+
+                mesh.drawingBufferFilling(
+                    buf,
+                    scene.dbl[1].graphicsPipeline,
+                    scene.dbl[1].pipelineInfoCreator.pipelineLayout,
+                    scene.dbl[1].descriptorsSet,
+                    noTranslation,
+                );
+            });
         });
 
         {
@@ -282,7 +222,7 @@ void main() {
             static size_t fps;
 
             frameNum++;
-            writeln("FPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx);
+            write("\rFPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx);
 
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
@@ -310,11 +250,14 @@ void main() {
 
 import dlib.math;
 
-void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent)
+void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent, ref PrimitivesTree tree)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
     auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
+    auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
+
+    tree.root.payload = Bone(cubeRotation.toMatrix4x4);
 
     WorldTransformationUniformBuffer* wtb;
     assert(uniformBuffer.cpuBuf.length == WorldTransformationUniformBuffer.sizeof);
@@ -333,21 +276,75 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-// Display data:
+auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, scope VkDescriptorPool descriptorPool)
+{
+    auto cube = createCubeDemoMesh();
+    cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
-const Vertex[] vertices = [
-    Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
-    Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
-    Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
-    Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+    //TODO: move descriptorsSets to drawable
+    cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
 
-    Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
-    Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
-    Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
-    Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
-];
+    auto tree = new PrimitivesTree(scene);
+    auto cubeNode = tree.root.addChildNode();
 
-ushort[] indices = [
-    0, 1, 2, 2, 3, 0,
-    4, 5, 6, 6, 7, 4,
-];
+    tree.setPayload(*cubeNode, cube, 0);
+
+    return tree;
+}
+
+/// Displaying data
+auto createDemoMesh()
+{
+    return new TexturedMesh(
+    [
+        Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+        Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+        Vertex(Vector3f(0.5, 0.5, 0), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+        Vertex(Vector3f(-0.5, 0.5, 0), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+
+        Vertex(Vector3f(-0.5, -0.35, -0.5), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
+        Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
+        Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
+        Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
+    ],
+    [
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4,
+    ]);
+}
+
+auto createCubeVertices()
+{
+    auto red = Vector3f(1.0f, 0.0f, 0.0f);
+    auto green = Vector3f(0.0f, 1.0f, 0.0f);
+    auto blue = Vector3f(0.0f, 0.0f, 1.0f);
+
+    auto vertices = [
+        Vertex(Vector3f(-0.2, -0.2, -0.2), red),    // 0
+        Vertex(Vector3f(-0.2, -0.2,  0.2), blue),   // 1
+        Vertex(Vector3f( 0.2, -0.2, -0.2), green),  // 2
+        Vertex(Vector3f( 0.2, -0.2,  0.2), green),  // 3
+        Vertex(Vector3f( 0.2,  0.2, -0.2), red),    // 4
+        Vertex(Vector3f( 0.2,  0.2,  0.2), green),  // 5
+        Vertex(Vector3f(-0.2,  0.2,  0.2), red),    // 6
+        Vertex(Vector3f(-0.2,  0.2, -0.2), green),  // 7
+    ];
+
+    ushort[] indices = [
+        2, 1, 0, 1, 2, 3,   // 1
+        2, 4, 3, 3, 4, 5,   // 2
+        3, 5, 6, 1, 3, 6,   // 3
+        4, 7, 6, 4, 6, 5,   // 4
+        0, 1, 6, 0, 6 ,7,   // 5
+        0, 7, 2, 2, 7, 4,   // 6
+    ];
+
+    import std.typecons;
+    return tuple(vertices, indices);
+}
+
+auto createCubeDemoMesh()
+{
+    auto v = createCubeVertices;
+    return new ColoredMesh(v[0], v[1]);
+}

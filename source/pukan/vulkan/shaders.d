@@ -1,18 +1,42 @@
 module pukan.vulkan.shaders;
 
-import pukan.vulkan;
-import pukan.vulkan.bindings;
-import pukan.exceptions;
-import std.exception: enforce;
-
-///
-class ShaderModule
+package mixin template Shaders()
 {
-    LogicalDevice device;
-    VkShaderModule shaderModule;
+    import std.container.slist;
+    private SList!ShaderInfo loadedShaders;
+
+    ref ShaderInfo uploadShaderToGPU(
+        ubyte[] sprivBinary,
+        VkShaderStageFlagBits stage,
+        VkDescriptorSetLayoutBinding[] layoutBindings,
+        VkPushConstantRange pushConstant = VkPushConstantRange.init,
+    )
+    in(sprivBinary.length % 4 == 0)
+    {
+        VkShaderModuleCreateInfo cinf = {
+            sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            codeSize: sprivBinary.length,
+            pCode: cast(uint*) sprivBinary.ptr,
+        };
+
+        ShaderInfo add;
+        vkCreateShaderModule(device, &cinf, this.alloc, &add.shaderModule).vkCheck;
+        add.stage = stage;
+        add.layoutBindings = layoutBindings;
+        add.pushConstantRange = pushConstant;
+
+        loadedShaders.insert(add);
+
+        return loadedShaders.front;
+    }
 
     //TODO: remove?
-    this(LogicalDevice dev, string filename)
+    auto uploadShaderFromFileToGPU(
+        string filename,
+        VkShaderStageFlagBits stage,
+        VkDescriptorSetLayoutBinding[] layoutBindings,
+        VkPushConstantRange pushConstant = VkPushConstantRange.init
+    )
     {
         import std.file: read;
 
@@ -20,30 +44,26 @@ class ShaderModule
 
         enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
-        this(dev, code);
+        return uploadShaderToGPU(code, stage, layoutBindings, pushConstant);
     }
 
-    this(LogicalDevice dev, ubyte[] sprivBinary)
-    in(sprivBinary.length % 4 == 0)
+    private void shadersDtor()
     {
-        device = dev;
-
-        VkShaderModuleCreateInfo cinf = {
-            sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            codeSize: sprivBinary.length,
-            pCode: cast(uint*) sprivBinary.ptr,
-        };
-
-        vkCreateShaderModule(dev.device, &cinf, dev.alloc, &shaderModule).vkCheck;
+        foreach(e; loadedShaders)
+            vkDestroyShaderModule(this.device, e.shaderModule, this.alloc);
     }
+}
 
-    ~this()
-    {
-        if(device && shaderModule)
-            vkDestroyShaderModule(device.device, shaderModule, device.alloc);
-    }
+import pukan.vulkan.bindings;
 
-    auto createShaderStageInfo(VkShaderStageFlagBits stage)
+struct ShaderInfo
+{
+    VkShaderModule shaderModule;
+    VkShaderStageFlagBits stage;
+    VkDescriptorSetLayoutBinding[] layoutBindings;
+    VkPushConstantRange pushConstantRange;
+
+    auto createShaderStageInfo()
     {
         VkPipelineShaderStageCreateInfo cinf = {
             sType: VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -51,8 +71,24 @@ class ShaderModule
             pName: "main", // shader entry point
         };
 
+        // "module" is D keyword, workaround:
         __traits(getMember, cinf, "module") = shaderModule;
 
         return cinf;
     }
+}
+
+VkDescriptorSetLayoutBinding[] createLayoutBinding(ShaderInfo[] shaders)
+{
+    VkDescriptorSetLayoutBinding[] ret;
+
+    foreach(ref shader; shaders)
+    {
+        foreach(ref b; shader.layoutBindings)
+            assert(b.stageFlags == shader.stage);
+
+        ret ~= shader.layoutBindings;
+    }
+
+    return ret;
 }

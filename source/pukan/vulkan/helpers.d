@@ -190,3 +190,26 @@ void printStackTrace()
 
     defaultTraceDeallocator(trace);
 }
+
+debug version = PukanVulkanCodeSanitizer;
+
+/// Wrapper for a mixin template to prevent accessing external variables except .this
+package mixin template ScopedLogicalDeviceTemplateMixin(alias M)
+{
+    version(PukanVulkanCodeSanitizer)
+    {
+        // Just compile template mixin twice, once inside of the unused class:
+        private static class Enclosure
+        {
+            import pukan.vulkan.bindings;
+
+            // Only these two variables are needed to be accessible from a template mixins:
+            VkDevice device;
+            VkAllocationCallbacks* alloc;
+
+            mixin M;
+        }
+    }
+
+     mixin M;
+}

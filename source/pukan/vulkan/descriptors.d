@@ -1,20 +1,14 @@
 module pukan.vulkan.descriptors;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.helpers;
 
-class DescriptorPool
+package mixin template DescriptorPools()
 {
-    LogicalDevice device;
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkDescriptorPool descriptorPool;
-    alias this = descriptorPool;
+    import std.container.slist;
+    /* private FIXME*/ SList!PoolAndLayoutInfo descriptorPools;
 
-    this(LogicalDevice dev, VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
+    ref PoolAndLayoutInfo createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
-        device = dev;
-
         {
             // In general, VkDescriptorSetLayoutCreateInfo are not related to any pool.
             // But for now it is convenient to place it here
@@ -24,8 +18,12 @@ class DescriptorPool
                 pBindings: descriptorSetLayoutBindings.ptr,
             };
 
-            vkCall(device.device, &descrLayoutCreateInfo, device.alloc, &descriptorSetLayout);
+            PoolAndLayoutInfo add;
+            vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &add.descriptorSetLayout);
+            descriptorPools.insert(add);
         }
+
+        VkDescriptorPool descriptorPool;
 
         {
             VkDescriptorPoolSize[] poolSizes;
@@ -40,59 +38,51 @@ class DescriptorPool
             VkDescriptorPoolCreateInfo descriptorPoolInfo = {
                 poolSizeCount: cast(uint) poolSizes.length,
                 pPoolSizes: poolSizes.ptr,
-                maxSets: 1, // TODO: number of frames
+                maxSets: 1,
             };
 
-            vkCall(device.device, &descriptorPoolInfo, device.alloc, &descriptorPool);
+            vkCall(this.device, &descriptorPoolInfo, this.alloc, &descriptorPools.front.descriptorPool);
+        }
+
+        return descriptorPools.front;
+    }
+
+    private void descriptorPoolsDtor()
+    {
+        foreach(ref e; descriptorPools)
+        {
+            // always unconditionally exists
+            vkDestroyDescriptorSetLayout(this.device, e.descriptorSetLayout, this.alloc);
+
+            if(e.descriptorPool)
+                vkDestroyDescriptorPool(this.device, e.descriptorPool, this.alloc);
         }
     }
 
-    ~this()
-    {
-        if(descriptorPool)
-            vkDestroyDescriptorPool(device, descriptorPool, device.alloc);
-
-        if(descriptorSetLayout)
-            vkDestroyDescriptorSetLayout(device, descriptorSetLayout, device.alloc);
-    }
-
-    auto allocateDescriptorSets(VkDescriptorSetLayout[] layouts)
+    auto allocateDescriptorSets(ref PoolAndLayoutInfo layout, uint count)
     {
         VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
             sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            descriptorPool: descriptorPool,
-            descriptorSetCount: cast(uint) layouts.length,
-            pSetLayouts: layouts.ptr,
+            descriptorPool: layout.descriptorPool,
+            descriptorSetCount: count,
+            pSetLayouts: &layout.descriptorSetLayout,
         };
 
-        VkDescriptorSet[] descriptorSets;
-        descriptorSets.length = cast(uint) layouts.length;
-        vkAllocateDescriptorSets(device.device, &descriptorSetAllocateInfo, descriptorSets.ptr).vkCheck;
+        VkDescriptorSet[] ret;
+        ret.length = count;
+        vkAllocateDescriptorSets(this.device, &descriptorSetAllocateInfo, ret.ptr).vkCheck;
 
-        return descriptorSets;
+        return ret;
     }
 
-    void updateSets(VkWriteDescriptorSet[] writeDescriptorSets)
+    void updateDescriptorSets(ref scope VkWriteDescriptorSet[] writeDescriptorSets)
     {
         vkUpdateDescriptorSets(device, cast(uint) writeDescriptorSets.length, writeDescriptorSets.ptr, 0, null);
     }
 }
 
-VkDescriptorSetLayoutBinding[] createLayoutBinding(DescriptorSet)(DescriptorSet[] descriptorSets, VkShaderStageFlagBits[] stageFlags)
-in(descriptorSets.length == stageFlags.length)
+struct PoolAndLayoutInfo
 {
-    VkDescriptorSetLayoutBinding[] ret;
-    ret.length = descriptorSets.length;
-
-    foreach(i, ref r; ret)
-    {
-        ref dsc = descriptorSets[i];
-
-        r.binding = dsc.dstBinding;
-        r.descriptorType = dsc.descriptorType;
-        r.descriptorCount = dsc.descriptorCount;
-        r.stageFlags = stageFlags[i];
-    }
-
-    return ret;
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSetLayout descriptorSetLayout;
 }

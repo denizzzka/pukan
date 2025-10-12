@@ -10,7 +10,6 @@ abstract class RenderPass
     alias this = vkRenderPass;
 
     VkFormat imageFormat;
-    void recordCommandBuffer(VkCommandBuffer commandBuffer);
 }
 
 class DefaultRenderPass : RenderPass
@@ -102,16 +101,16 @@ class DefaultRenderPass : RenderPass
         dstAccessMask: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     };
 
-    static struct VariableData
+    static struct CommonData
     {
         VkExtent2D imageExtent;
         VkFramebuffer frameBuffer;
-        VkBuffer vertexBuffer;
-        VkBuffer indexBuffer;
-        uint indicesNum;
-        VkDescriptorSet[] descriptorSets;
-        VkPipelineLayout pipelineLayout;
-        VkPipeline graphicsPipeline;
+    }
+
+    static struct VariableData
+    {
+        CommonData common;
+        alias this = common;
     }
 
     VkViewport viewport;
@@ -136,19 +135,7 @@ class DefaultRenderPass : RenderPass
         );
     }
 
-    void drawIndexed(VkCommandBuffer buf)
-    {
-        auto vertexBuffers = [vertexBuffer];
-        VkDeviceSize[] offsets = [VkDeviceSize(0)];
-
-        vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
-        vkCmdBindIndexBuffer(buf, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
-
-        vkCmdDrawIndexed(buf, data.indicesNum, 1, 0, 0, 0);
-    }
-
-    override void recordCommandBuffer(VkCommandBuffer commandBuffer)
+    void recordCommandBuffer(VkCommandBuffer commandBuffer,  void delegate(ref VkCommandBuffer) fillBufferDg)
     {
         VkRenderPassBeginInfo renderPassInfo;
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -171,14 +158,21 @@ class DefaultRenderPass : RenderPass
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        drawIndexed(commandBuffer);
+        fillBufferDg(commandBuffer);
 
         vkCmdEndRenderPass(commandBuffer);
     }
+}
+
+///
+interface DrawableByVulkan
+{
+    import dlib.math: Matrix4x4f;
+
+    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
+    void drawingBufferFilling(VkCommandBuffer buf, VkPipeline graphicsPipeline, VkPipelineLayout pipelineLayout, VkDescriptorSet[] descriptorSets, ref Matrix4x4f trans);
 }

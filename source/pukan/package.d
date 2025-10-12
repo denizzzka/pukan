@@ -1,5 +1,8 @@
 module pukan;
 
+public import pukan.primitives_tree;
+public import pukan.primitives_tree.mesh;
+public import pukan.primitives_tree.tree;
 public import pukan.scene;
 public import pukan.vulkan;
 

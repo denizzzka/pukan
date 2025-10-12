@@ -15,7 +15,7 @@ class Texture
     VkImageView imageView;
     VkSampler sampler;
 
-    this(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf)
+    this(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, string filename)
     {
         this.device = device;
 

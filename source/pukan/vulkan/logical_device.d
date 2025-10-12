@@ -83,7 +83,12 @@ class LogicalDevice
     ~this()
     {
         if(device)
+        {
+            pipelinesDtor();
+            descriptorPoolsDtor();
+            shadersDtor();
             vkDestroyDevice(device, alloc);
+        }
     }
 
     auto alloc() => physicalDevice.instance.allocator;
@@ -130,6 +135,17 @@ class LogicalDevice
     {
         return new CommandPool(this, familyIdx);
     }
+
+    import pukan.vulkan.helpers: ScopedLogicalDeviceTemplateMixin;
+
+    import pukan.vulkan.shaders: Shaders;
+    mixin ScopedLogicalDeviceTemplateMixin!Shaders;
+
+    import pukan.vulkan.descriptors: DescriptorPools;
+    mixin ScopedLogicalDeviceTemplateMixin!DescriptorPools;
+
+    import pukan.vulkan.pipelines: Pipelines;
+    mixin ScopedLogicalDeviceTemplateMixin!Pipelines;
 }
 
 class Semaphore

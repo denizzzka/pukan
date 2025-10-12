@@ -19,17 +19,18 @@ class Scene
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    ShaderModule vertShader;
-    ShaderModule fragShader;
-    VkPipelineShaderStageCreateInfo[] shaderStages;
+    static struct Doubled
+    {
+        PoolAndLayoutInfo poolAndLayout;
+        VkDescriptorSet[] descriptorsSet;
+        DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
+        VkGraphicsPipelineCreateInfo pipelineCreateInfo;
+        VkPipeline graphicsPipeline;
+    }
 
-    DescriptorPool descriptorPool;
-    VkDescriptorSet[] descriptorSets;
+    Doubled[2] dbl;
 
-    DefaultPipelineInfoCreator!Vertex pipelineInfoCreator;
-    GraphicsPipelines graphicsPipelines;
-
-    this(LogicalDevice dev, VkSurfaceKHR surf, VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, WindowSizeChangeDetectedCallback wsc)
+    this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
         device = dev;
         surface = surf;
@@ -41,20 +42,65 @@ class Scene
 
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
-        vertShader = device.create!ShaderModule("vert.spv");
-        fragShader = device.create!ShaderModule("frag.spv");
 
-        shaderStages = [
-            vertShader.createShaderStageInfo(VK_SHADER_STAGE_VERTEX_BIT),
-            fragShader.createShaderStageInfo(VK_SHADER_STAGE_FRAGMENT_BIT),
+        auto vertShader = device.uploadShaderToGPU(
+            cast(ubyte[]) import("vert.spv"),
+            VK_SHADER_STAGE_VERTEX_BIT,
+            [
+                VkDescriptorSetLayoutBinding(
+                    binding: 0,
+                    descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    descriptorCount: 1,
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                ),
+            ],
+            VkPushConstantRange(
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                offset: 0,
+                size: Bone.mat.sizeof,
+            )
+        );
+
+        auto coloredFragShader = device.uploadShaderToGPU(
+            cast(ubyte[]) import("colored_frag.spv"),
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            null
+        );
+        auto texturedFragShader = device.uploadShaderToGPU(
+            cast(ubyte[]) import("textured_frag.spv"),
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            [
+                VkDescriptorSetLayoutBinding(
+                    binding: 1,
+                    descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    descriptorCount: 1,
+                    stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                ),
+            ]
+        );
+
+        auto coloredShaderStages = [
+            vertShader,
+            coloredFragShader,
         ];
 
-        descriptorPool = device.create!DescriptorPool(descriptorSetLayoutBindings);
-        pipelineInfoCreator = new DefaultPipelineInfoCreator!Vertex(device, descriptorPool.descriptorSetLayout, shaderStages);
-        VkGraphicsPipelineCreateInfo[] infos = [pipelineInfoCreator.pipelineCreateInfo];
-        graphicsPipelines = device.create!GraphicsPipelines(infos, renderPass);
+        auto texturedShaderStages = [
+            vertShader,
+            texturedFragShader,
+        ];
 
-        descriptorSets = descriptorPool.allocateDescriptorSets([descriptorPool.descriptorSetLayout]);
+        void initPoolAndPipelineInfo(S)(size_t i, S shaderStages)
+        {
+            auto layoutBindings = createLayoutBinding(shaderStages);
+            dbl[i].poolAndLayout = device.createDescriptorPool(layoutBindings);
+            dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
+            dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, dbl[i].poolAndLayout.descriptorSetLayout, shaderStages, renderPass);
+            dbl[i].pipelineCreateInfo = dbl[i].pipelineInfoCreator.pipelineCreateInfo;
+            dbl[i].graphicsPipeline = device.createGraphicsPipelines([dbl[i].pipelineCreateInfo])[0];
+        }
+
+        initPoolAndPipelineInfo(0, coloredShaderStages);
+        initPoolAndPipelineInfo(1, texturedShaderStages);
     }
 
     ~this()
@@ -62,9 +108,6 @@ class Scene
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
         frameBuilder.destroy;
-
-        //TODO: remove
-        graphicsPipelines.destroy;
     }
 
     void recreateSwapChain()

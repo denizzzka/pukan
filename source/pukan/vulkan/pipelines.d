@@ -4,27 +4,34 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 
-class DefaultPipelineInfoCreator(Vertex)
+class DefaultGraphicsPipelineInfoCreator(Vertex)
 {
     LogicalDevice device;
     VkPipelineLayout pipelineLayout;
     VkPipelineShaderStageCreateInfo[] shaderStages;
+    VkPushConstantRange[] pushConstantRanges;
 
-    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, VkPipelineShaderStageCreateInfo[] shads)
+    this(LogicalDevice dev, VkDescriptorSetLayout descriptorSetLayout, ShaderInfo[] shads, RenderPass renderPass)
     {
         device = dev;
 
-        pipelineLayout = createPipelineLayout(device, descriptorSetLayout); //TODO: move out from this class?
-        scope(failure) destroy(pipelineLayout);
+        foreach(ref s; shads)
+        {
+            shaderStages ~= s.createShaderStageInfo;
 
-        shaderStages = shads;
+            if(s.pushConstantRange.stageFlags)
+                pushConstantRanges ~= s.pushConstantRange;
+        }
+
+        pipelineLayout = createPipelineLayout(device, descriptorSetLayout, pushConstantRanges); //TODO: move out from this class?
+        scope(failure) destroy(pipelineLayout);
 
         initDepthStencil();
         initDynamicStates();
         initVertexInputStateCreateInfo();
         initViewportState();
 
-        fillPipelineInfo();
+        fillPipelineInfo(renderPass);
     }
 
     ~this()
@@ -95,7 +102,7 @@ class DefaultPipelineInfoCreator(Vertex)
 
     VkGraphicsPipelineCreateInfo pipelineCreateInfo;
 
-    void fillPipelineInfo()
+    void fillPipelineInfo(ref RenderPass renderPass)
     {
         import pukan.vulkan.defaults: colorBlending, inputAssembly, multisampling, rasterizer;
 
@@ -113,6 +120,7 @@ class DefaultPipelineInfoCreator(Vertex)
             pColorBlendState: &colorBlending,
             pDynamicState: &dynamicState,
             layout: pipelineLayout,
+            renderPass: renderPass.vkRenderPass,
             subpass: 0,
             basePipelineHandle: null, // Optional
             basePipelineIndex: -1, // Optional
@@ -120,54 +128,42 @@ class DefaultPipelineInfoCreator(Vertex)
     }
 }
 
-abstract class Pipelines
+package mixin template Pipelines()
 {
-    LogicalDevice device;
-    VkPipeline[] pipelines;
-    alias this = pipelines;
+    private VkPipeline[] pipelines;
 
-    this(LogicalDevice dev)
-    {
-        device = dev;
-    }
-
-    ~this()
+    private void pipelinesDtor()
     {
         foreach(ref p; pipelines)
-            vkDestroyPipeline(device.device, p, device.alloc);
+            vkDestroyPipeline(this.device, p, this.alloc);
     }
-}
 
-class GraphicsPipelines : Pipelines
-{
-    this(LogicalDevice dev, VkGraphicsPipelineCreateInfo[] infos, RenderPass renderPass)
+    VkPipeline[] createGraphicsPipelines(VkGraphicsPipelineCreateInfo[] infos)
+    out(r; r.length == infos.length)
     {
-        super(dev);
-
-        foreach(ref inf; infos)
-            inf.renderPass = renderPass.vkRenderPass;
-
-        pipelines.length = infos.length;
+        size_t prevLen = pipelines.length;
+        pipelines.length += infos.length;
 
         vkCreateGraphicsPipelines(
-            device.device,
+            this.device,
             null, // pipelineCache
             cast(uint) infos.length,
             infos.ptr,
-            device.alloc,
-            pipelines.ptr
+            this.alloc,
+            &pipelines[prevLen]
         ).vkCheck;
+
+        return pipelines[prevLen .. $];
     }
 }
 
-auto createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout)
+VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout descriptorSetLayout, VkPushConstantRange[] pushConstantRanges)
 {
-    // pipeline layout can be used to pass uniform vars into shaders
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         setLayoutCount: 1,
         pSetLayouts: &descriptorSetLayout,
-        pushConstantRangeCount: 0, // Optional
-        pPushConstantRanges: null, // Optional
+        pushConstantRangeCount: cast(uint) pushConstantRanges.length,
+        pPushConstantRanges: pushConstantRanges.ptr,
     };
 
     VkPipelineLayout pipelineLayout;
