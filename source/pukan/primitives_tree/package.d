@@ -9,9 +9,9 @@ import pukan.vulkan.renderpass: DrawableByVulkan;
 import std.variant: Algebraic;
 import dlib.math: Matrix4x4f;
 
-struct Drawable
+struct Drawable //TODO: remove
 {
-    ubyte pipelineCfgIdx;
+    GraphicsPipelineCfg cfg;
 
     DrawableByVulkan drawable;
     alias this = drawable;

@@ -288,7 +288,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto tree = new DrawableTree(scene);
     auto cubeNode = tree.root.addChildNode();
 
-    tree.setPayload(*cubeNode, cube, 0);
+    tree.setPayload(*cubeNode, cube, scene.dbl[0].graphicsPipelineCfg);
 
     return tree;
 }
