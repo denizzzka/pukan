@@ -8,11 +8,13 @@ class ColoredMesh : DrawableByVulkan
 {
     Vertex[] vertices;
     ushort[] indices;
+    VkDescriptorSet[] descriptorSets;
 
-    this(Vertex[] vertices, ushort[] indices)
+    this(VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices)
     {
         this.vertices = vertices;
         this.indices = indices;
+        descriptorSets = ds;
     }
 
     static struct VerticesGPUBuffer
@@ -75,7 +77,7 @@ class ColoredMesh : DrawableByVulkan
 
     import dlib.math: Matrix4x4f;
 
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, VkDescriptorSet[] descriptorSets, Matrix4x4f trans) //const
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans) //const
     {
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
@@ -97,9 +99,9 @@ class TexturedMesh : ColoredMesh
     //TODO: move to mesh-in-GPU descriptor
     Texture texture;
 
-    this(Vertex[] vertices, ushort[] indices)
+    this(VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices)
     {
-        super(vertices, indices);
+        super(ds, vertices, indices);
     }
 
     ~this()

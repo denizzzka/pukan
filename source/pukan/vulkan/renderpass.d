@@ -175,5 +175,5 @@ interface DrawableByVulkan
 
     //FIXME:
     //~ void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, VkDescriptorSet[] descriptorSets, Matrix4x4f trans);
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans);
 }

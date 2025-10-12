@@ -18,19 +18,17 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
 {
     import dlib.math;
 
-    void drawingBufferFilling(VkCommandBuffer buf, VkDescriptorSet[] descriptorSets)
+    void drawingBufferFilling(VkCommandBuffer buf)
     {
-        //~ auto pipelineCfg = GraphicsPipelineCfg.init;
-
-        drawingBufferFilling(buf, GraphicsPipelineCfg.init, descriptorSets, Matrix4f.identity);
+        drawingBufferFilling(buf, GraphicsPipelineCfg.init, Matrix4f.identity);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, VkDescriptorSet[] descriptorSets, Matrix4x4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans)
     {
-        drawingBufferFilling(buf, pipelineCfg, descriptorSets, trans, root);
+        drawingBufferFilling(buf, pipelineCfg, trans, root);
     }
 
-    private void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, VkDescriptorSet[] descriptorSets, Matrix4x4f trans, ref Node curr)
+    private void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, ref Node curr)
     {
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
@@ -39,7 +37,6 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
             dr.drawingBufferFilling(
                 buf,
                 pipelineCfg,
-                descriptorSets,
                 trans,
             );
         }
@@ -53,6 +50,6 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFilling(buf, pipelineCfg, descriptorSets, trans, c);
+            drawingBufferFilling(buf, pipelineCfg, trans, c);
     }
 }

@@ -191,23 +191,7 @@ void main() {
             fb.uniformBuffer.recordUpload(cb);
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
-                auto noTranslation = Matrix4f.identity;
-
-                tree.drawingBufferFilling(buf, scene.dbl[0].descriptorsSet);
-
-                //~ tree.drawingBufferFilling(
-                    //~ buf,
-                    //~ scene.dbl[0].graphicsPipelineCfg,
-                    //~ scene.dbl[0].descriptorsSet,
-                    //~ noTranslation,
-                //~ );
-
-                //~ mesh.drawingBufferFilling(
-                    //~ buf,
-                    //~ scene.dbl[1].graphicsPipelineCfg,
-                    //~ scene.dbl[1].descriptorsSet,
-                    //~ noTranslation,
-                //~ );
+                tree.drawingBufferFilling(buf);
             });
         });
 
@@ -280,7 +264,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto coloredBranch = tree.root.addChildNode(scene.dbl[0].graphicsPipelineCfg);
 
     {
-        auto cube = createCubeDemoMesh();
+        auto cube = createCubeDemoMesh(scene.dbl[0].descriptorsSet);
         cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
         //TODO: move descriptorsSets to drawable
@@ -293,7 +277,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);
 
     {
-        auto mesh = createTexturedDemoMesh();
+        auto mesh = createTexturedDemoMesh(scene.dbl[1].descriptorsSet);
         mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
         // Texture descriptor set:
@@ -309,9 +293,9 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 }
 
 /// Displaying data
-auto createTexturedDemoMesh()
+auto createTexturedDemoMesh(VkDescriptorSet[] ds)
 {
-    return new TexturedMesh(
+    return new TexturedMesh(ds,
     [
         Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
         Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
@@ -359,8 +343,8 @@ auto createCubeVertices()
     return tuple(vertices, indices);
 }
 
-auto createCubeDemoMesh()
+auto createCubeDemoMesh(VkDescriptorSet[] ds)
 {
     auto v = createCubeVertices;
-    return new ColoredMesh(v[0], v[1]);
+    return new ColoredMesh(ds, v[0], v[1]);
 }
