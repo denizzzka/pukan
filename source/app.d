@@ -163,7 +163,7 @@ void main() {
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool);
     scope(exit) tree.destroy;
 
-    scope mesh = createDemoMesh();
+    scope mesh = createTexturedDemoMesh();
     scope(exit) mesh.destroy;
 
     /// Vertices descriptor
@@ -294,7 +294,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 }
 
 /// Displaying data
-auto createDemoMesh()
+auto createTexturedDemoMesh()
 {
     return new TexturedMesh(
     [
