@@ -22,10 +22,6 @@ auto loadGlTF2(string filename)
         enforce(ver == "2.0", "glTF version "~ver~" unsupported");
     }
 
-    const sceneIdx = json["scene"].get!int;
-    const scenes = json["scenes"].byValue.array;
-    enforce(scenes.length <= 1);
-
     auto ret = new GlTF;
 
     Buffer[] buffers;
@@ -63,8 +59,6 @@ auto loadGlTF2(string filename)
         );
     }
 
-    auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!ushort);
-
     foreach(node; json["nodes"])
     {
         ushort[] childrenIdxs;
@@ -77,6 +71,18 @@ auto loadGlTF2(string filename)
             name: node["name"].opt!string,
             childrenNodeIndices: childrenIdxs,
         );
+    }
+
+    auto scenes = json["scenes"].byValue.array;
+    enforce(scenes.length <= 1);
+
+    {
+        Json rootScene = scenes[ json["scene"].get!ushort ];
+
+        ret.rootSceneNode.name = rootScene["name"].opt!string;
+        ret.rootSceneNode.childrenNodeIndices = rootScene["nodes"]
+            .byValue.map!((e) => e.get!ushort)
+            .array;
     }
 
     return ret;
@@ -160,4 +166,5 @@ class GlTF
     Accessor[] accessors;
     Node[] nodes;
     Mesh[] meshes;
+    Node rootSceneNode;
 }
