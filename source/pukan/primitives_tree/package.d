@@ -26,10 +26,11 @@ struct NodeT(Payload)
 
     Node* addChildNode()
     {
-        parent = &this;
         children.length++;
+        auto c = &children[$-1];
+        c.parent = &this;
 
-        return &children[$-1];
+        return c;
     }
 
     auto addChildNode(T)(T payload)
