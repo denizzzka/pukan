@@ -7,12 +7,14 @@ import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
-class PrimitivesTree
+class TreeT(NodeT)
 {
-    Node root;
+    NodeT root;
 
-    void forEachNode(void delegate(ref Node) dg) => root.traversal(dg);
+    void forEachNode(void delegate(ref NodeT) dg) => root.traversal(dg);
 }
+
+alias PrimitivesTree = TreeT!Node;
 
 class DrawableTree : PrimitivesTree, DrawableByVulkan
 {

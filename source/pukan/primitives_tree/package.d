@@ -13,7 +13,6 @@ alias Payload = Algebraic!(
     Bone,
     GraphicsPipelineCfg, // switches pipeline for children nodes
     DrawableByVulkan,
-    PrimitivesTree,
 );
 
 alias Node = NodeT!Payload;
