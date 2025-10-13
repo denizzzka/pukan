@@ -46,6 +46,22 @@ auto loadGlTF2(string filename)
 struct Buffer
 {
     ubyte[] buf;
+
+    View createView(Json view)
+    {
+        const offset = view["byteOffset"].get!size_t;
+
+        return View(
+            bufSlice: buf[ offset .. offset + view["byteLength"].get!size_t ],
+            stride: view["byteStride"].get!uint,
+        );
+    }
+}
+
+struct View
+{
+    ubyte[] bufSlice;
+    uint stride;
 }
 
 private Buffer readBufFile(string dir, in Json fileDescr)
