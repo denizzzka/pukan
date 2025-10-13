@@ -164,8 +164,6 @@ void main() {
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool, cubeRotator);
     scope(exit) tree.destroy;
 
-    auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
-
     import pukan.exceptions;
 
     auto sw = StopWatch(AutoStart.yes);
@@ -274,6 +272,11 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         cubeRotator = n.payload.peek!Bone;
 
         n.addChildNode(cube);
+    }
+
+    {
+        auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
+        coloredBranch.addChildNode(gltfObj);
     }
 
     auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);

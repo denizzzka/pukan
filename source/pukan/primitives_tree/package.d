@@ -20,12 +20,15 @@ alias Node = NodeT!Payload;
 struct NodeT(Payload)
 {
     //TODO: unused, remove?
-    Node* parent;
-    Node[] children;
+    NodeT* parent;
+    NodeT[] children;
     /*package*/ Payload payload;
 
-    Node* addChildNode()
+    NodeT* addChildNode()
     {
+        //FIXME: array moved if grows and pointers become invalidated. Move to SList?
+        children.reserve = 100;
+
         children.length++;
         auto c = &children[$-1];
         c.parent = &this;
@@ -46,7 +49,7 @@ struct NodeT(Payload)
         return n;
     }
 
-    package void traversal(void delegate(ref Node) dg)
+    package void traversal(void delegate(ref NodeT) dg)
     {
         dg(this);
 
@@ -59,6 +62,7 @@ struct NodeT(Payload)
 struct Bone
 {
     //TODO: 4x3 should be enough
+    //TODO: init value Matrix4x4f.identity
     Matrix4x4f mat;
     alias this = mat;
 

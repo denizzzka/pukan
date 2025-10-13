@@ -1,5 +1,8 @@
 module pukan.gltf;
 
+import dlib.math;
+import pukan.vulkan.bindings;
+import pukan.vulkan;
 import std.algorithm;
 import std.array;
 import std.exception: enforce;
@@ -158,10 +161,20 @@ struct Node
     ushort[] childrenNodeIndices;
 }
 
-class GlTF
+class GlTF : DrawableByVulkan
 {
     Accessor[] accessors;
     Node[] nodes;
     Mesh[] meshes;
     Node rootSceneNode;
+
+    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        //FIXME: implement
+    }
+
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans)
+    {
+        //FIXME: implement
+    }
 }
