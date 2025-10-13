@@ -37,6 +37,13 @@ auto loadGlTF2(string filename)
         bufferViews ~= buffers[idx].createView(v);
     }
 
+    Accessor[] accessors;
+    foreach(a; json["accessors"])
+    {
+        const idx = a["bufferView"].get!uint;
+        accessors ~= bufferViews[idx].createAccessor(a);
+    }
+
     auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
     const nodes = json["nodes"];
 
@@ -54,7 +61,7 @@ struct Buffer
 
     View createView(Json view)
     {
-        const offset = view["byteOffset"].get!size_t;
+        const offset = view["byteOffset"].opt!size_t;
 
         return View(
             bufSlice: buf[ offset .. offset + view["byteLength"].get!size_t ],
@@ -67,6 +74,28 @@ struct View
 {
     ubyte[] bufSlice;
     uint stride;
+
+    Accessor createAccessor(Json accessor)
+    {
+        enforce("sparse" !in accessor);
+
+        const offset = accessor["byteOffset"].opt!size_t;
+
+        return Accessor(
+            bufSlice[offset .. $],
+            type: accessor["type"].get!string,
+            componentType: accessor["componentType"].get!uint,
+            count: accessor["count"].get!uint,
+        );
+    }
+}
+
+struct Accessor
+{
+    ubyte[] viewSlice;
+    string type;
+    uint componentType;
+    uint count;
 }
 
 private Buffer readBufFile(string dir, in Json fileDescr)
