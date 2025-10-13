@@ -14,9 +14,6 @@ auto loadGlTF2(string filename)
     const json = std.file.readText(filename).parseJsonString;
     const dir = std.path.dirName(filename);
 
-    writeln(filename);
-    writeln(dir);
-
     {
         const ver = json["asset"]["version"].get!string;
         enforce(ver == "2.0", "glTF version "~ver~" unsupported");
