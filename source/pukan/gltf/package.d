@@ -26,7 +26,7 @@ auto loadGlTF2(string filename)
     const scenes = json["scenes"].byValue.array;
     enforce(scenes.length <= 1);
 
-    ubyte[][] buffers;
+    Buffer[] buffers;
     foreach(buf; json["buffers"])
     {
         buffers ~= readBufFile(dir, buf);
@@ -43,13 +43,20 @@ auto loadGlTF2(string filename)
     return 0;
 }
 
-private ubyte[] readBufFile(string dir, in Json fileDescr)
+struct Buffer
+{
+    ubyte[] buf;
+}
+
+private Buffer readBufFile(string dir, in Json fileDescr)
 {
     const len = fileDescr["byteLength"].get!ulong;
     const filename = fileDescr["uri"].get!string;
-    auto bin = cast(ubyte[]) std.file.read(dir ~ std.path.dirSeparator ~ filename);
 
-    enforce(bin.length == len);
+    Buffer ret;
+    ret.buf = cast(ubyte[]) std.file.read(dir ~ std.path.dirSeparator ~ filename);
 
-    return bin;
+    enforce(ret.buf.length == len);
+
+    return ret;
 }
