@@ -16,8 +16,11 @@ alias Payload = Algebraic!(
     PrimitivesTree,
 );
 
-struct Node
+alias Node = NodeT!Payload;
+
+struct NodeT(Payload)
 {
+    //TODO: unused, remove?
     Node* parent;
     Node[] children;
     /*package*/ Payload payload;
