@@ -173,7 +173,6 @@ interface DrawableByVulkan
 {
     import dlib.math: Matrix4x4f;
 
-    //FIXME:
-    //~ void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
+    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans);
 }
