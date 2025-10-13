@@ -33,6 +33,11 @@ struct NodeT(Payload)
         return c;
     }
 
+    auto addChildNode(DrawableByVulkan payload)
+    {
+        return addChildNode!DrawableByVulkan(payload);
+    }
+
     auto addChildNode(T)(T payload)
     {
         auto n = addChildNode();

@@ -273,8 +273,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto n = coloredBranch.addChildNode(Bone());
         cubeRotator = n.payload.peek!Bone;
 
-        //TODO: get rid of this cast
-        n.addChildNode(cast(DrawableByVulkan) cube);
+        n.addChildNode(cube);
     }
 
     auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);
@@ -287,8 +286,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
         mesh.updateTextureDescriptorSet(device, frameBuilder, frameBuilder.commandPool, commandBuffer, textureDstSet, "demo/assets/texture.jpeg");
 
-        //TODO: get rid of this cast
-        textureBranch.addChildNode(cast(DrawableByVulkan) mesh);
+        textureBranch.addChildNode(mesh);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
