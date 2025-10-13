@@ -28,8 +28,13 @@ auto loadGlTF2(string filename)
 
     Buffer[] buffers;
     foreach(buf; json["buffers"])
-    {
         buffers ~= readBufFile(dir, buf);
+
+    View[] bufferViews;
+    foreach(v; json["bufferViews"])
+    {
+        const idx = v["buffer"].get!uint;
+        bufferViews ~= buffers[idx].createView(v);
     }
 
     auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
@@ -53,7 +58,7 @@ struct Buffer
 
         return View(
             bufSlice: buf[ offset .. offset + view["byteLength"].get!size_t ],
-            stride: view["byteStride"].get!uint,
+            stride: view["byteStride"].opt!uint,
         );
     }
 }
