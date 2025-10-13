@@ -63,13 +63,21 @@ auto loadGlTF2(string filename)
         );
     }
 
-    auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
-    const nodes = json["nodes"];
+    auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!ushort);
 
-    foreach(i; nodesIdxs)
+    Node[] nodes;
+    foreach(node; json["nodes"])
     {
-        //~ NodePayload
-        //~ nodes[i]
+        ushort[] childrenIdxs;
+        const children = "children" in node;
+        if(children)
+            foreach(child; *children)
+                childrenIdxs ~= child.get!ushort;
+
+        nodes ~= Node(
+            name: node["name"].opt!string,
+            childrenNodeIndices: childrenIdxs,
+        );
     }
 
     return 0;
@@ -142,9 +150,10 @@ struct Primitive
     Accessor* accessor;
 }
 
-struct NodePayload
+struct Node
 {
-    string nodeName;
+    string name;
+    ushort[] childrenNodeIndices;
 }
 
 class GlTF
