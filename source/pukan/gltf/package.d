@@ -3,6 +3,7 @@ module pukan.gltf;
 import std.algorithm;
 import std.array;
 import std.exception: enforce;
+debug import std.stdio; //FIXME: remove
 static import std.file;
 static import std.path;
 import vibe.data.json;
@@ -13,7 +14,6 @@ auto loadGlTF2(string filename)
     const json = std.file.readText(filename).parseJsonString;
     const dir = std.path.dirName(filename);
 
-    import std.stdio;
     writeln(filename);
     writeln(dir);
 
@@ -26,6 +26,12 @@ auto loadGlTF2(string filename)
     const scenes = json["scenes"].byValue.array;
     enforce(scenes.length <= 1);
 
+    ubyte[][] buffers;
+    foreach(buf; json["buffers"])
+    {
+        buffers ~= readBufFile(dir, buf);
+    }
+
     auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
     const nodes = json["nodes"];
 
@@ -35,4 +41,15 @@ auto loadGlTF2(string filename)
     }
 
     return 0;
+}
+
+private ubyte[] readBufFile(string dir, in Json fileDescr)
+{
+    const len = fileDescr["byteLength"].get!ulong;
+    const filename = fileDescr["uri"].get!string;
+    auto bin = cast(ubyte[]) std.file.read(dir ~ std.path.dirSeparator ~ filename);
+
+    enforce(bin.length == len);
+
+    return bin;
 }
