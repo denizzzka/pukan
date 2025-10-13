@@ -266,7 +266,6 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
     {
         auto cube = createCubeDemoMesh(scene.dbl[0].descriptorsSet);
-        cube.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
         //TODO: move descriptorsSets to drawable
         cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
@@ -282,7 +281,6 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
     {
         auto mesh = createTexturedDemoMesh(scene.dbl[1].descriptorsSet);
-        mesh.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
         // Texture descriptor set:
         //TODO: move descriptorsSets to drawable
@@ -292,6 +290,8 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         //TODO: get rid of this cast
         textureBranch.addChildNode(cast(DrawableByVulkan) mesh);
     }
+
+    tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
     return tree;
 }

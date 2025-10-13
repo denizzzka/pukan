@@ -2,6 +2,7 @@ module pukan.primitives_tree.tree;
 
 import pukan.primitives_tree;
 import pukan.vulkan.bindings;
+import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
@@ -22,10 +23,20 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
 
     ~this()
     {
+        forEachDrawablePayload((d) => d.destroy);
+    }
+
+    void forEachDrawablePayload(void delegate(DrawableByVulkan) dg)
+    {
         forEachNode((n){
             if(n.payload.type == typeid(DrawableByVulkan))
-                n.payload.destroy;
+                dg(*n.payload.peek!DrawableByVulkan);
         });
+    }
+
+    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        forEachDrawablePayload((d) => d.uploadToGPUImmediate(device, commandPool, commandBuffer));
     }
 
     void drawingBufferFilling(VkCommandBuffer buf)
