@@ -26,6 +26,8 @@ auto loadGlTF2(string filename)
     const scenes = json["scenes"].byValue.array;
     enforce(scenes.length <= 1);
 
+    auto ret = new GlTF;
+
     Buffer[] buffers;
     foreach(buf; json["buffers"])
         buffers ~= readBufFile(dir, buf);
@@ -37,14 +39,12 @@ auto loadGlTF2(string filename)
         bufferViews ~= buffers[idx].createView(v);
     }
 
-    Accessor[] accessors;
     foreach(a; json["accessors"])
     {
         const idx = a["bufferView"].get!uint;
-        accessors ~= bufferViews[idx].createAccessor(a);
+        ret.accessors ~= bufferViews[idx].createAccessor(a);
     }
 
-    Mesh[] meshes;
     foreach(mesh; json["meshes"])
     {
         Primitive[] primitives;
@@ -53,11 +53,11 @@ auto loadGlTF2(string filename)
             const accessorIdx = primitive["indices"].get!ushort;
 
             primitives ~= Primitive(
-                accessor: &accessors[accessorIdx],
+                accessor: &ret.accessors[accessorIdx],
             );
         }
 
-        meshes ~= Mesh(
+        ret.meshes ~= Mesh(
             name: mesh["name"].opt!string,
             primitives: primitives,
         );
@@ -65,7 +65,6 @@ auto loadGlTF2(string filename)
 
     auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!ushort);
 
-    Node[] nodes;
     foreach(node; json["nodes"])
     {
         ushort[] childrenIdxs;
@@ -74,13 +73,13 @@ auto loadGlTF2(string filename)
             foreach(child; *children)
                 childrenIdxs ~= child.get!ushort;
 
-        nodes ~= Node(
+        ret.nodes ~= Node(
             name: node["name"].opt!string,
             childrenNodeIndices: childrenIdxs,
         );
     }
 
-    return 0;
+    return ret;
 }
 
 struct Buffer
@@ -158,5 +157,7 @@ struct Node
 
 class GlTF
 {
-    //~ Vertex[] vertices;
+    Accessor[] accessors;
+    Node[] nodes;
+    Mesh[] meshes;
 }
