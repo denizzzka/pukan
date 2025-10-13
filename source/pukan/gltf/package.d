@@ -44,11 +44,31 @@ auto loadGlTF2(string filename)
         accessors ~= bufferViews[idx].createAccessor(a);
     }
 
+    Mesh[] meshes;
+    foreach(mesh; json["meshes"])
+    {
+        Primitive[] primitives;
+        foreach(primitive; mesh["primitives"])
+        {
+            const accessorIdx = primitive["indices"].get!ushort;
+
+            primitives ~= Primitive(
+                accessor: &accessors[accessorIdx],
+            );
+        }
+
+        meshes ~= Mesh(
+            name: mesh["name"].opt!string,
+            primitives: primitives,
+        );
+    }
+
     auto nodesIdxs = scenes[sceneIdx]["nodes"].byValue.map!((e) => e.get!int);
     const nodes = json["nodes"];
 
     foreach(i; nodesIdxs)
     {
+        //~ NodePayload
         //~ nodes[i]
     }
 
@@ -109,4 +129,25 @@ private Buffer readBufFile(string dir, in Json fileDescr)
     enforce(ret.buf.length == len);
 
     return ret;
+}
+
+struct Mesh
+{
+    string name;
+    Primitive[] primitives;
+}
+
+struct Primitive
+{
+    Accessor* accessor;
+}
+
+struct NodePayload
+{
+    string nodeName;
+}
+
+class GlTF
+{
+    //~ Vertex[] vertices;
 }
