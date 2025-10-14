@@ -266,32 +266,29 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto v = createCubeVertices;
         auto cube = scene.coloredMeshFactory.create(scene.frameBuilder, v[0], v[1]);
 
-        //TODO: move descriptorsSets to drawable
-        cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
-
         auto n = coloredBranch.addChildNode(Bone());
         cubeRotator = n.payload.peek!Bone;
 
         n.addChildNode(cube);
     }
 
-    {
-        auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
-        coloredBranch.addChildNode(gltfObj);
-    }
+    //~ {
+        //~ auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
+        //~ coloredBranch.addChildNode(gltfObj);
+    //~ }
 
     auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);
 
-    {
-        auto mesh = createTexturedDemoMesh(scene.dbl[1].descriptorsSet);
+    //~ {
+        //~ auto mesh = createTexturedDemoMesh(scene.dbl[1].descriptorsSet);
 
-        // Texture descriptor set:
-        //TODO: move descriptorsSets to drawable
-        scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
-        mesh.updateTextureDescriptorSet(device, frameBuilder, frameBuilder.commandPool, commandBuffer, textureDstSet, "demo/assets/texture.jpeg");
+        //~ // Texture descriptor set:
+        //~ //TODO: move descriptorsSets to drawable
+        //~ scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
+        //~ mesh.updateTextureDescriptorSet(device, frameBuilder, frameBuilder.commandPool, commandBuffer, textureDstSet, "demo/assets/texture.jpeg");
 
-        textureBranch.addChildNode(mesh);
-    }
+        //~ textureBranch.addChildNode(mesh);
+    //~ }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 

@@ -22,7 +22,7 @@ class Scene
     static struct Doubled
     {
         PoolAndLayoutInfo poolAndLayout;
-        VkDescriptorSet[] descriptorsSet;
+        //~ VkDescriptorSet[] descriptorsSet;
         DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
         VkGraphicsPipelineCreateInfo pipelineCreateInfo;
         GraphicsPipelineCfg graphicsPipelineCfg;
@@ -95,17 +95,19 @@ class Scene
         {
             auto layoutBindings = createLayoutBinding(shaderStages);
             dbl[i].poolAndLayout = device.createDescriptorPool(layoutBindings);
-            dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
+            //~ dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
             dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [dbl[i].poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
             dbl[i].pipelineCreateInfo = dbl[i].pipelineInfoCreator.pipelineCreateInfo;
             dbl[i].graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([dbl[i].pipelineCreateInfo])[0];
             dbl[i].graphicsPipelineCfg.pipelineLayout = dbl[i].pipelineInfoCreator.pipelineLayout;
         }
 
-        initPoolAndPipelineInfo(0, coloredShaderStages);
+        //~ initPoolAndPipelineInfo(0, coloredShaderStages);
         initPoolAndPipelineInfo(1, texturedShaderStages);
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
+
+        dbl[0].graphicsPipelineCfg = coloredMeshFactory.graphicsPipelineCfg;
     }
 
     ~this()

@@ -61,7 +61,7 @@ class ColoredMesh : Mesh, DrawableByVulkan
         r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
-    void updateDescriptorSet(LogicalDevice device, FrameBuilder frameBuilder, VkDescriptorSet dstDescriptorSet)
+    void updateDescriptorSet(LogicalDevice device, FrameBuilder frameBuilder /* TODO: replace by sort of uniform buffer */)
     {
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
@@ -72,11 +72,11 @@ class ColoredMesh : Mesh, DrawableByVulkan
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: dstDescriptorSet,
+                dstSet: descriptorSets[0],
                 dstBinding: 0,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
+                descriptorCount: 1, //FIXME: accept array
                 pBufferInfo: &bufferInfo,
             ),
         ];

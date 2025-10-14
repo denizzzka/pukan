@@ -76,7 +76,7 @@ struct PrimitivesFactory(T)
 
     LogicalDevice device;
     private PoolAndLayoutInfo poolAndLayout;
-    private GraphicsPipelineCfg graphicsPipelineCfg;
+    GraphicsPipelineCfg graphicsPipelineCfg;
 
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
     {
@@ -97,7 +97,7 @@ struct PrimitivesFactory(T)
         auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
 
         auto r = new T(descriptorsSet, vertices, indices);
-        r.updateDescriptorSet(device, frameBuilder, descriptorsSet[0]);
+        r.updateDescriptorSet(device, frameBuilder);
 
         return r;
     }
