@@ -98,7 +98,7 @@ struct PrimitivesFactory(T)
         auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
 
         auto r = new T(descriptorsSet, args);
-        r.updateDescriptorSet(device, frameBuilder);
+        r.updateDescriptorSets(device, frameBuilder);
 
         return r;
     }

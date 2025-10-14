@@ -61,7 +61,7 @@ class ColoredMesh : Mesh, DrawableByVulkan
         r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
-    void updateDescriptorSet(LogicalDevice device, FrameBuilder frameBuilder /* TODO: replace by sort of uniform buffer */)
+    void updateDescriptorSets(LogicalDevice device, FrameBuilder frameBuilder /* TODO: replace by sort of uniform buffer */)
     {
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
@@ -118,7 +118,7 @@ class TexturedMesh : ColoredMesh
         texture.destroy;
     }
 
-    override void updateDescriptorSet(LogicalDevice device, FrameBuilder frameBuilder)
+    override void updateDescriptorSets(LogicalDevice device, FrameBuilder frameBuilder)
     {
         import pukan.scene: WorldTransformationUniformBuffer;
 
