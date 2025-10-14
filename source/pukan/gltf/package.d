@@ -119,12 +119,18 @@ struct View
         import std.stdio;
         writeln(accessor);
 
-        return Accessor(
+        auto r = Accessor(
             viewSlice: bufSlice[offset .. $],
-            type: accessor["type"].get!string,
-            componentType: accessor["componentType"].get!ComponentType,
             count: accessor["count"].get!uint,
         );
+
+        debug
+        {
+            r.type = accessor["type"].get!string;
+            r.componentType = accessor["componentType"].get!ComponentType;
+        }
+
+        return r;
     }
 }
 
@@ -141,9 +147,9 @@ enum ComponentType : short
 struct Accessor
 {
     ubyte[] viewSlice;
-    string type; //TODO: debug only
-    ComponentType componentType; //TODO: ditto
     uint count;
+    debug string type;
+    debug ComponentType componentType;
 }
 
 private Buffer readBufFile(string dir, in Json fileDescr)
@@ -239,6 +245,7 @@ class GlTF : DrawableByVulkan
         {
             auto indices = accessors[ primitive.indicesAccessorIdx ];
 
+            debug
             {
                 import std.conv: to;
 
@@ -264,8 +271,8 @@ class GlTF : DrawableByVulkan
             auto vertices = &accessors[vertIdx];
 
             assert(vertices.count > 0);
-            enforce(vertices.type == "VEC3");
-            enforce(vertices.componentType == ComponentType.FLOAT);
+            debug assert(vertices.type == "VEC3");
+            debug assert(vertices.componentType == ComponentType.FLOAT);
 
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
