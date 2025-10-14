@@ -184,6 +184,8 @@ class GlTF : DrawableByVulkan
     Node rootSceneNode;
     //}
 
+    private TransferBuffer indicesBuffer;
+
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         {
@@ -206,12 +208,17 @@ class GlTF : DrawableByVulkan
                 import std.conv: to;
 
                 enforce(indices.type == "SCALAR", indices.type.to!string);
-                enforce(
-                    indices.componentType == ComponentType.UNSIGNED_SHORT ||
-                    indices.componentType == ComponentType.UNSIGNED_INT,
-                    indices.componentType.to!string
-                );
+                enforce(indices.componentType == ComponentType.UNSIGNED_SHORT, indices.componentType.to!string);
             }
+
+            assert(indices.count > 0);
+
+            indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+            // Copy indices to mapped memory
+            indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
+
+            indicesBuffer.uploadImmediate(commandPool, commandBuffer);
         }
     }
 
