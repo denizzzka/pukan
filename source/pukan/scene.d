@@ -19,8 +19,10 @@ class Scene
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
+    import pukan.primitives_tree: PrimitivesFactory;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!TexturedMesh texturedMeshFactory;
+    GltfFactory gltfFactory;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
@@ -81,8 +83,15 @@ class Scene
             texturedFragShader,
         ];
 
+        //FIXME: stub
+        auto animatedMeshShaderStages = [
+            vertShader,
+            coloredFragShader,
+        ];
+
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, texturedShaderStages, renderPass);
+        //~ gltfFactory = GltfFactory(device, animatedMeshShaderStages, renderPass);
     }
 
     ~this()

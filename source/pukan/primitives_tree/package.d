@@ -94,6 +94,7 @@ struct PrimitivesFactory(T)
 
     auto create(CTOR_ARGS...)(FrameBuilder frameBuilder, CTOR_ARGS args)
     {
+        assert(device);
         auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
 
         auto r = new T(descriptorsSet, args);

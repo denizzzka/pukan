@@ -12,7 +12,7 @@ static import std.path;
 import vibe.data.json;
 
 ///
-auto loadGlTF2(string filename)
+auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets)
 {
     const json = std.file.readText(filename).parseJsonString;
     const dir = std.path.dirName(filename);
@@ -22,7 +22,7 @@ auto loadGlTF2(string filename)
         enforce(ver == "2.0", "glTF version "~ver~" unsupported");
     }
 
-    auto ret = new GlTF;
+    auto ret = new GlTF(descriptorSets);
 
     Buffer[] buffers;
     foreach(buf; json["buffers"])
@@ -188,6 +188,12 @@ class GlTF : DrawableByVulkan
 
     private TransferBuffer indicesBuffer;
     private TransferBuffer vertexBuffer;
+    private VkDescriptorSet[] descriptorSets;
+
+    this(VkDescriptorSet[] ds)
+    {
+        descriptorSets = ds;
+    }
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
@@ -243,8 +249,82 @@ class GlTF : DrawableByVulkan
         }
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
     {
-        //FIXME: implement
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+
+        auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
+        VkDeviceSize[] offsets = [VkDeviceSize(0)];
+
+        vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
+
+        vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
+
+        //FIXME:
+        //~ vkCmdDrawIndexed(buf, cast(uint) indices.length, 1, 0, 0, 0);
     }
 }
+
+struct GltfFactory
+{
+    import pukan.vulkan;
+    import shaders = pukan.vulkan.shaders;
+    import pukan.vulkan.frame_builder;
+
+    LogicalDevice device;
+    private PoolAndLayoutInfo poolAndLayout;
+    GraphicsPipelineCfg graphicsPipelineCfg;
+
+    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
+    {
+
+        auto layoutBindings = shaders.createLayoutBinding(shaderStages);
+        poolAndLayout = device.createDescriptorPool(layoutBindings);
+
+        auto pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex3(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
+        graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
+
+        auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
+        graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineCreateInfo])[0];
+    }
+
+    auto create(string filename)
+    {
+        assert(device);
+        auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
+
+        return loadGlTF2(filename, descriptorsSet);
+    }
+}
+
+struct Vertex3
+{
+    Vector3f pos;
+
+    static auto getBindingDescription()
+    {
+        VkVertexInputBindingDescription r = {
+            binding: 0,
+            stride: this.sizeof,
+            inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+        };
+
+        return r;
+    }
+
+    static auto getAttributeDescriptions()
+    {
+        VkVertexInputAttributeDescription[1] ad;
+
+        ad[0] = VkVertexInputAttributeDescription(
+            binding: 0,
+            location: 0,
+            format: VK_FORMAT_R32G32B32_SFLOAT,
+            offset: pos.offsetof,
+        );
+
+        return ad;
+    }
+};
