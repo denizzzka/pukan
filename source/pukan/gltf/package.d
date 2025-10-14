@@ -191,12 +191,8 @@ class GlTF : DrawableByVulkan
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
 
-    static struct UBO
+    static struct UBOContent
     {
-        import pukan.scene;
-
-        WorldTransformation mvp;
-
         static struct Material
         {
             Vector4f baseColorFactor;
@@ -211,7 +207,10 @@ class GlTF : DrawableByVulkan
 
         // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
-        uniformBuffer = device.create!TransferBuffer(UBO.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+        auto ubo = cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
+        ubo.material.baseColorFactor = Vector4f(0.5, 0.5, 0.5, 0.5);
     }
 
     ~this()
@@ -278,7 +277,7 @@ class GlTF : DrawableByVulkan
         VkDescriptorBufferInfo bufferInfo = {
             buffer: uniformBuffer.gpuBuffer,
             offset: 0,
-            range: UBO.sizeof,
+            range: UBOContent.sizeof,
         };
 
         VkWriteDescriptorSet[] descriptorWrites = [
