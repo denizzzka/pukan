@@ -84,8 +84,6 @@ struct PrimitivesFactory(T)
         this.device = device;
 
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
-        import std.stdio;
-        writeln("primitive layoutBindings: ", layoutBindings);
         poolAndLayout = device.createDescriptorPool(layoutBindings);
 
         pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);

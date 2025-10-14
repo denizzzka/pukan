@@ -347,8 +347,6 @@ struct GltfFactory
         this.device = device;
 
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
-        import std.stdio;
-        writeln("layoutBindings: ", layoutBindings);
         poolAndLayout = device.createDescriptorPool(layoutBindings);
 
         pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex3(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
