@@ -49,7 +49,8 @@ auto loadGlTF2(string filename)
             const accessorIdx = primitive["indices"].get!ushort;
 
             primitives ~= Primitive(
-                accessor: &ret.accessors[accessorIdx],
+                attributes: primitive["attributes"],
+                indices: &ret.accessors[accessorIdx],
             );
         }
 
@@ -163,7 +164,8 @@ struct Mesh
 
 struct Primitive
 {
-    Accessor* accessor;
+    Json attributes;
+    Accessor* indices; //TODO: optional
 }
 
 struct Node
@@ -188,21 +190,20 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        assert(rootSceneNode.childrenNodeIndices.length == 1);
+        const node = nodes[ rootSceneNode.childrenNodeIndices[0] ];
+
+        //TODO: just skip such node
+        enforce(node.meshIdx >= 0, "mesh index not found");
+
+        const mesh = &meshes[node.meshIdx];
+        assert(mesh.primitives.length == 1);
+
+        const primitive = &mesh.primitives[0];
+        enforce(primitive.indices !is null, "non-indexed geometry isn't supported");
+
         {
-            assert(rootSceneNode.childrenNodeIndices.length == 1);
-            const node = nodes[ rootSceneNode.childrenNodeIndices[0] ];
-
-            //TODO: just skip such node
-            enforce(node.meshIdx >= 0, "mesh index not found");
-
-            const mesh = &meshes[node.meshIdx];
-            assert(mesh.primitives.length == 1);
-
-            const primitive = &mesh.primitives[0];
-
-            enforce(primitive.accessor !is null, "non-indexed geometry isn't supported");
-
-            auto indices = primitive.accessor;
+            auto indices = primitive.indices;
 
             {
                 import std.conv: to;
