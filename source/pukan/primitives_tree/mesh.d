@@ -66,7 +66,7 @@ class ColoredMesh : Mesh, DrawableByVulkan
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
             offset: 0,
-            range: WorldTransformationUniformBuffer.sizeof,
+            range: WorldTransformation.sizeof,
         };
 
         VkWriteDescriptorSet[] descriptorWrites = [
@@ -120,12 +120,12 @@ class TexturedMesh : ColoredMesh
 
     override void updateDescriptorSets(LogicalDevice device, FrameBuilder frameBuilder)
     {
-        import pukan.scene: WorldTransformationUniformBuffer;
+        import pukan.scene: WorldTransformation;
 
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
             offset: 0,
-            range: WorldTransformationUniformBuffer.sizeof,
+            range: WorldTransformation.sizeof,
         };
 
         VkDescriptorImageInfo imageInfo = {

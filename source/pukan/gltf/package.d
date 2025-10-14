@@ -195,7 +195,7 @@ class GlTF : DrawableByVulkan
     {
         import pukan.scene;
 
-        WorldTransformationUniformBuffer mvp;
+        WorldTransformation mvp;
 
         static struct Material
         {

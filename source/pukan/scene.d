@@ -35,7 +35,7 @@ class Scene
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
 
-        frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
+        frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
 
         initShaders!(Bone.mat.sizeof)(device);
@@ -134,7 +134,7 @@ class Scene
 import dlib.math;
 
 ///
-struct WorldTransformationUniformBuffer
+struct WorldTransformation
 {
     Matrix4f model; /// model to World
     Matrix4f view; /// World to view (to camera)

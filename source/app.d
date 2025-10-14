@@ -239,10 +239,10 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
 
     *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 
-    WorldTransformationUniformBuffer* wtb;
-    assert(uniformBuffer.cpuBuf.length == WorldTransformationUniformBuffer.sizeof);
+    WorldTransformation* wtb;
+    assert(uniformBuffer.cpuBuf.length == WorldTransformation.sizeof);
 
-    wtb = cast(WorldTransformationUniformBuffer*) uniformBuffer.cpuBuf.ptr;
+    wtb = cast(WorldTransformation*) uniformBuffer.cpuBuf.ptr;
     wtb.model = rotation.toMatrix4x4;
     wtb.view = lookAtMatrix(
         Vector3f(1, 1, 1), // camera position
