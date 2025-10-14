@@ -221,7 +221,7 @@ class GlTF : DrawableByVulkan
         uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
         auto ubo = cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
-        ubo.material.baseColorFactor = Vector4f(0.5, 0.5, 0.5, 0.5);
+        ubo.material.baseColorFactor = Vector4f(0, 1, 0.2, 1);
     }
 
     ~this()
@@ -309,8 +309,12 @@ class GlTF : DrawableByVulkan
             ),
         ];
 
-        //FIXME: enable if need
-        //~ device.updateDescriptorSets(descriptorWrites);
+        device.updateDescriptorSets(descriptorWrites);
+    }
+
+    void refreshBuffers(VkCommandBuffer buf)
+    {
+        uniformBuffer.recordUpload(buf);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline_UNUSED_FIXME_REMOVE, Matrix4x4f trans)

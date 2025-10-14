@@ -192,6 +192,8 @@ void main() {
 
             auto cb = frame.commandBuffer;
 
+            tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
+
             scene.renderPass.recordCommandBuffer(cb, (buf){
                 tree.startDrawTree(buf);
             });
