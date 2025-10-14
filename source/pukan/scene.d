@@ -19,17 +19,6 @@ class Scene
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    static struct Doubled
-    {
-        PoolAndLayoutInfo poolAndLayout;
-        //~ VkDescriptorSet[] descriptorsSet;
-        DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
-        VkGraphicsPipelineCreateInfo pipelineCreateInfo;
-        GraphicsPipelineCfg graphicsPipelineCfg;
-    }
-
-    Doubled[2] dbl;
-
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!TexturedMesh texturedMeshFactory;
 
@@ -92,25 +81,8 @@ class Scene
             texturedFragShader,
         ];
 
-        void initPoolAndPipelineInfo(S)(size_t i, S shaderStages)
-        {
-            auto layoutBindings = createLayoutBinding(shaderStages);
-            dbl[i].poolAndLayout = device.createDescriptorPool(layoutBindings);
-            //~ dbl[i].descriptorsSet = device.allocateDescriptorSets(dbl[i].poolAndLayout, 1);
-            dbl[i].pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [dbl[i].poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
-            dbl[i].pipelineCreateInfo = dbl[i].pipelineInfoCreator.pipelineCreateInfo;
-            dbl[i].graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([dbl[i].pipelineCreateInfo])[0];
-            dbl[i].graphicsPipelineCfg.pipelineLayout = dbl[i].pipelineInfoCreator.pipelineLayout;
-        }
-
-        //~ initPoolAndPipelineInfo(0, coloredShaderStages);
-        //~ initPoolAndPipelineInfo(1, texturedShaderStages);
-
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, texturedShaderStages, renderPass);
-
-        dbl[0].graphicsPipelineCfg = coloredMeshFactory.graphicsPipelineCfg;
-        dbl[1].graphicsPipelineCfg = texturedMeshFactory.graphicsPipelineCfg;
     }
 
     ~this()

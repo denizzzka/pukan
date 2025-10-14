@@ -161,7 +161,7 @@ void main() {
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
     Bone* cubeRotator;
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, scene.dbl[0].poolAndLayout.descriptorPool, cubeRotator);
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator);
     scope(exit) tree.destroy;
 
     import pukan.exceptions;
@@ -256,11 +256,11 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
     );
 }
 
-auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, scope VkDescriptorPool descriptorPool, out Bone* cubeRotator)
+auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
 {
     auto tree = new DrawableTree;
 
-    auto coloredBranch = tree.root.addChildNode(scene.dbl[0].graphicsPipelineCfg);
+    auto coloredBranch = tree.root.addChildNode(scene.coloredMeshFactory.graphicsPipelineCfg);
 
     {
         auto v = createCubeVertices;
@@ -277,7 +277,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         //~ coloredBranch.addChildNode(gltfObj);
     //~ }
 
-    auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);
+    auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
 
     {
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices);
