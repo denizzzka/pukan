@@ -58,7 +58,14 @@ class Scene
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, texturedShaderStages, renderPass);
-        //~ gltfFactory = GltfFactory(device, animatedMeshShaderStages, renderPass);
+        gltfFactory = GltfFactory(
+            device,
+            [
+                gltf_vertShader,
+                gltf_fragShader,
+            ],
+            renderPass,
+        );
     }
 
     ~this()
