@@ -190,6 +190,7 @@ class GlTF : DrawableByVulkan
     private TransferBuffer vertexBuffer;
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
+    private ushort indices_count;
 
     static struct UBOContent
     {
@@ -243,6 +244,7 @@ class GlTF : DrawableByVulkan
             }
 
             assert(indices.count > 0);
+            indices_count = cast(ushort) indices.count;
 
             indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
@@ -305,11 +307,10 @@ class GlTF : DrawableByVulkan
         vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
         vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16 /* !!! */);
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
-        //FIXME:
-        //~ vkCmdDrawIndexed(buf, cast(uint) indices.length, 1, 0, 0, 0);
+        vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
     }
 }
 
