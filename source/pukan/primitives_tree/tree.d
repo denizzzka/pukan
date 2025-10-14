@@ -71,6 +71,6 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFilling(buf, pipelineCfg, trans, c);
+            drawingBufferFilling(buf, pipelineCfg, trans, *c);
     }
 }

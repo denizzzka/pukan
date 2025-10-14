@@ -6,6 +6,7 @@ import pukan.scene: Vertex;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
+import std.container.slist;
 import std.variant: Algebraic;
 import dlib.math: Matrix4x4f;
 
@@ -21,17 +22,15 @@ struct NodeT(Payload)
 {
     //TODO: unused, remove?
     NodeT* parent;
-    NodeT[] children;
+    SList!(NodeT*) children;
     /*package*/ Payload payload;
 
     NodeT* addChildNode()
     {
-        //FIXME: array moved if grows and pointers become invalidated. Move to SList?
-        children.reserve = 100;
-
-        children.length++;
-        auto c = &children[$-1];
+        auto c = new NodeT;
         c.parent = &this;
+
+        children.insert(c);
 
         return c;
     }
