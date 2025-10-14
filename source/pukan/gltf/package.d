@@ -87,6 +87,8 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             .array;
     }
 
+    ret.updateDescriptorSetsAndUniformBuffers(device);
+
     return ret;
 }
 
@@ -291,6 +293,8 @@ class GlTF : DrawableByVulkan
             range: UBOContent.sizeof,
         };
 
+        assert(descriptorSets.length == 1);
+
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -303,7 +307,7 @@ class GlTF : DrawableByVulkan
             ),
         ];
 
-        device.updateDescriptorSets(descriptorWrites);
+        //~ device.updateDescriptorSets(descriptorWrites);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
@@ -316,7 +320,7 @@ class GlTF : DrawableByVulkan
         vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
         vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers.ptr, offsets.ptr);
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16 /* !!! */);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
         vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
@@ -340,6 +344,8 @@ struct GltfFactory
         this.device = device;
 
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
+        import std.stdio;
+        writeln("layoutBindings: ", layoutBindings);
         poolAndLayout = device.createDescriptorPool(layoutBindings);
 
         pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex3(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);

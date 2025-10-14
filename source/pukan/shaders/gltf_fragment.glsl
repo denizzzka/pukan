@@ -1,9 +1,19 @@
-#version 450
+#version 460
 
-layout(location = 0) in vec4 fragColor;
+//~ struct Material {
+    //~ vec4 baseColorFactor;
+//~ };
+
+//TODO: include UniformBufferObject from vertices shader
+//~ layout(binding = 0) uniform UniformBufferObject {
+    //~ Material material;
+//~ } ubo;
+
+//~ layout(location = 8) in vec4 fragColor;
 layout(location = 0) out vec4 outColor;
 
 void main() {
+    outColor = vec4(0, 1, 0, 0);
     //~ outColor = fragColor;
-    outColor = vec4(0.8, 0.8, 0.8, 0.8);
+    //~ outColor = ubo.material.baseColorFactor;
 }
