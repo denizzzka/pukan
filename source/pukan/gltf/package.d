@@ -12,7 +12,7 @@ static import std.path;
 import vibe.data.json;
 
 ///
-auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice device)
+auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice device, ref GraphicsPipelineCfg pipeline)
 {
     const json = std.file.readText(filename).parseJsonString;
     const dir = std.path.dirName(filename);
@@ -22,7 +22,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         enforce(ver == "2.0", "glTF version "~ver~" unsupported");
     }
 
-    auto ret = new GlTF(descriptorSets, device);
+    auto ret = new GlTF(pipeline, descriptorSets, device);
 
     Buffer[] buffers;
     foreach(buf; json["buffers"])
@@ -196,6 +196,7 @@ class GlTF : DrawableByVulkan
 
     private TransferBuffer indicesBuffer;
     private TransferBuffer vertexBuffer;
+    private GraphicsPipelineCfg* pipeline;
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
     private ushort indices_count;
@@ -210,8 +211,9 @@ class GlTF : DrawableByVulkan
         Material material;
     }
 
-    private this(VkDescriptorSet[] ds, LogicalDevice device)
+    private this(ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] ds, LogicalDevice device)
     {
+        this.pipeline = &pipeline;
         descriptorSets = ds;
 
         // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -310,7 +312,7 @@ class GlTF : DrawableByVulkan
         //~ device.updateDescriptorSets(descriptorWrites);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline_UNUSED_FIXME_REMOVE, Matrix4x4f trans)
     {
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
@@ -360,7 +362,7 @@ struct GltfFactory
         assert(device);
         auto descriptorSets = device.allocateDescriptorSets(poolAndLayout, 1);
 
-        return loadGlTF2(filename, descriptorSets, device);
+        return loadGlTF2(filename, descriptorSets, device, graphicsPipelineCfg);
     }
 }
 
