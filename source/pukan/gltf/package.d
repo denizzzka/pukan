@@ -331,6 +331,7 @@ struct GltfFactory
 
     LogicalDevice device;
     private PoolAndLayoutInfo poolAndLayout;
+    //TODO: contains part of poolAndLayout data. Deduplicate?
     private DefaultGraphicsPipelineInfoCreator!Vertex3 pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
