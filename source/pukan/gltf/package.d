@@ -289,7 +289,7 @@ class GlTF : DrawableByVulkan
                 dstBinding: 0,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1, //FIXME: accept array
+                descriptorCount: 1,
                 pBufferInfo: &bufferInfo,
             ),
         ];
@@ -341,9 +341,9 @@ struct GltfFactory
     auto create(string filename)
     {
         assert(device);
-        auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
+        auto descriptorSets = device.allocateDescriptorSets(poolAndLayout, 1);
 
-        return loadGlTF2(filename, descriptorsSet, device);
+        return loadGlTF2(filename, descriptorSets, device);
     }
 }
 
