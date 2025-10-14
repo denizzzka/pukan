@@ -11,6 +11,7 @@ class FrameBuilder
 {
     LogicalDevice device;
     private Queue graphicsQueue;
+    //TODO: remove:
     TransferBuffer uniformBuffer;
     /* TODO:private */ CommandPool commandPool;
 

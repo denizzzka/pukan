@@ -12,7 +12,7 @@ static import std.path;
 import vibe.data.json;
 
 ///
-auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets)
+auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice device)
 {
     const json = std.file.readText(filename).parseJsonString;
     const dir = std.path.dirName(filename);
@@ -22,7 +22,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets)
         enforce(ver == "2.0", "glTF version "~ver~" unsupported");
     }
 
-    auto ret = new GlTF(descriptorSets);
+    auto ret = new GlTF(descriptorSets, device);
 
     Buffer[] buffers;
     foreach(buf; json["buffers"])
@@ -189,10 +189,34 @@ class GlTF : DrawableByVulkan
     private TransferBuffer indicesBuffer;
     private TransferBuffer vertexBuffer;
     private VkDescriptorSet[] descriptorSets;
+    private TransferBuffer uniformBuffer;
 
-    this(VkDescriptorSet[] ds)
+    static struct UBO
+    {
+        import pukan.scene;
+
+        WorldTransformationUniformBuffer mvp;
+
+        static struct Material
+        {
+            Vector4f baseColorFactor;
+        }
+
+        Material material;
+    }
+
+    private this(VkDescriptorSet[] ds, LogicalDevice device)
     {
         descriptorSets = ds;
+
+        // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
+        // need to allocate more memory then divide it into pieces
+        uniformBuffer = device.create!TransferBuffer(UBO.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    }
+
+    ~this()
+    {
+        uniformBuffer.destroy;
     }
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
@@ -249,6 +273,29 @@ class GlTF : DrawableByVulkan
         }
     }
 
+    void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
+    {
+        VkDescriptorBufferInfo bufferInfo = {
+            buffer: uniformBuffer.gpuBuffer,
+            offset: 0,
+            range: UBO.sizeof,
+        };
+
+        VkWriteDescriptorSet[] descriptorWrites = [
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: descriptorSets[0],
+                dstBinding: 0,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1, //FIXME: accept array
+                pBufferInfo: &bufferInfo,
+            ),
+        ];
+
+        device.updateDescriptorSets(descriptorWrites);
+    }
+
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
     {
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
@@ -296,7 +343,7 @@ struct GltfFactory
         assert(device);
         auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
 
-        return loadGlTF2(filename, descriptorsSet);
+        return loadGlTF2(filename, descriptorsSet, device);
     }
 }
 
