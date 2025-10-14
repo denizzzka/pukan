@@ -272,10 +272,10 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         n.addChildNode(cube);
     }
 
-    //~ {
-        //~ auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
-        //~ coloredBranch.addChildNode(gltfObj);
-    //~ }
+    {
+        auto gltfObj = loadGlTF2("demo/assets/AnimatedCube/glTF/AnimatedCube.gltf");
+        coloredBranch.addChildNode(gltfObj);
+    }
 
     auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
 
