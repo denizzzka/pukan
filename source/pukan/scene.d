@@ -50,12 +50,6 @@ class Scene
             texturedFragShader,
         ];
 
-        //FIXME: stub
-        auto animatedMeshShaderStages = [
-            vertShader,
-            coloredFragShader,
-        ];
-
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, texturedShaderStages, renderPass);
         gltfFactory = GltfFactory(
