@@ -8,6 +8,9 @@ ShaderInfo vertShader;
 ShaderInfo coloredFragShader;
 ShaderInfo texturedFragShader;
 
+ShaderInfo gltf_vertShader;
+ShaderInfo gltf_fragShader;
+
 void initShaders(size_t boneMatrixSize)(LogicalDevice device)
 {
     vertShader = device.uploadShaderToGPU(
@@ -45,5 +48,29 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
         ]
+    );
+
+    gltf_vertShader = device.uploadShaderToGPU(
+        cast(ubyte[]) import("gltf_vertices.spv"),
+        VK_SHADER_STAGE_VERTEX_BIT,
+        [
+            VkDescriptorSetLayoutBinding(
+                binding: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            ),
+        ],
+        VkPushConstantRange(
+            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            offset: 0,
+            size: boneMatrixSize,
+        )
+    );
+
+    gltf_fragShader = device.uploadShaderToGPU(
+        cast(ubyte[]) import("gltf_fragment.spv"),
+        VK_SHADER_STAGE_FRAGMENT_BIT,
+        null
     );
 }
