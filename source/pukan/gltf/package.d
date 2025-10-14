@@ -46,11 +46,11 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         Primitive[] primitives;
         foreach(primitive; mesh["primitives"])
         {
-            const accessorIdx = primitive["indices"].get!ushort;
+            const indicesAccessorIdx = primitive["indices"].opt!int(-1);
 
             primitives ~= Primitive(
+                indicesAccessorIdx: indicesAccessorIdx,
                 attributes: primitive["attributes"],
-                indices: &ret.accessors[accessorIdx],
             );
         }
 
@@ -71,7 +71,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.nodes ~= Node(
             name: node["name"].opt!string,
             childrenNodeIndices: childrenIdxs,
-            meshIdx: node["mesh"].opt!short(-1),
+            meshIdx: node["mesh"].opt!int(-1),
         );
     }
 
@@ -116,8 +116,11 @@ struct View
 
         const offset = accessor["byteOffset"].opt!size_t;
 
+        import std.stdio;
+        writeln(accessor);
+
         return Accessor(
-            bufSlice[offset .. $],
+            viewSlice: bufSlice[offset .. $],
             type: accessor["type"].get!string,
             componentType: accessor["componentType"].get!ComponentType,
             count: accessor["count"].get!uint,
@@ -138,8 +141,8 @@ enum ComponentType : short
 struct Accessor
 {
     ubyte[] viewSlice;
-    string type;
-    ComponentType componentType;
+    string type; //TODO: debug only
+    ComponentType componentType; //TODO: ditto
     uint count;
 }
 
@@ -164,14 +167,14 @@ struct Mesh
 
 struct Primitive
 {
+    int indicesAccessorIdx = -1;
     Json attributes;
-    Accessor* indices; //TODO: optional
 }
 
 struct Node
 {
     string name; /// Not a unique name
-    short meshIdx = -1;
+    int meshIdx = -1;
     //TODO: store also transformation, rotation, scale matrices, etc
     ushort[] childrenNodeIndices;
 }
@@ -231,10 +234,10 @@ class GlTF : DrawableByVulkan
         assert(mesh.primitives.length == 1);
 
         const primitive = &mesh.primitives[0];
-        enforce(primitive.indices !is null, "non-indexed geometry isn't supported");
+        enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
 
         {
-            auto indices = primitive.indices;
+            auto indices = accessors[ primitive.indicesAccessorIdx ];
 
             {
                 import std.conv: to;
@@ -252,12 +255,6 @@ class GlTF : DrawableByVulkan
 
             // Copy indices to mapped memory
             indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
-
-            import std.stdio;
-            foreach(i, v; cast(ushort[]) indicesBuffer.cpuBuf)
-            {
-                writeln("i=",i," idx=", v);
-            }
 
             indicesBuffer.uploadImmediate(commandPool, commandBuffer);
         }
