@@ -175,7 +175,11 @@ void main() {
     {
         glfwPollEvents();
 
-        updateWorldTransformations(scene.frameBuilder.uniformBuffer, sw, scene.swapChain.imageExtent, tree, cubeRotator);
+        WorldTransformation wtb;
+        updateWorldTransformations(wtb, sw, scene.swapChain.imageExtent, tree, cubeRotator);
+        const transl = wtb.proj * wtb.view * wtb.model;
+
+        tree.root.payload = Bone(transl);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
 
@@ -187,7 +191,7 @@ void main() {
             }
 
             auto cb = frame.commandBuffer;
-            fb.uniformBuffer.recordUpload(cb);
+            //~ fb.uniformBuffer.recordUpload(cb); //TODO: remove
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
                 tree.drawingBufferFilling(buf);
@@ -230,19 +234,12 @@ void main() {
 
 import dlib.math;
 
-void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch sw, in VkExtent2D imageExtent, PrimitivesTree tree, Bone* cubeRotator)
+WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
-    const curr = sw.peek.total!"msecs" * 0.001;
+    auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * currDeltaTime);
 
-    auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * curr);
-    auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
+    WorldTransformation wtb;
 
-    *cubeRotator = Bone(cubeRotation.toMatrix4x4);
-
-    WorldTransformation* wtb;
-    assert(uniformBuffer.cpuBuf.length == WorldTransformation.sizeof);
-
-    wtb = cast(WorldTransformation*) uniformBuffer.cpuBuf.ptr;
     wtb.model = rotation.toMatrix4x4;
     wtb.view = lookAtMatrix(
         Vector3f(1, 1, 1), // camera position
@@ -254,6 +251,18 @@ void updateWorldTransformations(ref TransferBuffer uniformBuffer, ref StopWatch 
         cast(float) imageExtent.width / imageExtent.height,
         0.1f /* zNear */, 10.0f /* zFar */
     );
+
+    return wtb;
+}
+
+void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, in VkExtent2D imageExtent, PrimitivesTree tree, Bone* cubeRotator)
+{
+    const curr = sw.peek.total!"msecs" * 0.001;
+
+    wtb = calculateWTB(imageExtent, curr);
+
+    auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
+    *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
