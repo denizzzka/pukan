@@ -31,6 +31,7 @@ class Scene
     Doubled[2] dbl;
 
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
+    PrimitivesFactory!TexturedMesh texturedMeshFactory;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
@@ -103,11 +104,13 @@ class Scene
         }
 
         //~ initPoolAndPipelineInfo(0, coloredShaderStages);
-        initPoolAndPipelineInfo(1, texturedShaderStages);
+        //~ initPoolAndPipelineInfo(1, texturedShaderStages);
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
+        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, texturedShaderStages, renderPass);
 
         dbl[0].graphicsPipelineCfg = coloredMeshFactory.graphicsPipelineCfg;
+        dbl[1].graphicsPipelineCfg = texturedMeshFactory.graphicsPipelineCfg;
     }
 
     ~this()

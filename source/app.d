@@ -279,26 +279,23 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
     auto textureBranch = tree.root.addChildNode(scene.dbl[1].graphicsPipelineCfg);
 
-    //~ {
-        //~ auto mesh = createTexturedDemoMesh(scene.dbl[1].descriptorsSet);
+    {
+        auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices);
 
-        //~ // Texture descriptor set:
-        //~ //TODO: move descriptorsSets to drawable
-        //~ scope textureDstSet = scene.dbl[1].descriptorsSet[0 /*TODO: frame number?*/];
-        //~ mesh.updateTextureDescriptorSet(device, frameBuilder, frameBuilder.commandPool, commandBuffer, textureDstSet, "demo/assets/texture.jpeg");
+        // Texture descriptor set:
+        //TODO: move descriptorsSets to drawable
+        scope textureDstSet = mesh.descriptorSets[0];
+        mesh.updateTextureDescriptorSet(device, frameBuilder, frameBuilder.commandPool, commandBuffer, textureDstSet, "demo/assets/texture.jpeg");
 
-        //~ textureBranch.addChildNode(mesh);
-    //~ }
+        textureBranch.addChildNode(mesh);
+    }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
     return tree;
 }
 
-/// Displaying data
-auto createTexturedDemoMesh(VkDescriptorSet[] ds)
-{
-    return new TexturedMesh(ds,
+auto texturedVertices =
     [
         Vertex(Vector3f(-0.5, -0.5, 0), Vector3f(1.0f, 0.0f, 0.0f), Vector2f(1, 0)),
         Vertex(Vector3f(0.5, -0.5, 0), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
@@ -309,12 +306,13 @@ auto createTexturedDemoMesh(VkDescriptorSet[] ds)
         Vertex(Vector3f(0.5, -0.15, -0.5), Vector3f(0.0f, 1.0f, 0.0f), Vector2f(0, 0)),
         Vertex(Vector3f(0.5, 0.15, -0.5), Vector3f(0.0f, 0.0f, 1.0f), Vector2f(0, 1)),
         Vertex(Vector3f(-0.5, 0.35, -0.5), Vector3f(1.0f, 1.0f, 1.0f), Vector2f(1, 1)),
-    ],
+    ];
+
+ushort[] texturedIndices =
     [
         0, 1, 2, 2, 3, 0,
         4, 5, 6, 6, 7, 4,
-    ]);
-}
+    ];
 
 auto createCubeVertices()
 {
