@@ -309,6 +309,7 @@ class GlTF : DrawableByVulkan
             ),
         ];
 
+        //FIXME: enable if need
         //~ device.updateDescriptorSets(descriptorWrites);
     }
 
