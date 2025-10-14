@@ -187,6 +187,7 @@ class GlTF : DrawableByVulkan
     //}
 
     private TransferBuffer indicesBuffer;
+    private TransferBuffer vertexBuffer;
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
@@ -220,6 +221,25 @@ class GlTF : DrawableByVulkan
             indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
 
             indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+        }
+
+        {
+            const vertIdx = primitive.attributes["POSITION"].get!ushort;
+            auto vertices = &accessors[vertIdx];
+
+            assert(vertices.count > 0);
+            enforce(vertices.type == "VEC3");
+            enforce(vertices.componentType == ComponentType.FLOAT);
+
+            import dlib.math: Vector3f;
+            static assert(Vector3f.sizeof == float.sizeof * 3);
+
+            vertexBuffer = device.create!TransferBuffer(Vector3f.sizeof * vertices.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            // Copy vertices to mapped memory
+            vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices.viewSlice;
+
+            vertexBuffer.uploadImmediate(commandPool, commandBuffer);
         }
     }
 
