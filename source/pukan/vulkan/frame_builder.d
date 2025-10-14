@@ -11,8 +11,6 @@ class FrameBuilder
 {
     LogicalDevice device;
     private Queue graphicsQueue;
-    //TODO: remove:
-    TransferBuffer uniformBuffer;
     /* TODO:private */ CommandPool commandPool;
 
     this(LogicalDevice dev, size_t uniformBufferSize)
@@ -21,16 +19,11 @@ class FrameBuilder
         //TODO: implement method to acquire graphics queue
         graphicsQueue = device.createSyncQueue;
         commandPool = device.createCommandPool();
-
-        // FIXME: bad idea to allocate a memory buffer only for one uniform buffer,
-        // need to allocate more memory then divide it into pieces
-        uniformBuffer = device.create!TransferBuffer(uniformBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
 
     ~this()
     {
         destroy(commandPool);
-        destroy(uniformBuffer);
     }
 
     ///

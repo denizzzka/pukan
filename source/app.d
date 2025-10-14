@@ -191,7 +191,6 @@ void main() {
             }
 
             auto cb = frame.commandBuffer;
-            //~ fb.uniformBuffer.recordUpload(cb); //TODO: remove
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
                 tree.drawingBufferFilling(buf);

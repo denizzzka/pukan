@@ -61,27 +61,8 @@ class ColoredMesh : Mesh, DrawableByVulkan
         r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
-    void updateDescriptorSets(LogicalDevice device, FrameBuilder frameBuilder /* TODO: replace by sort of uniform buffer */)
+    void updateDescriptorSets(LogicalDevice device)
     {
-        VkDescriptorBufferInfo bufferInfo = {
-            buffer: frameBuilder.uniformBuffer.gpuBuffer,
-            offset: 0,
-            range: WorldTransformation.sizeof,
-        };
-
-        VkWriteDescriptorSet[] descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1, //FIXME: accept array
-                pBufferInfo: &bufferInfo,
-            ),
-        ];
-
-        device.updateDescriptorSets(descriptorWrites);
     }
 
     import dlib.math: Matrix4x4f;
@@ -118,15 +99,9 @@ class TexturedMesh : ColoredMesh
         texture.destroy;
     }
 
-    override void updateDescriptorSets(LogicalDevice device, FrameBuilder frameBuilder)
+    override void updateDescriptorSets(LogicalDevice device)
     {
         import pukan.scene: WorldTransformation;
-
-        VkDescriptorBufferInfo bufferInfo = {
-            buffer: frameBuilder.uniformBuffer.gpuBuffer,
-            offset: 0,
-            range: WorldTransformation.sizeof,
-        };
 
         VkDescriptorImageInfo imageInfo = {
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -135,15 +110,6 @@ class TexturedMesh : ColoredMesh
         };
 
         VkWriteDescriptorSet[] descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &bufferInfo,
-            ),
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 dstSet: descriptorSets[0],
