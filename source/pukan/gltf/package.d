@@ -70,6 +70,7 @@ auto loadGlTF2(string filename)
         ret.nodes ~= Node(
             name: node["name"].opt!string,
             childrenNodeIndices: childrenIdxs,
+            meshIdx: node["mesh"].opt!short(-1),
         );
     }
 
@@ -117,17 +118,27 @@ struct View
         return Accessor(
             bufSlice[offset .. $],
             type: accessor["type"].get!string,
-            componentType: accessor["componentType"].get!uint,
+            componentType: accessor["componentType"].get!ComponentType,
             count: accessor["count"].get!uint,
         );
     }
+}
+
+enum ComponentType : short
+{
+    BYTE = 5120,
+    UNSIGNED_BYTE = 5121,
+    SHORT = 5122,
+    UNSIGNED_SHORT = 5123,
+    UNSIGNED_INT = 5125,
+    FLOAT = 5126,
 }
 
 struct Accessor
 {
     ubyte[] viewSlice;
     string type;
-    uint componentType;
+    ComponentType componentType;
     uint count;
 }
 
@@ -157,7 +168,9 @@ struct Primitive
 
 struct Node
 {
-    string name;
+    string name; /// Not a unique name
+    short meshIdx = -1;
+    //TODO: store also transformation, rotation, scale matrices, etc
     ushort[] childrenNodeIndices;
 }
 
@@ -173,7 +186,33 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        //FIXME: implement
+        {
+            assert(rootSceneNode.childrenNodeIndices.length == 1);
+            const node = nodes[ rootSceneNode.childrenNodeIndices[0] ];
+
+            //TODO: just skip such node
+            enforce(node.meshIdx >= 0, "mesh index not found");
+
+            const mesh = &meshes[node.meshIdx];
+            assert(mesh.primitives.length == 1);
+
+            const primitive = &mesh.primitives[0];
+
+            enforce(primitive.accessor !is null, "non-indexed geometry isn't supported");
+
+            auto indices = primitive.accessor;
+
+            {
+                import std.conv: to;
+
+                enforce(indices.type == "SCALAR", indices.type.to!string);
+                enforce(
+                    indices.componentType == ComponentType.UNSIGNED_SHORT ||
+                    indices.componentType == ComponentType.UNSIGNED_INT,
+                    indices.componentType.to!string
+                );
+            }
+        }
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans)
