@@ -1,6 +1,7 @@
 module pukan.scene;
 
 import pukan;
+import pukan.shaders;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
@@ -37,41 +38,7 @@ class Scene
         frameBuilder = device.create!FrameBuilder(WorldTransformationUniformBuffer.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
 
-        auto vertShader = device.uploadShaderToGPU(
-            cast(ubyte[]) import("vert.spv"),
-            VK_SHADER_STAGE_VERTEX_BIT,
-            [
-                VkDescriptorSetLayoutBinding(
-                    binding: 0,
-                    descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                    descriptorCount: 1,
-                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                ),
-            ],
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                offset: 0,
-                size: Bone.mat.sizeof,
-            )
-        );
-
-        auto coloredFragShader = device.uploadShaderToGPU(
-            cast(ubyte[]) import("colored_frag.spv"),
-            VK_SHADER_STAGE_FRAGMENT_BIT,
-            null
-        );
-        auto texturedFragShader = device.uploadShaderToGPU(
-            cast(ubyte[]) import("textured_frag.spv"),
-            VK_SHADER_STAGE_FRAGMENT_BIT,
-            [
-                VkDescriptorSetLayoutBinding(
-                    binding: 1,
-                    descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    descriptorCount: 1,
-                    stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-                ),
-            ]
-        );
+        initShaders!(Bone.mat.sizeof)(device);
 
         auto coloredShaderStages = [
             vertShader,
