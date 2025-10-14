@@ -263,7 +263,8 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto coloredBranch = tree.root.addChildNode(scene.dbl[0].graphicsPipelineCfg);
 
     {
-        auto cube = createCubeDemoMesh(scene.dbl[0].descriptorsSet);
+        auto v = createCubeVertices;
+        auto cube = scene.coloredMeshFactory.create(scene.frameBuilder, v[0], v[1]);
 
         //TODO: move descriptorsSets to drawable
         cube.updateDescriptorSet(device, frameBuilder, scene.dbl[0].descriptorsSet[0 /*TODO: frame number?*/]);
@@ -346,10 +347,4 @@ auto createCubeVertices()
 
     import std.typecons;
     return tuple(vertices, indices);
-}
-
-auto createCubeDemoMesh(VkDescriptorSet[] ds)
-{
-    auto v = createCubeVertices;
-    return new ColoredMesh(ds, v[0], v[1]);
 }

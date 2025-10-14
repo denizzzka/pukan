@@ -67,3 +67,38 @@ struct Bone
 
     uint translationBufferIdx;
 }
+
+struct PrimitivesFactory(T)
+{
+    import pukan.vulkan;
+    import shaders = pukan.vulkan.shaders;
+    import pukan.vulkan.frame_builder;
+
+    LogicalDevice device;
+    private PoolAndLayoutInfo poolAndLayout;
+    private GraphicsPipelineCfg graphicsPipelineCfg;
+
+    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
+    {
+        this.device = device;
+
+        auto layoutBindings = shaders.createLayoutBinding(shaderStages);
+        poolAndLayout = device.createDescriptorPool(layoutBindings);
+
+        auto pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
+        graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
+
+        auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
+        graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineCreateInfo])[0];
+    }
+
+    auto create(FrameBuilder frameBuilder, Vertex[] vertices, ushort[] indices)
+    {
+        auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
+
+        auto r = new T(descriptorsSet, vertices, indices);
+        r.updateDescriptorSet(device, frameBuilder, descriptorsSet[0]);
+
+        return r;
+    }
+}

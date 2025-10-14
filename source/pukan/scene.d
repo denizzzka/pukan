@@ -30,6 +30,8 @@ class Scene
 
     Doubled[2] dbl;
 
+    PrimitivesFactory!ColoredMesh coloredMeshFactory;
+
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
         device = dev;
@@ -102,6 +104,8 @@ class Scene
 
         initPoolAndPipelineInfo(0, coloredShaderStages);
         initPoolAndPipelineInfo(1, texturedShaderStages);
+
+        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
     }
 
     ~this()
