@@ -76,6 +76,7 @@ struct PrimitivesFactory(T)
 
     LogicalDevice device;
     private PoolAndLayoutInfo poolAndLayout;
+    private DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
@@ -85,7 +86,7 @@ struct PrimitivesFactory(T)
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
         poolAndLayout = device.createDescriptorPool(layoutBindings);
 
-        auto pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
+        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
         graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
 
         auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;

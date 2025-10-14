@@ -327,6 +327,7 @@ struct GltfFactory
 
     LogicalDevice device;
     private PoolAndLayoutInfo poolAndLayout;
+    private DefaultGraphicsPipelineInfoCreator!Vertex3 pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
@@ -336,7 +337,7 @@ struct GltfFactory
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
         poolAndLayout = device.createDescriptorPool(layoutBindings);
 
-        auto pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex3(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
+        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex3(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
         graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
 
         auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
