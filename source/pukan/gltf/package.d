@@ -279,6 +279,7 @@ struct GltfFactory
 
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
     {
+        this.device = device;
 
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
         poolAndLayout = device.createDescriptorPool(layoutBindings);
