@@ -116,9 +116,6 @@ struct View
 
         const offset = accessor["byteOffset"].opt!size_t;
 
-        import std.stdio;
-        writeln(accessor);
-
         auto r = Accessor(
             viewSlice: bufSlice[offset .. $],
             count: accessor["count"].get!uint,
