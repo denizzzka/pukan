@@ -105,11 +105,11 @@ class ColoredMesh : Mesh, DrawableByVulkan
 
 class TexturedMesh : ColoredMesh
 {
-    //TODO: move to mesh-in-GPU descriptor
     Texture texture;
 
-    this(VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices)
+    this(VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices, Texture texture)
     {
+        this.texture = texture;
         super(ds, vertices, indices);
     }
 
@@ -118,18 +118,9 @@ class TexturedMesh : ColoredMesh
         texture.destroy;
     }
 
-    void updateTextureDescriptorSet(
-        LogicalDevice device,
-        FrameBuilder frameBuilder,
-        CommandPool commandPool,
-        scope VkCommandBuffer commandBuffer,
-        VkDescriptorSet dstDescriptorSet,
-        string filename,
-    ) //TODO: const
+    override void updateDescriptorSet(LogicalDevice device, FrameBuilder frameBuilder)
     {
         import pukan.scene: WorldTransformationUniformBuffer;
-
-        texture = device.create!Texture(commandPool, commandBuffer, filename);
 
         VkDescriptorBufferInfo bufferInfo = {
             buffer: frameBuilder.uniformBuffer.gpuBuffer,
@@ -146,7 +137,7 @@ class TexturedMesh : ColoredMesh
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: dstDescriptorSet,
+                dstSet: descriptorSets[0],
                 dstBinding: 0,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -155,7 +146,7 @@ class TexturedMesh : ColoredMesh
             ),
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: dstDescriptorSet,
+                dstSet: descriptorSets[0],
                 dstBinding: 1,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,

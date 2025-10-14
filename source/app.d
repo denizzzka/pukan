@@ -280,12 +280,8 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
 
     {
-        auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices);
-
-        // Texture descriptor set:
-        //TODO: move descriptorsSets to drawable
-        scope textureDstSet = mesh.descriptorSets[0];
-        mesh.updateTextureDescriptorSet(device, frameBuilder, frameBuilder.commandPool, commandBuffer, textureDstSet, "demo/assets/texture.jpeg");
+        auto texture = device.create!Texture(frameBuilder.commandPool, commandBuffer, "demo/assets/texture.jpeg");
+        auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
         textureBranch.addChildNode(mesh);
     }

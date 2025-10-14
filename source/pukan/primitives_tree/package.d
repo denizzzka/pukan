@@ -92,11 +92,11 @@ struct PrimitivesFactory(T)
         graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineCreateInfo])[0];
     }
 
-    auto create(FrameBuilder frameBuilder, Vertex[] vertices, ushort[] indices)
+    auto create(CTOR_ARGS...)(FrameBuilder frameBuilder, CTOR_ARGS args)
     {
         auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
 
-        auto r = new T(descriptorsSet, vertices, indices);
+        auto r = new T(descriptorsSet, args);
         r.updateDescriptorSet(device, frameBuilder);
 
         return r;
