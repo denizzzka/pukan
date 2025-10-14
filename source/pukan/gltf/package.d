@@ -163,10 +163,13 @@ struct Node
 
 class GlTF : DrawableByVulkan
 {
+    //TODO:
+    //const {
     Accessor[] accessors;
     Node[] nodes;
     Mesh[] meshes;
     Node rootSceneNode;
+    //}
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
