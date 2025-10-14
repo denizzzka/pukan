@@ -193,7 +193,7 @@ void main() {
             auto cb = frame.commandBuffer;
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
-                tree.drawingBufferFilling(buf);
+                tree.startDrawTree(buf);
             });
         });
 

@@ -39,9 +39,15 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
         forEachDrawablePayload((d) => d.uploadToGPUImmediate(device, commandPool, commandBuffer));
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf)
+    //TODO: remove? Translation now is mandatory arg for start of the scene rendering
+    void startDrawTree(VkCommandBuffer buf)
     {
         drawingBufferFilling(buf, GraphicsPipelineCfg.init, Matrix4f.identity);
+    }
+
+    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
+    {
+        drawingBufferFilling(buf, GraphicsPipelineCfg.init, trans);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans)
