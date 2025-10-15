@@ -7,11 +7,7 @@ package mixin template Images()
 
     auto createImage(ref VkImageCreateInfo createInfo)
     {
-        VkImage image;
-        vkCall(this.device, &createInfo, this.alloc, &image);
-        images.insert(image);
-
-        return images.front;
+        return images.insertOne((e) => vkCall(this.device, &createInfo, this.alloc, &e));
     }
 
     private void imagesDtor()
