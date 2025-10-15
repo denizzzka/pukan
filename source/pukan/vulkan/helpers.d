@@ -218,12 +218,22 @@ struct SimpleSList(T)
 {
     import std.container.slist;
 
-    private SList!VkImage list;
+    private SList!T list;
+
+    alias ElemType = Elem;
 
     void insert(T val) { list.insert(val); }
     Elem front() => Elem(list.opSlice);
     bool empty() => list.empty;
     auto opSlice() => list.opSlice();
+    auto insertOne(void delegate(ref T) dg)
+    {
+        T val;
+        dg(val);
+        list.insert(val);
+
+        return front();
+    }
 
     static struct Elem
     {
