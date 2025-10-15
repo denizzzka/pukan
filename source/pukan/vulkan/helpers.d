@@ -194,7 +194,7 @@ void printStackTrace()
 debug version = PukanVulkanCodeSanitizer;
 
 /// Wrapper for a mixin template to prevent accessing external variables except .this
-package mixin template ScopedLogicalDeviceTemplateMixin(alias M)
+mixin template ScopedLogicalDeviceTemplateMixin(alias M)
 {
     version(PukanVulkanCodeSanitizer)
     {
@@ -214,7 +214,7 @@ package mixin template ScopedLogicalDeviceTemplateMixin(alias M)
      mixin M;
 }
 
-struct SimpleSList(T)
+struct SimpleSList(T, alias elementDtor = null)
 {
     import std.container.slist;
 
