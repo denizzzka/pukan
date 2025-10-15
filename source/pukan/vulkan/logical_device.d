@@ -84,6 +84,7 @@ class LogicalDevice
     {
         if(device)
         {
+            memoryDtor();
             imagesDtor();
             pipelinesDtor();
             descriptorPoolsDtor();
@@ -150,6 +151,9 @@ class LogicalDevice
 
     import pukan.vulkan.image: Images;
     mixin ScopedLogicalDeviceTemplateMixin!Images;
+
+    import pukan.vulkan.memory: Memory;
+    mixin ScopedLogicalDeviceTemplateMixin!Memory;
 }
 
 class Semaphore

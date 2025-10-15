@@ -1,5 +1,37 @@
 module pukan.vulkan.memory;
 
+package mixin template Memory()
+{
+    import pukan.vulkan.helpers: SimpleSList;
+
+    private SimpleSList!VkDeviceMemory deviceMemoryChunks;
+
+    auto allocateDeviceMemory(VkMemoryAllocateInfo allocInfo)
+    {
+        return deviceMemoryChunks.insertOne((mem){
+            vkAllocateMemory(this.device, &allocInfo, this.alloc, &mem).vkCheck;
+        });
+    }
+
+    private SimpleSList!VkBuffer buffers;
+
+    buffers.ElemType createBuffer(VkBufferCreateInfo createInfo)
+    {
+        return buffers.insertOne((e){
+            vkCreateBuffer(this.device, &createInfo, this.alloc, &e).vkCheck;
+        });
+    }
+
+    private void memoryDtor()
+    {
+        foreach(e; buffers)
+            vkDestroyBuffer(this.device, e, this.alloc);
+
+        foreach(e; deviceMemoryChunks)
+            vkFreeMemory(this.device, e, this.alloc);
+    }
+}
+
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
