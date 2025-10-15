@@ -294,7 +294,8 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
 
     {
-        auto texture = device.create!Texture(frameBuilder.commandPool, commandBuffer, "demo/assets/texture.jpeg");
+        auto img = loadImageFromFile("demo/assets/texture.jpeg");
+        auto texture = device.create!Texture(frameBuilder.commandPool, commandBuffer, &img);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
         textureBranch.addChildNode(mesh);

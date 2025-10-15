@@ -1,6 +1,5 @@
 module pukan.vulkan.textures;
 
-import gamut;
 import pukan.exceptions;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -15,18 +14,17 @@ class Texture
     VkImageView imageView;
     VkSampler sampler;
 
-    this(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, string filename)
+    this(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, Img image)
     {
         this.device = device;
 
-        Image image = loadImage("demo/assets/texture.jpeg");
         VkDeviceSize imageSize = image.width * image.height * 4 /* rgba */;
 
         //FIXME: TransferBuffer is used only as src buffer
         scope buf = device.create!MemoryBufferMappedToCPU(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
         scope(exit) destroy(buf);
 
-        buf.cpuBuf[0 .. $] = image.allPixelsAtOnce;
+        buf.cpuBuf[0 .. $] = cast(void[]) image.allPixelsAtOnce;
 
         {
             VkImageCreateInfo imageInfo = {
@@ -86,18 +84,4 @@ class Texture
 
         destroy(textureImageMemory);
     }
-}
-
-Image loadImage(string filepath)
-{
-    Image image;
-    image.loadFromFile(filepath, LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT|LOAD_ALPHA);
-
-    if (image.isError)
-        throw new PukanException(image.errorMessage.to!string);
-
-    enforce!PukanException(image.type == PixelType.rgba8, "Unsupported texture type: "~image.type.to!string);
-    enforce!PukanException(image.layers == 1, "Texture image must contain one layer");
-
-    return image;
 }
