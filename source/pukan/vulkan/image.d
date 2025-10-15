@@ -1,5 +1,30 @@
 module pukan.vulkan.image;
 
+package mixin template Images()
+{
+    import std.container.slist;
+    private SList!VkImage images;
+
+    auto createImage(ref VkImageCreateInfo createInfo)
+    {
+        VkImage image;
+        vkCall(this.device, &createInfo, this.alloc, &image);
+        images.insert(image);
+
+        return images.front;
+    }
+
+    private void imagesDtor()
+    {
+        foreach(e; images)
+            vkDestroyImage(this.device, e, this.alloc);
+    }
+
+    void bindMemoryAsImage(ref VkImageCreateInfo createInfo)
+    {
+    }
+}
+
 import pukan.exceptions: PukanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
