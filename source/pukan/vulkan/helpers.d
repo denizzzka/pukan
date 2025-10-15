@@ -191,7 +191,7 @@ void printStackTrace()
     defaultTraceDeallocator(trace);
 }
 
-debug version = PukanVulkanCodeSanitizer;
+//~ debug version = PukanVulkanCodeSanitizer;
 
 /// Wrapper for a mixin template to prevent accessing external variables except .this
 mixin template ScopedLogicalDeviceTemplateMixin(alias M)

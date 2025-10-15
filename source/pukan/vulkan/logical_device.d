@@ -138,7 +138,12 @@ class LogicalDevice
         return new CommandPool(this, familyIdx);
     }
 
-    import pukan.vulkan.helpers: ScopedLogicalDeviceTemplateMixin;
+    //~ import pukan.vulkan.helpers: ScopedLogicalDeviceTemplateMixin;
+
+    mixin template ScopedLogicalDeviceTemplateMixin(alias M)
+    {
+         mixin M;
+    }
 
     import pukan.vulkan.shaders: Shaders;
     mixin ScopedLogicalDeviceTemplateMixin!Shaders;
@@ -154,6 +159,11 @@ class LogicalDevice
 
     import pukan.vulkan.memory: Memory;
     mixin ScopedLogicalDeviceTemplateMixin!Memory;
+
+    //~ auto allocateDeviceMemory2(ref VkMemoryAllocateInfo allocInfo)
+    //~ {
+        //~ return allocateDeviceMemory(allocInfo);
+    //~ }
 }
 
 class Semaphore

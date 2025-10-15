@@ -1,12 +1,14 @@
 module pukan.vulkan.memory;
 
-package mixin template Memory()
+mixin template Memory()
 {
+    int allocTest() => 123;
+
     import pukan.vulkan.helpers: SimpleSList;
 
-    private SimpleSList!VkDeviceMemory deviceMemoryChunks;
+    SimpleSList!VkDeviceMemory deviceMemoryChunks;
 
-    auto allocateDeviceMemory(ref VkMemoryAllocateInfo allocInfo)
+    public deviceMemoryChunks.ElemType allocateDeviceMemory(ref VkMemoryAllocateInfo allocInfo)
     {
         return deviceMemoryChunks.insertOne((mem){
             vkAllocateMemory(this.device, &allocInfo, this.alloc, &mem).vkCheck;
@@ -116,6 +118,8 @@ class MemoryBufferBase
     LogicalDevice device;
     MemChunk deviceMemory;
 
+    import std.traits;
+
     this(LogicalDevice dev, in VkMemoryRequirements memRequirements, in VkMemoryPropertyFlags propFlags)
     {
         device = dev;
@@ -127,7 +131,11 @@ class MemoryBufferBase
         };
 
         deviceMemory = device.allocateDeviceMemory(allocInfo);
+
+        ReturnType!(LogicalDevice.allocateDeviceMemory) deviceMemory2;
     }
+
+    ReturnType!(LogicalDevice.allocTest) deviceMemory3;
 
     ~this()
     {
