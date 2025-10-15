@@ -213,3 +213,25 @@ package mixin template ScopedLogicalDeviceTemplateMixin(alias M)
 
      mixin M;
 }
+
+struct SimpleSList(T)
+{
+    import std.container.slist;
+
+    private SList!VkImage list;
+
+    void insert(T val) { list.insert(val); }
+    Elem front() => Elem(list.opSlice);
+    bool empty() => list.empty;
+    auto opSlice() => list.opSlice();
+
+    static struct Elem
+    {
+        import std.traits;
+
+        ReturnType!(list.opSlice) val;
+
+        ref getVal() => val.front;
+        alias this = getVal;
+    }
+}
