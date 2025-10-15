@@ -90,7 +90,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
 
     foreach(img; json["images"])
     {
-        //~ ret.images ~= loadImage(build_path(dir, img["uri"].get!string));
+        //~ ret.images ~= device.create!loadImage(build_path(dir, img["uri"].get!string));
     }
 
     ret.updateDescriptorSetsAndUniformBuffers(device);
@@ -200,7 +200,7 @@ class GlTF : DrawableByVulkan
     Node[] nodes;
     Mesh[] meshes;
     Node rootSceneNode;
-    gamut.Image[] images;
+    ImageMemory[] images;
     //}
 
     private TransferBuffer indicesBuffer;
