@@ -20,7 +20,7 @@ package mixin template Images()
             vkDestroyImage(this.device, e, this.alloc);
     }
 
-    void bindMemoryAsImage(ref VkImageCreateInfo createInfo)
+    void bindMemoryAsImage(SimpleSList!VkImage.Elem img)
     {
     }
 }
