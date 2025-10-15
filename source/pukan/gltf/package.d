@@ -1,5 +1,6 @@
 module pukan.gltf;
 
+static import gamut;
 import dlib.math;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -87,6 +88,11 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             .array;
     }
 
+    foreach(img; json["images"])
+    {
+        //~ ret.images ~= loadImage(build_path(dir, img["uri"].get!string));
+    }
+
     ret.updateDescriptorSetsAndUniformBuffers(device);
 
     return ret;
@@ -151,13 +157,15 @@ struct Accessor
     debug ComponentType componentType;
 }
 
+private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
+
 private Buffer readBufFile(string dir, in Json fileDescr)
 {
     const len = fileDescr["byteLength"].get!ulong;
     const filename = fileDescr["uri"].get!string;
 
     Buffer ret;
-    ret.buf = cast(ubyte[]) std.file.read(dir ~ std.path.dirSeparator ~ filename);
+    ret.buf = cast(ubyte[]) std.file.read(build_path(dir, filename));
 
     enforce(ret.buf.length == len);
 
@@ -192,6 +200,7 @@ class GlTF : DrawableByVulkan
     Node[] nodes;
     Mesh[] meshes;
     Node rootSceneNode;
+    gamut.Image[] images;
     //}
 
     private TransferBuffer indicesBuffer;
