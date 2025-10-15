@@ -6,7 +6,7 @@ package mixin template Memory()
 
     private SimpleSList!VkDeviceMemory deviceMemoryChunks;
 
-    auto allocateDeviceMemory(VkMemoryAllocateInfo allocInfo)
+    auto allocateDeviceMemory(ref VkMemoryAllocateInfo allocInfo)
     {
         return deviceMemoryChunks.insertOne((mem){
             vkAllocateMemory(this.device, &allocInfo, this.alloc, &mem).vkCheck;
@@ -31,6 +31,8 @@ package mixin template Memory()
             vkFreeMemory(this.device, e, this.alloc);
     }
 }
+
+alias MemChunk = SimpleSList!VkDeviceMemory.ElemType;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -110,25 +112,28 @@ class MemoryBuffer : MemoryBufferBase
 
 class MemoryBufferBase
 {
+    //TODO: remove:
     LogicalDevice device;
-    VkDeviceMemory deviceMemory;
+    MemChunk deviceMemory;
 
     this(LogicalDevice dev, in VkMemoryRequirements memRequirements, in VkMemoryPropertyFlags propFlags)
     {
         device = dev;
 
         VkMemoryAllocateInfo allocInfo = {
+            sType: VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             allocationSize: memRequirements.size,
             memoryTypeIndex: device.physicalDevice.findMemoryType(memRequirements.memoryTypeBits, propFlags),
         };
 
-        vkCall(device.device, &allocInfo, device.alloc, &deviceMemory);
+        deviceMemory = device.allocateDeviceMemory(allocInfo);
     }
 
     ~this()
     {
-        if(deviceMemory)
-            vkFreeMemory(device.device, deviceMemory, device.alloc);
+        //FIXME:
+        //~ if(deviceMemory)
+            //~ vkFreeMemory(device.device, deviceMemory, device.alloc);
     }
 }
 
