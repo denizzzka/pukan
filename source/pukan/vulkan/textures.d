@@ -19,15 +19,7 @@ class Texture
     {
         this.device = device;
 
-        Image image;
-        image.loadFromFile("demo/assets/texture.jpeg", LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT|LOAD_ALPHA);
-
-        if (image.isError)
-            throw new PukanException(image.errorMessage.to!string);
-
-        enforce!PukanException(image.type == PixelType.rgba8, "Unsupported texture type: "~image.type.to!string);
-        enforce!PukanException(image.layers == 1, "Texture image must contain one layer");
-
+        Image image = loadImage("demo/assets/texture.jpeg");
         VkDeviceSize imageSize = image.width * image.height * 4 /* rgba */;
 
         //FIXME: TransferBuffer is used only as src buffer
@@ -94,4 +86,18 @@ class Texture
 
         destroy(textureImageMemory);
     }
+}
+
+Image loadImage(string filepath)
+{
+    Image image;
+    image.loadFromFile(filepath, LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT|LOAD_ALPHA);
+
+    if (image.isError)
+        throw new PukanException(image.errorMessage.to!string);
+
+    enforce!PukanException(image.type == PixelType.rgba8, "Unsupported texture type: "~image.type.to!string);
+    enforce!PukanException(image.layers == 1, "Texture image must contain one layer");
+
+    return image;
 }
