@@ -38,7 +38,7 @@ class ImageMemory : MemoryBufferBase
 
     this(LogicalDevice device, ref VkImageCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
     {
-        vkCall(device.device, &createInfo, device.alloc, &image);
+        image = device.createImage(createInfo);
 
         imageExtent = createInfo.extent;
 
@@ -48,12 +48,6 @@ class ImageMemory : MemoryBufferBase
         super(device, memRequirements, propFlags);
 
         vkBindImageMemory(device, image, super.deviceMemory, 0 /* memoryOffset */).vkCheck;
-    }
-
-    ~this()
-    {
-        if(image)
-            vkDestroyImage(device, image, device.alloc);
     }
 
     void addPipelineBarrier(VkCommandBuffer buf, VkImageLayout oldLayout, VkImageLayout newLayout)
