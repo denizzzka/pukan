@@ -237,7 +237,7 @@ import dlib.math;
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
-    auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * currDeltaTime);
+    auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * currDeltaTime * 0.1);
 
     WorldTransformation wtb;
 

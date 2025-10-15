@@ -319,6 +319,8 @@ class GlTF : DrawableByVulkan
 
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline_UNUSED_FIXME_REMOVE, Matrix4x4f trans)
     {
+        //~ trans *= Vector3f(-1, -1, -1).scaleMatrix;
+
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
         auto vertexBuffers = [vertexBuffer.gpuBuffer.buf];
