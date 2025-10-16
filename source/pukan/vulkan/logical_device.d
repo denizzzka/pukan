@@ -138,6 +138,8 @@ class LogicalDevice
         return new CommandPool(this, familyIdx);
     }
 
+    //TODO: This will be moved to a specific objects (where required) to reduce the number of references to the device
+
     import pukan.vulkan.helpers: ScopedLogicalDeviceTemplateMixin;
 
     import pukan.vulkan.shaders: Shaders;
