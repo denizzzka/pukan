@@ -18,39 +18,7 @@ class Texture
     {
         this.device = device;
 
-        VkDeviceSize imageSize = image.width * image.height * 4 /* rgba */;
-
-        //FIXME: TransferBuffer is used only as src buffer
-        scope buf = device.create!MemoryBufferMappedToCPU(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-        scope(exit) destroy(buf);
-
-        buf.cpuBuf[0 .. $] = cast(void[]) image.allPixelsAtOnce;
-
-        {
-            VkImageCreateInfo imageInfo = {
-                imageType: VK_IMAGE_TYPE_2D,
-                format: VK_FORMAT_R8G8B8A8_SRGB,
-                tiling: VK_IMAGE_TILING_OPTIMAL,
-                extent: VkExtent3D(
-                    width: image.width,
-                    height: image.height,
-                    depth: 1,
-                ),
-                mipLevels: 1,
-                arrayLayers: 1,
-                initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
-                usage: VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                sharingMode: VK_SHARING_MODE_EXCLUSIVE,
-                samples: VK_SAMPLE_COUNT_1_BIT,
-            };
-
-            //TODO: implement check what VK_FORMAT_R8G8B8A8_SRGB is supported
-
-            textureImageMemory = device.create!ImageMemory(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        }
-
-        // TODO: fix ugly args naming
-        textureImageMemory.copyFromBuffer(commandPool, commandBuf, buf.buf);
+        textureImageMemory = loadImageToMemory(device, commandPool, commandBuf, image);
 
         createImageView(imageView, device, VK_FORMAT_R8G8B8A8_SRGB, textureImageMemory.image);
 
