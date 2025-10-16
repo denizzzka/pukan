@@ -14,11 +14,11 @@ class Texture
     VkImageView imageView;
     VkSampler sampler;
 
-    this(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, ref VkSamplerCreateInfo samplerInfo, Img image)
+    this(LogicalDevice device, ImageMemory image, ref VkSamplerCreateInfo samplerInfo)
     {
         this.device = device;
 
-        textureImageMemory = loadImageToMemory(device, commandPool, commandBuf, image);
+        textureImageMemory = image;
 
         createImageView(imageView, device, VK_FORMAT_R8G8B8A8_SRGB, textureImageMemory.image);
 
@@ -32,7 +32,5 @@ class Texture
 
         if(imageView)
             vkDestroyImageView(device, imageView, device.alloc);
-
-        destroy(textureImageMemory);
     }
 }

@@ -294,7 +294,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
 
     {
-        auto img = loadImageFromFile("demo/assets/texture.jpeg");
+        auto extFormatImg = loadImageFromFile("demo/assets/texture.jpeg");
 
         VkSamplerCreateInfo samplerInfo;
         {
@@ -313,7 +313,8 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
             samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         }
 
-        auto texture = device.create!Texture(frameBuilder.commandPool, commandBuffer, samplerInfo, &img);
+        auto img = loadImageToMemory(device, frameBuilder.commandPool, commandBuffer, extFormatImg);
+        auto texture = device.create!Texture(img, samplerInfo);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
         textureBranch.addChildNode(mesh);

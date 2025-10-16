@@ -88,17 +88,41 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             .array;
     }
 
+    scope commandPool = device.createCommandPool();
+    scope commandBufs = commandPool.allocateBuffers(1);
+    scope(exit) commandPool.freeBuffers(commandBufs);
+
     foreach(img; json["images"])
     {
         import pukan.misc: loadImageFromFile;
 
         auto extFormatImg = loadImageFromFile("demo/assets/texture.jpeg");
-
-        scope commandPool = device.createCommandPool();
-        scope commandBufs = commandPool.allocateBuffers(1);
-        scope(exit) commandPool.freeBuffers(commandBufs);
-
         ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg);
+    }
+
+    //FIXME: implement samplers reading
+
+    foreach(tx; json["textures"])
+    {
+        VkSamplerCreateInfo defaultSampler = {
+            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            magFilter: VK_FILTER_LINEAR,
+            minFilter: VK_FILTER_LINEAR,
+            addressModeU: VK_SAMPLER_ADDRESS_MODE_REPEAT,
+            addressModeV: VK_SAMPLER_ADDRESS_MODE_REPEAT,
+            addressModeW: VK_SAMPLER_ADDRESS_MODE_REPEAT,
+            anisotropyEnable: VK_TRUE,
+            maxAnisotropy: 16, //TODO: use vkGetPhysicalDeviceProperties (at least)
+            borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+            unnormalizedCoordinates: VK_FALSE,
+            compareEnable: VK_FALSE,
+            compareOp: VK_COMPARE_OP_ALWAYS,
+            mipmapMode: VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        };
+
+        auto image = ret.images[ tx["source"].get!ushort ];
+        //FIXME: use samplers[]
+        ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
     ret.updateDescriptorSetsAndUniformBuffers(device);
@@ -209,6 +233,7 @@ class GlTF : DrawableByVulkan
     Mesh[] meshes;
     Node rootSceneNode;
     ImageMemory[] images;
+    Texture[] textures;
     //}
 
     private TransferBuffer indicesBuffer;
