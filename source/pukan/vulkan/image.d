@@ -22,7 +22,7 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 
-class ImageMemory : MemoryBufferBase
+class ImageMemory : DeviceMemory
 {
     VkImage image;
     alias this = image;

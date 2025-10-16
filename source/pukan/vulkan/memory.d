@@ -67,7 +67,7 @@ class MemoryBufferMappedToCPU : MemoryBuffer
 }
 
 //TODO: Incorporate into LogicalDevice by using mixin template?
-class MemoryBuffer : MemoryBufferBase
+class MemoryBuffer : DeviceMemory
 {
     //TODO: subst by ElemType
     VkBuffer buf;
@@ -106,7 +106,7 @@ class MemoryBuffer : MemoryBufferBase
     }
 }
 
-class MemoryBufferBase
+class DeviceMemory
 {
     //TODO: remove:
     LogicalDevice device;
