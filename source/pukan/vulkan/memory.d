@@ -40,10 +40,13 @@ import pukan.vulkan.helpers;
 
 class MemoryBufferMappedToCPU : MemoryBuffer
 {
+    LogicalDevice device;
     void[] cpuBuf; /// CPU-mapped memory buffer
 
     this(LogicalDevice device, size_t size, VkBufferUsageFlags usageFlags)
     {
+        this.device = device;
+
         VkBufferCreateInfo createInfo = {
             sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             size: size,
@@ -108,15 +111,11 @@ class MemoryBuffer : DeviceMemory
 
 class DeviceMemory
 {
-    //TODO: remove:
-    LogicalDevice device;
     //TODO: ElemType
     MemChunk deviceMemory;
 
-    this(LogicalDevice dev, in VkMemoryRequirements memRequirements, in VkMemoryPropertyFlags propFlags)
+    this(LogicalDevice device, in VkMemoryRequirements memRequirements, in VkMemoryPropertyFlags propFlags)
     {
-        device = dev;
-
         VkMemoryAllocateInfo allocInfo = {
             sType: VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             allocationSize: memRequirements.size,
@@ -124,6 +123,11 @@ class DeviceMemory
         };
 
         deviceMemory = device.allocateDeviceMemory(allocInfo);
+    }
+
+    this()
+    {
+        deviceMemory.free;
     }
 }
 
