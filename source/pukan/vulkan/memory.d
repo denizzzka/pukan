@@ -15,7 +15,7 @@ package mixin template Memory()
 
     private SimpleSList!VkBuffer buffers;
 
-    buffers.ElemType createBuffer(VkBufferCreateInfo createInfo)
+    buffers.ElemType createBuffer(ref VkBufferCreateInfo createInfo)
     {
         return buffers.insertOne((e){
             vkCreateBuffer(this.device, &createInfo, this.alloc, &e).vkCheck;
@@ -45,6 +45,7 @@ class MemoryBufferMappedToCPU : MemoryBuffer
     this(LogicalDevice device, size_t size, VkBufferUsageFlags usageFlags)
     {
         VkBufferCreateInfo createInfo = {
+            sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             size: size,
             usage: usageFlags,
             sharingMode: VK_SHARING_MODE_EXCLUSIVE,
@@ -73,7 +74,7 @@ class MemoryBuffer : MemoryBufferBase
 
     this(LogicalDevice device, ref VkBufferCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
     {
-        vkCall(device.device, &createInfo, device.alloc, &buf);
+        buf = device.createBuffer(createInfo);
 
         VkMemoryRequirements memRequirements;
         vkGetBufferMemoryRequirements(device.device, buf, &memRequirements);
@@ -85,8 +86,9 @@ class MemoryBuffer : MemoryBufferBase
 
     ~this()
     {
-        if(buf)
-            vkDestroyBuffer(device.device, buf, device.alloc);
+        //FIXME:
+        //~ if(buf)
+            //~ vkDestroyBuffer(device.device, buf, device.alloc);
     }
 
     //TODO: static?
@@ -151,6 +153,7 @@ class TransferBuffer
         cpuBuffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,);
 
         VkBufferCreateInfo dstBufInfo = {
+            sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             size: size,
             usage: VK_BUFFER_USAGE_TRANSFER_DST_BIT | mergeUsageFlags,
             sharingMode: VK_SHARING_MODE_EXCLUSIVE,
