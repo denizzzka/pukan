@@ -122,7 +122,7 @@ class ImageMemory : DeviceMemory
     }
 }
 
-ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, Img image)
+ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, ref Img image)
 {
     VkDeviceSize imageSize = image.width * image.height * 4 /* rgba */;
 

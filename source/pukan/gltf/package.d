@@ -90,7 +90,15 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
 
     foreach(img; json["images"])
     {
-        //~ ret.images ~= device.create!loadImage(build_path(dir, img["uri"].get!string));
+        import pukan.misc: loadImageFromFile;
+
+        auto extFormatImg = loadImageFromFile("demo/assets/texture.jpeg");
+
+        scope commandPool = device.createCommandPool();
+        scope commandBufs = commandPool.allocateBuffers(1);
+        scope(exit) commandPool.freeBuffers(commandBufs);
+
+        ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg);
     }
 
     ret.updateDescriptorSetsAndUniformBuffers(device);
