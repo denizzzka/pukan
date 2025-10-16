@@ -22,10 +22,32 @@ package mixin template Memory()
         });
     }
 
+    private SimpleSList!(VkBuffer[]) buffersArrays;
+
+    auto createBuffersArray(/*in*/ VkBufferCreateInfo createInfo, size_t num = 1)
+    {
+        return buffersArrays.insertOne((ref arr){
+            arr.length = num;
+
+            foreach(ref e; arr)
+                vkCreateBuffer(device, cast() &createInfo, alloc, &e).vkCheck;
+
+            scope(failure) destroyBuffers(arr);
+        });
+    }
+
+    private void destroyBuffers(T)(T arr)
+    {
+        foreach(ref e; arr)
+            vkDestroyBuffer(this.device, e, this.alloc);
+    }
+
     private void memoryDtor()
     {
-        foreach(e; buffers)
-            vkDestroyBuffer(this.device, e, this.alloc);
+        foreach(arr; buffersArrays)
+            destroyBuffers(arr);
+
+        destroyBuffers(buffers);
 
         foreach(e; deviceMemoryChunks)
             vkFreeMemory(this.device, e, this.alloc);
