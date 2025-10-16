@@ -69,6 +69,7 @@ class MemoryBufferMappedToCPU : MemoryBuffer
 //TODO: Incorporate into LogicalDevice by using mixin template?
 class MemoryBuffer : MemoryBufferBase
 {
+    //TODO: subst by ElemType
     VkBuffer buf;
     alias this = buf;
 
@@ -82,13 +83,6 @@ class MemoryBuffer : MemoryBufferBase
         super(device, memRequirements, propFlags);
 
         vkBindBufferMemory(device, buf, deviceMemory, 0 /*memoryOffset*/).vkCheck;
-    }
-
-    ~this()
-    {
-        //FIXME:
-        //~ if(buf)
-            //~ vkDestroyBuffer(device.device, buf, device.alloc);
     }
 
     //TODO: static?
@@ -116,6 +110,7 @@ class MemoryBufferBase
 {
     //TODO: remove:
     LogicalDevice device;
+    //TODO: ElemType
     MemChunk deviceMemory;
 
     this(LogicalDevice dev, in VkMemoryRequirements memRequirements, in VkMemoryPropertyFlags propFlags)
@@ -129,13 +124,6 @@ class MemoryBufferBase
         };
 
         deviceMemory = device.allocateDeviceMemory(allocInfo);
-    }
-
-    ~this()
-    {
-        //FIXME:
-        //~ if(deviceMemory)
-            //~ vkFreeMemory(device.device, deviceMemory, device.alloc);
     }
 }
 
