@@ -15,10 +15,6 @@ package mixin template Images()
         foreach(e; images)
             vkDestroyImage(this.device, e, this.alloc);
     }
-
-    void bindMemoryAsImage(SimpleSList!VkImage.Elem img)
-    {
-    }
 }
 
 import pukan.exceptions: PukanException;
