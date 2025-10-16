@@ -33,6 +33,7 @@ package mixin template Memory()
 }
 
 alias MemChunk = SimpleSList!VkDeviceMemory.ElemType;
+alias BufChunk = SimpleSList!VkBuffer.ElemType;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -72,8 +73,7 @@ class MemoryBufferMappedToCPU : MemoryBuffer
 //TODO: Incorporate into LogicalDevice by using mixin template?
 class MemoryBuffer : DeviceMemory
 {
-    //TODO: subst by ElemType
-    VkBuffer buf;
+    BufChunk buf;
     alias this = buf;
 
     this(LogicalDevice device, ref VkBufferCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
@@ -86,6 +86,11 @@ class MemoryBuffer : DeviceMemory
         super(device, memRequirements, propFlags);
 
         vkBindBufferMemory(device, buf, deviceMemory, 0 /*memoryOffset*/).vkCheck;
+    }
+
+    ~this()
+    {
+        buf.free();
     }
 
     //TODO: static?
@@ -111,7 +116,6 @@ class MemoryBuffer : DeviceMemory
 
 class DeviceMemory
 {
-    //TODO: ElemType
     MemChunk deviceMemory;
 
     this(LogicalDevice device, in VkMemoryRequirements memRequirements, in VkMemoryPropertyFlags propFlags)
