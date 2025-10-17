@@ -104,8 +104,6 @@ class TexturedMesh : ColoredMesh
 
     override void updateDescriptorSets(LogicalDevice device)
     {
-        import pukan.scene: WorldTransformation;
-
         VkDescriptorImageInfo imageInfo = {
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             imageView: texture.imageView,
