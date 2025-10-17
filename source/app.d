@@ -242,6 +242,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     WorldTransformation wtb;
 
     wtb.model = rotation.toMatrix4x4;
+    // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
         Vector3f(1, 1, 1), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
