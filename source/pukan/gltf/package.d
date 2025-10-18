@@ -128,6 +128,9 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
+    if(textures.length)
+        ret.ubo.material.renderType.x = 1;
+
     ret.updateDescriptorSetsAndUniformBuffers(device);
 
     return ret;
@@ -270,14 +273,19 @@ class GlTF : DrawableByVulkan
         // need to allocate more memory then divide it into pieces
         uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-        auto ubo = cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
-        ubo.material.renderType.x = 0; //FIXME: need switching
-        ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
+        UBOContent newUbo;
+        newUbo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
+        ubo = newUbo;
     }
 
     ~this()
     {
         uniformBuffer.destroy;
+    }
+
+    private ref UBOContent ubo()
+    {
+        return *cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
     }
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
