@@ -93,7 +93,8 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
     scope commandBufs = commandPool.allocateBuffers(1);
     scope(exit) commandPool.freeBuffers(commandBufs);
 
-    foreach(img; json["images"])
+    auto images = "images" in json;
+    if(images) foreach(img; *images)
     {
         import pukan.misc: loadImageFromFile;
 
@@ -103,7 +104,8 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
 
     //FIXME: implement samplers reading
 
-    foreach(tx; json["textures"])
+    auto textures = "textures" in json;
+    if(textures) foreach(tx; *textures)
     {
         VkSamplerCreateInfo defaultSampler = {
             sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
