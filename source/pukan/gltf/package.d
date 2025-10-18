@@ -328,12 +328,13 @@ class GlTF : DrawableByVulkan
             enforce(vertices.count > 0);
             debug assert(vertices.type == "VEC3");
             debug assert(vertices.componentType == ComponentType.FLOAT);
-            debug assert(vertices.stride > 0);
 
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            vertexBuffer = device.create!TransferBuffer(vertices.stride * vertices.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            const sz = (vertices.stride ? vertices.stride : Vector3f.sizeof) * vertices.count;
+
+            vertexBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             // Copy vertices to mapped memory
             vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices.viewSlice;
