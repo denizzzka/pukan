@@ -142,32 +142,35 @@ struct Buffer
         const offset = view["byteOffset"].opt!size_t;
 
         return View(
-            bufSlice: buf[ offset .. offset + view["byteLength"].get!size_t ],
-            stride: view["byteStride"].opt!uint,
+            view: buf[ offset .. offset + view["byteLength"].get!size_t ],
+            stride: view["byteStride"].opt!ubyte,
         );
     }
 }
 
 struct View
 {
-    ubyte[] bufSlice;
-    uint stride;
+    ubyte[] view;
+    const ubyte stride; // distance between start points of each element
 
     Accessor createAccessor(Json accessor)
     {
         enforce("sparse" !in accessor);
 
         const offset = accessor["byteOffset"].opt!size_t;
+        const count = accessor["count"].get!uint;
+        const len = stride ? (offset + stride*count) : view.length;
 
         auto r = Accessor(
-            viewSlice: bufSlice[offset .. $],
-            count: accessor["count"].get!uint,
+            viewSlice: view[offset .. len],
+            count: count,
         );
 
         debug
         {
             r.type = accessor["type"].get!string;
             r.componentType = accessor["componentType"].get!ComponentType;
+            r.stride = stride;
         }
 
         return r;
@@ -190,6 +193,7 @@ struct Accessor
     uint count;
     debug string type;
     debug ComponentType componentType;
+    debug ubyte stride;
 }
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
@@ -250,6 +254,7 @@ class GlTF : DrawableByVulkan
     {
         static struct Material
         {
+            uint isTextureLoaded;
             Vector4f baseColorFactor;
         }
 
@@ -266,6 +271,7 @@ class GlTF : DrawableByVulkan
         uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
         auto ubo = cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
+        ubo.material.isTextureLoaded = 1; //FIXME
         ubo.material.baseColorFactor = Vector4f(0, 1, 0.2, 1);
     }
 
@@ -276,7 +282,9 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        assert(rootSceneNode.childrenNodeIndices.length == 1);
+        assert(rootSceneNode.childrenNodeIndices.length > 0);
+
+        //FIXME: display all nodes, not only the first
         const node = nodes[ rootSceneNode.childrenNodeIndices[0] ];
 
         //TODO: just skip such node
@@ -290,6 +298,7 @@ class GlTF : DrawableByVulkan
 
         {
             auto indices = accessors[ primitive.indicesAccessorIdx ];
+            enforce(indices.stride == 0);
 
             debug
             {
@@ -316,14 +325,15 @@ class GlTF : DrawableByVulkan
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
             auto vertices = &accessors[vertIdx];
 
-            assert(vertices.count > 0);
+            enforce(vertices.count > 0);
             debug assert(vertices.type == "VEC3");
             debug assert(vertices.componentType == ComponentType.FLOAT);
+            debug assert(vertices.stride > 0);
 
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            vertexBuffer = device.create!TransferBuffer(Vector3f.sizeof * vertices.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            vertexBuffer = device.create!TransferBuffer(vertices.stride * vertices.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             // Copy vertices to mapped memory
             vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices.viewSlice;
@@ -344,7 +354,7 @@ class GlTF : DrawableByVulkan
 
         {
             import std.conv: to;
-            assert(textures.length == 1, textures.length.to!string);
+            assert(textures.length <= 1, textures.length.to!string);
         }
 
         VkDescriptorImageInfo imageInfo = {
