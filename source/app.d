@@ -237,7 +237,7 @@ import dlib.math;
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
-    auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * currDeltaTime * 0.1);
+    auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * currDeltaTime /* * 0.1 */);
 
     WorldTransformation wtb;
 
@@ -280,13 +280,13 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto n = coloredBranch.addChildNode(Bone());
         cubeRotator = n.payload.peek!Bone;
 
-        n.addChildNode(cube);
+        //~ n.addChildNode(cube);
     }
 
     {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 0.3).translationMatrix;
 
-        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf");
+        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf");
         coloredBranch
             .addChildNode(Bone(mat: trans))
             .addChildNode(gltfObj);
@@ -318,7 +318,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto texture = device.create!Texture(img, samplerInfo);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
-        textureBranch.addChildNode(mesh);
+        //~ textureBranch.addChildNode(mesh);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);

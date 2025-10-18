@@ -254,7 +254,7 @@ class GlTF : DrawableByVulkan
     {
         static struct Material
         {
-            uint isTextureLoaded;
+            uint renderType;
             Vector4f baseColorFactor;
         }
 
@@ -271,7 +271,7 @@ class GlTF : DrawableByVulkan
         uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
         auto ubo = cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
-        ubo.material.isTextureLoaded = 1; //FIXME
+        ubo.material.renderType = 0; //FIXME
         ubo.material.baseColorFactor = Vector4f(0, 1, 0.2, 1);
     }
 
@@ -319,6 +319,10 @@ class GlTF : DrawableByVulkan
             indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
 
             indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+
+            import std.stdio;
+            indices.viewSlice.writeln;
+            (cast(ushort[]) indices.viewSlice).writeln;
         }
 
         {
@@ -340,6 +344,10 @@ class GlTF : DrawableByVulkan
             vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices.viewSlice;
 
             vertexBuffer.uploadImmediate(commandPool, commandBuffer);
+
+            import std.stdio;
+            (cast(Vector3f[]) vertices.viewSlice).writeln;
+            writeln("sz=", sz);
         }
     }
 
@@ -358,11 +366,11 @@ class GlTF : DrawableByVulkan
             assert(textures.length <= 1, textures.length.to!string);
         }
 
-        VkDescriptorImageInfo imageInfo = {
-            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            imageView: textures[0].imageView,
-            sampler: textures[0].sampler,
-        };
+        //~ VkDescriptorImageInfo imageInfo = {
+            //~ imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            //~ imageView: textures[0].imageView,
+            //~ sampler: textures[0].sampler,
+        //~ };
 
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
@@ -374,15 +382,15 @@ class GlTF : DrawableByVulkan
                 descriptorCount: 1,
                 pBufferInfo: &bufferInfo,
             ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &imageInfo,
-            ),
+            //~ VkWriteDescriptorSet(
+                //~ sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                //~ dstSet: descriptorSets[0],
+                //~ dstBinding: 1,
+                //~ dstArrayElement: 0,
+                //~ descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                //~ descriptorCount: 1,
+                //~ pImageInfo: &imageInfo,
+            //~ ),
         ];
 
         device.updateDescriptorSets(descriptorWrites);
@@ -458,7 +466,7 @@ struct ShaderInputVertex
     {
         VkVertexInputBindingDescription r = {
             binding: 0,
-            stride: this.sizeof,
+            stride: this.sizeof, //FIXME: use stride from accessor
             inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
         };
 
