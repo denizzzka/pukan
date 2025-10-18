@@ -47,7 +47,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         Primitive[] primitives;
         foreach(primitive; mesh["primitives"])
         {
-            enforce(primitive["mode"].get!ushort == 4, "only supported mode = 4 (TRIANGLES)");
+            enforce(primitive["mode"].opt!ushort(4) == 4, "only supported mode = 4 (TRIANGLES)");
             const indicesAccessorIdx = primitive["indices"].opt!int(-1);
 
             primitives ~= Primitive(
