@@ -128,7 +128,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
-    if(textures.length)
+    if(ret.textures.length)
         ret.ubo.material.renderType.x = 1;
 
     ret.updateDescriptorSetsAndUniformBuffers(device);
@@ -374,12 +374,6 @@ class GlTF : DrawableByVulkan
             assert(textures.length <= 1, textures.length.to!string);
         }
 
-        VkDescriptorImageInfo imageInfo = {
-            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            imageView: textures[0].imageView,
-            sampler: textures[0].sampler,
-        };
-
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -390,16 +384,27 @@ class GlTF : DrawableByVulkan
                 descriptorCount: 1,
                 pBufferInfo: &bufferInfo,
             ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &imageInfo,
-            ),
         ];
+
+        if(textures.length)
+        {
+            VkDescriptorImageInfo imageInfo = {
+                imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                imageView: textures[0].imageView,
+                sampler: textures[0].sampler,
+            };
+
+            descriptorWrites ~=
+                VkWriteDescriptorSet(
+                    sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    dstSet: descriptorSets[0],
+                    dstBinding: 1,
+                    dstArrayElement: 0,
+                    descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    descriptorCount: 1,
+                    pImageInfo: &imageInfo,
+                );
+        }
 
         device.updateDescriptorSets(descriptorWrites);
     }
