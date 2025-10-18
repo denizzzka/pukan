@@ -407,7 +407,7 @@ struct GltfFactory
     LogicalDevice device;
     private PoolAndLayoutInfo poolAndLayout;
     //TODO: contains part of poolAndLayout data. Deduplicate?
-    private DefaultGraphicsPipelineInfoCreator!Vertex3 pipelineInfoCreator;
+    private DefaultGraphicsPipelineInfoCreator!ShaderInputVertex pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
@@ -417,7 +417,7 @@ struct GltfFactory
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
         poolAndLayout = device.createDescriptorPool(layoutBindings);
 
-        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex3(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
+        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!ShaderInputVertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
         graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
 
         auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
@@ -433,10 +433,13 @@ struct GltfFactory
     }
 }
 
-struct Vertex3
+//TODO: use as mandatory vertex shader creation argument?
+struct ShaderInputVertex
 {
     Vector3f pos;
+    Vector2f texCoord;
 
+    //TODO: convert to enum?
     static auto getBindingDescription()
     {
         VkVertexInputBindingDescription r = {
@@ -448,16 +451,25 @@ struct Vertex3
         return r;
     }
 
+    //TODO: convert to enum?
     static auto getAttributeDescriptions()
     {
-        VkVertexInputAttributeDescription[1] ad;
-
-        ad[0] = VkVertexInputAttributeDescription(
-            binding: 0,
-            location: 0,
-            format: VK_FORMAT_R32G32B32_SFLOAT,
-            offset: pos.offsetof,
-        );
+        VkVertexInputAttributeDescription[2] ad = [
+            // position:
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 0,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+                offset: pos.offsetof,
+            ),
+            // textureCoord:
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 1,
+                format: VK_FORMAT_R32G32_SFLOAT,
+                offset: texCoord.offsetof,
+            ),
+        ];
 
         return ad;
     }
