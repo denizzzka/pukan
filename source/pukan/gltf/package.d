@@ -96,7 +96,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
     {
         import pukan.misc: loadImageFromFile;
 
-        auto extFormatImg = loadImageFromFile("demo/assets/texture.jpeg");
+        auto extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string));
         ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg);
     }
 
