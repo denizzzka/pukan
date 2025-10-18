@@ -254,7 +254,7 @@ class GlTF : DrawableByVulkan
     {
         static struct Material
         {
-            uint renderType;
+            Vector4i renderType;
             Vector4f baseColorFactor;
         }
 
@@ -271,8 +271,8 @@ class GlTF : DrawableByVulkan
         uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
         auto ubo = cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
-        ubo.material.renderType = 0; //FIXME
-        ubo.material.baseColorFactor = Vector4f(0, 1, 0.2, 1);
+        ubo.material.renderType.x = 0; //FIXME: need switching
+        ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
     }
 
     ~this()
@@ -366,11 +366,11 @@ class GlTF : DrawableByVulkan
             assert(textures.length <= 1, textures.length.to!string);
         }
 
-        //~ VkDescriptorImageInfo imageInfo = {
-            //~ imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            //~ imageView: textures[0].imageView,
-            //~ sampler: textures[0].sampler,
-        //~ };
+        VkDescriptorImageInfo imageInfo = {
+            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            imageView: textures[0].imageView,
+            sampler: textures[0].sampler,
+        };
 
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
@@ -382,15 +382,15 @@ class GlTF : DrawableByVulkan
                 descriptorCount: 1,
                 pBufferInfo: &bufferInfo,
             ),
-            //~ VkWriteDescriptorSet(
-                //~ sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                //~ dstSet: descriptorSets[0],
-                //~ dstBinding: 1,
-                //~ dstArrayElement: 0,
-                //~ descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                //~ descriptorCount: 1,
-                //~ pImageInfo: &imageInfo,
-            //~ ),
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: descriptorSets[0],
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: &imageInfo,
+            ),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

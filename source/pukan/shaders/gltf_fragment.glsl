@@ -2,7 +2,7 @@
 
 struct Material
 {
-    uint renderType;
+    ivec4 renderType;
     vec4 baseColorFactor;
 };
 
@@ -17,10 +17,8 @@ layout(location = 0) in vec2 fragTextureCoord;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    //~ if(ubo.material.renderType == 1) // texture loaded
-        outColor = vec4(1.0, 0.0, 1.0, 1.0);
-        //~ outColor = texture(textureSampler, fragTextureCoord);
-    //~ else
-        //~ outColor = vec4(1,1,0,0.5);
-        //~ outColor = ubo.material.baseColorFactor;
+    if(ubo.material.renderType.x == 1) // texture loaded
+        outColor = texture(textureSampler, fragTextureCoord);
+    else
+        outColor = ubo.material.baseColorFactor;
 }
