@@ -1,139 +1,12 @@
 module pukan.gltf;
 
-static import gamut;
 import dlib.math;
+public import pukan.gltf.loader: loadGlTF2;
+public import pukan.gltf.factory: GltfFactory;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
-import std.algorithm;
-import std.array;
 import std.exception: enforce;
-debug import std.stdio; //FIXME: remove
-static import std.file;
-static import std.path;
 import vibe.data.json;
-
-///
-auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice device, ref GraphicsPipelineCfg pipeline)
-{
-    const json = std.file.readText(filename).parseJsonString;
-    const dir = std.path.dirName(filename);
-
-    {
-        const ver = json["asset"]["version"].get!string;
-        enforce(ver == "2.0", "glTF version "~ver~" unsupported");
-    }
-
-    auto ret = new GlTF(pipeline, descriptorSets, device);
-
-    Buffer[] buffers;
-    foreach(buf; json["buffers"])
-        buffers ~= readBufFile(dir, buf);
-
-    View[] bufferViews;
-    foreach(v; json["bufferViews"])
-    {
-        const idx = v["buffer"].get!uint;
-        bufferViews ~= buffers[idx].createView(v);
-    }
-
-    foreach(a; json["accessors"])
-    {
-        const idx = a["bufferView"].get!uint;
-        ret.accessors ~= bufferViews[idx].createAccessor(a);
-    }
-
-    foreach(mesh; json["meshes"])
-    {
-        Primitive[] primitives;
-        foreach(primitive; mesh["primitives"])
-        {
-            enforce(primitive["mode"].opt!ushort(4) == 4, "only supported mode = 4 (TRIANGLES)");
-            const indicesAccessorIdx = primitive["indices"].opt!int(-1);
-
-            primitives ~= Primitive(
-                indicesAccessorIdx: indicesAccessorIdx,
-                attributes: primitive["attributes"],
-            );
-        }
-
-        ret.meshes ~= Mesh(
-            name: mesh["name"].opt!string,
-            primitives: primitives,
-        );
-    }
-
-    foreach(node; json["nodes"])
-    {
-        ushort[] childrenIdxs;
-        const children = "children" in node;
-        if(children)
-            foreach(child; *children)
-                childrenIdxs ~= child.get!ushort;
-
-        ret.nodes ~= Node(
-            name: node["name"].opt!string,
-            childrenNodeIndices: childrenIdxs,
-            meshIdx: node["mesh"].opt!int(-1),
-        );
-    }
-
-    auto scenes = json["scenes"].byValue.array;
-    enforce(scenes.length <= 1);
-
-    {
-        Json rootScene = scenes[ json["scene"].get!ushort ];
-
-        ret.rootSceneNode.name = rootScene["name"].opt!string;
-        ret.rootSceneNode.childrenNodeIndices = rootScene["nodes"]
-            .byValue.map!((e) => e.get!ushort)
-            .array;
-    }
-
-    scope commandPool = device.createCommandPool();
-    scope commandBufs = commandPool.allocateBuffers(1);
-    scope(exit) commandPool.freeBuffers(commandBufs);
-
-    auto images = "images" in json;
-    if(images) foreach(img; *images)
-    {
-        import pukan.misc: loadImageFromFile;
-
-        auto extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string));
-        ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg);
-    }
-
-    //FIXME: implement samplers reading
-
-    auto textures = "textures" in json;
-    if(textures) foreach(tx; *textures)
-    {
-        VkSamplerCreateInfo defaultSampler = {
-            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-            magFilter: VK_FILTER_LINEAR,
-            minFilter: VK_FILTER_LINEAR,
-            addressModeU: VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            addressModeV: VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            addressModeW: VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            anisotropyEnable: VK_TRUE,
-            maxAnisotropy: 16, //TODO: use vkGetPhysicalDeviceProperties (at least)
-            borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-            unnormalizedCoordinates: VK_FALSE,
-            compareEnable: VK_FALSE,
-            compareOp: VK_COMPARE_OP_ALWAYS,
-            mipmapMode: VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        };
-
-        auto image = ret.images[ tx["source"].get!ushort ];
-        //FIXME: use samplers[]
-        ret.textures ~= device.create!Texture(image, defaultSampler);
-    }
-
-    ret.ubo.material.renderType.x = ret.textures.length ? 1 : 0;
-
-    ret.updateDescriptorSetsAndUniformBuffers(device);
-
-    return ret;
-}
 
 struct Buffer
 {
@@ -198,21 +71,6 @@ struct Accessor
     debug ubyte stride;
 }
 
-private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
-
-private Buffer readBufFile(string dir, in Json fileDescr)
-{
-    const len = fileDescr["byteLength"].get!ulong;
-    const filename = fileDescr["uri"].get!string;
-
-    Buffer ret;
-    ret.buf = cast(ubyte[]) std.file.read(build_path(dir, filename));
-
-    enforce(ret.buf.length == len);
-
-    return ret;
-}
-
 struct Mesh
 {
     string name;
@@ -233,19 +91,21 @@ struct Node
     ushort[] childrenNodeIndices;
 }
 
-class GlTF : DrawableByVulkan
+struct GltfContent
 {
-    //TODO:
-    //const {
     Accessor[] accessors;
     Node[] nodes;
     Mesh[] meshes;
     Node rootSceneNode;
     ImageMemory[] images;
     Texture[] textures;
-    //}
+}
 
+class GlTF : DrawableByVulkan
+{
     private Texture fakeTexture;
+    private GltfContent content;
+    alias this = content;
 
     private TransferBuffer indicesBuffer;
     private TransferBuffer vertexBuffer;
@@ -265,20 +125,21 @@ class GlTF : DrawableByVulkan
         Material material;
     }
 
-    private this(ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] ds, LogicalDevice device)
+    package this(ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] ds, LogicalDevice device, GltfContent cont)
     {
         this.pipeline = &pipeline;
         descriptorSets = ds;
+        content = cont;
 
         // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
         uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-        UBOContent newUbo;
-        newUbo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
-        ubo = newUbo;
+        ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
+        ubo.material.renderType.x = textures.length ? 1 : 0;
 
         fakeTexture = createFakeTexture1x1(device);
+        updateDescriptorSetsAndUniformBuffers(device);
     }
 
     ~this()
@@ -361,7 +222,7 @@ class GlTF : DrawableByVulkan
         }
     }
 
-    void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
+    private void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
         VkDescriptorBufferInfo bufferInfo = {
             buffer: uniformBuffer.gpuBuffer,
@@ -440,41 +301,6 @@ class GlTF : DrawableByVulkan
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
         vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
-    }
-}
-
-struct GltfFactory
-{
-    import pukan.vulkan;
-    import shaders = pukan.vulkan.shaders;
-    import pukan.vulkan.frame_builder;
-
-    LogicalDevice device;
-    private PoolAndLayoutInfo poolAndLayout;
-    //TODO: contains part of poolAndLayout data. Deduplicate?
-    private DefaultGraphicsPipelineInfoCreator!ShaderInputVertex pipelineInfoCreator;
-    GraphicsPipelineCfg graphicsPipelineCfg;
-
-    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
-    {
-        this.device = device;
-
-        auto layoutBindings = shaders.createLayoutBinding(shaderStages);
-        poolAndLayout = device.createDescriptorPool(layoutBindings);
-
-        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!ShaderInputVertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
-        graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
-
-        auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
-        graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineCreateInfo])[0];
-    }
-
-    auto create(string filename)
-    {
-        assert(device);
-        auto descriptorSets = device.allocateDescriptorSets(poolAndLayout, 1);
-
-        return loadGlTF2(filename, descriptorSets, device, graphicsPipelineCfg);
     }
 }
 
