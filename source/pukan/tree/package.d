@@ -1,11 +1,12 @@
 module pukan.tree;
 
+import pukan.vulkan.helpers: SimpleSList;
 import std.container.slist;
 
 class Node
 {
     debug Node parent;
-    SList!(Node) children;
+    SimpleSList!Node children;
 
     auto addChildNode()
     {
@@ -14,10 +15,10 @@ class Node
 
         children.insert(c);
 
-        return children.opSlice;
+        return children.front;
     }
 
-    protected void traversal(void delegate(Node) dg)
+    void traversal(void delegate(Node) dg)
     {
         dg(this);
 
