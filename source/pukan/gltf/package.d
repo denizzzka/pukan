@@ -499,7 +499,7 @@ struct ShaderInputVertex
     {
         VkVertexInputBindingDescription r = {
             binding: 0,
-            stride: pos.sizeof, //FIXME: use stride from accessor
+            stride: pos.sizeof,
             inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
         };
 
