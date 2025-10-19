@@ -128,7 +128,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
-    ret.ubo.material.renderType.x = 0; //ret.textures.length ? 1 : 0;
+    ret.ubo.material.renderType.x = ret.textures.length ? 1 : 0;
 
     ret.updateDescriptorSetsAndUniformBuffers(device);
 
@@ -388,7 +388,7 @@ class GlTF : DrawableByVulkan
 
         VkDescriptorImageInfo imageInfo;
 
-        //~ if(textures.length == 0)
+        if(textures.length == 0)
         {
             imageInfo = VkDescriptorImageInfo(
                 imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -396,14 +396,14 @@ class GlTF : DrawableByVulkan
                 sampler: fakeTexture.sampler,
             );
         }
-        //~ else
-        //~ {
-            //~ imageInfo = VkDescriptorImageInfo(
-                //~ imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                //~ imageView: textures[0].imageView,
-                //~ sampler: textures[0].sampler,
-            //~ );
-        //~ }
+        else
+        {
+            imageInfo = VkDescriptorImageInfo(
+                imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                imageView: textures[0].imageView,
+                sampler: textures[0].sampler,
+            );
+        }
 
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
