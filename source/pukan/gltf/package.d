@@ -334,14 +334,14 @@ struct ShaderInputVertex
                 binding: 0,
                 location: 0,
                 format: VK_FORMAT_R32G32B32_SFLOAT,
-                offset: pos.offsetof,
+                //~ offset: pos.offsetof,
             ),
             // textureCoord:
             VkVertexInputAttributeDescription(
                 binding: 0,
                 location: 1,
                 format: VK_FORMAT_R32G32_SFLOAT,
-                offset: texCoord.offsetof,
+                //~ offset: texCoord.offsetof,
             ),
         ];
 
