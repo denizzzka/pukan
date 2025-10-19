@@ -128,7 +128,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
-    ret.ubo.material.renderType.x = 1; //ret.textures.length ? 1 : 0;
+    ret.ubo.material.renderType.x = 0; //ret.textures.length ? 1 : 0;
 
     ret.updateDescriptorSetsAndUniformBuffers(device);
 
@@ -450,9 +450,6 @@ class GlTF : DrawableByVulkan
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
         vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
-
-        writeln("indices: ", indicesBuffer.gpuBuffer.buf);
-        writeln("vertices: ", vertexBuffer.gpuBuffer.buf);
     }
 }
 
