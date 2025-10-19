@@ -21,5 +21,4 @@ void main() {
         outColor = texture(textureSampler, fragTextureCoord);
     else
         outColor = ubo.material.baseColorFactor;
-        //~ outColor = vec4(0.5, 0.7, 0.2, 0.8);
 }
