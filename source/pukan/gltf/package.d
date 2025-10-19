@@ -324,18 +324,12 @@ class GlTF : DrawableByVulkan
 
             indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-            //~ indices.viewSlice[0..$] = [1, 0, 0, 0, 2, 0];
-
             assert(indicesBuffer.cpuBuf.length == indices.viewSlice.length);
 
             // Copy indices to mapped memory
             indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
 
             indicesBuffer.uploadImmediate(commandPool, commandBuffer);
-
-            import std.stdio;
-            indices.viewSlice.writeln;
-            (cast(ushort[]) indices.viewSlice).writeln;
         }
 
         {
@@ -364,10 +358,6 @@ class GlTF : DrawableByVulkan
             vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices.viewSlice;
 
             vertexBuffer.uploadImmediate(commandPool, commandBuffer);
-
-            import std.stdio;
-            (cast(Vector3f[]) vertices.viewSlice).writeln;
-            writeln("sz=", sz);
         }
     }
 
