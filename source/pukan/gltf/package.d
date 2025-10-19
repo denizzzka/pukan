@@ -354,7 +354,7 @@ class GlTF : DrawableByVulkan
                 sz *= Vector3f.sizeof;
             else
             {
-                assert(vertices.stride <= Vector3f.sizeof);
+                enforce(vertices.stride == Vector3f.sizeof);
                 sz *= vertices.stride;
             }
 
