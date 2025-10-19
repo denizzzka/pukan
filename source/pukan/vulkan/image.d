@@ -158,3 +158,16 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool
 
     return ret;
 }
+
+auto createFakeImage1x1(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf)
+{
+    static struct FakeImg
+    {
+        auto width() => 1;
+        auto height() => 1;
+        ubyte[] allPixelsAtOnce() => [0xff, 0xff, 0xff, 0xff]; //rgba
+    }
+
+    FakeImg extFormatImg;
+    return loadImageToMemory(device, commandPool, commandBuf, extFormatImg);
+}

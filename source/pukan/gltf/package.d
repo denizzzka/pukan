@@ -128,8 +128,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
-    if(ret.textures.length)
-        ret.ubo.material.renderType.x = 1;
+    ret.ubo.material.renderType.x = 1; //ret.textures.length ? 1 : 0;
 
     ret.updateDescriptorSetsAndUniformBuffers(device);
 
@@ -246,6 +245,8 @@ class GlTF : DrawableByVulkan
     Texture[] textures;
     //}
 
+    private Texture fakeTexture;
+
     private TransferBuffer indicesBuffer;
     private TransferBuffer vertexBuffer;
     private GraphicsPipelineCfg* pipeline;
@@ -276,6 +277,8 @@ class GlTF : DrawableByVulkan
         UBOContent newUbo;
         newUbo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
         ubo = newUbo;
+
+        fakeTexture = createFakeTexture1x1(device);
     }
 
     ~this()
@@ -320,6 +323,8 @@ class GlTF : DrawableByVulkan
             indices_count = cast(ushort) indices.count;
 
             indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+            //~ indices.viewSlice[0..$] = [1, 0, 0, 0, 2, 0];
 
             assert(indicesBuffer.cpuBuf.length == indices.viewSlice.length);
 
@@ -374,6 +379,25 @@ class GlTF : DrawableByVulkan
             assert(textures.length <= 1, textures.length.to!string);
         }
 
+        VkDescriptorImageInfo imageInfo;
+
+        //~ if(textures.length == 0)
+        {
+            imageInfo = VkDescriptorImageInfo(
+                imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                imageView: fakeTexture.imageView,
+                sampler: fakeTexture.sampler,
+            );
+        }
+        //~ else
+        //~ {
+            //~ imageInfo = VkDescriptorImageInfo(
+                //~ imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                //~ imageView: textures[0].imageView,
+                //~ sampler: textures[0].sampler,
+            //~ );
+        //~ }
+
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -384,27 +408,16 @@ class GlTF : DrawableByVulkan
                 descriptorCount: 1,
                 pBufferInfo: &bufferInfo,
             ),
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: descriptorSets[0],
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: &imageInfo,
+            ),
         ];
-
-        if(textures.length)
-        {
-            VkDescriptorImageInfo imageInfo = {
-                imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                imageView: textures[0].imageView,
-                sampler: textures[0].sampler,
-            };
-
-            descriptorWrites ~=
-                VkWriteDescriptorSet(
-                    sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    dstSet: descriptorSets[0],
-                    dstBinding: 1,
-                    dstArrayElement: 0,
-                    descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    descriptorCount: 1,
-                    pImageInfo: &imageInfo,
-                );
-        }
 
         device.updateDescriptorSets(descriptorWrites);
     }
@@ -430,6 +443,9 @@ class GlTF : DrawableByVulkan
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
         vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
+
+        writeln("indices: ", indicesBuffer.gpuBuffer.buf);
+        writeln("vertices: ", vertexBuffer.gpuBuffer.buf);
     }
 }
 
