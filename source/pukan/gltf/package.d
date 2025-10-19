@@ -349,7 +349,14 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            const sz = (vertices.stride ? vertices.stride : Vector3f.sizeof) * vertices.count;
+            size_t sz = vertices.count;
+            if(vertices.stride == 0)
+                sz *= Vector3f.sizeof;
+            else
+            {
+                assert(vertices.stride <= Vector3f.sizeof);
+                sz *= vertices.stride;
+            }
 
             vertexBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
