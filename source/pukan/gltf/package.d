@@ -3,103 +3,11 @@ module pukan.gltf;
 import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
+import pukan.gltf.loader;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.exception: enforce;
 import vibe.data.json;
-
-struct Buffer
-{
-    ubyte[] buf;
-
-    View createView(Json view)
-    {
-        const offset = view["byteOffset"].opt!size_t;
-
-        return View(
-            view: buf[ offset .. offset + view["byteLength"].get!size_t ],
-            stride: view["byteStride"].opt!ubyte,
-        );
-    }
-}
-
-struct View
-{
-    ubyte[] view;
-    const ubyte stride; // distance between start points of each element
-
-    Accessor createAccessor(Json accessor)
-    {
-        enforce("sparse" !in accessor);
-
-        const offset = accessor["byteOffset"].opt!size_t;
-        const count = accessor["count"].get!uint;
-        const len = stride ? (offset + stride*count) : view.length;
-
-        auto r = Accessor(
-            viewSlice: view[offset .. len],
-            count: count,
-        );
-
-        debug
-        {
-            r.type = accessor["type"].get!string;
-            r.componentType = accessor["componentType"].get!ComponentType;
-            r.stride = stride;
-        }
-
-        return r;
-    }
-}
-
-enum ComponentType : short
-{
-    BYTE = 5120,
-    UNSIGNED_BYTE = 5121,
-    SHORT = 5122,
-    UNSIGNED_SHORT = 5123,
-    UNSIGNED_INT = 5125,
-    FLOAT = 5126,
-}
-
-struct Accessor
-{
-    ubyte[] viewSlice;
-    uint count;
-    debug string type;
-    debug ComponentType componentType;
-    debug ubyte stride;
-}
-
-struct Mesh
-{
-    string name;
-    Primitive[] primitives;
-}
-
-struct Primitive
-{
-    int indicesAccessorIdx = -1;
-    Json attributes;
-}
-
-struct Node
-{
-    string name; /// Not a unique name
-    Matrix4x4f trans;
-    int meshIdx = -1;
-    ushort[] childrenNodeIndices;
-}
-
-struct GltfContent
-{
-    Accessor[] accessors;
-    Node[] nodes;
-    Mesh[] meshes;
-    Node rootSceneNode;
-    ImageMemory[] images;
-    Texture[] textures;
-}
 
 class GlTF : DrawableByVulkan
 {
