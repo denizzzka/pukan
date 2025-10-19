@@ -2,19 +2,22 @@ module pukan.tree;
 
 import pukan.vulkan.helpers: SimpleSList;
 import std.container.slist;
+import std.traits;
 
 class Node
 {
     debug Node parent;
-    SimpleSList!Node children;
+    SList!Node children;
 
-    protected auto addChildNode(Node c)
+    alias RT = ReturnType!(children.opSlice);
+
+    protected RT addChildNode(Node c)
     {
         debug c.parent = this;
 
         children.insert(c);
 
-        return children.front;
+        return children.opSlice();
     }
 
     void traversal(void delegate(Node) dg)
@@ -32,7 +35,7 @@ unittest
     {
         int payload;
 
-        Node.children.ElemType addChildNode()
+        Node.RT addChildNode()
         {
             auto n = new DerrNode;
             return super.addChildNode(n);
@@ -40,5 +43,7 @@ unittest
     }
 
     auto root = new DerrNode;
-    root.addChildNode();
+    auto n = root.addChildNode();
+
+    root.traversal((n){ (cast(DerrNode) n).payload = 123; });
 }
