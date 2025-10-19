@@ -241,7 +241,7 @@ struct SimpleSList(T, alias elementDtor = null)
 
         ReturnType!(list.opSlice) val;
 
-        ref getVal() => val.front;
+        ref getVal(ET = T)() => cast(ET) val.front;
         alias this = getVal;
 
         void free() { /* TODO: implement */ }

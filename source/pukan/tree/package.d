@@ -8,9 +8,8 @@ class Node
     debug Node parent;
     SimpleSList!Node children;
 
-    auto addChildNode()
+    protected auto addChildNode(Node c)
     {
-        auto c = new Node;
         debug c.parent = this;
 
         children.insert(c);
@@ -25,4 +24,21 @@ class Node
         foreach(c; children)
             c.traversal(dg);
     }
+}
+
+unittest
+{
+    class DerrNode : Node
+    {
+        int payload;
+
+        Node.children.ElemType addChildNode()
+        {
+            auto n = new DerrNode;
+            return super.addChildNode(n);
+        }
+    }
+
+    auto root = new DerrNode;
+    root.addChildNode();
 }
