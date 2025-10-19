@@ -86,8 +86,8 @@ struct Primitive
 struct Node
 {
     string name; /// Not a unique name
+    Matrix4x4f trans;
     int meshIdx = -1;
-    //TODO: store also transformation, rotation, scale matrices, etc
     ushort[] childrenNodeIndices;
 }
 

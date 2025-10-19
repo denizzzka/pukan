@@ -68,10 +68,29 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             foreach(child; *children)
                 childrenIdxs ~= child.get!ushort;
 
+        import dlib.math;
+
+        Matrix4x4f trans;
+        {
+            auto transJson = node["translation"].opt!(Json[]);
+            if(transJson.length == 0)
+                trans = Matrix4x4f.identity;
+            else
+            {
+                auto a = transJson.array;
+                enforce(a.length == 3);
+
+                trans = Vector3f(a[0], a[1], a[2]).translationMatrix;
+
+                //TODO: implement rotation and scale
+            }
+        }
+
         ret.nodes ~= Node(
             name: node["name"].opt!string,
             childrenNodeIndices: childrenIdxs,
             meshIdx: node["mesh"].opt!int(-1),
+            trans: trans,
         );
     }
 
