@@ -76,7 +76,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
     }
 
     auto scenes = json["scenes"].byValue.array;
-    enforce(scenes.length <= 1);
+    enforce(scenes.length == 1);
 
     {
         Json rootScene = scenes[ json["scene"].get!ushort ];

@@ -156,9 +156,12 @@ class GlTF : DrawableByVulkan
     {
         assert(rootSceneNode.childrenNodeIndices.length > 0);
 
-        //FIXME: display all nodes, not only the first
-        const node = nodes[ rootSceneNode.childrenNodeIndices[0] ];
+        foreach(rootNodeIdx; rootSceneNode.childrenNodeIndices)
+            uploadNodeToGPU(device, commandPool, commandBuffer, nodes[rootNodeIdx]);
+    }
 
+    private void uploadNodeToGPU(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer, in Node node)
+    {
         //TODO: just skip such node
         enforce(node.meshIdx >= 0, "mesh index not found");
 
