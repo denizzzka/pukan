@@ -7,7 +7,7 @@ package mixin template DescriptorPools()
     import std.container.slist;
     /* private FIXME*/ SList!PoolAndLayoutInfo descriptorPools;
 
-    ref PoolAndLayoutInfo createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
+    ref PoolAndLayoutInfo createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, uint maxSets)
     {
         {
             // In general, VkDescriptorSetLayoutCreateInfo are not related to any pool.
@@ -38,7 +38,7 @@ package mixin template DescriptorPools()
             VkDescriptorPoolCreateInfo descriptorPoolInfo = {
                 poolSizeCount: cast(uint) poolSizes.length,
                 pPoolSizes: poolSizes.ptr,
-                maxSets: 1,
+                maxSets: maxSets,
             };
 
             vkCall(this.device, &descriptorPoolInfo, this.alloc, &descriptorPools.front.descriptorPool);
