@@ -311,15 +311,15 @@ struct ShaderInputVertex
     Vector2f texCoord;
 
     //TODO: convert to enum?
-    static auto getBindingDescription()
+    static auto getBindingDescriptions()
     {
-        VkVertexInputBindingDescription r = {
-            binding: 0,
-            stride: pos.sizeof,
-            inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
-        };
-
-        return r;
+        return [
+            VkVertexInputBindingDescription(
+                binding: 0,
+                stride: pos.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+        ];
     }
 
     //TODO: convert to enum?

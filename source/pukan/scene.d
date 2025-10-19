@@ -141,14 +141,14 @@ struct Vertex {
     Vector3f color;
     Vector2f texCoord;
 
-    static auto getBindingDescription() {
-        VkVertexInputBindingDescription r = {
-            binding: 0,
-            stride: this.sizeof,
-            inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
-        };
-
-        return r;
+    static auto getBindingDescriptions() {
+        return [
+            VkVertexInputBindingDescription(
+                binding: 0,
+                stride: this.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+        ];
     }
 
     static auto getAttributeDescriptions()

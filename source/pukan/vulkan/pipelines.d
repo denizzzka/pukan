@@ -58,7 +58,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
 
     auto initVertexInputStateCreateInfo()
     {
-        static bindingDescriptions = [Vertex.getBindingDescription];
+        static bindingDescriptions = Vertex.getBindingDescriptions;
         static attributeDescriptions = Vertex.getAttributeDescriptions;
 
         vertexInputInfo = VkPipelineVertexInputStateCreateInfo(
