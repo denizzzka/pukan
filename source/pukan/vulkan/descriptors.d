@@ -23,8 +23,6 @@ package mixin template DescriptorPools()
             descriptorPools.insert(add);
         }
 
-        VkDescriptorPool descriptorPool;
-
         {
             VkDescriptorPoolSize[] poolSizes;
             poolSizes.length = descriptorSetLayoutBindings.length;
@@ -32,7 +30,7 @@ package mixin template DescriptorPools()
             foreach(i, ref poolSize; poolSizes)
             {
                 poolSize.type = descriptorSetLayoutBindings[i].descriptorType;
-                poolSize.descriptorCount = descriptorSetLayoutBindings[i].descriptorCount;
+                poolSize.descriptorCount = descriptorSetLayoutBindings[i].descriptorCount * maxSets;
             }
 
             VkDescriptorPoolCreateInfo descriptorPoolInfo = {
