@@ -3,6 +3,7 @@ module pukan.primitives_tree;
 import pukan.primitives_tree.mesh;
 import pukan.primitives_tree.tree: PrimitivesTree;
 import pukan.scene: Vertex;
+import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
@@ -18,35 +19,24 @@ alias Payload = Algebraic!(
 
 alias Node = NodeT!Payload;
 
-struct NodeT(Payload)
+class NodeT(Payload) : BaseNode
 {
-    //TODO: unused, remove?
-    NodeT* parent;
-    SList!(NodeT*) children;
     /*package*/ Payload payload;
 
-    NodeT* addChildNode()
-    {
-        auto c = new NodeT;
-        c.parent = &this;
-
-        children.insert(c);
-
-        return c;
-    }
-
-    auto addChildNode(DrawableByVulkan payload)
+    BaseNode.RT addChildNode(DrawableByVulkan payload)
     {
         return addChildNode!DrawableByVulkan(payload);
     }
 
     auto addChildNode(T)(T payload)
     {
-        auto n = addChildNode();
-        n.payload = payload;
+        auto c = new NodeT;
+        c.payload = payload;
 
-        return n;
+        return super.addChildNode(c);
     }
+
+    //void forEachNode(void delegate(ref NodeT) dg) => root.traversal(dg);
 
     package void traversal(void delegate(ref NodeT) dg)
     {
