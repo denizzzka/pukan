@@ -175,5 +175,5 @@ interface DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
     void refreshBuffers(VkCommandBuffer buf);
-    void drawingBufferFilling(VkCommandBuffer buf, /* TODO: remove */ GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans);
+    void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans);
 }

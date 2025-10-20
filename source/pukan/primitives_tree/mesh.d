@@ -16,7 +16,7 @@ class Mesh
     }
 }
 
-class ColoredMesh : Mesh, DrawableByVulkan
+class ColoredMesh : Mesh
 {
     VkDescriptorSet[] descriptorSets;
 

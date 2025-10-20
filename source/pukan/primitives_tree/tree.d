@@ -47,4 +47,13 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         foreach(ref c; curr.children)
             drawingBufferFillingRecursive(buf, pipelineCfg, trans, cast(Node) c);
     }
+
+    //TODO: why this is need to implement?
+    override void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        super.uploadToGPUImmediate(device, commandPool, commandBuffer);
+    }
+
+    //TODO: ditto
+    override void refreshBuffers(VkCommandBuffer buf){}
 }
