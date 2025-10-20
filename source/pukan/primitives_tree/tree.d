@@ -80,8 +80,7 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
             pipelineCfg = *curr.payload.peek!GraphicsPipelineCfg;
         }
 
-        //FIXME:
-        //~ foreach(ref c; curr.children)
-            //~ drawingBufferFilling(buf, pipelineCfg, trans, c);
+        foreach(ref c; curr.children)
+            drawingBufferFilling(buf, pipelineCfg, trans, *c);
     }
 }
