@@ -15,21 +15,26 @@ class DrawableTree(Payload) : DrawableByVulkan
         Payload payload;
         alias this = payload;
 
-        Node addChildNode(Payload payload)
-        {
-            return addChildNode!Payload(payload);
-        }
+        Node addChild(DrawableByVulkan val) => addChild!DrawableByVulkan(cast(DrawableByVulkan) val);
 
-        auto addChildNode(T)(T payload)
+        Node addChild(T)(T val)
+        if(!is(T == Node))
         {
             auto n = new Node;
-            n.payload = payload;
+            n.payload = Payload(val);
 
-            return addChildNode(n);
+            return addChild(n);
         }
+
+        Node addChild(Node n) => cast(Node) super.addChildNode(n).front;
     }
 
     Node root;
+
+    this()
+    {
+        root = new Node;
+    }
 
     ~this()
     {
@@ -73,11 +78,7 @@ class DrawableTree(Payload) : DrawableByVulkan
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
 
-            dr.drawingBufferFilling(
-                buf,
-                GraphicsPipelineCfg.init, //FIXME: remove
-                trans,
-            );
+            dr.drawingBufferFilling(buf, trans);
         }
         else if(curr.payload.type == typeid(Bone))
         {

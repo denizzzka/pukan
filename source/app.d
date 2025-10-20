@@ -1,4 +1,5 @@
 import pukan;
+import pukan.scene_tree;
 import pukan.vulkan.bindings;
 import glfw3.api;
 import std.conv: to;
@@ -195,7 +196,7 @@ void main() {
             tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
 
             scene.renderPass.recordCommandBuffer(cb, (buf){
-                tree.startDrawTree(buf);
+                tree.drawingBufferFilling(buf, Matrix4x4f.identity);
             });
         });
 
@@ -257,54 +258,55 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     return wtb;
 }
 
-void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, in VkExtent2D imageExtent, PrimitivesTree tree, Bone* cubeRotator)
+void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, in VkExtent2D imageExtent, SceneTree tree, Bone* cubeRotator)
 {
     const curr = sw.peek.total!"msecs" * 0.001;
 
     wtb = calculateWTB(imageExtent, curr);
 
     auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
-    *cubeRotator = Bone(cubeRotation.toMatrix4x4);
+    //~ *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
 {
-    import pukan.scene_tree;
     auto tree = new SceneTree;
 
-    auto primit = tree.root.addChildNode(new PrimitivesTree);
+    //~ auto primitTree = tree.root.addDrawable(new PrimitivesTree);
 
-    auto coloredBranch = tree.root.addChildNode(scene.coloredMeshFactory.graphicsPipelineCfg);
+    //~ auto coloredBranch = primitTree.addChildNode(
+        //~ primitTree.Payload(scene.coloredMeshFactory.graphicsPipelineCfg)
+    //~ );
 
-    {
-        auto v = createCubeVertices;
-        auto cube = scene.coloredMeshFactory.create(scene.frameBuilder, v[0], v[1]);
+    //~ {
+        //~ auto v = createCubeVertices;
+        //~ auto cube = scene.coloredMeshFactory.create(scene.frameBuilder, v[0], v[1]);
 
-        auto n = coloredBranch.addChildNode(Bone());
-        cubeRotator = n.payload.peek!Bone;
+        //~ auto n = coloredBranch.addChildNode(Bone());
+        //~ cubeRotator = n.payload.peek!Bone;
 
-        n.addChildNode(cube);
-    }
+        //~ n.addChildNode(cube);
+    //~ }
 
     {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 0.3).translationMatrix;
 
         auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf");
-        coloredBranch
-            .addChildNode(Bone(mat: trans))
-            .addChildNode(gltfObj);
+        tree.root
+            .addChild(Bone(mat: trans))
+            .addChild(gltfObj);
     }
 
     {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(-1, 1, 0.3).translationMatrix;
 
         auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf");
-        coloredBranch
-            .addChildNode(Bone(mat: trans))
-            .addChildNode(gltfObj);
+        tree.root
+            .addChild(Bone(mat: trans))
+            .addChild(gltfObj);
     }
 
-    auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
+    //~ auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
 
     {
         auto extFormatImg = loadImageFromFile("demo/assets/texture.jpeg");
@@ -330,7 +332,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto texture = device.create!Texture(img, samplerInfo);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
-        textureBranch.addChildNode(mesh);
+        //~ textureBranch.addChildNode(mesh);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);

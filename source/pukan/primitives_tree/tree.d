@@ -25,15 +25,13 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
 
     private void drawingBufferFillingRecursive(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, Node curr)
     {
+        //TODO: add primitive draw support
+
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
 
-            dr.drawingBufferFilling(
-                buf,
-                pipelineCfg,
-                trans,
-            );
+            dr.drawingBufferFilling(buf, trans);
         }
         else if(curr.payload.type == typeid(Bone))
         {
