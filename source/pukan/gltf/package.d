@@ -4,6 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
+static import pukan.tree;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.exception: enforce;

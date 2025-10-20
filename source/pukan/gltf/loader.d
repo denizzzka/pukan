@@ -88,10 +88,12 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         }
 
         ret.nodes ~= Node(
-            name: node["name"].opt!string,
             childrenNodeIndices: childrenIdxs,
-            meshIdx: node["mesh"].opt!int(-1),
-            trans: trans,
+            payload: NodePayload(
+                name: node["name"].opt!string,
+                meshIdx: node["mesh"].opt!int(-1),
+                trans: trans,
+            ),
         );
     }
 
@@ -224,12 +226,18 @@ struct Primitive
     Json attributes;
 }
 
-struct Node
+struct NodePayload
 {
     string name; /// Not a unique name
     Matrix4x4f trans;
     int meshIdx = -1;
+}
+
+struct Node
+{
     ushort[] childrenNodeIndices;
+    NodePayload payload;
+    alias this = payload;
 }
 
 struct GltfContent
