@@ -1,6 +1,7 @@
 module pukan.primitives_tree.tree;
 
-import pukan.primitives_tree;
+import pukan.primitives_tree: Payload, Bone;
+import pukan.tree.drawable_tree: DrawableTreeBase = DrawableTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
@@ -8,16 +9,7 @@ import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
-class TreeT(NodeT)
-{
-    NodeT root;
-
-    void forEachNode(void delegate(ref NodeT) dg) => root.traversal(dg);
-}
-
-alias PrimitivesTree = TreeT!Node;
-
-class DrawableTree : PrimitivesTree, DrawableByVulkan
+class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
 {
     import dlib.math;
 
@@ -26,40 +18,12 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
         forEachDrawablePayload((d) => d.destroy);
     }
 
-    void forEachDrawablePayload(void delegate(DrawableByVulkan) dg)
+    override void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
     {
-        forEachNode((n){
-            if(n.payload.type == typeid(DrawableByVulkan))
-                dg(*n.payload.peek!DrawableByVulkan);
-        });
+        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, root);
     }
 
-    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
-    {
-        forEachDrawablePayload((d) => d.uploadToGPUImmediate(device, commandPool, commandBuffer));
-    }
-
-    void refreshBuffers(VkCommandBuffer buf)
-    {
-    }
-
-    //TODO: remove? Translation now is mandatory arg for start of the scene rendering
-    void startDrawTree(VkCommandBuffer buf)
-    {
-        drawingBufferFilling(buf, GraphicsPipelineCfg.init, Matrix4f.identity);
-    }
-
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
-    {
-        drawingBufferFilling(buf, GraphicsPipelineCfg.init, trans);
-    }
-
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans)
-    {
-        drawingBufferFilling(buf, pipelineCfg, trans, root);
-    }
-
-    private void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, ref Node curr)
+    private void drawingBufferFillingRecursive(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, Node curr)
     {
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
@@ -81,6 +45,6 @@ class DrawableTree : PrimitivesTree, DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFilling(buf, pipelineCfg, trans, *c);
+            drawingBufferFillingRecursive(buf, pipelineCfg, trans, cast(Node) c);
     }
 }

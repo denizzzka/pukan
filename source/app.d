@@ -269,7 +269,10 @@ void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, i
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
 {
-    auto tree = new DrawableTree;
+    import pukan.scene_tree;
+    auto tree = new SceneTree;
+
+    auto primit = tree.root.addChildNode(new PrimitivesTree);
 
     auto coloredBranch = tree.root.addChildNode(scene.coloredMeshFactory.graphicsPipelineCfg);
 

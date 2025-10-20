@@ -17,47 +17,6 @@ alias Payload = Algebraic!(
     DrawableByVulkan,
 );
 
-alias Node = NodeT!Payload;
-
-struct NodeT(Payload)
-{
-    //TODO: unused, remove?
-    NodeT* parent;
-    SList!(NodeT*) children;
-    /*package*/ Payload payload;
-
-    NodeT* addChildNode()
-    {
-        auto c = new NodeT;
-        c.parent = &this;
-
-        children.insert(c);
-
-        return c;
-    }
-
-    auto addChildNode(DrawableByVulkan payload)
-    {
-        return addChildNode!DrawableByVulkan(payload);
-    }
-
-    auto addChildNode(T)(T payload)
-    {
-        auto n = addChildNode();
-        n.payload = payload;
-
-        return n;
-    }
-
-    package void traversal(void delegate(ref NodeT) dg)
-    {
-        dg(this);
-
-        foreach(ref c; children)
-            c.traversal(dg);
-    }
-}
-
 /// Represents the translation of an node relative to the ancestor bone node
 struct Bone
 {

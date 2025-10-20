@@ -14,6 +14,19 @@ class DrawableTree(Payload) : DrawableByVulkan
     {
         Payload payload;
         alias this = payload;
+
+        Node addChildNode(Payload payload)
+        {
+            return addChildNode!Payload(payload);
+        }
+
+        auto addChildNode(T)(T payload)
+        {
+            auto n = new Node;
+            n.payload = payload;
+
+            return addChildNode(n);
+        }
     }
 
     Node root;
@@ -51,7 +64,7 @@ class DrawableTree(Payload) : DrawableByVulkan
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
     {
-        drawingBufferFilling(buf, trans);
+        drawingBufferFillingRecursive(buf, trans, root);
     }
 
     private void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, Node curr)
