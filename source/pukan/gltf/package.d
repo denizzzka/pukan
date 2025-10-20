@@ -1,20 +1,39 @@
 module pukan.gltf;
 
 import dlib.math;
-public import pukan.gltf.loader: loadGlTF2, LoaderNode = Node;
+public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
-static import pukan.tree;
+import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.exception: enforce;
 import vibe.data.json;
 
+alias LoaderNode = pukan.gltf.loader.Node;
+
+class Node : BaseNode
+{
+    NodePayload payload;
+    alias this = payload;
+
+    this(NodePayload pa)
+    {
+        payload = pa;
+    }
+
+    void traversal(void delegate(Node) dg)
+    {
+        super.traversal((n){
+            dg(cast(Node) n);
+        });
+    }
+}
+
 class GlTF : DrawableByVulkan
 {
     private Node rootSceneNode;
     private Texture fakeTexture;
-    private Node[] nodes;
     private GltfContent content;
     alias this = content;
 
@@ -36,13 +55,30 @@ class GlTF : DrawableByVulkan
         Material material;
     }
 
+    // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
+    // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
     package this(ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] ds, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode)
     {
         this.pipeline = &pipeline;
         descriptorSets = ds;
         content = cont;
-        this.nodes = nodes;
-        this.rootSceneNode = rootSceneNode;
+
+        {
+            Node createNodeHier(ref LoaderNode ln)
+            {
+                auto nn = new Node(ln.payload);
+
+                foreach(idx; ln.childrenNodeIndices)
+                {
+                    auto c = createNodeHier(nodes[idx]);
+                    nn.addChildNode(c);
+                }
+
+                return nn;
+            }
+
+            this.rootSceneNode = createNodeHier(rootSceneNode);
+        }
 
         // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
@@ -67,16 +103,15 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        assert(rootSceneNode.childrenNodeIndices.length > 0);
-
-        foreach(rootNodeIdx; rootSceneNode.childrenNodeIndices)
-            uploadNodeToGPU(device, commandPool, commandBuffer, nodes[rootNodeIdx]);
+        rootSceneNode.traversal((node){
+            uploadNodeToGPU(device, commandPool, commandBuffer, node);
+        });
     }
 
     private void uploadNodeToGPU(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer, in Node node)
     {
-        //TODO: just skip such node
-        enforce(node.meshIdx >= 0, "mesh index not found");
+        // Node without mesh attached, skip
+        if(node.meshIdx < 0) return;
 
         const mesh = &meshes[node.meshIdx];
         assert(mesh.primitives.length == 1);

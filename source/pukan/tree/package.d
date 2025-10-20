@@ -11,7 +11,7 @@ class Node
 
     alias RT = ReturnType!(children.opSlice);
 
-    protected RT addChildNode(Node c)
+    RT addChildNode(Node c)
     {
         debug c.parent = this;
 
