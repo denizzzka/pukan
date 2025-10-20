@@ -30,6 +30,7 @@ class DrawableTree(Payload) : DrawableByVulkan
     }
 
     Node root;
+    alias this = root;
 
     this()
     {

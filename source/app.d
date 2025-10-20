@@ -272,21 +272,20 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 {
     auto tree = new SceneTree;
 
-    //~ auto primitTree = tree.root.addDrawable(new PrimitivesTree);
+    auto primitTree = new PrimitivesTree;
+    tree.addChild(primitTree);
 
-    //~ auto coloredBranch = primitTree.addChildNode(
-        //~ primitTree.Payload(scene.coloredMeshFactory.graphicsPipelineCfg)
-    //~ );
+    auto coloredBranch = primitTree.addChild(scene.coloredMeshFactory.graphicsPipelineCfg);
 
-    //~ {
-        //~ auto v = createCubeVertices;
-        //~ auto cube = scene.coloredMeshFactory.create(scene.frameBuilder, v[0], v[1]);
+    {
+        auto v = createCubeVertices;
+        auto cube = scene.coloredMeshFactory.create(scene.frameBuilder, v[0], v[1]);
 
-        //~ auto n = coloredBranch.addChildNode(Bone());
-        //~ cubeRotator = n.payload.peek!Bone;
+        auto n = coloredBranch.addChild(Bone());
+        cubeRotator = n.payload.peek!Bone;
 
-        //~ n.addChildNode(cube);
-    //~ }
+        n.addChild(cube);
+    }
 
     {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 0.3).translationMatrix;
