@@ -20,7 +20,7 @@ class Node
         return children.opSlice();
     }
 
-    void traversal(void delegate(Node) dg)
+    protected void traversal(void delegate(Node) dg)
     {
         dg(this);
 
