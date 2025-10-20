@@ -1,7 +1,7 @@
 module pukan.gltf;
 
 import dlib.math;
-public import pukan.gltf.loader: loadGlTF2;
+public import pukan.gltf.loader: loadGlTF2, LoaderNode = Node;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
 static import pukan.tree;
@@ -12,7 +12,9 @@ import vibe.data.json;
 
 class GlTF : DrawableByVulkan
 {
+    private Node rootSceneNode;
     private Texture fakeTexture;
+    private Node[] nodes;
     private GltfContent content;
     alias this = content;
 
@@ -34,11 +36,13 @@ class GlTF : DrawableByVulkan
         Material material;
     }
 
-    package this(ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] ds, LogicalDevice device, GltfContent cont)
+    package this(ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] ds, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode)
     {
         this.pipeline = &pipeline;
         descriptorSets = ds;
         content = cont;
+        this.nodes = nodes;
+        this.rootSceneNode = rootSceneNode;
 
         // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
         // need to allocate more memory then divide it into pieces
