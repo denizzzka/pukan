@@ -23,6 +23,8 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
     }
 
     GltfContent ret;
+    Node[] nodes;
+    Node rootSceneNode;
 
     Buffer[] buffers;
     foreach(buf; json["buffers"])
@@ -87,11 +89,13 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             }
         }
 
-        ret.nodes ~= Node(
-            name: node["name"].opt!string,
+        nodes ~= Node(
             childrenNodeIndices: childrenIdxs,
-            meshIdx: node["mesh"].opt!int(-1),
-            trans: trans,
+            payload: NodePayload(
+                name: node["name"].opt!string,
+                meshIdx: node["mesh"].opt!int(-1),
+                trans: trans,
+            ),
         );
     }
 
@@ -101,8 +105,8 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
     {
         Json rootScene = scenes[ json["scene"].get!ushort ];
 
-        ret.rootSceneNode.name = rootScene["name"].opt!string;
-        ret.rootSceneNode.childrenNodeIndices = rootScene["nodes"]
+        rootSceneNode.name = rootScene["name"].opt!string;
+        rootSceneNode.childrenNodeIndices = rootScene["nodes"]
             .byValue.map!((e) => e.get!ushort)
             .array;
     }
@@ -146,7 +150,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
-    return new GlTF(pipeline, descriptorSets, device, ret);
+    return new GlTF(pipeline, descriptorSets, device, ret, nodes, rootSceneNode);
 }
 
 struct Buffer
@@ -224,20 +228,24 @@ struct Primitive
     Json attributes;
 }
 
-struct Node
+struct NodePayload
 {
     string name; /// Not a unique name
     Matrix4x4f trans;
     int meshIdx = -1;
+}
+
+struct Node
+{
     ushort[] childrenNodeIndices;
+    NodePayload payload;
+    alias this = payload;
 }
 
 struct GltfContent
 {
     Accessor[] accessors;
-    Node[] nodes;
     Mesh[] meshes;
-    Node rootSceneNode;
     ImageMemory[] images;
     Texture[] textures;
 }

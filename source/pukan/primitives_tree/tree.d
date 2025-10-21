@@ -1,86 +1,78 @@
 module pukan.primitives_tree.tree;
 
-import pukan.primitives_tree;
+import pukan.primitives_tree: Payload, DrawablePrimitive, Bone;
+import pukan.tree.drawable_tree: DrawableTreeBase = DrawableTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
-import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
-class TreeT(NodeT)
-{
-    NodeT root;
-
-    void forEachNode(void delegate(ref NodeT) dg) => root.traversal(dg);
-}
-
-alias PrimitivesTree = TreeT!Node;
-
-class DrawableTree : PrimitivesTree, DrawableByVulkan
+/// This is a very unusual type of drawable object, added during engine
+/// development for variety. You're unlikely to need it.
+class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
 {
     import dlib.math;
 
     ~this()
     {
+        forEachPrimitive((e) => e.destroy);
         forEachDrawablePayload((d) => d.destroy);
     }
 
-    void forEachDrawablePayload(void delegate(DrawableByVulkan) dg)
+    override void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
     {
-        forEachNode((n){
-            if(n.payload.type == typeid(DrawableByVulkan))
-                dg(*n.payload.peek!DrawableByVulkan);
-        });
+        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, root);
     }
 
-    void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    private void drawingBufferFillingRecursive(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, Node curr)
     {
-        forEachDrawablePayload((d) => d.uploadToGPUImmediate(device, commandPool, commandBuffer));
-    }
+        // TODO: deduplicate code with DrawableTree.drawingBufferFillingRecursive ?
 
-    void refreshBuffers(VkCommandBuffer buf)
-    {
-    }
+        if(curr.payload.type == typeid(DrawablePrimitive))
+        {
+            auto dr = curr.payload.peek!DrawablePrimitive;
 
-    //TODO: remove? Translation now is mandatory arg for start of the scene rendering
-    void startDrawTree(VkCommandBuffer buf)
-    {
-        drawingBufferFilling(buf, GraphicsPipelineCfg.init, Matrix4f.identity);
-    }
-
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
-    {
-        drawingBufferFilling(buf, GraphicsPipelineCfg.init, trans);
-    }
-
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans)
-    {
-        drawingBufferFilling(buf, pipelineCfg, trans, root);
-    }
-
-    private void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, ref Node curr)
-    {
+            dr.drawingBufferFilling(buf, pipelineCfg, trans);
+        }
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
 
-            dr.drawingBufferFilling(
-                buf,
-                pipelineCfg,
-                trans,
-            );
+            dr.drawingBufferFilling(buf, trans);
         }
         else if(curr.payload.type == typeid(Bone))
         {
             trans *= curr.payload.peek!Bone.mat;
         }
-        else if(curr.payload.type == typeid(GraphicsPipelineCfg)) //TODO: not needed for glTF
+        else if(curr.payload.type == typeid(GraphicsPipelineCfg))
         {
             pipelineCfg = *curr.payload.peek!GraphicsPipelineCfg;
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFilling(buf, pipelineCfg, trans, *c);
+            drawingBufferFillingRecursive(buf, pipelineCfg, trans, cast(Node) c);
     }
+
+    private void forEachPrimitive(void delegate(DrawablePrimitive) dg)
+    {
+        root.traversal((node){
+            auto n = cast(Node) node;
+
+            if(n.payload.type == typeid(DrawablePrimitive))
+                dg(*n.payload.peek!DrawablePrimitive);
+        });
+    }
+
+    override void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        forEachPrimitive((pr){
+            pr.uploadToGPUImmediate(device, commandPool, commandBuffer);
+        });
+
+        super.uploadToGPUImmediate(device, commandPool, commandBuffer);
+    }
+
+    //TODO: ditto
+    override void refreshBuffers(VkCommandBuffer buf){}
 }

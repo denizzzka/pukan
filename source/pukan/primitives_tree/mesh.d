@@ -1,5 +1,6 @@
 module pukan.primitives_tree.mesh;
 
+import pukan.primitives_tree: DrawablePrimitive;
 import pukan.scene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -16,11 +17,11 @@ class Mesh
     }
 }
 
-class ColoredMesh : Mesh, DrawableByVulkan
+class ColoredMesh : Mesh, DrawablePrimitive
 {
     VkDescriptorSet[] descriptorSets;
 
-    this(VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices)
+    this(LogicalDevice, VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices)
     {
         descriptorSets = ds;
         super(vertices, indices);
@@ -61,10 +62,6 @@ class ColoredMesh : Mesh, DrawableByVulkan
         r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
-    void updateDescriptorSets(LogicalDevice device)
-    {
-    }
-
     void refreshBuffers(VkCommandBuffer buf)
     {
     }
@@ -91,10 +88,12 @@ class TexturedMesh : ColoredMesh
 {
     Texture texture;
 
-    this(VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices, Texture texture)
+    this(LogicalDevice device, VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices, Texture texture)
     {
         this.texture = texture;
-        super(ds, vertices, indices);
+        super(device, ds, vertices, indices);
+
+        updateDescriptorSets(device);
     }
 
     ~this()
@@ -102,7 +101,7 @@ class TexturedMesh : ColoredMesh
         texture.destroy;
     }
 
-    override void updateDescriptorSets(LogicalDevice device)
+    private void updateDescriptorSets(LogicalDevice device)
     {
         VkDescriptorImageInfo imageInfo = {
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
