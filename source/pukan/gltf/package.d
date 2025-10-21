@@ -170,7 +170,7 @@ class GlTF : DrawableByVulkan
             vertexBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             // Copy vertices to mapped memory
-            vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices.viewSlice;
+            vertexBuffer.cpuBuf[0..$] = vertices.viewSlice;
 
             vertexBuffer.uploadImmediate(commandPool, commandBuffer);
         }
@@ -193,7 +193,7 @@ class GlTF : DrawableByVulkan
             texCoordsBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             // Copy vertices to mapped memory
-            texCoordsBuffer.cpuBuf[0..$] = cast(void[]) texCoords.viewSlice;
+            texCoordsBuffer.cpuBuf[0..$] = texCoords.viewSlice;
 
             texCoordsBuffer.uploadImmediate(commandPool, commandBuffer);
         }
@@ -315,6 +315,11 @@ struct ShaderInputVertex
                 stride: pos.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: 1,
+                stride: texCoord.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
         ];
     }
 
@@ -331,7 +336,7 @@ struct ShaderInputVertex
             ),
             // textureCoord:
             VkVertexInputAttributeDescription(
-                binding: 0,
+                binding: 1,
                 location: 1,
                 format: VK_FORMAT_R32G32_SFLOAT,
                 //~ offset: texCoord.offsetof,
