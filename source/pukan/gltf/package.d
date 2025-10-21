@@ -111,7 +111,7 @@ class GlTF : DrawableByVulkan
 
     private void uploadNodeToGPU(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        // FIXME: also process Node without mesh
+        // Node without mesh attached
         if(node.meshIdx < 0) return;
 
         const mesh = &meshes[node.meshIdx];
