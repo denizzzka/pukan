@@ -284,7 +284,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto n = coloredBranch.addChild(Bone());
         cubeRotator = n.payload.peek!Bone;
 
-        n.addChild(cube);
+        n.addChild(cast(DrawablePrimitive) cube);
     }
 
     {

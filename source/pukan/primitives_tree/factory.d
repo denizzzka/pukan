@@ -32,8 +32,7 @@ struct PrimitivesFactory(T)
         assert(device);
         auto descriptorsSet = device.allocateDescriptorSets(poolAndLayout, 1);
 
-        auto r = new T(descriptorsSet, args);
-        r.updateDescriptorSets(device);
+        auto r = new T(device, descriptorsSet, args);
 
         return r;
     }

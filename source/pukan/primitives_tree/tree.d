@@ -1,11 +1,10 @@
 module pukan.primitives_tree.tree;
 
-import pukan.primitives_tree: Payload, Bone;
+import pukan.primitives_tree: Payload, DrawablePrimitive, Bone;
 import pukan.tree.drawable_tree: DrawableTreeBase = DrawableTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
-import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
@@ -25,8 +24,12 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
 
     private void drawingBufferFillingRecursive(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, Node curr)
     {
-        //TODO: add primitive draw support
+        if(curr.payload.type == typeid(DrawablePrimitive))
+        {
+            auto dr = curr.payload.peek!DrawablePrimitive;
 
+            dr.drawingBufferFilling(buf, pipelineCfg, trans);
+        }
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
@@ -46,9 +49,22 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
             drawingBufferFillingRecursive(buf, pipelineCfg, trans, cast(Node) c);
     }
 
-    //TODO: why this is need to implement?
+    private void forEachPrimitive(void delegate(DrawablePrimitive) dg)
+    {
+        root.traversal((node){
+            auto n = cast(Node) node;
+
+            if(n.payload.type == typeid(DrawablePrimitive))
+                dg(*n.payload.peek!DrawablePrimitive);
+        });
+    }
+
     override void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        forEachPrimitive((pr){
+            pr.uploadToGPUImmediate(device, commandPool, commandBuffer);
+        });
+
         super.uploadToGPUImmediate(device, commandPool, commandBuffer);
     }
 
