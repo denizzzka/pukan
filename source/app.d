@@ -305,7 +305,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
             .addChild(gltfObj);
     }
 
-    //~ auto textureBranch = tree.root.addChildNode(scene.texturedMeshFactory.graphicsPipelineCfg);
+    auto textureBranch = primitTree.addChild(scene.texturedMeshFactory.graphicsPipelineCfg);
 
     {
         auto extFormatImg = loadImageFromFile("demo/assets/texture.jpeg");
@@ -331,7 +331,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto texture = device.create!Texture(img, samplerInfo);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
-        //~ textureBranch.addChildNode(mesh);
+        textureBranch.addChild(cast(DrawablePrimitive) mesh);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
