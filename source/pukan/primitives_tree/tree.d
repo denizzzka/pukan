@@ -14,6 +14,7 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
 
     ~this()
     {
+        forEachPrimitive((e) => e.destroy);
         forEachDrawablePayload((d) => d.destroy);
     }
 
