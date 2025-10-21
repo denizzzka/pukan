@@ -41,7 +41,7 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         {
             trans *= curr.payload.peek!Bone.mat;
         }
-        else if(curr.payload.type == typeid(GraphicsPipelineCfg)) //TODO: not needed for glTF
+        else if(curr.payload.type == typeid(GraphicsPipelineCfg))
         {
             pipelineCfg = *curr.payload.peek!GraphicsPipelineCfg;
         }
