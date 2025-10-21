@@ -75,18 +75,50 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
 
         Matrix4x4f trans;
         {
-            auto transJson = node["translation"].opt!(Json[]);
-            if(transJson.length == 0)
-                trans = Matrix4x4f.identity;
-            else
+            Vector3f tr;
+            Quaternionf rot;
+            Vector3f scale;
+
             {
-                auto a = transJson.array;
-                enforce(a.length == 3);
+                auto json = node["translation"].opt!(Json[]);
+                if(json.length == 0)
+                    tr = Vector3f(0, 0, 0);
+                else
+                {
+                    auto a = json.array;
+                    enforce(a.length == 3);
 
-                trans = Vector3f(a[0], a[1], a[2]).translationMatrix;
-
-                //TODO: implement rotation and scale
+                    tr = Vector3f(a[0], a[1], a[2]);
+                }
             }
+
+            {
+                auto json = node["rotation"].opt!(Json[]);
+                if(json.length == 0)
+                    rot = Quaternionf.identity;
+                else
+                {
+                    auto a = json.array;
+                    enforce(a.length == 4);
+
+                    rot = Quaternionf(Vector4f(a[0], a[1], a[2], a[3]));
+                }
+            }
+
+            {
+                auto json = node["scale"].opt!(Json[]);
+                if(json.length == 0)
+                    scale = Vector3f(1, 1, 1);
+                else
+                {
+                    auto a = json.array;
+                    enforce(a.length == 3);
+
+                    scale = Vector3f(a[0], a[1], a[2]);
+                }
+            }
+
+            trans = tr.translationMatrix * rot.toMatrix4x4 * scale.scaleMatrix;
         }
 
         nodes ~= Node(
