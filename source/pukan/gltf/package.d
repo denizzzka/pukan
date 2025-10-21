@@ -14,6 +14,9 @@ alias LoaderNode = pukan.gltf.loader.Node;
 
 class Node : BaseNode
 {
+    private TransferBuffer indicesBuffer;
+    private ushort indices_count;
+
     NodePayload payload;
     alias this = payload;
 
@@ -37,12 +40,10 @@ class GlTF : DrawableByVulkan
     private GltfContent content;
     alias this = content;
 
-    private TransferBuffer indicesBuffer;
     private TransferBuffer vertexBuffer;
     private GraphicsPipelineCfg* pipeline;
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
-    private ushort indices_count;
 
     static struct UBOContent
     {
@@ -104,13 +105,13 @@ class GlTF : DrawableByVulkan
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         rootSceneNode.traversal((node){
-            uploadNodeToGPU(device, commandPool, commandBuffer, node);
+            uploadNodeToGPU(node, device, commandPool, commandBuffer);
         });
     }
 
-    private void uploadNodeToGPU(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer, in Node node)
+    private void uploadNodeToGPU(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        // Node without mesh attached, skip
+        // FIXME: also process Node without mesh
         if(node.meshIdx < 0) return;
 
         const mesh = &meshes[node.meshIdx];
@@ -132,16 +133,16 @@ class GlTF : DrawableByVulkan
             }
 
             assert(indices.count > 0);
-            indices_count = cast(ushort) indices.count;
+            node.indices_count = cast(ushort) indices.count;
 
-            indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+            node.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-            assert(indicesBuffer.cpuBuf.length == indices.viewSlice.length);
+            assert(node.indicesBuffer.cpuBuf.length == indices.viewSlice.length);
 
             // Copy indices to mapped memory
-            indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
+            node.indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
 
-            indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+            node.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
         }
 
         {
@@ -243,15 +244,29 @@ class GlTF : DrawableByVulkan
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
         VkDeviceSize[] offsets = [VkDeviceSize(0)];
-
-        vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
-
-        //TODO: pass few buffers simultaneously
         vkCmdBindVertexBuffers(buf, 0, 1, &(vertexBuffer.gpuBuffer.buf.getVal()), offsets.ptr);
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
-        vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
+        drawingBufferFillingRecursive(buf, trans, rootSceneNode);
+    }
+
+    void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, Node node)
+    {
+        import std.math;
+
+        assert(!node.trans[0].isNaN);
+
+        trans *= node.trans;
+
+        if(node.indices_count)
+        {
+            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
+            vkCmdBindIndexBuffer(buf, node.indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdDrawIndexed(buf, node.indices_count, 1, 0, 0, 0);
+        }
+
+        foreach(c; node.children)
+            drawingBufferFillingRecursive(buf, trans, cast(Node) c);
     }
 }
 

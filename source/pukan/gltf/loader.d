@@ -106,6 +106,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         Json rootScene = scenes[ json["scene"].get!ushort ];
 
         rootSceneNode.name = rootScene["name"].opt!string;
+        rootSceneNode.trans = Matrix4x4f.identity;
         rootSceneNode.childrenNodeIndices = rootScene["nodes"]
             .byValue.map!((e) => e.get!ushort)
             .array;
