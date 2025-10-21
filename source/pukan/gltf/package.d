@@ -41,6 +41,7 @@ class GlTF : DrawableByVulkan
     alias this = content;
 
     private TransferBuffer vertexBuffer;
+    private TransferBuffer texCoordsBuffer;
     private GraphicsPipelineCfg* pipeline;
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
@@ -171,6 +172,28 @@ class GlTF : DrawableByVulkan
             vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices.viewSlice;
 
             vertexBuffer.uploadImmediate(commandPool, commandBuffer);
+        }
+
+        enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
+
+        if(content.textures.length)
+        {
+            const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
+            auto texCoords = &accessors[idx];
+
+            enforce(texCoords.count > 0);
+            debug assert(texCoords.type == "VEC2");
+            debug assert(texCoords.componentType == ComponentType.FLOAT);
+
+            enforce(texCoords.stride == 0);
+            size_t sz = Vector2f.sizeof * texCoords.count;
+
+            texCoordsBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            // Copy vertices to mapped memory
+            texCoordsBuffer.cpuBuf[0..$] = cast(void[]) texCoords.viewSlice;
+
+            texCoordsBuffer.uploadImmediate(commandPool, commandBuffer);
         }
     }
 
