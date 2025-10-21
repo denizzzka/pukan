@@ -7,6 +7,7 @@ import pukan.gltf.loader;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
+import std.conv: to;
 import std.exception: enforce;
 import vibe.data.json;
 
@@ -185,7 +186,8 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            enforce(texCoords.stride == 0);
+            //TODO: create buffers in loader and pass stride value
+            enforce(texCoords.stride == 0 || texCoords.stride == Vector2f.sizeof, texCoords.stride.to!string);
             size_t sz = Vector2f.sizeof * texCoords.count;
 
             texCoordsBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
