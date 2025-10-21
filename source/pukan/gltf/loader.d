@@ -80,40 +80,34 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             Vector3f scale;
 
             {
-                auto json = node["translation"].opt!(Json[]);
-                if(json.length == 0)
+                auto json = "translation" in node;
+                if(json is null)
                     tr = Vector3f(0, 0, 0);
                 else
                 {
-                    auto a = json.array;
-                    enforce(a.length == 3);
-
+                    auto a = (*json).deserializeJson!(float[3]);
                     tr = Vector3f(a[0], a[1], a[2]);
                 }
             }
 
             {
-                auto json = node["rotation"].opt!(Json[]);
-                if(json.length == 0)
+                auto json = "rotation" in node;
+                if(json is null)
                     rot = Quaternionf.identity;
                 else
                 {
-                    auto a = json.array;
-                    enforce(a.length == 4);
-
+                    auto a = (*json).deserializeJson!(float[4]);
                     rot = Quaternionf(Vector4f(a[0], a[1], a[2], a[3]));
                 }
             }
 
             {
-                auto json = node["scale"].opt!(Json[]);
-                if(json.length == 0)
+                auto json = "scale" in node;
+                if(json is null)
                     scale = Vector3f(1, 1, 1);
                 else
                 {
-                    auto a = json.array;
-                    enforce(a.length == 3);
-
+                    auto a = (*json).deserializeJson!(float[3]);
                     scale = Vector3f(a[0], a[1], a[2]);
                 }
             }
