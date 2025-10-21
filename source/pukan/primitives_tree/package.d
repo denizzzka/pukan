@@ -16,6 +16,7 @@ alias Payload = Algebraic!(
 );
 
 /// Represents the translation of an node relative to the ancestor bone node
+//TODO: move to pukan.tree
 struct Bone
 {
     //TODO: 4x3 should be enough
