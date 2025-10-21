@@ -266,8 +266,13 @@ class GlTF : DrawableByVulkan
 
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
-        VkDeviceSize[] offsets = [VkDeviceSize(0)];
-        vkCmdBindVertexBuffers(buf, 0, 1, &(vertexBuffer.gpuBuffer.buf.getVal()), offsets.ptr);
+        VkBuffer[2] buffers = [
+            vertexBuffer.gpuBuffer.buf.getVal(),
+            texCoordsBuffer.gpuBuffer.buf.getVal(),
+        ];
+        VkDeviceSize[2] offsets = [0 , 0];
+        vkCmdBindVertexBuffers(buf, 0, cast(uint) buffers.length, buffers.ptr, offsets.ptr);
+
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
         drawingBufferFillingRecursive(buf, trans, rootSceneNode);
