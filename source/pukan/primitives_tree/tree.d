@@ -8,6 +8,8 @@ import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
+/// This is a very unusual type of drawable object, added during engine
+/// development for variety. You're unlikely to need it.
 class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
 {
     import dlib.math;
