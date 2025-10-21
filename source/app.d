@@ -265,7 +265,7 @@ void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, i
     wtb = calculateWTB(imageExtent, curr);
 
     auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
-    //~ *cubeRotator = Bone(cubeRotation.toMatrix4x4);
+    *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)

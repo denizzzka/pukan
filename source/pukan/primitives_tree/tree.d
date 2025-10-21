@@ -25,6 +25,8 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
 
     private void drawingBufferFillingRecursive(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, Node curr)
     {
+        // TODO: deduplicate code with DrawableTree.drawingBufferFillingRecursive ?
+
         if(curr.payload.type == typeid(DrawablePrimitive))
         {
             auto dr = curr.payload.peek!DrawablePrimitive;
