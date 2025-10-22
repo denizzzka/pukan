@@ -175,6 +175,9 @@ class TransferBuffer
 
     this(LogicalDevice device, MemoryBufferMappedToCPU cpuBuffer, VkBufferUsageFlags mergeUsageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT)
     {
+        assert(cpuBuffer);
+        assert(cpuBuffer.cpuBuf.length > 0);
+
         this.cpuBuffer = cpuBuffer;
 
         VkBufferCreateInfo dstBufInfo = {

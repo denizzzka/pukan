@@ -67,13 +67,12 @@ class GlTF : DrawableByVulkan
         descriptorSets = ds;
         content = cont;
 
-        buffers.length = content.buffers.length;
-        foreach(i, b; buffers)
+        this.buffers.length = content.buffers.length;
+        foreach(i, buf; content.buffers)
         {
-            auto buf = content.buffers[i].buf;
-            b = device.create!MemoryBufferMappedToCPU(buf.length, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+            this.buffers[i] = device.create!MemoryBufferMappedToCPU(buf.buf.length, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
             //TODO: get rid of this redundant copying:
-            b.cpuBuf[0..$] = buf;
+            this.buffers[i].cpuBuf[0..$] = buf.buf[0 .. $];
         }
 
         {
@@ -146,14 +145,11 @@ class GlTF : DrawableByVulkan
             assert(indices.count > 0);
             node.indices_count = cast(ushort) indices.count;
 
-            node.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
             auto indicesAcc = content.getBuffer(indices);
-            assert(node.indicesBuffer.cpuBuf.length == indicesAcc.buf.length);
 
-            // Copy indices to mapped memory
-            // FIXME: redundant copying
-            node.indicesBuffer.cpuBuf[0..$] = indicesAcc.buf;
+            assert(buffers.length > 0);
+            assert(device);
+            node.indicesBuffer = device.create!TransferBuffer(buffers[indicesAcc.bufIdx], VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
             node.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
         }
@@ -179,10 +175,7 @@ class GlTF : DrawableByVulkan
                 sz *= verticesAcc.stride;
             }
 
-            vertexBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            // Copy vertices to mapped memory
-            vertexBuffer.cpuBuf[0..$] = verticesAcc.buf;
+            vertexBuffer = device.create!TransferBuffer(buffers[verticesAcc.bufIdx], VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             vertexBuffer.uploadImmediate(commandPool, commandBuffer);
         }
@@ -204,24 +197,24 @@ class GlTF : DrawableByVulkan
 
             size_t sz = texCoordsAcc.stride * texCoords.count;
 
-            texCoordsBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            //FIXME:
+            //~ auto arr = cast(vec2[]) buffers[texCoordsAcc.bufIdx].cpuBuf;
+            //~ if(texCoords.min_max != Json.emptyObject)
+            //~ {
+                //~ // Normalization
+                //~ import std.algorithm;
+                //~ import std.array;
 
-            auto arr = cast(vec2[]) texCoordsAcc.buf;
-            if(texCoords.min_max != Json.emptyObject)
-            {
-                // Normalization
-                import std.algorithm;
-                import std.array;
+                //~ const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
+                //~ const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
 
-                const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
-                const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
+                //~ const range = max - min;
+                //~ arr = arr.map!((e) => (e - min)/range).array;
+            //~ }
 
-                const range = max - min;
-                arr = arr.map!((e) => (e - min)/range).array;
-            }
+            //~ buffers[texCoordsAcc.bufIdx].cpuBuf = arr;
 
-            // Copy vertices to mapped memory
-            texCoordsBuffer.cpuBuf[0..$] = arr;
+            texCoordsBuffer = device.create!TransferBuffer(buffers[texCoordsAcc.bufIdx], VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             texCoordsBuffer.uploadImmediate(commandPool, commandBuffer);
         }

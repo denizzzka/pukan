@@ -287,21 +287,21 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
 
-    BufAccess getBuffer(in Accessor accessor)
+    const BufAccess getBuffer(in Accessor accessor)
     {
-        BufAccess r;
         const view = bufferViews[accessor.viewIdx];
-        r.offset = view.offset + accessor.offset;
-        r.stride = view.stride;
-        r.buf = buffers[view.bufferIdx].buf;
 
-        return r;
+        return BufAccess(
+            offset: view.offset + accessor.offset,
+            stride: view.stride,
+            bufIdx: view.bufferIdx,
+        );
     }
 }
 
 struct BufAccess
 {
-    ubyte[] buf;
+    size_t bufIdx;
     uint offset;
     ushort stride;
 }
