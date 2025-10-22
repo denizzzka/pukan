@@ -41,6 +41,7 @@ class GlTF : DrawableByVulkan
     private GltfContent content;
     alias this = content;
 
+    private MemoryBufferMappedToCPU[] buffers;
     private TransferBuffer vertexBuffer;
     private TransferBuffer texCoordsBuffer;
     private GraphicsPipelineCfg* pipeline;
@@ -65,6 +66,15 @@ class GlTF : DrawableByVulkan
         this.pipeline = &pipeline;
         descriptorSets = ds;
         content = cont;
+
+        buffers.length = content.buffers.length;
+        foreach(i, b; buffers)
+        {
+            auto buf = content.buffers[i].buf;
+            b = device.create!MemoryBufferMappedToCPU(buf.length, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+            //TODO: get rid of this redundant copying:
+            b.cpuBuf[0..$] = buf;
+        }
 
         {
             Node createNodeHier(ref LoaderNode ln)
