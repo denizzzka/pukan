@@ -29,17 +29,16 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
     foreach(buf; json["buffers"])
         ret.buffers ~= readBufFile(dir, buf);
 
-    View[] bufferViews;
     foreach(v; json["bufferViews"])
     {
         const idx = v["buffer"].get!uint;
-        bufferViews ~= ret.buffers[idx].createView(v);
+        ret.bufferViews ~= ret.buffers[idx].createView(idx, v);
     }
 
     foreach(a; json["accessors"])
     {
         const idx = a["bufferView"].get!uint;
-        ret.accessors ~= bufferViews[idx].createAccessor(a);
+        ret.accessors ~= ret.bufferViews[idx].createAccessor(idx, a);
     }
 
     foreach(mesh; json["meshes"])
@@ -183,12 +182,11 @@ struct Buffer
 {
     ubyte[] buf;
 
-    View createView(Json view)
+    View createView(size_t idx, Json view)
     {
-        const offset = view["byteOffset"].opt!size_t;
-
         return View(
-            view: buf[ offset .. offset + view["byteLength"].get!size_t ],
+            bufferIdx: idx,
+            offset: view["byteOffset"].opt!uint,
             stride: view["byteStride"].opt!ubyte,
         );
     }
@@ -196,18 +194,15 @@ struct Buffer
 
 struct View
 {
-    ubyte[] view;
+    const size_t bufferIdx;
+    const uint offset;
     const ubyte stride; // distance between start points of each element
 
-    Accessor createAccessor(Json accessor)
+    Accessor createAccessor(size_t idx, Json accessor)
     {
         enforce("sparse" !in accessor);
         const normalized = accessor["normalized"].opt!bool(false);
         enforce(!normalized);
-
-        const offset = accessor["byteOffset"].opt!size_t;
-        const count = accessor["count"].get!uint;
-        const len = stride ? (offset + stride*count) : view.length;
 
         Json min_max;
         if("min" !in accessor)
@@ -221,16 +216,16 @@ struct View
         }
 
         auto r = Accessor(
-            viewSlice: view[offset .. len],
-            count: count,
+            viewIdx: idx,
+            count: accessor["count"].get!uint,
             min_max: min_max,
+            offset: accessor["byteOffset"].opt!uint,
         );
 
         debug
         {
             r.type = accessor["type"].get!string;
             r.componentType = accessor["componentType"].get!ComponentType;
-            r.stride = stride;
         }
 
         return r;
@@ -249,12 +244,12 @@ enum ComponentType : short
 
 struct Accessor
 {
-    ubyte[] viewSlice;
+    const size_t viewIdx;
+    uint offset;
     uint count;
     Json min_max;
     debug string type;
     debug ComponentType componentType;
-    debug ubyte stride;
 }
 
 struct Mesh
@@ -286,10 +281,29 @@ struct Node
 struct GltfContent
 {
     Buffer[] buffers;
+    View[] bufferViews;
     Accessor[] accessors;
     Mesh[] meshes;
     ImageMemory[] images;
     Texture[] textures;
+
+    BufAccess getBuffer(in Accessor accessor)
+    {
+        BufAccess r;
+        const view = bufferViews[accessor.viewIdx];
+        r.offset = view.offset + accessor.offset;
+        r.stride = view.stride;
+        r.buf = buffers[view.bufferIdx].buf;
+
+        return r;
+    }
+}
+
+struct BufAccess
+{
+    ubyte[] buf;
+    uint offset;
+    ushort stride;
 }
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;

@@ -134,7 +134,6 @@ class GlTF : DrawableByVulkan
 
         {
             auto indices = accessors[ primitive.indicesAccessorIdx ];
-            enforce(indices.stride == 0);
 
             debug
             {
@@ -149,10 +148,12 @@ class GlTF : DrawableByVulkan
 
             node.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-            assert(node.indicesBuffer.cpuBuf.length == indices.viewSlice.length);
+            auto indicesAcc = content.getBuffer(indices);
+            assert(node.indicesBuffer.cpuBuf.length == indicesAcc.buf.length);
 
             // Copy indices to mapped memory
-            node.indicesBuffer.cpuBuf[0..$] = cast(void[]) indices.viewSlice;
+            // FIXME: redundant copying
+            node.indicesBuffer.cpuBuf[0..$] = indicesAcc.buf;
 
             node.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
         }
@@ -169,18 +170,19 @@ class GlTF : DrawableByVulkan
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
             size_t sz = vertices.count;
-            if(vertices.stride == 0)
+            auto verticesAcc = content.getBuffer(*vertices);
+            if(verticesAcc.stride == 0)
                 sz *= Vector3f.sizeof;
             else
             {
-                enforce(vertices.stride == Vector3f.sizeof);
-                sz *= vertices.stride;
+                enforce(verticesAcc.stride == Vector3f.sizeof);
+                sz *= verticesAcc.stride;
             }
 
             vertexBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             // Copy vertices to mapped memory
-            vertexBuffer.cpuBuf[0..$] = vertices.viewSlice;
+            vertexBuffer.cpuBuf[0..$] = verticesAcc.buf;
 
             vertexBuffer.uploadImmediate(commandPool, commandBuffer);
         }
@@ -196,13 +198,15 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            //TODO: create buffers in loader and pass stride value
-            enforce(texCoords.stride == 0 || texCoords.stride == Vector2f.sizeof, texCoords.stride.to!string);
-            size_t sz = Vector2f.sizeof * texCoords.count;
+            auto texCoordsAcc = content.getBuffer(*texCoords);
+            if(texCoordsAcc.stride == 0)
+                texCoordsAcc.stride = Vector2f.sizeof;
+
+            size_t sz = texCoordsAcc.stride * texCoords.count;
 
             texCoordsBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-            auto arr = cast(vec2[]) texCoords.viewSlice;
+            auto arr = cast(vec2[]) texCoordsAcc.buf;
             if(texCoords.min_max != Json.emptyObject)
             {
                 // Normalization
