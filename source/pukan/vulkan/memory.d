@@ -168,11 +168,18 @@ class TransferBuffer
     {
         this.device = device;
 
-        cpuBuffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,);
+        auto cpuBuffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+        this(device, cpuBuffer, mergeUsageFlags);
+    }
+
+    this(LogicalDevice device, MemoryBufferMappedToCPU cpuBuffer, VkBufferUsageFlags mergeUsageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+    {
+        this.cpuBuffer = cpuBuffer;
 
         VkBufferCreateInfo dstBufInfo = {
             sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            size: size,
+            size: cpuBuffer.cpuBuf.length,
             usage: VK_BUFFER_USAGE_TRANSFER_DST_BIT | mergeUsageFlags,
             sharingMode: VK_SHARING_MODE_EXCLUSIVE,
         };
