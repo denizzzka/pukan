@@ -26,15 +26,14 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
     Node[] nodes;
     Node rootSceneNode;
 
-    Buffer[] buffers;
     foreach(buf; json["buffers"])
-        buffers ~= readBufFile(dir, buf);
+        ret.buffers ~= readBufFile(dir, buf);
 
     View[] bufferViews;
     foreach(v; json["bufferViews"])
     {
         const idx = v["buffer"].get!uint;
-        bufferViews ~= buffers[idx].createView(v);
+        bufferViews ~= ret.buffers[idx].createView(v);
     }
 
     foreach(a; json["accessors"])
@@ -286,6 +285,7 @@ struct Node
 
 struct GltfContent
 {
+    Buffer[] buffers;
     Accessor[] accessors;
     Mesh[] meshes;
     ImageMemory[] images;
