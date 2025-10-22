@@ -203,14 +203,28 @@ struct View
     Accessor createAccessor(Json accessor)
     {
         enforce("sparse" !in accessor);
+        const normalized = accessor["normalized"].opt!bool(false);
+        enforce(!normalized);
 
         const offset = accessor["byteOffset"].opt!size_t;
         const count = accessor["count"].get!uint;
         const len = stride ? (offset + stride*count) : view.length;
 
+        Json min_max;
+        if("min" !in accessor)
+            min_max = Json.emptyObject;
+        else
+        {
+            min_max = Json([
+                "min": accessor["min"],
+                "max": accessor["max"],
+            ]);
+        }
+
         auto r = Accessor(
             viewSlice: view[offset .. len],
             count: count,
+            min_max: min_max,
         );
 
         debug
@@ -238,6 +252,7 @@ struct Accessor
 {
     ubyte[] viewSlice;
     uint count;
+    Json min_max;
     debug string type;
     debug ComponentType componentType;
     debug ubyte stride;

@@ -192,8 +192,22 @@ class GlTF : DrawableByVulkan
 
             texCoordsBuffer = device.create!TransferBuffer(sz, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
+            auto arr = cast(vec2[]) texCoords.viewSlice;
+            if(texCoords.min_max != Json.emptyObject)
+            {
+                // Normalization
+                import std.algorithm;
+                import std.array;
+
+                const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
+                const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
+
+                const range = max - min;
+                arr = arr.map!((e) => (e - min)/range).array;
+            }
+
             // Copy vertices to mapped memory
-            texCoordsBuffer.cpuBuf[0..$] = texCoords.viewSlice;
+            texCoordsBuffer.cpuBuf[0..$] = arr;
 
             texCoordsBuffer.uploadImmediate(commandPool, commandBuffer);
         }
