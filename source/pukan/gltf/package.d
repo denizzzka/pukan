@@ -202,6 +202,12 @@ class GlTF : DrawableByVulkan
 
             enforce(ta.stride >= Vector2f.sizeof);
 
+            /* TODO:
+            Such approach to buffer leads to buffer data duplication.
+            But this avoids complicating the shader. In the future,
+            it's better to create a shader with a configurable stride
+            value
+            */
             ubyte[] texCoordsSlice = cast(ubyte[]) buffers[ta.bufIdx]
                 .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
 
