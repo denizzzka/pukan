@@ -116,16 +116,15 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        rootSceneNode.traversal((node){
+            setUpEachNode(node, device, commandPool, commandBuffer);
+        });
+
         foreach(ref buf; buffers)
             buf.uploadImmediate(commandPool, commandBuffer);
-
-        rootSceneNode.traversal((node){
-            uploadNodeToGPU(node, device, commandPool, commandBuffer);
-        });
     }
 
-    //TODO: actually not loads anything into GPU at all
-    private void uploadNodeToGPU(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    private void setUpEachNode(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         // Node without mesh attached
         if(node.meshIdx < 0) return;
@@ -188,22 +187,36 @@ class GlTF : DrawableByVulkan
             if(texCoordsAccessor.stride == 0)
                 texCoordsAccessor.stride = Vector2f.sizeof;
 
-            //FIXME:
-            //~ auto arr = cast(vec2[]) buffers[texCoordsAcc.bufIdx].cpuBuf;
-            //~ if(texCoords.min_max != Json.emptyObject)
-            //~ {
-                //~ // Normalization
-                //~ import std.algorithm;
-                //~ import std.array;
+            // Need to normalize coordinates?
+            if(texCoords.min_max != Json.emptyObject)
+            {
+                auto ta = &texCoordsAccessor;
 
-                //~ const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
-                //~ const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
+                ubyte[] texCoordsSlice = cast(ubyte[]) buffers[ta.bufIdx]
+                    .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
 
-                //~ const range = max - min;
-                //~ arr = arr.map!((e) => (e - min)/range).array;
-            //~ }
+                import std.algorithm;
+                import std.array;
+                import std.range;
 
-            //~ buffers[texCoordsAcc.bufIdx].cpuBuf = arr;
+                const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
+                const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
+                const range = max - min;
+
+                assert(ta.stride >= Vector2f.sizeof);
+                assert(texCoordsSlice.length > 0);
+
+                texCoordsSlice = texCoordsSlice
+                    .chunks(ta.stride)
+                    .map!((ubyte[] b){
+                        //TODO: endiannes?
+                        auto e = cast(Vector2f*) &b[0];
+                        *e = (*e - min) / range;
+                        return b;
+                    })
+                    .joiner
+                    .array[0 .. $];
+            }
         }
     }
 
