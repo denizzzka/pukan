@@ -195,27 +195,31 @@ class GlTF : DrawableByVulkan
                 ubyte[] texCoordsSlice = cast(ubyte[]) buffers[ta.bufIdx]
                     .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
 
-                import std.algorithm;
-                import std.array;
-                import std.range;
-
                 const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
                 const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
-                const range = max - min;
 
-                assert(ta.stride >= Vector2f.sizeof);
-                assert(texCoordsSlice.length > 0);
-                assert(texCoordsSlice.length % ta.stride == 0);
+                if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
+                {
+                    import std.algorithm;
+                    import std.array;
+                    import std.range;
 
-                version(BigEndian)
-                    static assert(false, "big endian arch isn't supported");
+                    const range = max - min;
 
-                texCoordsSlice
-                    .chunks(ta.stride)
-                    .each!((ubyte[] b){
-                        auto e = cast(Vector2f*) &b[0];
-                        e[0] = (e[0] - min) / range;
-                    });
+                    assert(ta.stride >= Vector2f.sizeof);
+                    assert(texCoordsSlice.length > 0);
+                    assert(texCoordsSlice.length % ta.stride == 0);
+
+                    version(BigEndian)
+                        static assert(false, "big endian arch isn't supported");
+
+                    texCoordsSlice
+                        .chunks(ta.stride)
+                        .each!((ubyte[] b){
+                            auto e = cast(Vector2f*) &b[0];
+                            e[0] = (e[0] - min) / range;
+                        });
+                }
             }
         }
     }
