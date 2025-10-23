@@ -43,7 +43,7 @@ class GlTF : DrawableByVulkan
 
     private TransferBuffer[] buffers;
     private BufAccess verticesAccessor;
-    private BufAccess texCoordsAccessor;
+    private TransferBuffer texCoordsBuf;
     private GraphicsPipelineCfg* pipeline;
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
@@ -122,6 +122,8 @@ class GlTF : DrawableByVulkan
 
         foreach(ref buf; buffers)
             buf.uploadImmediate(commandPool, commandBuffer);
+
+        texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
     private void setUpEachNode(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
@@ -195,32 +197,36 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            texCoordsAccessor = content.getAccess(*texCoords);
-            if(texCoordsAccessor.stride == 0)
-                texCoordsAccessor.stride = Vector2f.sizeof;
+            auto texCoordsAccessor = content.getAccess(*texCoords);
+            auto ta = &texCoordsAccessor;
+
+            enforce(ta.stride >= Vector2f.sizeof);
+
+            ubyte[] texCoordsSlice = cast(ubyte[]) buffers[ta.bufIdx]
+                .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
+
+            enforce(texCoordsSlice.length > 0);
+            enforce(texCoordsSlice.length % ta.stride == 0);
+
+            import std.algorithm;
+            import std.array;
+            import std.range;
+
+            auto fetchedCoords = texCoordsSlice
+                .chunks(ta.stride)
+                .map!((ubyte[] b){
+                    return *cast(Vector2f*) &b[0];
+                });
 
             // Need to normalize coordinates?
             if(texCoords.min_max != Json.emptyObject)
             {
-                auto ta = &texCoordsAccessor;
-
-                ubyte[] texCoordsSlice = cast(ubyte[]) buffers[ta.bufIdx]
-                    .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
-
                 const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
                 const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
 
                 //~ if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
                 {
-                    import std.algorithm;
-                    import std.array;
-                    import std.range;
-
                     const range = max - min;
-
-                    assert(ta.stride >= Vector2f.sizeof);
-                    assert(texCoordsSlice.length > 0);
-                    assert(texCoordsSlice.length % ta.stride == 0);
 
                     version(BigEndian)
                         static assert(false, "big endian arch isn't supported");
@@ -228,38 +234,17 @@ class GlTF : DrawableByVulkan
                     import std.stdio;
                     writeln("normalize:");
 
-                    texCoordsSlice
-                        .chunks(ta.stride)
-                        .each!((ubyte[] b){
-                            auto e = cast(Vector2f*) &b[0];
-                            //~ writeln("fro=", e[0]);
-                            e[0] = (e[0] - min) / range;
-                            writeln("res=", e[0]);
-                        });
-
-                    Vector2f[] replaceTexCoords = [
-                        Vector2f(0, 1),
-                        Vector2f(1, 1),
-                        Vector2f(0, 0),
-                        Vector2f(1, 0),
-                    ];
-
-                    auto tr1 = texCoordsSlice
-                        .chunks(ta.stride);
-
-                    import std.typecons;
-
-                    //~ writeln("replaced:");
-
-                    zip(tr1, replaceTexCoords)
-                        .each!((ubyte[] b, Vector2f repl){
-                            auto e = cast(Vector2f*) &b[0];
-                            //~ writeln("fro=", e[0]);
-                            //~ e[0] = repl;
-                            //~ writeln("res=", e[0]);
+                    fetchedCoords
+                        .each!((e){
+                            writeln("fro=", e);
+                            e = (e - min) / range;
+                            writeln("res=", e);
                         });
                 }
             }
+
+            texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
         }
     }
 
@@ -338,11 +323,11 @@ class GlTF : DrawableByVulkan
 
         VkBuffer[2] buffers = [
             vertexBuffer.gpuBuffer.buf.getVal(),
-            texCoordsAccessor.bufIdx >= 0
-                ? buffers[texCoordsAccessor.bufIdx].gpuBuffer.buf.getVal()
+            texCoordsBuf
+                ? texCoordsBuf.gpuBuffer.buf.getVal()
                 : vertexBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
         ];
-        VkDeviceSize[2] offsets = [verticesAccessor.offset, texCoordsAccessor.offset];
+        VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
         vkCmdBindVertexBuffers(buf, 0, cast(uint) buffers.length, buffers.ptr, offsets.ptr);
 
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
