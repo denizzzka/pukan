@@ -189,7 +189,10 @@ class GlTF : DrawableByVulkan
             auto texCoordsAccessor = content.getAccess(*texCoords);
             auto ta = &texCoordsAccessor;
 
-            enforce(ta.stride >= Vector2f.sizeof);
+            if(ta.stride == 0)
+                texCoordsAccessor.stride = Vector2f.sizeof;
+
+            enforce(ta.stride >= Vector2f.sizeof, ta.stride.to!string);
 
             /* TODO:
             Such approach to buffer leads to buffer data duplication.
