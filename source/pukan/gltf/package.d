@@ -222,7 +222,7 @@ class GlTF : DrawableByVulkan
                 const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
                 const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
 
-                //~ if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
+                if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
                 {
                     const range = max - min;
 
