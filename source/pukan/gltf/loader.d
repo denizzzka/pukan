@@ -287,7 +287,7 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
 
-    const BufAccess getBuffer(in Accessor accessor)
+    const BufAccess getAccess(in Accessor accessor)
     {
         const view = bufferViews[accessor.viewIdx];
 
@@ -301,7 +301,7 @@ struct GltfContent
 
 struct BufAccess
 {
-    size_t bufIdx;
+    ptrdiff_t bufIdx = -1;
     uint offset;
     ushort stride;
 }

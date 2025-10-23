@@ -15,7 +15,7 @@ alias LoaderNode = pukan.gltf.loader.Node;
 
 class Node : BaseNode
 {
-    private TransferBuffer indicesBuffer;
+    private BufAccess indicesAccessor;
     private ushort indices_count;
 
     NodePayload payload;
@@ -41,9 +41,9 @@ class GlTF : DrawableByVulkan
     private GltfContent content;
     alias this = content;
 
-    private MemoryBufferMappedToCPU[] buffers;
-    private TransferBuffer vertexBuffer;
-    private TransferBuffer texCoordsBuffer;
+    private TransferBuffer[] buffers;
+    private BufAccess verticesAccessor;
+    private BufAccess texCoordsAccessor;
     private GraphicsPipelineCfg* pipeline;
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
@@ -70,7 +70,8 @@ class GlTF : DrawableByVulkan
         this.buffers.length = content.buffers.length;
         foreach(i, buf; content.buffers)
         {
-            this.buffers[i] = device.create!MemoryBufferMappedToCPU(buf.buf.length, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+            //TODO: usage bits may be set by using introspection of destiny of the buffer
+            this.buffers[i] = device.create!TransferBuffer(buf.buf.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             //TODO: get rid of this redundant copying:
             this.buffers[i].cpuBuf[0..$] = buf.buf[0 .. $];
         }
@@ -115,11 +116,15 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        foreach(ref buf; buffers)
+            buf.uploadImmediate(commandPool, commandBuffer);
+
         rootSceneNode.traversal((node){
             uploadNodeToGPU(node, device, commandPool, commandBuffer);
         });
     }
 
+    //TODO: actually not loads anything into GPU at all
     private void uploadNodeToGPU(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         // Node without mesh attached
@@ -145,13 +150,11 @@ class GlTF : DrawableByVulkan
             assert(indices.count > 0);
             node.indices_count = cast(ushort) indices.count;
 
-            auto indicesAcc = content.getBuffer(indices);
+            node.indicesAccessor = content.getAccess(indices);
 
-            assert(buffers.length > 0);
-            assert(device);
-            node.indicesBuffer = device.create!TransferBuffer(buffers[indicesAcc.bufIdx], VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
-            node.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+            //TODO: unused, remove:
+            if(node.indicesAccessor.stride == 0)
+                node.indicesAccessor.stride = ushort.sizeof;
         }
 
         {
@@ -165,19 +168,9 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            size_t sz = vertices.count;
-            auto verticesAcc = content.getBuffer(*vertices);
-            if(verticesAcc.stride == 0)
-                sz *= Vector3f.sizeof;
-            else
-            {
-                enforce(verticesAcc.stride == Vector3f.sizeof);
-                sz *= verticesAcc.stride;
-            }
-
-            vertexBuffer = device.create!TransferBuffer(buffers[verticesAcc.bufIdx], VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            vertexBuffer.uploadImmediate(commandPool, commandBuffer);
+            verticesAccessor = content.getAccess(*vertices);
+            if(verticesAccessor.stride == 0)
+                verticesAccessor.stride = Vector3f.sizeof;
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -191,11 +184,9 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            auto texCoordsAcc = content.getBuffer(*texCoords);
-            if(texCoordsAcc.stride == 0)
-                texCoordsAcc.stride = Vector2f.sizeof;
-
-            size_t sz = texCoordsAcc.stride * texCoords.count;
+            texCoordsAccessor = content.getAccess(*texCoords);
+            if(texCoordsAccessor.stride == 0)
+                texCoordsAccessor.stride = Vector2f.sizeof;
 
             //FIXME:
             //~ auto arr = cast(vec2[]) buffers[texCoordsAcc.bufIdx].cpuBuf;
@@ -213,10 +204,6 @@ class GlTF : DrawableByVulkan
             //~ }
 
             //~ buffers[texCoordsAcc.bufIdx].cpuBuf = arr;
-
-            texCoordsBuffer = device.create!TransferBuffer(buffers[texCoordsAcc.bufIdx], VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            texCoordsBuffer.uploadImmediate(commandPool, commandBuffer);
         }
     }
 
@@ -289,12 +276,18 @@ class GlTF : DrawableByVulkan
 
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
+        assert(verticesAccessor.stride);
+        auto vertexBuffer = buffers[verticesAccessor.bufIdx];
+        assert(vertexBuffer.cpuBuf.length > 5);
+
         VkBuffer[2] buffers = [
             vertexBuffer.gpuBuffer.buf.getVal(),
-            texCoordsBuffer ? texCoordsBuffer.gpuBuffer.buf.getVal() : null,
+            texCoordsAccessor.bufIdx >= 0
+                ? buffers[texCoordsAccessor.bufIdx].gpuBuffer.buf.getVal()
+                : null,
         ];
-        VkDeviceSize[2] offsets = [0 , 0];
-        vkCmdBindVertexBuffers(buf, 0, texCoordsBuffer ? 2 : 1, buffers.ptr, offsets.ptr);
+        VkDeviceSize[2] offsets = [verticesAccessor.offset, texCoordsAccessor.offset];
+        vkCmdBindVertexBuffers(buf, 0, texCoordsAccessor.bufIdx >= 0 ? 2 : 1, buffers.ptr, offsets.ptr);
 
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
 
@@ -311,8 +304,11 @@ class GlTF : DrawableByVulkan
 
         if(node.indices_count)
         {
+            assert(node.indicesAccessor.stride == ushort.sizeof);
+            auto indicesBuffer = buffers[node.indicesAccessor.bufIdx];
+
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
-            vkCmdBindIndexBuffer(buf, node.indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), node.indicesAccessor.offset, VK_INDEX_TYPE_UINT16);
             vkCmdDrawIndexed(buf, node.indices_count, 1, 0, 0, 0);
         }
 
