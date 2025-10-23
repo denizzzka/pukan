@@ -206,10 +206,12 @@ class GlTF : DrawableByVulkan
                 assert(ta.stride >= Vector2f.sizeof);
                 assert(texCoordsSlice.length > 0);
 
+                version(BigEndian)
+                    static assert(false, "big endian arch isn't supported");
+
                 texCoordsSlice = texCoordsSlice
                     .chunks(ta.stride)
                     .map!((ubyte[] b){
-                        //TODO: endiannes?
                         auto e = cast(Vector2f*) &b[0];
                         *e = (*e - min) / range;
                         return b;
