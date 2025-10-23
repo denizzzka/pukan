@@ -158,9 +158,9 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             magFilter: VK_FILTER_LINEAR,
             minFilter: VK_FILTER_LINEAR,
-            addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-            addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-            addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeU: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+            addressModeV: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
+            addressModeW: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
             anisotropyEnable: VK_TRUE,
             maxAnisotropy: 16, //TODO: use vkGetPhysicalDeviceProperties (at least)
             borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,

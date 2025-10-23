@@ -154,6 +154,12 @@ class GlTF : DrawableByVulkan
             //TODO: unused, remove:
             if(node.indicesAccessor.stride == 0)
                 node.indicesAccessor.stride = ushort.sizeof;
+
+            {
+                auto bb = buffers[node.indicesAccessor.bufIdx].cpuBuf[node.indicesAccessor.offset .. node.indicesAccessor.offset + node.indices_count * node.indicesAccessor.stride];
+                import std.stdio;
+                writeln(cast(ushort[]) bb);
+            }
         }
 
         {
@@ -170,6 +176,12 @@ class GlTF : DrawableByVulkan
             verticesAccessor = content.getAccess(*vertices);
             if(verticesAccessor.stride == 0)
                 verticesAccessor.stride = Vector3f.sizeof;
+
+            {
+                auto bb = buffers[verticesAccessor.bufIdx].cpuBuf[verticesAccessor.offset .. verticesAccessor.offset + vertices.count * verticesAccessor.stride];
+                import std.stdio;
+                writeln(cast(Vector3f[]) bb);
+            }
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -198,7 +210,7 @@ class GlTF : DrawableByVulkan
                 const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
                 const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
 
-                if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
+                //~ if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
                 {
                     import std.algorithm;
                     import std.array;
@@ -213,11 +225,38 @@ class GlTF : DrawableByVulkan
                     version(BigEndian)
                         static assert(false, "big endian arch isn't supported");
 
+                    import std.stdio;
+                    writeln("normalize:");
+
                     texCoordsSlice
                         .chunks(ta.stride)
                         .each!((ubyte[] b){
                             auto e = cast(Vector2f*) &b[0];
+                            //~ writeln("fro=", e[0]);
                             e[0] = (e[0] - min) / range;
+                            writeln("res=", e[0]);
+                        });
+
+                    Vector2f[] replaceTexCoords = [
+                        Vector2f(0, 1),
+                        Vector2f(1, 1),
+                        Vector2f(0, 0),
+                        Vector2f(1, 0),
+                    ];
+
+                    auto tr1 = texCoordsSlice
+                        .chunks(ta.stride);
+
+                    import std.typecons;
+
+                    //~ writeln("replaced:");
+
+                    zip(tr1, replaceTexCoords)
+                        .each!((ubyte[] b, Vector2f repl){
+                            auto e = cast(Vector2f*) &b[0];
+                            //~ writeln("fro=", e[0]);
+                            //~ e[0] = repl;
+                            //~ writeln("res=", e[0]);
                         });
                 }
             }
