@@ -297,6 +297,15 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     }
 
     {
+        auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 2.3).translationMatrix;
+
+        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleTexture/glTF/SimpleTexture.gltf");
+        tree.root
+            .addChild(Bone(mat: trans))
+            .addChild(gltfObj);
+    }
+
+    {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(-1, 1, 0.3).translationMatrix;
 
         auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf");
