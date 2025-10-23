@@ -123,7 +123,8 @@ class GlTF : DrawableByVulkan
         foreach(ref buf; buffers)
             buf.uploadImmediate(commandPool, commandBuffer);
 
-        texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
+        if(texCoordsBuf)
+            texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
     private void setUpEachNode(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
