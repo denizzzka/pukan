@@ -156,12 +156,6 @@ class GlTF : DrawableByVulkan
             //TODO: unused, remove:
             if(node.indicesAccessor.stride == 0)
                 node.indicesAccessor.stride = ushort.sizeof;
-
-            {
-                auto bb = buffers[node.indicesAccessor.bufIdx].cpuBuf[node.indicesAccessor.offset .. node.indicesAccessor.offset + node.indices_count * node.indicesAccessor.stride];
-                import std.stdio;
-                writeln(cast(ushort[]) bb);
-            }
         }
 
         {
@@ -178,12 +172,6 @@ class GlTF : DrawableByVulkan
             verticesAccessor = content.getAccess(*vertices);
             if(verticesAccessor.stride == 0)
                 verticesAccessor.stride = Vector3f.sizeof;
-
-            {
-                auto bb = buffers[verticesAccessor.bufIdx].cpuBuf[verticesAccessor.offset .. verticesAccessor.offset + vertices.count * verticesAccessor.stride];
-                import std.stdio;
-                writeln(cast(Vector3f[]) bb);
-            }
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -237,14 +225,9 @@ class GlTF : DrawableByVulkan
                     version(BigEndian)
                         static assert(false, "big endian arch isn't supported");
 
-                    import std.stdio;
-                    writeln("normalize:");
-
                     fetchedCoords
                         .each!((e){
-                            writeln("fro=", e);
                             e = (e - min) / range;
-                            writeln("res=", e);
                         });
                 }
             }
