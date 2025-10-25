@@ -8,8 +8,16 @@ import pukan.vulkan.bindings;
 import pukan.gltf: GlTF;
 alias TextureDescr = GlTF.TextureDescr;
 
-//FIXME: remove
-alias UBOContent = GlTF.UBOContent;
+static struct Material
+{
+    Vector4i renderType;
+    Vector4f baseColorFactor;
+}
+
+struct UBOContent
+{
+    Material material;
+}
 
 class Mesh
 {

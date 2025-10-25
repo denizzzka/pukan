@@ -56,17 +56,6 @@ class GlTF : DrawableByVulkan
         VkWriteDescriptorSet descr;
     }
 
-    static struct UBOContent
-    {
-        static struct Material
-        {
-            Vector4i renderType;
-            Vector4f baseColorFactor;
-        }
-
-        Material material;
-    }
-
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
     package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode)
