@@ -50,10 +50,6 @@ class GlTF : DrawableByVulkan
     private MeshClass[] meshes;
     private VkDescriptorSet[] meshesDescriptorSets;
 
-    private TransferBuffer uniformBuffer;
-    private VkDescriptorBufferInfo uboInfo;
-    private VkWriteDescriptorSet uboWriteDescriptor;
-
     static struct TextureDescr
     {
         VkDescriptorImageInfo info;
@@ -105,32 +101,6 @@ class GlTF : DrawableByVulkan
             this.rootSceneNode = createNodeHier(rootSceneNode);
         }
 
-        {
-            // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
-            // need to allocate more memory then divide it into pieces
-            uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-
-            ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
-            ubo.material.renderType.x = textures.length ? 1 : 0;
-
-            // Prepare descriptor
-            VkDescriptorBufferInfo bufferInfo = {
-                buffer: uniformBuffer.gpuBuffer,
-                offset: 0,
-                range: UBOContent.sizeof,
-            };
-
-            uboWriteDescriptor = VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: meshesDescriptorSets[0],
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &bufferInfo,
-            );
-        }
-
         // Textures:
         {
             fakeTexture = createFakeTexture1x1(device);
@@ -170,25 +140,18 @@ class GlTF : DrawableByVulkan
             }
         }
 
-        updateDescriptorSetsAndUniformBuffers(device);
-    }
+        this.rootSceneNode.traversal((node){
+            setUpEachNode(node, device);
+        });
 
-    ~this()
-    {
-        uniformBuffer.destroy;
-    }
+        assert(meshesDescriptorSets.length == 1);
 
-    private ref UBOContent ubo()
-    {
-        return *cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
+        foreach(ref mesh; meshes)
+            mesh.updateDescriptorSetsAndUniformBuffers(device);
     }
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        rootSceneNode.traversal((node){
-            setUpEachNode(node, device, commandPool, commandBuffer);
-        });
-
         foreach(ref buf; buffers)
             buf.uploadImmediate(commandPool, commandBuffer);
 
@@ -196,7 +159,7 @@ class GlTF : DrawableByVulkan
             texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
-    private void setUpEachNode(ref Node node, LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    private void setUpEachNode(ref Node node, LogicalDevice device)
     {
         // Node without mesh attached
         if(node.meshIdx < 0) return;
@@ -204,7 +167,7 @@ class GlTF : DrawableByVulkan
         const mesh = &content.meshes[node.meshIdx];
         assert(mesh.primitives.length == 1);
 
-        node.mesh = new MeshClass(mesh.name, meshesDescriptorSets[node.meshIdx]);
+        node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], textures.length > 0);
         meshes ~= node.mesh;
 
         const primitive = &mesh.primitives[0];
@@ -315,25 +278,10 @@ class GlTF : DrawableByVulkan
         node.mesh.textureDescr = &texturesDescrs[0];
     }
 
-    private void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
-    {
-        assert(meshesDescriptorSets.length == 1);
-
-        VkWriteDescriptorSet[] descriptorWrites;
-        descriptorWrites.length = texturesDescrs.length;
-
-        foreach(i, ref descr; descriptorWrites)
-            descr = texturesDescrs[i].descr;
-
-        descriptorWrites ~= uboWriteDescriptor;
-
-        device.updateDescriptorSets(descriptorWrites);
-    }
-
     void refreshBuffers(VkCommandBuffer buf)
     {
-        // TODO: move to updateDescriptorSetsAndUniformBuffers?
-        uniformBuffer.recordUpload(buf);
+        foreach(e; meshes)
+            e.refreshBuffers(buf);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
