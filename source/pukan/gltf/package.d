@@ -316,16 +316,20 @@ class GlTF : DrawableByVulkan
     {
         assert(descriptorSets.length == 1);
 
-        VkWriteDescriptorSet[] descriptorWrites = [
-            uboWriteDescriptor,
-            texturesDescrs[0].descr, //FIXME
-        ];
+        VkWriteDescriptorSet[] descriptorWrites;
+        descriptorWrites.length = texturesDescrs.length;
+
+        foreach(i, ref descr; descriptorWrites)
+            descr = texturesDescrs[i].descr;
+
+        descriptorWrites ~= uboWriteDescriptor;
 
         device.updateDescriptorSets(descriptorWrites);
     }
 
     void refreshBuffers(VkCommandBuffer buf)
     {
+        // TODO: move to updateDescriptorSetsAndUniformBuffers?
         uniformBuffer.recordUpload(buf);
     }
 
