@@ -111,6 +111,7 @@ class GlTF : DrawableByVulkan
             ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
             ubo.material.renderType.x = textures.length ? 1 : 0;
 
+            // Prepare descriptor
             VkDescriptorBufferInfo bufferInfo = {
                 buffer: uniformBuffer.gpuBuffer,
                 offset: 0,
