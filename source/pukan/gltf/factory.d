@@ -19,7 +19,7 @@ struct GltfFactory
         this.device = device;
 
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
-        poolAndLayout = device.createDescriptorPool(layoutBindings, 2 /*FIXME*/);
+        poolAndLayout = device.createDescriptorPool(layoutBindings, 20 /*FIXME*/);
 
         pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!ShaderInputVertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
         graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
