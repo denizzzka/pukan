@@ -350,12 +350,9 @@ class GlTF : DrawableByVulkan
 
         if(node.mesh && node.mesh.indices_count)
         {
-            assert(node.mesh.indicesAccessor.stride == ushort.sizeof);
-            auto indicesBuffer = buffers[node.mesh.indicesAccessor.bufIdx];
-
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
-            vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), node.mesh.indicesAccessor.offset, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(buf, node.mesh.indices_count, 1, 0, 0, 0);
+
+            node.mesh.drawingBufferFilling(buffers, buf, trans);
         }
 
         foreach(c; node.children)
