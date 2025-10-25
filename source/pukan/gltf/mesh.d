@@ -91,7 +91,6 @@ class Mesh
         uniformBuffer.recordUpload(buf);
     }
 
-    //TODO: buffers seems redundant: accessor can provide this functionality
     void drawingBufferFilling(TransferBuffer[] buffers, VkCommandBuffer buf, in Matrix4x4f trans)
     {
         assert(indices_count);
