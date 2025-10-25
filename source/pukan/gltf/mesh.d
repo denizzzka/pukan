@@ -66,8 +66,6 @@ class Mesh
         return *cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
     }
 
-    //~ ref TextureDescr getTextureDescr() => *textureDescr;
-
     package void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
