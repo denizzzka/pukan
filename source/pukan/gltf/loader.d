@@ -218,7 +218,8 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     scope(exit) commandPool.freeBuffers(commandBufs);
 
     auto images = "images" in json;
-    if(images) foreach(img; *images)
+    if(images)
+        foreach(ref img; *images) //FIXME: indent
     {
         const viewIdxPtr = "bufferView" in img;
 
@@ -226,6 +227,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         import std.traits: ReturnType;
 
         ReturnType!loadImageFromMemory extFormatImg;
+        VkFormat format;
 
         if(viewIdxPtr !is null)
         {
@@ -239,12 +241,12 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             const View view = ret.bufferViews[viewIdxPtr.get!ushort];
             const Buffer imgBuf = ret.buffers[view.bufferIdx];
 
-            extFormatImg = loadImageFromMemory(imgBuf.buf[view.offset .. view.offset + view.length]);
+            extFormatImg = loadImageFromMemory(imgBuf.buf[view.offset .. view.offset + view.length], format);
         }
         else
-            extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string));
+            extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string), format);
 
-        ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg);
+        ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg, format);
     }
 
     //FIXME: implement samplers reading

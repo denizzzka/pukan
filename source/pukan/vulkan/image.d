@@ -122,9 +122,26 @@ class ImageMemory : DeviceMemory
     }
 }
 
-ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, ref Img image)
+ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, ref Img image, in VkFormat pixelFormat)
 {
-    VkDeviceSize imageSize = image.width * image.height * 4 /* rgba */;
+    VkDeviceSize imageSize;
+
+    switch(pixelFormat)
+    {
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            imageSize = image.width * image.height * 4;
+            break;
+
+        case VK_FORMAT_R8G8B8_SRGB:
+            imageSize = image.width * image.height * 3;
+            break;
+
+        default:
+            import std.conv;
+            import std.exception;
+            enforce!PukanException(false, "Unsupported pixel format: "~pixelFormat.to!string);
+            break;
+    }
 
     //FIXME: TransferBuffer is used only as src buffer
     scope buf = device.create!MemoryBufferMappedToCPU(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
@@ -134,7 +151,7 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool
 
     VkImageCreateInfo imageInfo = {
         imageType: VK_IMAGE_TYPE_2D,
-        format: VK_FORMAT_R8G8B8A8_SRGB,
+        format: pixelFormat,
         tiling: VK_IMAGE_TILING_OPTIMAL,
         extent: VkExtent3D(
             width: image.width,
@@ -169,5 +186,5 @@ auto createFakeImage1x1(LogicalDevice device, CommandPool commandPool, VkCommand
     }
 
     FakeImg extFormatImg;
-    return loadImageToMemory(device, commandPool, commandBuf, extFormatImg);
+    return loadImageToMemory(device, commandPool, commandBuf, extFormatImg, VK_FORMAT_R8G8B8A8_SRGB);
 }
