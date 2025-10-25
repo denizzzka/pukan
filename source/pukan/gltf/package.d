@@ -46,7 +46,7 @@ class GlTF : DrawableByVulkan
     private TransferBuffer texCoordsBuf;
     private TextureDescr[] texturesDescrs;
     private GraphicsPipelineCfg* pipeline;
-    private VkDescriptorSet[] descriptorSets;
+    private VkDescriptorSet[] meshesDescriptorSets;
 
     private TransferBuffer uniformBuffer;
     private VkDescriptorBufferInfo uboInfo;
@@ -75,7 +75,7 @@ class GlTF : DrawableByVulkan
     {
         this.pipeline = &pipeline;
         content = cont;
-        descriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
+        meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
         this.buffers.length = content.buffers.length;
         foreach(i, buf; content.buffers)
@@ -120,7 +120,7 @@ class GlTF : DrawableByVulkan
 
             uboWriteDescriptor = VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
+                dstSet: meshesDescriptorSets[0],
                 dstBinding: 0,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -158,7 +158,7 @@ class GlTF : DrawableByVulkan
             {
                 descr.descr = VkWriteDescriptorSet(
                     sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    dstSet: descriptorSets[0],
+                    dstSet: meshesDescriptorSets[0],
                     dstBinding: 1,
                     dstArrayElement: 0,
                     descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -202,7 +202,7 @@ class GlTF : DrawableByVulkan
         const mesh = &meshes[node.meshIdx];
         assert(mesh.primitives.length == 1);
 
-        node.mesh = new MeshClass(mesh.name, descriptorSets[node.meshIdx]);
+        node.mesh = new MeshClass(mesh.name, meshesDescriptorSets[node.meshIdx]);
 
         const primitive = &mesh.primitives[0];
         enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
@@ -314,7 +314,7 @@ class GlTF : DrawableByVulkan
 
     private void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        assert(descriptorSets.length == 1);
+        assert(meshesDescriptorSets.length == 1);
 
         VkWriteDescriptorSet[] descriptorWrites;
         descriptorWrites.length = texturesDescrs.length;
@@ -352,7 +352,7 @@ class GlTF : DrawableByVulkan
         VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
         vkCmdBindVertexBuffers(buf, 0, cast(uint) buffers.length, buffers.ptr, offsets.ptr);
 
-        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
+        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) meshesDescriptorSets.length, meshesDescriptorSets.ptr, 0, null);
 
         drawingBufferFillingRecursive(buf, trans, rootSceneNode);
     }
