@@ -396,6 +396,7 @@ struct GltfContent
 
         return BufAccess(
             offset: view.offset + accessor.offset,
+            viewLength: view.length,
             stride: view.stride,
             bufIdx: view.bufferIdx,
         );
@@ -405,6 +406,7 @@ struct GltfContent
 struct BufAccess
 {
     ptrdiff_t bufIdx = -1;
+    uint viewLength;
     uint offset;
     ushort stride;
 }
