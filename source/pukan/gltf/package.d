@@ -251,16 +251,12 @@ class GlTF : DrawableByVulkan
 
         assert(descriptorSets.length == 1);
 
-        {
-            import std.conv: to;
-            assert(textures.length <= 1, textures.length.to!string);
-        }
-
-        VkDescriptorImageInfo imageInfo;
+        // Textures:
+        VkDescriptorImageInfo[] imageInfos;
 
         if(textures.length == 0)
         {
-            imageInfo = VkDescriptorImageInfo(
+            imageInfos ~= VkDescriptorImageInfo(
                 imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 imageView: fakeTexture.imageView,
                 sampler: fakeTexture.sampler,
@@ -268,11 +264,14 @@ class GlTF : DrawableByVulkan
         }
         else
         {
-            imageInfo = VkDescriptorImageInfo(
-                imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                imageView: textures[0].imageView,
-                sampler: textures[0].sampler,
-            );
+            imageInfos.length = textures.length;
+
+            foreach(i, ref imageInfo; imageInfos)
+                imageInfo = VkDescriptorImageInfo(
+                    imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    imageView: textures[i].imageView,
+                    sampler: textures[i].sampler,
+                );
         }
 
         VkWriteDescriptorSet[] descriptorWrites = [
@@ -292,7 +291,7 @@ class GlTF : DrawableByVulkan
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 descriptorCount: 1,
-                pImageInfo: &imageInfo,
+                pImageInfo: &imageInfos[0], //FIXME
             ),
         ];
 
