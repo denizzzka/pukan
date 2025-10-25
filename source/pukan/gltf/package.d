@@ -46,6 +46,8 @@ class GlTF : DrawableByVulkan
     private TransferBuffer texCoordsBuf;
     private TextureDescr[] texturesDescrs;
     private GraphicsPipelineCfg* pipeline;
+
+    private MeshClass[] meshes;
     private VkDescriptorSet[] meshesDescriptorSets;
 
     private TransferBuffer uniformBuffer;
@@ -199,10 +201,11 @@ class GlTF : DrawableByVulkan
         // Node without mesh attached
         if(node.meshIdx < 0) return;
 
-        const mesh = &meshes[node.meshIdx];
+        const mesh = &content.meshes[node.meshIdx];
         assert(mesh.primitives.length == 1);
 
         node.mesh = new MeshClass(mesh.name, meshesDescriptorSets[node.meshIdx]);
+        meshes ~= node.mesh;
 
         const primitive = &mesh.primitives[0];
         enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
