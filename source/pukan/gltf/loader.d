@@ -52,6 +52,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
             primitives ~= Primitive(
                 indicesAccessorIdx: indicesAccessorIdx,
                 attributes: primitive["attributes"],
+                material: primitive["material"],
             );
         }
 
@@ -262,6 +263,7 @@ struct Primitive
 {
     int indicesAccessorIdx = -1;
     Json attributes;
+    Json material;
 }
 
 struct NodePayload
