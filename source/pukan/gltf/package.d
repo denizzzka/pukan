@@ -107,7 +107,45 @@ class GlTF : DrawableByVulkan
         ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
         ubo.material.renderType.x = textures.length ? 1 : 0;
 
-        fakeTexture = createFakeTexture1x1(device);
+        // Textures:
+        {
+            fakeTexture = createFakeTexture1x1(device);
+
+            if(textures.length == 0)
+            {
+                texturesDescrs.length = 1;
+                texturesDescrs[0].info = VkDescriptorImageInfo(
+                    imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    imageView: fakeTexture.imageView,
+                    sampler: fakeTexture.sampler,
+                );
+            }
+            else
+            {
+                texturesDescrs.length = textures.length;
+
+                foreach(i, ref descr; texturesDescrs)
+                    descr.info = VkDescriptorImageInfo(
+                        imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        imageView: textures[i].imageView,
+                        sampler: textures[i].sampler,
+                    );
+            }
+
+            foreach(ref descr; texturesDescrs)
+            {
+                descr.descr = VkWriteDescriptorSet(
+                    sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    dstSet: descriptorSets[0],
+                    dstBinding: 1,
+                    dstArrayElement: 0,
+                    descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    descriptorCount: 1,
+                    pImageInfo: &descr.info,
+                );
+            }
+        }
+
         updateDescriptorSetsAndUniformBuffers(device);
     }
 
@@ -261,41 +299,6 @@ class GlTF : DrawableByVulkan
         };
 
         assert(descriptorSets.length == 1);
-
-        // Textures:
-        if(textures.length == 0)
-        {
-            texturesDescrs.length = 1;
-            texturesDescrs[0].info = VkDescriptorImageInfo(
-                imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                imageView: fakeTexture.imageView,
-                sampler: fakeTexture.sampler,
-            );
-        }
-        else
-        {
-            texturesDescrs.length = textures.length;
-
-            foreach(i, ref descr; texturesDescrs)
-                descr.info = VkDescriptorImageInfo(
-                    imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    imageView: textures[i].imageView,
-                    sampler: textures[i].sampler,
-                );
-        }
-
-        foreach(ref descr; texturesDescrs)
-        {
-            descr.descr = VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &descr.info,
-            );
-        }
 
         VkWriteDescriptorSet[] descriptorWrites = [
             VkWriteDescriptorSet(
