@@ -248,6 +248,8 @@ class GlTF : DrawableByVulkan
             texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
         }
+
+        node.mesh.textureDescr = &texturesDescrs[0];
     }
 
     private void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
