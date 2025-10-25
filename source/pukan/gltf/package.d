@@ -156,6 +156,7 @@ class GlTF : DrawableByVulkan
         const mesh = &content.meshes[node.meshIdx];
         assert(mesh.primitives.length == 1);
 
+        //~ node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], false /*textures.length > 0*/);
         node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], textures.length > 0);
         meshes ~= node.mesh;
 
@@ -318,6 +319,7 @@ class GlTF : DrawableByVulkan
 }
 
 //TODO: use as mandatory vertex shader creation argument?
+//TODO: move to C header and use from GLSL code too
 struct ShaderInputVertex
 {
     Vector3f pos;
@@ -329,12 +331,12 @@ struct ShaderInputVertex
         return [
             VkVertexInputBindingDescription(
                 binding: 0,
-                stride: pos.sizeof,
+                stride: ShaderInputVertex.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
             VkVertexInputBindingDescription(
                 binding: 1,
-                stride: texCoord.sizeof,
+                stride: ShaderInputVertex.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
         ];
@@ -349,14 +351,14 @@ struct ShaderInputVertex
                 binding: 0,
                 location: 0,
                 format: VK_FORMAT_R32G32B32_SFLOAT,
-                //~ offset: pos.offsetof,
+                offset: pos.offsetof,
             ),
             // textureCoord:
             VkVertexInputAttributeDescription(
                 binding: 1,
                 location: 1,
                 format: VK_FORMAT_R32G32_SFLOAT,
-                //~ offset: texCoord.offsetof,
+                offset: texCoord.offsetof,
             ),
         ];
 

@@ -311,7 +311,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
         const center = (max + min)/2;
 
-        const scale = 3;
+        const scale = 1;
         auto trans = (Vector3f(1, 1, 1) * scale).scaleMatrix * (-center).translationMatrix;
 
         //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb");
