@@ -71,11 +71,11 @@ class GlTF : DrawableByVulkan
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
-    package this(ref GraphicsPipelineCfg pipeline, VkDescriptorSet[] ds, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode)
+    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode)
     {
         this.pipeline = &pipeline;
-        descriptorSets = ds;
         content = cont;
+        descriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
         this.buffers.length = content.buffers.length;
         foreach(i, buf; content.buffers)

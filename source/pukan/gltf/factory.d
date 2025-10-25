@@ -31,8 +31,7 @@ struct GltfFactory
     auto create(string filename)
     {
         assert(device);
-        auto descriptorSets = device.allocateDescriptorSets(poolAndLayout, 1);
 
-        return loadGlTF2(filename, descriptorSets, device, graphicsPipelineCfg);
+        return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg);
     }
 }

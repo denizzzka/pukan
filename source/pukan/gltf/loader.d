@@ -12,7 +12,7 @@ static import std.path;
 import vibe.data.json;
 
 ///
-auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice device, ref GraphicsPipelineCfg pipeline)
+package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline)
 {
     const json = std.file.readText(filename).parseJsonString;
     const dir = std.path.dirName(filename);
@@ -176,7 +176,7 @@ auto loadGlTF2(string filename, VkDescriptorSet[] descriptorSets, LogicalDevice 
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
-    return new GlTF(pipeline, descriptorSets, device, ret, nodes, rootSceneNode);
+    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode);
 }
 
 struct Buffer
