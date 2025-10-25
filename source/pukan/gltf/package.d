@@ -202,7 +202,7 @@ class GlTF : DrawableByVulkan
         const mesh = &meshes[node.meshIdx];
         assert(mesh.primitives.length == 1);
 
-        node.mesh = new MeshClass(mesh.name);
+        node.mesh = new MeshClass(mesh.name, descriptorSets[node.meshIdx]);
 
         const primitive = &mesh.primitives[0];
         enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");

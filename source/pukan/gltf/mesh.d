@@ -14,10 +14,12 @@ class Mesh
     /*private*/ BufAccess indicesAccessor;
     /*private*/ ushort indices_count;
     /*private*/ TextureDescr* textureDescr;
+    /*private*/ VkDescriptorSet* descriptorSet;
 
-    package this(string name)
+    package this(string name, ref VkDescriptorSet descriptorSet)
     {
         this.name = name;
+        this.descriptorSet = &descriptorSet;
     }
 
     ref TextureDescr getTextureDescr() => *textureDescr;
