@@ -4,6 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
+import pukan.gltf.mesh: MeshClass = Mesh;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -15,11 +16,10 @@ alias LoaderNode = pukan.gltf.loader.Node;
 
 class Node : BaseNode
 {
-    private BufAccess indicesAccessor;
-    private ushort indices_count;
-
     NodePayload payload;
     alias this = payload;
+
+    MeshClass mesh;
 
     this(NodePayload pa)
     {
@@ -142,6 +142,8 @@ class GlTF : DrawableByVulkan
         const mesh = &meshes[node.meshIdx];
         assert(mesh.primitives.length == 1);
 
+        node.mesh = new MeshClass(mesh.name);
+
         const primitive = &mesh.primitives[0];
         enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
 
@@ -157,13 +159,13 @@ class GlTF : DrawableByVulkan
             }
 
             assert(indices.count > 0);
-            node.indices_count = cast(ushort) indices.count;
+            node.mesh.indices_count = cast(ushort) indices.count;
 
-            node.indicesAccessor = content.getAccess(indices);
+            node.mesh.indicesAccessor = content.getAccess(indices);
 
             //TODO: unused, remove:
-            if(node.indicesAccessor.stride == 0)
-                node.indicesAccessor.stride = ushort.sizeof;
+            if(node.mesh.indicesAccessor.stride == 0)
+                node.mesh.indicesAccessor.stride = ushort.sizeof;
         }
 
         {
@@ -346,14 +348,14 @@ class GlTF : DrawableByVulkan
 
         trans *= node.trans;
 
-        if(node.indices_count)
+        if(node.mesh && node.mesh.indices_count)
         {
-            assert(node.indicesAccessor.stride == ushort.sizeof);
-            auto indicesBuffer = buffers[node.indicesAccessor.bufIdx];
+            assert(node.mesh.indicesAccessor.stride == ushort.sizeof);
+            auto indicesBuffer = buffers[node.mesh.indicesAccessor.bufIdx];
 
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
-            vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), node.indicesAccessor.offset, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(buf, node.indices_count, 1, 0, 0, 0);
+            vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), node.mesh.indicesAccessor.offset, VK_INDEX_TYPE_UINT16);
+            vkCmdDrawIndexed(buf, node.mesh.indices_count, 1, 0, 0, 0);
         }
 
         foreach(c; node.children)
