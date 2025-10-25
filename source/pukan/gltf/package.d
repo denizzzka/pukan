@@ -44,9 +44,16 @@ class GlTF : DrawableByVulkan
     private TransferBuffer[] buffers;
     private BufAccess verticesAccessor;
     private TransferBuffer texCoordsBuf;
+    private TextureDescr[] texturesDescrs;
     private GraphicsPipelineCfg* pipeline;
     private VkDescriptorSet[] descriptorSets;
     private TransferBuffer uniformBuffer;
+
+    static struct TextureDescr
+    {
+        VkDescriptorImageInfo info;
+        VkWriteDescriptorSet descr;
+    }
 
     static struct UBOContent
     {
@@ -252,11 +259,10 @@ class GlTF : DrawableByVulkan
         assert(descriptorSets.length == 1);
 
         // Textures:
-        VkDescriptorImageInfo[] imageInfos;
-
         if(textures.length == 0)
         {
-            imageInfos ~= VkDescriptorImageInfo(
+            texturesDescrs.length = 1;
+            texturesDescrs[0].info = VkDescriptorImageInfo(
                 imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 imageView: fakeTexture.imageView,
                 sampler: fakeTexture.sampler,
@@ -264,14 +270,27 @@ class GlTF : DrawableByVulkan
         }
         else
         {
-            imageInfos.length = textures.length;
+            texturesDescrs.length = textures.length;
 
-            foreach(i, ref imageInfo; imageInfos)
-                imageInfo = VkDescriptorImageInfo(
+            foreach(i, ref descr; texturesDescrs)
+                descr.info = VkDescriptorImageInfo(
                     imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     imageView: textures[i].imageView,
                     sampler: textures[i].sampler,
                 );
+        }
+
+        foreach(ref descr; texturesDescrs)
+        {
+            descr.descr = VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: descriptorSets[0],
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: &descr.info,
+            );
         }
 
         VkWriteDescriptorSet[] descriptorWrites = [
@@ -284,15 +303,7 @@ class GlTF : DrawableByVulkan
                 descriptorCount: 1,
                 pBufferInfo: &bufferInfo,
             ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &imageInfos[0], //FIXME
-            ),
+            texturesDescrs[0].descr, //FIXME
         ];
 
         device.updateDescriptorSets(descriptorWrites);
