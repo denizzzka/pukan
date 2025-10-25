@@ -47,7 +47,10 @@ class GlTF : DrawableByVulkan
     private TextureDescr[] texturesDescrs;
     private GraphicsPipelineCfg* pipeline;
     private VkDescriptorSet[] descriptorSets;
+
     private TransferBuffer uniformBuffer;
+    private VkDescriptorBufferInfo uboInfo;
+    private VkWriteDescriptorSet uboWriteDescriptor;
 
     static struct TextureDescr
     {
@@ -100,12 +103,30 @@ class GlTF : DrawableByVulkan
             this.rootSceneNode = createNodeHier(rootSceneNode);
         }
 
-        // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
-        // need to allocate more memory then divide it into pieces
-        uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        {
+            // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
+            // need to allocate more memory then divide it into pieces
+            uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-        ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
-        ubo.material.renderType.x = textures.length ? 1 : 0;
+            ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
+            ubo.material.renderType.x = textures.length ? 1 : 0;
+
+            VkDescriptorBufferInfo bufferInfo = {
+                buffer: uniformBuffer.gpuBuffer,
+                offset: 0,
+                range: UBOContent.sizeof,
+            };
+
+            uboWriteDescriptor = VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: descriptorSets[0],
+                dstBinding: 0,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                pBufferInfo: &bufferInfo,
+            );
+        }
 
         // Textures:
         {
@@ -292,24 +313,10 @@ class GlTF : DrawableByVulkan
 
     private void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        VkDescriptorBufferInfo bufferInfo = {
-            buffer: uniformBuffer.gpuBuffer,
-            offset: 0,
-            range: UBOContent.sizeof,
-        };
-
         assert(descriptorSets.length == 1);
 
         VkWriteDescriptorSet[] descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &bufferInfo,
-            ),
+            uboWriteDescriptor,
             texturesDescrs[0].descr, //FIXME
         ];
 
