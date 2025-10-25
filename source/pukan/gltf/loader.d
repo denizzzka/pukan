@@ -11,10 +11,83 @@ static import std.file;
 static import std.path;
 import vibe.data.json;
 
+private struct Header
+{
+    uint magic;
+    uint ver;
+    uint length;
+
+    bool isBinaryFile() const
+    {
+        return magic == 0x46546C67 && ver == 2;
+    }
+}
+
+private auto readGltfFile(string filename)
+{
+    const fileContent = std.file.read(filename);
+    enforce(fileContent.length > 12);
+
+    const header = cast(Header*) &fileContent[0];
+
+    static struct Result
+    {
+        Json json;
+        ubyte[] buffer;
+    }
+
+    Result ret;
+    const(void)[] jsonText;
+
+    if(!header.isBinaryFile)
+        jsonText = fileContent;
+    else
+    {
+        enforce(fileContent.length == header.length);
+
+        size_t curr = Header.sizeof;
+        const jsonHdr = cast(ChunkHeader*) &fileContent[curr];
+        enforce(jsonHdr.isJson);
+
+        curr += ChunkHeader.sizeof;
+        jsonText = fileContent[curr .. curr + jsonHdr.chunkLength];
+
+        curr += jsonHdr.chunkLength;
+        const binHdr = cast(ChunkHeader*) &fileContent[curr];
+        enforce(!binHdr.isJson);
+
+        curr += ChunkHeader.sizeof;
+        ret.buffer = cast(ubyte[]) fileContent[curr .. curr + binHdr.chunkLength];
+    }
+
+    ret.json = (cast(string) jsonText).parseJsonString;
+
+    return ret;
+}
+
+private struct ChunkHeader
+{
+    uint chunkLength;
+    uint chunkType;
+
+    bool isJson() const
+    {
+        switch(chunkType)
+        {
+            case 0x4E4F534A: return true; // Structured JSON content
+            case 0x004E4942: return false; // Binary buffer
+            default: enforce(false, "unknown chunk type");
+        }
+
+        assert(0);
+    }
+}
+
 ///
 package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline)
 {
-    const json = std.file.readText(filename).parseJsonString;
+    auto gltfFile = readGltfFile(filename);
+    const json = gltfFile.json;
     const dir = std.path.dirName(filename);
 
     {
@@ -26,8 +99,11 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     Node[] nodes;
     Node rootSceneNode;
 
-    foreach(buf; json["buffers"])
-        ret.buffers ~= readBufFile(dir, buf);
+    if(gltfFile.buffer)
+        ret.buffers ~= Buffer(buf: gltfFile.buffer);
+    else
+        foreach(buf; json["buffers"])
+            ret.buffers ~= readBufFile(dir, buf);
 
     foreach(v; json["bufferViews"])
     {
