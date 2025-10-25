@@ -220,9 +220,30 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     auto images = "images" in json;
     if(images) foreach(img; *images)
     {
-        import pukan.misc: loadImageFromFile;
+        const viewIdxPtr = "bufferView" in img;
 
-        auto extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string));
+        import pukan.misc: loadImageFromFile, loadImageFromMemory;
+        import std.traits: ReturnType;
+
+        ReturnType!loadImageFromMemory extFormatImg;
+
+        if(viewIdxPtr !is null)
+        {
+            const mime = "mimeType" in img;
+            enforce(mime);
+            enforce(
+                mime.get!string == "image/jpeg" || mime.get!string == "image/png",
+                (*mime).to!string
+            );
+
+            const View view = ret.bufferViews[viewIdxPtr.get!ushort];
+            const Buffer imgBuf = ret.buffers[view.bufferIdx];
+
+            extFormatImg = loadImageFromMemory(imgBuf.buf[view.offset .. view.offset + view.length]);
+        }
+        else
+            extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string));
+
         ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg);
     }
 
@@ -263,6 +284,7 @@ struct Buffer
     {
         return View(
             bufferIdx: idx,
+            length: view["byteLength"].get!uint,
             offset: view["byteOffset"].opt!uint,
             stride: view["byteStride"].opt!ubyte,
         );
@@ -272,6 +294,7 @@ struct Buffer
 struct View
 {
     const size_t bufferIdx;
+    const uint length;
     const uint offset;
     const ubyte stride; // distance between start points of each element
 
