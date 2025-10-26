@@ -455,10 +455,8 @@ private struct AccessRange(T)
         currByte += accessor.stride;
     }
 
-    bool empty() const
-    {
-        return currStep >= accessor.count;
-    }
+    uint length() const => accessor.count;
+    bool empty() const => currStep >= length;
 
     version(LittleEndian)
     ref T front() const

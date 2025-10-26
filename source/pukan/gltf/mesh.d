@@ -20,9 +20,9 @@ class Mesh
 {
     string name;
     /*private*/ BufAccess verticesAccessor;
-    /*private*/ BufAccess indicesAccessor;
     /*private*/ uint indices_count;
     package TransferBuffer indicesBuffer;
+    //TODO: remove or not?
     package TransferBuffer verticesBuffer;
     //TODO: remove:
     /*private*/ TransferBuffer texCoordsBuf;
@@ -117,11 +117,8 @@ class Mesh
         vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
 
         assert(indices_count);
-        assert(indicesAccessor.stride == ushort.sizeof);
 
-        auto indicesBuffer = buffers[indicesAccessor.bufIdx];
-
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), indicesAccessor.offset, VK_INDEX_TYPE_UINT16);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), 0, VK_INDEX_TYPE_UINT16);
         vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
     }
 }

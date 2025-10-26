@@ -129,8 +129,12 @@ class GlTF : DrawableByVulkan
             buf.uploadImmediate(commandPool, commandBuffer);
 
         foreach(m; meshes)
+        {
+            m.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+
             if(m.texCoordsBuf)
                 m.texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
+        }
     }
 
     private void setUpEachNode(ref Node node, LogicalDevice device)
@@ -147,30 +151,18 @@ class GlTF : DrawableByVulkan
         const primitive = &mesh.primitives[0];
         enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
 
+        auto indices = accessors[ primitive.indicesAccessorIdx ];
+
+        debug
         {
-            auto indices = accessors[ primitive.indicesAccessorIdx ];
-
-            debug
-            {
-                import std.conv: to;
-
-                enforce(indices.type == "SCALAR", indices.type.to!string);
-                enforce(indices.componentType == ComponentType.UNSIGNED_SHORT, indices.componentType.to!string);
-            }
-
-            assert(indices.count > 0);
-            node.mesh.indices_count = indices.count;
-
-            node.mesh.indicesAccessor = content.getAccess(indices);
-
-            assert(node.mesh.indicesAccessor.stride == 0);
-
-            //TODO: unused, remove:
-            if(node.mesh.indicesAccessor.stride == 0)
-                node.mesh.indicesAccessor.stride = ushort.sizeof;
+            enforce(indices.type == "SCALAR", indices.type.to!string);
+            enforce(indices.componentType == ComponentType.UNSIGNED_SHORT, indices.componentType.to!string);
         }
 
-        auto indicesRange = content.rangify!ushort(node.mesh.indicesAccessor);
+        node.mesh.indices_count = cast(ushort) indices.count;
+
+        const indicesAccessor = content.getAccess(indices);
+        auto indicesRange = content.rangify!ushort(indicesAccessor);
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -265,16 +257,14 @@ class GlTF : DrawableByVulkan
 
             {
                 node.mesh.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                auto dstRange = cast(ushort[]) node.mesh.indicesBuffer.cpuBuf;
-                zip(indicesRange, dstRange)
-                    .each!((ref src, ref dst){
-                        dst = src;
-                    });
+                auto dstRange = cast(ushort[]) node.mesh.indicesBuffer.cpuBuf[0 .. $];
+
+                indicesRange.copy(dstRange);
             }
 
             {
                 node.mesh.verticesBuffer = device.create!TransferBuffer(ShaderVertex.sizeof * verticesRange.accessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-                auto dstRange = cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf;
+                auto dstRange = cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf[0 .. $];
 
                 if(texCoordsAccessor.bufIdx >= 0)
                 {
