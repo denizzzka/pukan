@@ -42,7 +42,6 @@ class GlTF : DrawableByVulkan
     alias this = content;
 
     private TransferBuffer[] buffers;
-    private TransferBuffer[] newBuffers;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
 
@@ -56,8 +55,6 @@ class GlTF : DrawableByVulkan
         this.pipeline = &pipeline;
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
-
-        this.newBuffers.length = content.buffers.length;
 
         this.buffers.length = content.buffers.length;
         foreach(i, buf; content.buffers)
@@ -166,8 +163,6 @@ class GlTF : DrawableByVulkan
 
             node.mesh.indicesAccessor = content.getAccess(indices);
 
-            fillBufferUsingRange!ushort(device, newBuffers, content, node.mesh.indicesAccessor);
-
             assert(node.mesh.indicesAccessor.stride == 0);
 
             //TODO: unused, remove:
@@ -189,8 +184,6 @@ class GlTF : DrawableByVulkan
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
             node.mesh.verticesAccessor = content.getAccess(*vertices);
-
-            fillBufferUsingRange!Vector3f(device, newBuffers, content, node.mesh.verticesAccessor);
 
             if(node.mesh.verticesAccessor.stride == 0)
                 node.mesh.verticesAccessor.stride = Vector3f.sizeof;
@@ -341,24 +334,6 @@ class GlTF : DrawableByVulkan
 
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
-    }
-}
-
-private void fillBufferUsingRange(T)(LogicalDevice device, ref TransferBuffer[] buffers, const GltfContent content, in BufAccess accessor)
-{
-    auto buf = &buffers[accessor.bufIdx];
-
-    if(*buf is null)
-    {
-        *buf = device.create!TransferBuffer(accessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        auto range = content.rangify!T(accessor);
-
-        import std.algorithm;
-
-        size_t cnt;
-        range.each!((e){ cnt++; });
-
-        assert(cnt == accessor.count);
     }
 }
 
