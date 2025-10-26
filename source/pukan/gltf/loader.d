@@ -406,7 +406,7 @@ struct BufAccess
 {
     ptrdiff_t bufIdx = -1;
     uint offset;
-    ushort stride;
+    ubyte stride;
 }
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
