@@ -166,7 +166,7 @@ class GlTF : DrawableByVulkan
 
             node.mesh.indicesAccessor = content.getAccess(indices);
 
-            fillBufferUsingRange(device, newBuffers, content, node.mesh.indicesAccessor);
+            fillBufferUsingRange!ushort(device, newBuffers, content, node.mesh.indicesAccessor);
 
             assert(node.mesh.indicesAccessor.stride == 0);
 
@@ -187,6 +187,9 @@ class GlTF : DrawableByVulkan
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
             node.mesh.verticesAccessor = content.getAccess(*vertices);
+
+            fillBufferUsingRange!Vector3f(device, newBuffers, content, node.mesh.verticesAccessor);
+
             if(node.mesh.verticesAccessor.stride == 0)
                 node.mesh.verticesAccessor.stride = Vector3f.sizeof;
         }
@@ -297,14 +300,14 @@ class GlTF : DrawableByVulkan
     }
 }
 
-private void fillBufferUsingRange(LogicalDevice device, ref TransferBuffer[] buffers, const GltfContent content, in BufAccess accessor)
+private void fillBufferUsingRange(T)(LogicalDevice device, ref TransferBuffer[] buffers, const GltfContent content, in BufAccess accessor)
 {
     auto buf = &buffers[accessor.bufIdx];
 
     if(*buf is null)
     {
         *buf = device.create!TransferBuffer(accessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        auto range = content.rangify!ushort(accessor);
+        auto range = content.rangify!T(accessor);
 
         import std.algorithm;
 
