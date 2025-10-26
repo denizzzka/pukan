@@ -21,7 +21,7 @@ class Mesh
     string name;
     /*private*/ BufAccess verticesAccessor;
     /*private*/ BufAccess indicesAccessor;
-    /*private*/ ushort indices_count;
+    /*private*/ uint indices_count;
     package TransferBuffer indicesBuffer;
     package TransferBuffer verticesBuffer;
     //TODO: remove:
