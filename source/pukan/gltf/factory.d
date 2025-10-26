@@ -11,7 +11,7 @@ struct GltfFactory
     LogicalDevice device;
     private PoolAndLayoutInfo poolAndLayout;
     //TODO: contains part of poolAndLayout data. Deduplicate?
-    private DefaultGraphicsPipelineInfoCreator!ShaderInputVertex pipelineInfoCreator;
+    private DefaultGraphicsPipelineInfoCreator!ShaderVertex pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
@@ -21,7 +21,7 @@ struct GltfFactory
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
         poolAndLayout = device.createDescriptorPool(layoutBindings, 20 /*FIXME*/);
 
-        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!ShaderInputVertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
+        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!ShaderVertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
         graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
 
         auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;

@@ -318,7 +318,8 @@ class GlTF : DrawableByVulkan
 }
 
 //TODO: use as mandatory vertex shader creation argument?
-struct ShaderInputVertex
+//TODO: move to C header and use from GLSL code too
+struct ShaderVertex
 {
     Vector3f pos;
     Vector2f texCoord;
