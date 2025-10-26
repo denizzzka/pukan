@@ -42,17 +42,11 @@ class GlTF : DrawableByVulkan
     alias this = content;
 
     private TransferBuffer[] buffers;
-    private TextureDescr[] texturesDescrs;
+    private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
 
     private MeshClass[] meshes;
     private VkDescriptorSet[] meshesDescriptorSets;
-
-    static struct TextureDescr
-    {
-        VkDescriptorImageInfo info;
-        VkWriteDescriptorSet descr;
-    }
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
@@ -90,12 +84,17 @@ class GlTF : DrawableByVulkan
 
         // Textures:
         {
-            fakeTexture = createFakeTexture1x1(device);
-
             if(textures.length == 0)
             {
-                texturesDescrs.length = 1;
-                texturesDescrs[0].info = VkDescriptorImageInfo(
+                /*
+                A fake texture is only needed if there are no textures
+                at all to substitute texture data that is unconditionally
+                passed to the shader.
+                */
+                fakeTexture = createFakeTexture1x1(device);
+
+                texturesDescrInfos.length = 1;
+                texturesDescrInfos[0] = VkDescriptorImageInfo(
                     imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     imageView: fakeTexture.imageView,
                     sampler: fakeTexture.sampler,
@@ -103,27 +102,14 @@ class GlTF : DrawableByVulkan
             }
             else
             {
-                texturesDescrs.length = textures.length;
+                texturesDescrInfos.length = textures.length;
 
-                foreach(i, ref descr; texturesDescrs)
-                    descr.info = VkDescriptorImageInfo(
+                foreach(i, ref descrInfo; texturesDescrInfos)
+                    descrInfo = VkDescriptorImageInfo(
                         imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         imageView: textures[i].imageView,
                         sampler: textures[i].sampler,
                     );
-            }
-
-            foreach(ref descr; texturesDescrs)
-            {
-                descr.descr = VkWriteDescriptorSet(
-                    sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    dstSet: meshesDescriptorSets[0],
-                    dstBinding: 1,
-                    dstArrayElement: 0,
-                    descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    descriptorCount: 1,
-                    pImageInfo: &descr.info,
-                );
             }
         }
 
@@ -263,7 +249,8 @@ class GlTF : DrawableByVulkan
             node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
         }
 
-        node.mesh.textureDescr = &texturesDescrs[0];
+        // Fake texture or real one provided just to stub shader input
+        node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];
     }
 
     void refreshBuffers(VkCommandBuffer buf)

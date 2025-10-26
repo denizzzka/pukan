@@ -5,9 +5,6 @@ public import pukan.gltf.loader: BufAccess;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
-import pukan.gltf: GlTF;
-alias TextureDescr = GlTF.TextureDescr;
-
 static struct Material
 {
     Vector4i renderType;
@@ -26,7 +23,7 @@ class Mesh
     /*private*/ BufAccess indicesAccessor;
     /*private*/ ushort indices_count;
     /*private*/ TransferBuffer texCoordsBuf;
-    /*private*/ TextureDescr* textureDescr;
+    /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
     /*private*/ VkDescriptorSet* descriptorSet;
 
     private TransferBuffer uniformBuffer;
@@ -81,7 +78,15 @@ class Mesh
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
         VkWriteDescriptorSet[] descriptorWrites = [
             uboWriteDescriptor,
-            textureDescr.descr,
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: *descriptorSet,
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: textureDescrImageInfo,
+            ),
         ];
 
         device.updateDescriptorSets(descriptorWrites);
