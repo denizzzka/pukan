@@ -22,6 +22,9 @@ class Mesh
     /*private*/ BufAccess verticesAccessor;
     /*private*/ BufAccess indicesAccessor;
     /*private*/ ushort indices_count;
+    package TransferBuffer indicesBuffer;
+    package TransferBuffer verticesBuffer;
+    //TODO: remove:
     /*private*/ TransferBuffer texCoordsBuf;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
     /*private*/ VkDescriptorSet* descriptorSet;

@@ -265,7 +265,43 @@ class GlTF : DrawableByVulkan
             node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
         }
 
-        //~ auto texCoordsRange = content.rangify!Vector3f(texCoordsAccessor);
+        // Fill buffers with a format specifically designed for out shaders
+        {
+            import std.algorithm;
+            import std.range;
+
+            {
+                node.mesh.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                auto dstRange = cast(ushort[]) node.mesh.indicesBuffer.cpuBuf;
+                zip(indicesRange, dstRange)
+                    .each!((ref src, ref dst){
+                        dst = src;
+                    });
+            }
+
+            {
+                node.mesh.verticesBuffer = device.create!TransferBuffer(ShaderVertex.sizeof * verticesRange.accessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+                auto dstRange = cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf;
+
+                if(texCoordsAccessor.bufIdx >= 0)
+                {
+                    auto texCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
+
+                    zip(verticesRange, texCoordsRange, dstRange)
+                        .each!((ref vert, ref tex, ref dst){
+                            dst.pos = vert;
+                            dst.texCoord = tex;
+                        });
+                }
+                else
+                {
+                    zip(verticesRange, dstRange)
+                        .each!((ref vert, ref dst){
+                            dst.pos = vert;
+                        });
+                }
+            }
+        }
 
         // Fake texture or real one provided just to stub shader input
         node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];

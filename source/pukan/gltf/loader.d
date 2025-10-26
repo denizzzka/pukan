@@ -425,7 +425,7 @@ struct BufAccess
 private struct AccessRange(T)
 {
     private const Buffer buffer;
-    private const BufAccess accessor;
+    const BufAccess accessor;
     private const uint bufEnd;
     private uint currByte;
     private uint currStep;
