@@ -84,10 +84,15 @@ class GlTF : DrawableByVulkan
 
         // Textures:
         {
-            fakeTexture = createFakeTexture1x1(device);
-
             if(textures.length == 0)
             {
+                /*
+                A fake texture is only needed if there are no textures
+                at all to substitute texture data that is unconditionally
+                passed to the shader.
+                */
+                fakeTexture = createFakeTexture1x1(device);
+
                 texturesDescrInfos.length = 1;
                 texturesDescrInfos[0] = VkDescriptorImageInfo(
                     imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
