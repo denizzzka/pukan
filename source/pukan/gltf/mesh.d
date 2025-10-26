@@ -5,9 +5,6 @@ public import pukan.gltf.loader: BufAccess;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
-import pukan.gltf: GlTF;
-alias TextureDescr = GlTF.TextureDescr;
-
 static struct Material
 {
     Vector4i renderType;
@@ -26,7 +23,7 @@ class Mesh
     /*private*/ BufAccess indicesAccessor;
     /*private*/ ushort indices_count;
     /*private*/ TransferBuffer texCoordsBuf;
-    /*private*/ TextureDescr* textureDescr;
+    /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
     /*private*/ VkDescriptorSet* descriptorSet;
 
     private TransferBuffer uniformBuffer;
@@ -88,7 +85,7 @@ class Mesh
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 descriptorCount: 1,
-                pImageInfo: &textureDescr.info,
+                pImageInfo: textureDescrImageInfo,
             ),
         ];
 
