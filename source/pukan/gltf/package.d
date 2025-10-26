@@ -175,6 +175,8 @@ class GlTF : DrawableByVulkan
                 node.mesh.indicesAccessor.stride = ushort.sizeof;
         }
 
+        auto indicesRange = content.rangify!ushort(node.mesh.indicesAccessor);
+
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
             auto vertices = &accessors[vertIdx];
@@ -194,7 +196,11 @@ class GlTF : DrawableByVulkan
                 node.mesh.verticesAccessor.stride = Vector3f.sizeof;
         }
 
+        auto verticesRange = content.rangify!Vector3f(node.mesh.verticesAccessor);
+
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
+
+        BufAccess texCoordsAccessor;
 
         if(content.textures.length)
         {
@@ -205,7 +211,7 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            auto texCoordsAccessor = content.getAccess(*texCoords);
+            texCoordsAccessor = content.getAccess(*texCoords);
             auto ta = &texCoordsAccessor;
 
             if(ta.stride == 0)
@@ -258,6 +264,8 @@ class GlTF : DrawableByVulkan
             node.mesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
         }
+
+        //~ auto texCoordsRange = content.rangify!Vector3f(texCoordsAccessor);
 
         // Fake texture or real one provided just to stub shader input
         node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];

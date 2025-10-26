@@ -405,6 +405,8 @@ struct GltfContent
 
     auto rangify(T)(BufAccess bufAccessor) const
     {
+        assert(bufAccessor.bufIdx >= 0);
+
         return AccessRange!T(buffers[bufAccessor.bufIdx], bufAccessor);
     }
 }
