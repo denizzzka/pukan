@@ -170,7 +170,7 @@ class GlTF : DrawableByVulkan
             if(nb is null)
             {
                 nb = device.create!TransferBuffer(node.mesh.indicesAccessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                auto r = content.rangify!(ushort.sizeof)(node.mesh.indicesAccessor);
+                auto r = content.rangify!ushort(node.mesh.indicesAccessor);
             }
 
             assert(node.mesh.indicesAccessor.stride == 0);

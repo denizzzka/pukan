@@ -402,9 +402,9 @@ struct GltfContent
         );
     }
 
-    auto rangify(ubyte Len)(BufAccess bufAccessor) const
+    auto rangify(T)(BufAccess bufAccessor) const
     {
-        return AccessRange!Len(buffers[bufAccessor.bufIdx], bufAccessor);
+        return AccessRange!T(buffers[bufAccessor.bufIdx], bufAccessor);
     }
 }
 
@@ -418,7 +418,7 @@ struct BufAccess
     ushort stride;
 }
 
-private struct AccessRange(ubyte Len)
+private struct AccessRange(T)
 {
     private const Buffer buffer;
     private const BufAccess accessor;
@@ -427,23 +427,33 @@ private struct AccessRange(ubyte Len)
     package this(in Buffer b, in BufAccess a)
     {
         buffer = b;
-        accessor = a;
+
+        BufAccess tmp = a;
+        if(tmp.stride == 0)
+            tmp.stride = T.sizeof;
+
+        accessor = tmp;
         currByte = a.offset;
-    }
 
-    alias R = ubyte[Len];
-
-    ref R front() const
-    {
-        return *(cast(R*) &buffer.buf[currByte]);
+        assert(accessor.stride >= T.sizeof);
     }
 
     void popFront()
     {
+        assert(currByte <= (accessor.viewLength - T.sizeof));
+
         currByte += accessor.stride;
     }
 
     bool empty() const => currByte >= accessor.viewLength;
+
+    version(LittleEndian)
+    ref T front() const
+    {
+        return *(cast(T*) cast(void*) &buffer.buf[currByte]);
+    }
+    else
+        static assert(false, "big endian not implemented");
 }
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
