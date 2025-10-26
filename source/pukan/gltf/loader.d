@@ -430,6 +430,8 @@ private struct AccessRange(T)
     private uint currByte;
     private uint currStep;
 
+    alias Elem = T;
+
     package this(in Buffer b, in BufAccess a)
     {
         buffer = b;

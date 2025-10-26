@@ -156,10 +156,12 @@ class GlTF : DrawableByVulkan
         debug
         {
             enforce(indices.type == "SCALAR", indices.type.to!string);
-            enforce(indices.componentType == ComponentType.UNSIGNED_SHORT, indices.componentType.to!string);
+            enforce(indices.componentType == ComponentType.UNSIGNED_SHORT
+                || indices.componentType == ComponentType.UNSIGNED_INT,
+                indices.componentType.to!string);
         }
 
-        node.mesh.indices_count = cast(ushort) indices.count;
+        node.mesh.indices_count = indices.count;
 
         const indicesAccessor = content.getAccess(indices);
         auto indicesRange = content.rangify!ushort(indicesAccessor);
@@ -256,8 +258,8 @@ class GlTF : DrawableByVulkan
             import std.range;
 
             {
-                node.mesh.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                auto dstRange = cast(ushort[]) node.mesh.indicesBuffer.cpuBuf[0 .. $];
+                node.mesh.indicesBuffer = device.create!TransferBuffer(indicesRange.Elem.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.cpuBuf;
 
                 indicesRange.copy(dstRange);
             }
