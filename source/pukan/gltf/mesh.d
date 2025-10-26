@@ -22,8 +22,10 @@ struct UBOContent
 class Mesh
 {
     string name;
+    /*private*/ BufAccess verticesAccessor;
     /*private*/ BufAccess indicesAccessor;
     /*private*/ ushort indices_count;
+    /*private*/ TransferBuffer texCoordsBuf;
     /*private*/ TextureDescr* textureDescr;
     /*private*/ VkDescriptorSet* descriptorSet;
 
@@ -94,6 +96,19 @@ class Mesh
     //TODO: buffers seems redundant: accessor can provide this functionality
     void drawingBufferFilling(TransferBuffer[] buffers, VkCommandBuffer buf, in Matrix4x4f trans)
     {
+        assert(verticesAccessor.stride);
+        auto vertexBuffer = buffers[verticesAccessor.bufIdx];
+        assert(vertexBuffer.cpuBuf.length > 5);
+
+        VkBuffer[2] vkbuffs = [
+            vertexBuffer.gpuBuffer.buf.getVal(),
+            texCoordsBuf
+                ? texCoordsBuf.gpuBuffer.buf.getVal()
+                : vertexBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
+        ];
+        VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
+        vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
+
         assert(indices_count);
         assert(indicesAccessor.stride == ushort.sizeof);
 

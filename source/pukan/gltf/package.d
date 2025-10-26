@@ -42,8 +42,6 @@ class GlTF : DrawableByVulkan
     alias this = content;
 
     private TransferBuffer[] buffers;
-    private BufAccess verticesAccessor;
-    private TransferBuffer texCoordsBuf;
     private TextureDescr[] texturesDescrs;
     private GraphicsPipelineCfg* pipeline;
 
@@ -144,8 +142,9 @@ class GlTF : DrawableByVulkan
         foreach(ref buf; buffers)
             buf.uploadImmediate(commandPool, commandBuffer);
 
-        if(texCoordsBuf)
-            texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
+        foreach(m; meshes)
+            if(m.texCoordsBuf)
+                m.texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
     private void setUpEachNode(ref Node node, LogicalDevice device)
@@ -194,9 +193,9 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            verticesAccessor = content.getAccess(*vertices);
-            if(verticesAccessor.stride == 0)
-                verticesAccessor.stride = Vector3f.sizeof;
+            node.mesh.verticesAccessor = content.getAccess(*vertices);
+            if(node.mesh.verticesAccessor.stride == 0)
+                node.mesh.verticesAccessor.stride = Vector3f.sizeof;
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -260,8 +259,8 @@ class GlTF : DrawableByVulkan
                 }
             }
 
-            texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
+            node.mesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
         }
 
         node.mesh.textureDescr = &texturesDescrs[0];
@@ -278,19 +277,6 @@ class GlTF : DrawableByVulkan
         //~ trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
-
-        assert(verticesAccessor.stride);
-        auto vertexBuffer = buffers[verticesAccessor.bufIdx];
-        assert(vertexBuffer.cpuBuf.length > 5);
-
-        VkBuffer[2] buffers = [
-            vertexBuffer.gpuBuffer.buf.getVal(),
-            texCoordsBuf
-                ? texCoordsBuf.gpuBuffer.buf.getVal()
-                : vertexBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
-        ];
-        VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
-        vkCmdBindVertexBuffers(buf, 0, cast(uint) buffers.length, buffers.ptr, offsets.ptr);
 
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) meshesDescriptorSets.length, meshesDescriptorSets.ptr, 0, null);
 
