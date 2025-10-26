@@ -174,7 +174,7 @@ class GlTF : DrawableByVulkan
             }
 
             assert(indices.count > 0);
-            node.mesh.indices_count = cast(ushort) indices.count;
+            node.mesh.indices_count = indices.count;
 
             node.mesh.indicesAccessor = content.getAccess(indices);
 

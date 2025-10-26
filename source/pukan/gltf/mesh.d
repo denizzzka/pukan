@@ -23,7 +23,7 @@ class Mesh
 {
     string name;
     /*private*/ BufAccess indicesAccessor;
-    /*private*/ ushort indices_count;
+    /*private*/ uint indices_count;
     /*private*/ TextureDescr* textureDescr;
     /*private*/ VkDescriptorSet* descriptorSet;
 
