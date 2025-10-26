@@ -166,20 +166,7 @@ class GlTF : DrawableByVulkan
 
             node.mesh.indicesAccessor = content.getAccess(indices);
 
-            auto nb = &newBuffers[node.mesh.indicesAccessor.bufIdx];
-            if(nb is null)
-            {
-                *nb = device.create!TransferBuffer(node.mesh.indicesAccessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                auto r = content.rangify!ushort(node.mesh.indicesAccessor);
-
-                //~ import std.range;
-                import std.algorithm;
-
-                size_t cnt;
-                r.each!((e){ cnt++; });
-
-                assert(cnt == indices.count);
-            }
+            fillBufferUsingRange(device, newBuffers, content, node.mesh.indicesAccessor);
 
             assert(node.mesh.indicesAccessor.stride == 0);
 
@@ -307,6 +294,24 @@ class GlTF : DrawableByVulkan
 
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
+    }
+}
+
+private void fillBufferUsingRange(LogicalDevice device, ref TransferBuffer[] buffers, const GltfContent content, in BufAccess accessor)
+{
+    auto buf = &buffers[accessor.bufIdx];
+
+    if(*buf is null)
+    {
+        *buf = device.create!TransferBuffer(accessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        auto range = content.rangify!ushort(accessor);
+
+        import std.algorithm;
+
+        size_t cnt;
+        range.each!((e){ cnt++; });
+
+        assert(cnt == accessor.count);
     }
 }
 
