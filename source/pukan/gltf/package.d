@@ -153,7 +153,7 @@ class GlTF : DrawableByVulkan
 
         auto indices = accessors[ primitive.indicesAccessorIdx ];
 
-        enforce(indices.type == "SCALAR", indices.type.to!string);
+        debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
         node.mesh.indices_count = indices.count;
 

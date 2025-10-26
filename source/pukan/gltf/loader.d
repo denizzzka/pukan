@@ -322,12 +322,12 @@ struct View
             count: accessor["count"].get!uint,
             min_max: min_max,
             offset: accessor["byteOffset"].opt!uint,
+            componentType: accessor["componentType"].get!ComponentType,
         );
 
         debug
         {
             r.type = accessor["type"].get!string;
-            r.componentType = accessor["componentType"].get!ComponentType;
         }
 
         return r;
