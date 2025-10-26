@@ -81,7 +81,15 @@ class Mesh
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
         VkWriteDescriptorSet[] descriptorWrites = [
             uboWriteDescriptor,
-            textureDescr.descr,
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: *descriptorSet,
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: &textureDescr.info,
+            ),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

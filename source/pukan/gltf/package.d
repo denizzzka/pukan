@@ -48,10 +48,11 @@ class GlTF : DrawableByVulkan
     private MeshClass[] meshes;
     private VkDescriptorSet[] meshesDescriptorSets;
 
+    //TODO: remove
     static struct TextureDescr
     {
         VkDescriptorImageInfo info;
-        VkWriteDescriptorSet descr;
+        //~ VkWriteDescriptorSet descr;
     }
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
@@ -111,19 +112,6 @@ class GlTF : DrawableByVulkan
                         imageView: textures[i].imageView,
                         sampler: textures[i].sampler,
                     );
-            }
-
-            foreach(ref descr; texturesDescrs)
-            {
-                descr.descr = VkWriteDescriptorSet(
-                    sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    dstSet: meshesDescriptorSets[0],
-                    dstBinding: 1,
-                    dstArrayElement: 0,
-                    descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    descriptorCount: 1,
-                    pImageInfo: &descr.info,
-                );
             }
         }
 
