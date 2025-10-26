@@ -166,10 +166,10 @@ class GlTF : DrawableByVulkan
 
             node.mesh.indicesAccessor = content.getAccess(indices);
 
-            auto nb = newBuffers[node.mesh.indicesAccessor.bufIdx];
+            auto nb = &newBuffers[node.mesh.indicesAccessor.bufIdx];
             if(nb is null)
             {
-                nb = device.create!TransferBuffer(node.mesh.indicesAccessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                *nb = device.create!TransferBuffer(node.mesh.indicesAccessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
                 auto r = content.rangify!ushort(node.mesh.indicesAccessor);
 
                 //~ import std.range;
