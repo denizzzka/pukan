@@ -249,7 +249,7 @@ class GlTF : DrawableByVulkan
             node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
         }
 
-        //FIXME: [0] ??
+        // Fake texture or real one provided just to stub shader input
         node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];
     }
 
