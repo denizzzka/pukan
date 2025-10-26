@@ -1,7 +1,7 @@
 module pukan.gltf.mesh;
 
 import dlib.math;
-public import pukan.gltf.loader: BufAccess;
+public import pukan.gltf.loader: BufAccess, ComponentType;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.conv: to;
@@ -22,12 +22,25 @@ struct IndicesBuf
     TransferBuffer buffer;
     VkIndexType indexType;
 
-    this(ubyte sz)
+    this(LogicalDevice device, ComponentType t, uint count)
     {
-        switch(sz)
+        with(ComponentType)
+        switch(t)
         {
-            case ushort.sizeof: indexType = VK_INDEX_TYPE_UINT16; break;
-            case uint.sizeof: indexType = VK_INDEX_TYPE_UINT32; break;
+            case UNSIGNED_SHORT: indexType = VK_INDEX_TYPE_UINT16; break;
+            case UNSIGNED_INT: indexType = VK_INDEX_TYPE_UINT32; break;
+            default: assert(0);
+        }
+
+        buffer = device.create!TransferBuffer(sz * count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    }
+
+    private uint sz() const
+    {
+        switch(indexType)
+        {
+            case VK_INDEX_TYPE_UINT16: return ushort.sizeof;
+            case VK_INDEX_TYPE_UINT32: return uint.sizeof;
             default: assert(0);
         }
     }

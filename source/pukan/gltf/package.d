@@ -153,18 +153,12 @@ class GlTF : DrawableByVulkan
 
         auto indices = accessors[ primitive.indicesAccessorIdx ];
 
-        debug
-        {
-            enforce(indices.type == "SCALAR", indices.type.to!string);
-            enforce(indices.componentType == ComponentType.UNSIGNED_SHORT
-                || indices.componentType == ComponentType.UNSIGNED_INT,
-                indices.componentType.to!string);
-        }
+        enforce(indices.type == "SCALAR", indices.type.to!string);
 
         node.mesh.indices_count = indices.count;
 
         const indicesAccessor = content.getAccess(indices);
-        auto indicesRange = content.rangify!ushort(indicesAccessor);
+        node.mesh.indicesBuffer = IndicesBuf(device, indices.componentType, node.mesh.indices_count);
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -257,13 +251,21 @@ class GlTF : DrawableByVulkan
             import std.algorithm;
             import std.range;
 
+            if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
             {
-                node.mesh.indicesBuffer = IndicesBuf(indicesRange.Elem.sizeof);
-                node.mesh.indicesBuffer.buffer = device.create!TransferBuffer(indicesRange.Elem.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                auto indicesRange = content.rangify!ushort(indicesAccessor);
                 auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
-
                 indicesRange.copy(dstRange);
             }
+            else if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
+            {
+                auto indicesRange = content.rangify!uint(indicesAccessor);
+                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
+                indicesRange.copy(dstRange);
+            }
+            else
+                assert(0);
+
 
             {
                 node.mesh.verticesBuffer = device.create!TransferBuffer(ShaderVertex.sizeof * verticesRange.accessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);

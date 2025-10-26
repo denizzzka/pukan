@@ -351,7 +351,7 @@ struct Accessor
     uint count;
     Json min_max;
     debug string type;
-    debug ComponentType componentType;
+    ComponentType componentType;
 }
 
 struct Mesh
