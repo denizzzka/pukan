@@ -399,6 +399,7 @@ struct GltfContent
             viewLength: view.length,
             stride: view.stride,
             bufIdx: view.bufferIdx,
+            count: accessor.count,
         );
     }
 
@@ -416,13 +417,16 @@ struct BufAccess
     uint viewLength;
     uint offset;
     ushort stride;
+    uint count;
 }
 
 private struct AccessRange(T)
 {
     private const Buffer buffer;
     private const BufAccess accessor;
+    private const uint bufEnd;
     private uint currByte;
+    private uint currStep;
 
     package this(in Buffer b, in BufAccess a)
     {
@@ -434,18 +438,25 @@ private struct AccessRange(T)
 
         accessor = tmp;
         currByte = a.offset;
+        bufEnd = a.offset + a.viewLength;
 
         assert(accessor.stride >= T.sizeof);
+        assert(!empty);
     }
 
     void popFront()
     {
-        assert(currByte <= (accessor.viewLength - T.sizeof));
+        enforce(currByte <= bufEnd - T.sizeof);
+        enforce(!empty);
 
+        currStep++;
         currByte += accessor.stride;
     }
 
-    bool empty() const => currByte >= accessor.viewLength;
+    bool empty() const
+    {
+        return currStep >= accessor.count;
+    }
 
     version(LittleEndian)
     ref T front() const
