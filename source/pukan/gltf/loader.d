@@ -401,14 +401,49 @@ struct GltfContent
             bufIdx: view.bufferIdx,
         );
     }
+
+    auto rangify(ubyte Len)(BufAccess bufAccessor)
+    {
+        return AccessRange!Len(buffers[bufAccessor.bufIdx], bufAccessor);
+    }
 }
 
+//TODO: private?
 struct BufAccess
 {
+    //FIXME: remove after moving to ranges?
     ptrdiff_t bufIdx = -1;
     uint viewLength;
     uint offset;
     ushort stride;
+}
+
+private struct AccessRange(ubyte Len)
+{
+    private const Buffer buffer;
+    private const BufAccess accessor;
+    private uint currByte;
+
+    package this(Buffer b, BufAccess a)
+    {
+        buffer = b;
+        accessor = a;
+        currByte = a.offset;
+    }
+
+    alias R = ubyte[Len];
+
+    ref R front() const
+    {
+        return *(cast(R*) &buffer.buf[currByte]);
+    }
+
+    void popFront()
+    {
+        currByte += accessor.stride;
+    }
+
+    bool empty() const => currByte >= accessor.viewLength;
 }
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
