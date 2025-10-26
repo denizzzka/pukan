@@ -4,7 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = Mesh;
+import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -130,7 +130,7 @@ class GlTF : DrawableByVulkan
 
         foreach(m; meshes)
         {
-            m.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+            m.indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
 
             if(m.texCoordsBuf)
                 m.texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
@@ -258,8 +258,9 @@ class GlTF : DrawableByVulkan
             import std.range;
 
             {
-                node.mesh.indicesBuffer = device.create!TransferBuffer(indicesRange.Elem.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.cpuBuf;
+                node.mesh.indicesBuffer = IndicesBuf(indicesRange.Elem.sizeof);
+                node.mesh.indicesBuffer.buffer = device.create!TransferBuffer(indicesRange.Elem.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
 
                 indicesRange.copy(dstRange);
             }

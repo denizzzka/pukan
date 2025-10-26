@@ -17,12 +17,28 @@ struct UBOContent
     Material material;
 }
 
+struct IndicesBuf
+{
+    TransferBuffer buffer;
+    VkIndexType indexType;
+
+    this(ubyte sz)
+    {
+        switch(sz)
+        {
+            case ushort.sizeof: indexType = VK_INDEX_TYPE_UINT16; break;
+            case uint.sizeof: indexType = VK_INDEX_TYPE_UINT32; break;
+            default: assert(0);
+        }
+    }
+}
+
 class Mesh
 {
     string name;
     /*private*/ BufAccess verticesAccessor;
     /*private*/ uint indices_count;
-    package TransferBuffer indicesBuffer;
+    package IndicesBuf indicesBuffer;
     //TODO: remove or not?
     package TransferBuffer verticesBuffer;
     //TODO: remove:
@@ -119,15 +135,7 @@ class Mesh
 
         assert(indices_count);
 
-        VkIndexType indexType;
-        switch(ushort.sizeof /* FIXME */)
-        {
-            case ushort.sizeof: indexType = VK_INDEX_TYPE_UINT16; break;
-            case uint.sizeof: indexType = VK_INDEX_TYPE_UINT32; break;
-            default: assert(0);
-        }
-
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), 0, indexType);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
         vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
     }
 }
