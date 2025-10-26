@@ -402,7 +402,7 @@ struct GltfContent
         );
     }
 
-    auto rangify(ubyte Len)(BufAccess bufAccessor)
+    auto rangify(ubyte Len)(BufAccess bufAccessor) const
     {
         return AccessRange!Len(buffers[bufAccessor.bufIdx], bufAccessor);
     }
@@ -424,7 +424,7 @@ private struct AccessRange(ubyte Len)
     private const BufAccess accessor;
     private uint currByte;
 
-    package this(Buffer b, BufAccess a)
+    package this(in Buffer b, in BufAccess a)
     {
         buffer = b;
         accessor = a;

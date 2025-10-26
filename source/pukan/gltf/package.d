@@ -42,6 +42,7 @@ class GlTF : DrawableByVulkan
     alias this = content;
 
     private TransferBuffer[] buffers;
+    private TransferBuffer[] newBuffers;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
 
@@ -55,6 +56,8 @@ class GlTF : DrawableByVulkan
         this.pipeline = &pipeline;
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
+
+        this.newBuffers.length = content.buffers.length;
 
         this.buffers.length = content.buffers.length;
         foreach(i, buf; content.buffers)
@@ -162,6 +165,15 @@ class GlTF : DrawableByVulkan
             node.mesh.indices_count = cast(ushort) indices.count;
 
             node.mesh.indicesAccessor = content.getAccess(indices);
+
+            auto nb = newBuffers[node.mesh.indicesAccessor.bufIdx];
+            if(nb is null)
+            {
+                nb = device.create!TransferBuffer(node.mesh.indicesAccessor.viewLength, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                auto r = content.rangify!(ushort.sizeof)(node.mesh.indicesAccessor);
+            }
+
+            assert(node.mesh.indicesAccessor.stride == 0);
 
             //TODO: unused, remove:
             if(node.mesh.indicesAccessor.stride == 0)
