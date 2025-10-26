@@ -416,7 +416,7 @@ struct BufAccess
     ptrdiff_t bufIdx = -1;
     uint viewLength;
     uint offset;
-    ushort stride;
+    ubyte stride;
     uint count;
 }
 
