@@ -155,7 +155,9 @@ class GlTF : DrawableByVulkan
                 import std.conv: to;
 
                 enforce(indices.type == "SCALAR", indices.type.to!string);
-                enforce(indices.componentType == ComponentType.UNSIGNED_SHORT, indices.componentType.to!string);
+                enforce(indices.componentType == ComponentType.UNSIGNED_SHORT
+                    || indices.componentType == ComponentType.UNSIGNED_INT,
+                    indices.componentType.to!string);
             }
 
             assert(indices.count > 0);
@@ -164,13 +166,9 @@ class GlTF : DrawableByVulkan
             node.mesh.indicesAccessor = content.getAccess(indices);
 
             assert(node.mesh.indicesAccessor.stride == 0);
-
-            //TODO: unused, remove:
-            if(node.mesh.indicesAccessor.stride == 0)
-                node.mesh.indicesAccessor.stride = ushort.sizeof;
         }
 
-        auto indicesRange = content.rangify!ushort(node.mesh.indicesAccessor);
+        auto indicesRange = content.rangify!uint(node.mesh.indicesAccessor);
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -264,8 +262,8 @@ class GlTF : DrawableByVulkan
             import std.range;
 
             {
-                node.mesh.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                auto dstRange = cast(ushort[]) node.mesh.indicesBuffer.cpuBuf;
+                node.mesh.indicesBuffer = device.create!TransferBuffer(indicesRange.Elem.sizeof * indicesRange.accessor.count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.cpuBuf;
                 zip(indicesRange, dstRange)
                     .each!((ref src, ref dst){
                         dst = src;

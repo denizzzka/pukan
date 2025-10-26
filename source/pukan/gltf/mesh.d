@@ -4,6 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: BufAccess;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import std.conv: to;
 
 static struct Material
 {
@@ -117,11 +118,18 @@ class Mesh
         vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
 
         assert(indices_count);
-        assert(indicesAccessor.stride == ushort.sizeof);
+
+        VkIndexType indexType;
+        switch(indicesAccessor.stride)
+        {
+            case ushort.sizeof: indexType = VK_INDEX_TYPE_UINT16; break;
+            case uint.sizeof: indexType = VK_INDEX_TYPE_UINT32; break;
+            default: assert(0, indicesAccessor.stride.to!string);
+        }
 
         auto indicesBuffer = buffers[indicesAccessor.bufIdx];
 
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), indicesAccessor.offset, VK_INDEX_TYPE_UINT16);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf.getVal(), indicesAccessor.offset, indexType);
         vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
     }
 }
