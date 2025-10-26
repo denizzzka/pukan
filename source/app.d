@@ -284,52 +284,44 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto n = coloredBranch.addChild(Bone());
         cubeRotator = n.payload.peek!Bone;
 
-        //~ n.addChild(cast(DrawablePrimitive) cube);
+        n.addChild(cast(DrawablePrimitive) cube);
     }
 
-    //~ {
-        //~ auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 0.3).translationMatrix;
-
-        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf");
-        //~ tree.root
-            //~ .addChild(Bone(mat: trans))
-            //~ .addChild(gltfObj);
-    //~ }
-
-    //~ {
-        //~ auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 2.3).translationMatrix;
-
-        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleTexture/glTF/SimpleTexture.gltf");
-        //~ tree.root
-            //~ .addChild(Bone(mat: trans))
-            //~ .addChild(gltfObj);
-    //~ }
-
     {
-        const max = Vector3f(21.870667, -40.59911, 114.58009);
-        const min = Vector3f(21.469711, -40.855274, 114.2257);
+        auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 0.3).translationMatrix;
 
-        const center = (max + min)/2;
-
-        const scale = 3;
-        auto trans = (Vector3f(1, 1, 1) * scale).scaleMatrix * (-center).translationMatrix;
-
-        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb");
-        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Cat1/model.glb");
-        //~ auto gltfObj = scene.gltfFactory.create("/home/denizzz/Dev/glTF-Sample-Assets/Models/CesiumMan/glTF-Binary/CesiumMan.glb");
+        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf");
         tree.root
             .addChild(Bone(mat: trans))
             .addChild(gltfObj);
     }
 
-    //~ {
-        //~ auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(-1, 1, 0.3).translationMatrix;
+    {
+        auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 2.3).translationMatrix;
 
-        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf");
-        //~ tree.root
-            //~ .addChild(Bone(mat: trans))
-            //~ .addChild(gltfObj);
-    //~ }
+        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleTexture/glTF/SimpleTexture.gltf");
+        tree.root
+            .addChild(Bone(mat: trans))
+            .addChild(gltfObj);
+    }
+
+    {
+        auto trans = Vector3f(2, 2, 2).scaleMatrix * Vector3f(0.2, -0.2, 0.1).translationMatrix;
+
+        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb");
+        tree.root
+            .addChild(Bone(mat: trans))
+            .addChild(gltfObj);
+    }
+
+    {
+        auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(-1, 1, 0.3).translationMatrix;
+
+        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf");
+        tree.root
+            .addChild(Bone(mat: trans))
+            .addChild(gltfObj);
+    }
 
     auto textureBranch = primitTree.addChild(scene.texturedMeshFactory.graphicsPipelineCfg);
 
@@ -358,7 +350,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto texture = device.create!Texture(img, samplerInfo);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
-        //~ textureBranch.addChild(cast(DrawablePrimitive) mesh);
+        textureBranch.addChild(cast(DrawablePrimitive) mesh);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
