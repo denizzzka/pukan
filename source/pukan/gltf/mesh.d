@@ -136,7 +136,7 @@ class Mesh
     void drawingBufferFilling(TransferBuffer[] buffers, VkCommandBuffer buf, in Matrix4x4f trans)
     {
         assert(verticesAccessor.stride);
-        auto vertexBuffer = buffers[verticesAccessor.bufIdx];
+        auto vertexBuffer = buffers[verticesAccessor.viewIdx];
         assert(vertexBuffer.cpuBuf.length > 5);
 
         VkBuffer[2] vkbuffs = [

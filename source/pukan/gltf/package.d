@@ -56,13 +56,13 @@ class GlTF : DrawableByVulkan
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
-        this.buffers.length = content.buffers.length;
-        foreach(i, buf; content.buffers)
+        this.buffers.length = content.bufferViews.length;
+        foreach(i, buf; content.bufferViews)
         {
             //TODO: usage bits may be set by using introspection of destiny of the buffer
             this.buffers[i] = device.create!TransferBuffer(buf.buf.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             //TODO: get rid of this redundant copying:
-            this.buffers[i].cpuBuf[0..$] = buf.buf[0 .. $];
+            this.buffers[i].cpuBuf[0..$] = cast(void[]) buf.buf[0 .. $];
         }
 
         {
@@ -204,7 +204,7 @@ class GlTF : DrawableByVulkan
             it's better to create a shader with a configurable stride
             value
             */
-            ubyte[] texCoordsSlice = cast(ubyte[]) buffers[ta.bufIdx]
+            ubyte[] texCoordsSlice = cast(ubyte[]) buffers[ta.viewIdx]
                 .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
 
             enforce(texCoordsSlice.length > 0);
@@ -269,7 +269,7 @@ class GlTF : DrawableByVulkan
                 node.mesh.verticesBuffer = device.create!TransferBuffer(ShaderVertex.sizeof * verticesRange.accessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
                 auto dstRange = cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf[0 .. $];
 
-                if(texCoordsAccessor.bufIdx >= 0)
+                if(texCoordsAccessor.viewIdx >= 0)
                 {
                     auto texCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
 

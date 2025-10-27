@@ -239,9 +239,8 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             );
 
             const View view = ret.bufferViews[viewIdxPtr.get!ushort];
-            const Buffer imgBuf = ret.buffers[view.bufferIdx];
 
-            extFormatImg = loadImageFromMemory(imgBuf.buf[view.offset .. view.offset + view.length], format);
+            extFormatImg = loadImageFromMemory(view.buf, format);
         }
         else
             extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string), format);
@@ -285,7 +284,7 @@ struct Buffer
     View createView(size_t idx, Json view)
     {
         return View(
-            bufferIdx: idx,
+            buffer: buf,
             length: view["byteLength"].get!uint,
             offset: view["byteOffset"].opt!uint,
             stride: view["byteStride"].opt!ubyte,
@@ -295,10 +294,14 @@ struct Buffer
 
 struct View
 {
-    const size_t bufferIdx;
-    const uint length;
-    const uint offset;
+    const ubyte[] buf;
     const ubyte stride; // distance between start points of each element
+
+    this(in ubyte[] buffer, uint length, uint offset, ubyte stride)
+    {
+        buf = buffer[offset .. offset + length];
+        this.stride = stride;
+    }
 
     Accessor createAccessor(size_t idx, Json accessor)
     {
@@ -383,7 +386,8 @@ struct Node
 
 struct GltfContent
 {
-    Buffer[] buffers;
+    //TODO: remove:
+    private Buffer[] buffers;
     View[] bufferViews;
     Accessor[] accessors;
     Mesh[] meshes;
@@ -395,28 +399,26 @@ struct GltfContent
         const view = bufferViews[accessor.viewIdx];
 
         return BufAccess(
-            offset: view.offset + accessor.offset,
-            viewLength: view.length,
+            offset: accessor.offset,
             stride: view.stride,
-            bufIdx: view.bufferIdx,
+            viewIdx: accessor.viewIdx,
             count: accessor.count,
         );
     }
 
     auto rangify(T)(BufAccess bufAccessor) const
     {
-        assert(bufAccessor.bufIdx >= 0);
+        assert(bufAccessor.viewIdx >= 0);
 
-        return AccessRange!T(buffers[bufAccessor.bufIdx], bufAccessor);
+        return AccessRange!T(bufferViews[bufAccessor.viewIdx], bufAccessor);
     }
 }
 
 //TODO: private?
 struct BufAccess
 {
-    //FIXME: remove after moving to ranges?
-    ptrdiff_t bufIdx = -1;
-    uint viewLength;
+    //TODO: remove?
+    ptrdiff_t viewIdx = -1;
     uint offset;
     ubyte stride;
     uint count;
@@ -424,7 +426,7 @@ struct BufAccess
 
 private struct AccessRange(T)
 {
-    private const Buffer buffer;
+    private const View view;
     const BufAccess accessor;
     private const uint bufEnd;
     private uint currByte;
@@ -432,9 +434,9 @@ private struct AccessRange(T)
 
     alias Elem = T;
 
-    package this(in Buffer b, in BufAccess a)
+    package this(in View v, in BufAccess a)
     {
-        buffer = b;
+        view = v;
 
         BufAccess tmp = a;
         if(tmp.stride == 0)
@@ -442,7 +444,7 @@ private struct AccessRange(T)
 
         accessor = tmp;
         currByte = a.offset;
-        bufEnd = a.offset + a.viewLength;
+        bufEnd = cast(uint) v.buf.length;
 
         assert(accessor.stride >= T.sizeof);
         assert(!empty);
@@ -463,7 +465,7 @@ private struct AccessRange(T)
     version(LittleEndian)
     ref T front() const
     {
-        return *(cast(T*) cast(void*) &buffer.buf[currByte]);
+        return *(cast(T*) cast(void*) &view.buf[currByte]);
     }
     else
         static assert(false, "big endian not implemented");
