@@ -155,10 +155,8 @@ class GlTF : DrawableByVulkan
 
         debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
-        node.mesh.indices_count = indices.count;
-
         const indicesAccessor = content.getAccess(indices);
-        node.mesh.indicesBuffer = IndicesBuf(device, indices.componentType, node.mesh.indices_count);
+        node.mesh.indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -320,7 +318,7 @@ class GlTF : DrawableByVulkan
 
         trans *= node.trans;
 
-        if(node.mesh && node.mesh.indices_count)
+        if(node.mesh && node.mesh.indicesBuffer.count)
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 

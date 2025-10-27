@@ -21,9 +21,12 @@ struct IndicesBuf
 {
     TransferBuffer buffer;
     VkIndexType indexType;
+    uint count;
 
     this(LogicalDevice device, ComponentType t, uint count)
     {
+        this.count = count;
+
         with(ComponentType)
         switch(t)
         {
@@ -50,7 +53,6 @@ class Mesh
 {
     string name;
     /*private*/ BufAccess verticesAccessor;
-    /*private*/ uint indices_count;
     package IndicesBuf indicesBuffer;
     //TODO: remove or not?
     package TransferBuffer verticesBuffer;
@@ -146,9 +148,9 @@ class Mesh
         VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
         vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
 
-        assert(indices_count);
+        assert(indicesBuffer.count);
 
         vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
-        vkCmdDrawIndexed(buf, indices_count, 1, 0, 0, 0);
+        vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
     }
 }
