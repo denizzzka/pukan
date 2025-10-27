@@ -95,20 +95,21 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         enforce(ver == "2.0", "glTF version "~ver~" unsupported");
     }
 
+    Buffer[] buffers;
     GltfContent ret;
     Node[] nodes;
     Node rootSceneNode;
 
     if(gltfFile.buffer)
-        ret.buffers ~= Buffer(buf: gltfFile.buffer);
+        buffers ~= Buffer(buf: gltfFile.buffer);
     else
         foreach(buf; json["buffers"])
-            ret.buffers ~= readBufFile(dir, buf);
+            buffers ~= readBufFile(dir, buf);
 
     foreach(v; json["bufferViews"])
     {
         const idx = v["buffer"].get!uint;
-        ret.bufferViews ~= ret.buffers[idx].createView(idx, v);
+        ret.bufferViews ~= buffers[idx].createView(idx, v);
     }
 
     foreach(a; json["accessors"])
@@ -386,8 +387,6 @@ struct Node
 
 struct GltfContent
 {
-    //TODO: remove:
-    private Buffer[] buffers;
     View[] bufferViews;
     Accessor[] accessors;
     Mesh[] meshes;
