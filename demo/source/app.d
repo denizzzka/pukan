@@ -275,7 +275,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto primitTree = new PrimitivesTree;
 
     {
-        auto trans = Vector3f(0, 0.8, 0).translationMatrix;
+        auto trans = Vector3f(0, 0, 1).translationMatrix;
         tree
             .addChild(Bone(mat: trans))
             .addChild(primitTree);
@@ -312,7 +312,8 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     }
 
     {
-        auto trans = Vector3f(2, 2, 2).scaleMatrix * Vector3f(0.2, -0.2, 0.1).translationMatrix;
+        const scale = 3;
+        auto trans = (Vector3f(3, 3, 3) * scale).scaleMatrix * Vector3f(0.03, 0.03, 0).translationMatrix;
 
         auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb");
         tree.root
