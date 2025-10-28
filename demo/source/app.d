@@ -161,11 +161,19 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
-    scope arena = createArena();
-
     Bone* cubeRotator;
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator);
     scope(exit) tree.destroy;
+
+    scope arena = createArena(device, scene, *frameBuilder, *initBuf);
+    scope(exit) arena.destroy;
+
+    {
+        auto trans = Vector3f(0, 0, 0).translationMatrix;
+        tree
+            .addChild(Bone(mat: trans))
+            .addChild(arena);
+    }
 
     import pukan.exceptions;
 
@@ -247,7 +255,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.model = rotation.toMatrix4x4;
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(0, -1, -2), // camera position
+        Vector3f(0, -1, -5), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
         Vector3f(0, -1, 0), // upward direction in World coordinates
     );
@@ -270,7 +278,7 @@ void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, i
     *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 }
 
-auto createArena() //LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer)
+SceneTree createArena(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer)
 {
     import std.file;
 
@@ -295,10 +303,32 @@ auto createArena() //LogicalDevice device, Scene scene, FrameBuilder frameBuilde
             found ~= gltfs.front;
     }
 
-    import std.stdio;
-    found.writeln;
+    import std.math;
 
-    return 0;
+    const sectorAngle = PI*2 / found.length;
+
+    const diameter = 2;
+    const startPlace = Vector3f(0, 0, diameter);
+
+    auto tree = new SceneTree;
+
+    foreach(i, filename; found)
+    {
+        auto rot_quat = rotationQuaternion(Vector3f(0, -1, 0), sectorAngle * i);
+
+        const scale = 0.1;
+        const place = rot_quat.rotate(startPlace);
+        auto trans = (Vector3f(1, 1, 1) * scale).scaleMatrix * place.translationMatrix;
+
+        auto obj = scene.gltfFactory.create(filename);
+        tree.root
+            .addChild(Bone(mat: trans))
+            .addChild(obj);
+    }
+
+    tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
+
+    return tree;
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
@@ -323,44 +353,44 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto n = coloredBranch.addChild(Bone());
         cubeRotator = n.payload.peek!Bone;
 
-        n.addChild(cast(DrawablePrimitive) cube);
+        //~ n.addChild(cast(DrawablePrimitive) cube);
     }
 
     {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 0.3).translationMatrix;
 
-        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf");
-        tree.root
-            .addChild(Bone(mat: trans))
-            .addChild(gltfObj);
+        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf");
+        //~ tree.root
+            //~ .addChild(Bone(mat: trans))
+            //~ .addChild(gltfObj);
     }
 
     {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(1, 1, 2.3).translationMatrix;
 
-        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleTexture/glTF/SimpleTexture.gltf");
-        tree.root
-            .addChild(Bone(mat: trans))
-            .addChild(gltfObj);
+        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/SimpleTexture/glTF/SimpleTexture.gltf");
+        //~ tree.root
+            //~ .addChild(Bone(mat: trans))
+            //~ .addChild(gltfObj);
     }
 
     {
         const scale = 3;
         auto trans = (Vector3f(3, 3, 3) * scale).scaleMatrix * Vector3f(0.03, 0.03, 0).translationMatrix;
 
-        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb");
-        tree.root
-            .addChild(Bone(mat: trans))
-            .addChild(gltfObj);
+        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb");
+        //~ tree.root
+            //~ .addChild(Bone(mat: trans))
+            //~ .addChild(gltfObj);
     }
 
     {
         auto trans = Vector3f(0.2, 0.2, 0.2).scaleMatrix * Vector3f(-1, 1, 0.3).translationMatrix;
 
-        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf");
-        tree.root
-            .addChild(Bone(mat: trans))
-            .addChild(gltfObj);
+        //~ auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf");
+        //~ tree.root
+            //~ .addChild(Bone(mat: trans))
+            //~ .addChild(gltfObj);
     }
 
     auto textureBranch = primitTree.addChild(scene.texturedMeshFactory.graphicsPipelineCfg);
@@ -390,7 +420,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto texture = device.create!Texture(img, samplerInfo);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
-        textureBranch.addChild(cast(DrawablePrimitive) mesh);
+        //~ textureBranch.addChild(cast(DrawablePrimitive) mesh);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
