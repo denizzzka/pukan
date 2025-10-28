@@ -248,16 +248,16 @@ import dlib.math;
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
-    auto rotation = rotationQuaternion(Vector3f(0, 0, 1), 90f.degtorad * currDeltaTime * 0.1);
+    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.1);
 
     WorldTransformation wtb;
 
     wtb.model = rotation.toMatrix4x4;
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(0, -1, -5), // camera position
+        Vector3f(0, -0.5, -1), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
-        Vector3f(0, -1, 0), // upward direction in World coordinates
+        Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
     );
     wtb.proj = perspectiveMatrix(
         45.0f /* FOV */,
@@ -278,13 +278,11 @@ void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, i
     *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 }
 
-SceneTree createArena(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer)
+private string[] gltfFilesSearch(string dir)
 {
     import std.file;
 
-    const objDir = "demo/assets/gltf_samples/";
-
-    auto samples = dirEntries(objDir, "*", SpanMode.shallow);
+    auto samples = dirEntries(dir, "*", SpanMode.shallow);
     string[] found;
     foreach(sample_dir; samples)
     {
@@ -303,8 +301,14 @@ SceneTree createArena(LogicalDevice device, Scene scene, FrameBuilder frameBuild
             found ~= gltfs.front;
     }
 
+    return found;
+}
+
+SceneTree createArena(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer)
+{
     import std.math;
 
+    const found = gltfFilesSearch("demo/assets/gltf_samples/");
     const sectorAngle = PI*2 / found.length;
 
     const diameter = 2;
