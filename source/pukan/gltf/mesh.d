@@ -1,7 +1,7 @@
 module pukan.gltf.mesh;
 
 import dlib.math;
-public import pukan.gltf.loader: BufAccess, ComponentType;
+public import pukan.gltf.loader: BufAccess, BufferPieceOnGPU, ComponentType;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.conv: to;
@@ -133,17 +133,17 @@ class Mesh
         uniformBuffer.recordUpload(buf);
     }
 
-    void drawingBufferFilling(TransferBuffer[] buffers, VkCommandBuffer buf, in Matrix4x4f trans)
+    void drawingBufferFilling(BufferPieceOnGPU[] buffers, VkCommandBuffer buf, in Matrix4x4f trans)
     {
         assert(verticesAccessor.stride);
         auto vertexBuffer = buffers[verticesAccessor.viewIdx];
-        assert(vertexBuffer.cpuBuf.length > 5);
+        assert(vertexBuffer.buffer.cpuBuf.length > 5);
 
         VkBuffer[2] vkbuffs = [
-            vertexBuffer.gpuBuffer.buf.getVal(),
+            vertexBuffer.buffer.gpuBuffer.buf.getVal(),
             texCoordsBuf
                 ? texCoordsBuf.gpuBuffer.buf.getVal()
-                : vertexBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
+                : vertexBuffer.buffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
         ];
         VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
         vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);

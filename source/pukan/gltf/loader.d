@@ -337,17 +337,6 @@ struct View
         return r;
     }
 
-    static class BufferPieceOnGPU
-    {
-        TransferBuffer buffer;
-
-        //TODO: add flag if CPU buf is not needed after uploading
-        void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
-        {
-            buffer.uploadImmediate(commandPool, commandBuffer);
-        }
-    }
-
     auto createGPUBuffer(LogicalDevice device, VkBufferUsageFlags flags) const
     {
         auto r = new BufferPieceOnGPU;
@@ -356,6 +345,17 @@ struct View
         r.buffer.cpuBuf[0 .. $] = cast(void[]) buf;
 
         return r;
+    }
+}
+
+class BufferPieceOnGPU
+{
+    TransferBuffer buffer;
+
+    //TODO: add flag if CPU buf is not needed after uploading
+    void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        buffer.uploadImmediate(commandPool, commandBuffer);
     }
 }
 
