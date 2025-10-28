@@ -1,6 +1,20 @@
 module pukan.gltf.factory;
 
 import pukan.gltf;
+import pukan.vulkan;
+
+class PipelineInfoCreator : DefaultGraphicsPipelineInfoCreator!ShaderVertex
+{
+    import pukan.vulkan.bindings;
+    import pukan.vulkan.renderpass;
+
+    this(LogicalDevice dev, VkDescriptorSetLayout[] descriptorSetLayouts, ShaderInfo[] shads, RenderPass renderPass)
+    {
+        rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+        super(dev, descriptorSetLayouts, shads, renderPass);
+    }
+}
 
 struct GltfFactory
 {
@@ -21,7 +35,7 @@ struct GltfFactory
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
         poolAndLayout = device.createDescriptorPool(layoutBindings, 20 /*FIXME*/);
 
-        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!ShaderVertex(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
+        pipelineInfoCreator = new PipelineInfoCreator(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
         graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
 
         auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;

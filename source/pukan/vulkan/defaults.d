@@ -10,20 +10,6 @@ VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
     primitiveRestartEnable: VK_FALSE,
 };
 
-VkPipelineRasterizationStateCreateInfo rasterizer = {
-    sType: VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-    rasterizerDiscardEnable: VK_FALSE,
-    depthClampEnable: VK_FALSE,
-    polygonMode: VK_POLYGON_MODE_FILL,
-    lineWidth: 1.0f,
-    cullMode: VK_CULL_MODE_BACK_BIT,
-    frontFace: VK_FRONT_FACE_CLOCKWISE,
-    depthBiasEnable: VK_FALSE,
-    depthBiasConstantFactor: 0.0f, // Optional
-    depthBiasClamp: 0.0f, // Optional
-    depthBiasSlopeFactor: 0.0f, // Optional
-};
-
 VkPipelineMultisampleStateCreateInfo multisampling = {
     sType: VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
     sampleShadingEnable: VK_FALSE,
