@@ -168,9 +168,7 @@ class GlTF : DrawableByVulkan
             if(node.mesh.verticesAccessor.stride == 0)
                 node.mesh.verticesAccessor.stride = Vector3f.sizeof;
 
-            const idx = node.mesh.verticesAccessor.viewIdx;
-            if(gpuBuffs[idx] is null)
-                gpuBuffs[idx] = content.bufferViews[idx].createGPUBuffer(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            createGpuBufIfNeed(device, node.mesh.verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         auto verticesRange = content.rangify!Vector3f(node.mesh.verticesAccessor);
@@ -196,8 +194,7 @@ class GlTF : DrawableByVulkan
 
             enforce(ta.stride >= Vector2f.sizeof, ta.stride.to!string);
 
-            if(gpuBuffs[ta.viewIdx] is null)
-                gpuBuffs[ta.viewIdx] = content.bufferViews[ta.viewIdx].createGPUBuffer(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             /* TODO:
             Such approach to buffer leads to buffer data duplication.
@@ -293,6 +290,12 @@ class GlTF : DrawableByVulkan
 
         // Fake texture or real one provided just to stub shader input
         node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];
+    }
+
+    private void createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
+    {
+        if(gpuBuffs[ac.viewIdx] is null)
+            gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
     }
 
     void refreshBuffers(VkCommandBuffer buf)
