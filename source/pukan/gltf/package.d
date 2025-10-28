@@ -194,17 +194,8 @@ class GlTF : DrawableByVulkan
 
             enforce(ta.stride >= Vector2f.sizeof, ta.stride.to!string);
 
-            createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            /* TODO:
-            Such approach to buffer leads to buffer data duplication.
-            But this avoids complicating the shader. In the future,
-            it's better to create a shader with a configurable stride
-            value
-            */
-            ubyte[] texCoordsSlice = cast(ubyte[]) gpuBuffs[ta.viewIdx]
-                .buffer
-                .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
+            ubyte[] texCoordsSlice = cast(ubyte[]) content.bufferViews[ta.viewIdx]
+                .buf[ta.offset .. ta.offset + ta.stride * texCoords.count];
 
             enforce(texCoordsSlice.length > 0);
             enforce(texCoordsSlice.length % ta.stride == 0);
