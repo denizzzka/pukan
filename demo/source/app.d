@@ -161,6 +161,8 @@ void main() {
     // Using any (of first frame, for example) buffer as buffer for initial loading
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
+    scope arena = createArena();
+
     Bone* cubeRotator;
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator);
     scope(exit) tree.destroy;
@@ -266,6 +268,37 @@ void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, i
 
     auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
     *cubeRotator = Bone(cubeRotation.toMatrix4x4);
+}
+
+auto createArena() //LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer)
+{
+    import std.file;
+
+    const objDir = "demo/assets/gltf_samples/";
+
+    auto samples = dirEntries(objDir, "*", SpanMode.shallow);
+    string[] found;
+    foreach(sample_dir; samples)
+    {
+        if(!sample_dir.isDir)
+            continue;
+
+        auto glbs = dirEntries(sample_dir, "*.glb", SpanMode.depth);
+        if(!glbs.empty)
+        {
+            found ~= glbs.front;
+            continue;
+        }
+
+        auto gltfs = dirEntries(sample_dir, "*.gltf", SpanMode.depth);
+        if(!gltfs.empty)
+            found ~= gltfs.front;
+    }
+
+    import std.stdio;
+    found.writeln;
+
+    return 0;
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
