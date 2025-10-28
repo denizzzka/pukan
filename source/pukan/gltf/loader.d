@@ -408,6 +408,7 @@ struct Node
 
 struct GltfContent
 {
+    //FIXME: remove, not needed t store it in GlTF object:
     View[] bufferViews;
     Accessor[] accessors;
     Mesh[] meshes;

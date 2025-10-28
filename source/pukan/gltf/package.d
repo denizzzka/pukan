@@ -58,13 +58,6 @@ class GlTF : DrawableByVulkan
 
         gpuBuffs.length = content.bufferViews.length;
 
-        //TODO: usage bits will be set in indices or vertices parsing part of code
-        //FIXME: remove:
-        foreach(i, buf; content.bufferViews)
-        {
-            gpuBuffs[i] = buf.createGPUBuffer(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        }
-
         {
             Node createNodeHier(ref LoaderNode ln)
             {
@@ -126,7 +119,8 @@ class GlTF : DrawableByVulkan
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         foreach(ref buf; gpuBuffs)
-            buf.uploadImmediate(commandPool, commandBuffer);
+            if(buf)
+                buf.uploadImmediate(commandPool, commandBuffer);
 
         foreach(m; meshes)
         {
@@ -201,6 +195,9 @@ class GlTF : DrawableByVulkan
                 texCoordsAccessor.stride = Vector2f.sizeof;
 
             enforce(ta.stride >= Vector2f.sizeof, ta.stride.to!string);
+
+            if(gpuBuffs[ta.viewIdx] is null)
+                gpuBuffs[ta.viewIdx] = content.bufferViews[ta.viewIdx].createGPUBuffer(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             /* TODO:
             Such approach to buffer leads to buffer data duplication.
