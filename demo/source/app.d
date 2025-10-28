@@ -165,7 +165,7 @@ void main() {
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator);
     scope(exit) tree.destroy;
 
-    scope arena = createArena(device, scene, *frameBuilder, *initBuf);
+    scope arena = createArena(scene);
     scope(exit) arena.destroy;
 
     {
@@ -174,6 +174,8 @@ void main() {
             .addChild(Bone(mat: trans))
             .addChild(arena);
     }
+
+    tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
     import pukan.exceptions;
 
@@ -304,7 +306,7 @@ private string[] gltfFilesSearch(string dir)
     return found;
 }
 
-SceneTree createArena(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer)
+SceneTree createArena(Scene scene)
 {
     import std.math;
 
@@ -329,8 +331,6 @@ SceneTree createArena(LogicalDevice device, Scene scene, FrameBuilder frameBuild
             .addChild(Bone(mat: trans))
             .addChild(obj);
     }
-
-    tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
     return tree;
 }
@@ -399,8 +399,6 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
         textureBranch.addChild(cast(DrawablePrimitive) mesh);
     }
-
-    tree.uploadToGPUImmediate(device, frameBuilder.commandPool, commandBuffer);
 
     return tree;
 }
