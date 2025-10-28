@@ -41,7 +41,7 @@ class GlTF : DrawableByVulkan
     private GltfContent content;
     alias this = content;
 
-    private BufferPieceOnGPU[] views;
+    private BufferPieceOnGPU[] gpuBuffs;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
 
@@ -56,11 +56,13 @@ class GlTF : DrawableByVulkan
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
-        views.length = content.bufferViews.length;
+        gpuBuffs.length = content.bufferViews.length;
+
+        //TODO: usage bits will be set in indices or vertices parsing part of code
+        //FIXME: remove:
         foreach(i, buf; content.bufferViews)
         {
-            //TODO: usage bits will be set in indices or vertices parsing part of code
-            views[i] = buf.createGPUBuffer(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            gpuBuffs[i] = buf.createGPUBuffer(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         {
@@ -123,8 +125,8 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        foreach(ref v; views)
-            v.uploadImmediate(commandPool, commandBuffer);
+        foreach(ref buf; gpuBuffs)
+            buf.uploadImmediate(commandPool, commandBuffer);
 
         foreach(m; meshes)
         {
@@ -171,6 +173,10 @@ class GlTF : DrawableByVulkan
 
             if(node.mesh.verticesAccessor.stride == 0)
                 node.mesh.verticesAccessor.stride = Vector3f.sizeof;
+
+            const idx = node.mesh.verticesAccessor.viewIdx;
+            if(gpuBuffs[idx] is null)
+                gpuBuffs[idx] = content.bufferViews[idx].createGPUBuffer(device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         auto verticesRange = content.rangify!Vector3f(node.mesh.verticesAccessor);
@@ -202,7 +208,7 @@ class GlTF : DrawableByVulkan
             it's better to create a shader with a configurable stride
             value
             */
-            ubyte[] texCoordsSlice = cast(ubyte[]) views[ta.viewIdx]
+            ubyte[] texCoordsSlice = cast(ubyte[]) gpuBuffs[ta.viewIdx]
                 .buffer
                 .cpuBuf[ta.offset .. ta.offset + ta.stride * texCoords.count];
 
@@ -321,7 +327,7 @@ class GlTF : DrawableByVulkan
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
-            node.mesh.drawingBufferFilling(views, buf, trans);
+            node.mesh.drawingBufferFilling(gpuBuffs, buf, trans);
         }
 
         foreach(c; node.children)
