@@ -42,6 +42,7 @@ class GlTF : DrawableByVulkan
     alias this = content;
 
     private TransferBuffer[] buffers;
+    private View.BufferPieceOnGPU[] views;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
 
@@ -56,6 +57,7 @@ class GlTF : DrawableByVulkan
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
+        views.length = content.bufferViews.length;
         this.buffers.length = content.bufferViews.length;
         foreach(i, buf; content.bufferViews)
         {
@@ -63,6 +65,8 @@ class GlTF : DrawableByVulkan
             this.buffers[i] = device.create!TransferBuffer(buf.buf.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             //TODO: get rid of this redundant copying:
             this.buffers[i].cpuBuf[0..$] = cast(void[]) buf.buf[0 .. $];
+
+            views[i] = buf.createGPUBuffer(device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         {
@@ -127,6 +131,9 @@ class GlTF : DrawableByVulkan
     {
         foreach(ref buf; buffers)
             buf.uploadImmediate(commandPool, commandBuffer);
+
+        foreach(ref v; views)
+            v.uploadImmediate(commandPool, commandBuffer);
 
         foreach(m; meshes)
         {

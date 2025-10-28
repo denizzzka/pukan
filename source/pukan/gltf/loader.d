@@ -340,24 +340,20 @@ struct View
     static class BufferPieceOnGPU
     {
         TransferBuffer buffer;
+
+        //TODO: add flag if CPU buf is not needed after uploading
+        void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+        {
+            buffer.uploadImmediate(commandPool, commandBuffer);
+        }
     }
 
-    //TODO: add flag if CPU buf is not needed after uploading
-    private auto createGPUBuffer(LogicalDevice device, VkBufferUsageFlags flags) const
+    auto createGPUBuffer(LogicalDevice device, VkBufferUsageFlags flags) const
     {
         auto r = new BufferPieceOnGPU;
         r.buffer = device.create!TransferBuffer(buf.length, flags);
 
         r.buffer.cpuBuf[0 .. $] = cast(void[]) buf;
-
-        return r;
-    }
-
-    auto createGPUBufferAndUploadImmediate(LogicalDevice device, scope CommandPool commandPool, scope VkCommandBuffer commandBuffer, VkBufferUsageFlags flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) const
-    {
-        auto r = createGPUBuffer(device, flags);
-
-        r.buffer.uploadImmediate(commandPool, commandBuffer);
 
         return r;
     }
