@@ -245,9 +245,9 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.model = rotation.toMatrix4x4;
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(1, 1, 1), // camera position
+        Vector3f(0, -1, -2), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
-        Vector3f(0, 0, -1), // upward direction in World coordinates
+        Vector3f(0, -1, 0), // upward direction in World coordinates
     );
     wtb.proj = perspectiveMatrix(
         45.0f /* FOV */,
@@ -273,7 +273,13 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto tree = new SceneTree;
 
     auto primitTree = new PrimitivesTree;
-    tree.addChild(primitTree);
+
+    {
+        auto trans = Vector3f(0, 0.8, 0).translationMatrix;
+        tree
+            .addChild(Bone(mat: trans))
+            .addChild(primitTree);
+    }
 
     auto coloredBranch = primitTree.addChild(scene.coloredMeshFactory.graphicsPipelineCfg);
 
@@ -373,8 +379,8 @@ auto texturedVertices =
 
 ushort[] texturedIndices =
     [
-        0, 1, 2, 2, 3, 0,
-        4, 5, 6, 6, 7, 4,
+        2, 1, 0, 0, 3, 2,
+        6, 5, 4, 4, 7, 6,
     ];
 
 auto createCubeVertices()
