@@ -107,7 +107,7 @@ void main() {
     ];
 
     auto device =  physDevice.createLogicalDevice(dev_extension_list);
-    scope(exit)
+    scope(success)
     {
         import core.memory: GC;
 
