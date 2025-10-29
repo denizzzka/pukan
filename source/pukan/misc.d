@@ -47,3 +47,22 @@ private void check(ref Image image, out VkFormat format)
             enforce!PukanException(false, "Unsupported texture type: "~image.type.to!string);
     }
 }
+
+import dlib.math: Vector3f;
+
+struct Boxf
+{
+    Vector3f min;
+    Vector3f max;
+}
+
+void expandAABB(ref Boxf box, in Vector3f v)
+{
+    if(v.x < box.min.x) box.min.x = v.x;
+    else
+    if(v.x > box.max.x) box.max.x = v.x;
+
+    if(v.y < box.min.y) box.min.y = v.y;
+    else
+    if(v.y > box.max.y) box.max.y = v.y;
+}

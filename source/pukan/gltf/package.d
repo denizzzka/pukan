@@ -116,6 +116,16 @@ class GlTF : DrawableByVulkan
             mesh.updateDescriptorSetsAndUniformBuffers(device);
     }
 
+    auto calcAABB() const
+    {
+        import pukan.misc: Boxf;
+
+        Boxf r;
+
+        foreach(m; meshes)
+            m.calcAABB(r);
+    }
+
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         foreach(ref buf; gpuBuffs)
@@ -168,6 +178,7 @@ class GlTF : DrawableByVulkan
             if(node.mesh.verticesAccessor.stride == 0)
                 node.mesh.verticesAccessor.stride = Vector3f.sizeof;
 
+            //TODO: duplicates ShaderVertex buffer?
             createGpuBufIfNeed(device, node.mesh.verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 

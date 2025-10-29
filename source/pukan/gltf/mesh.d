@@ -2,6 +2,7 @@ module pukan.gltf.mesh;
 
 import dlib.math;
 public import pukan.gltf.loader: BufAccess, BufferPieceOnGPU, ComponentType;
+import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.conv: to;
@@ -101,6 +102,23 @@ class Mesh
     ~this()
     {
         uniformBuffer.destroy;
+    }
+
+    package auto calcAABB(ref Boxf box) const
+    {
+        import pukan.gltf: ShaderVertex;
+        import std.math: isNaN;
+
+        const slice = cast(ShaderVertex[]) verticesBuffer.cpuBuf;
+
+        if(box.min.x.isNaN)
+        {
+            box.min = slice[0].pos;
+            box.max = box.min;
+        }
+
+        foreach(i; 1 .. slice.length)
+            expandAABB(box, slice[i].pos);
     }
 
     private ref UBOContent ubo()
