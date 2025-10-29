@@ -165,10 +165,9 @@ void main() {
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator);
     scope(exit) tree.destroy;
 
-    scope arena = createArena(scene);
-    scope(exit) arena.destroy;
-
     {
+        auto arena = createArena(scene);
+
         auto trans = Vector3f(0, 0, 0).translationMatrix;
         tree
             .addChild(Bone(mat: trans))
@@ -306,7 +305,7 @@ private string[] gltfFilesSearch(string dir)
     return found;
 }
 
-SceneTree createArena(Scene scene)
+DrawableByVulkan createArena(Scene scene)
 {
     import std.math;
 
