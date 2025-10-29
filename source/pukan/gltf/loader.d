@@ -205,7 +205,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     enforce(scenes.length == 1);
 
     {
-        Json rootScene = scenes[ json["scene"].get!ushort ];
+        Json rootScene = scenes[ json["scene"].opt!ushort(0) ];
 
         rootSceneNode.name = rootScene["name"].opt!string;
         rootSceneNode.trans = Matrix4x4f.identity;
