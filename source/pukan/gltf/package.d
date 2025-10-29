@@ -178,8 +178,7 @@ class GlTF : DrawableByVulkan
             if(node.mesh.verticesAccessor.stride == 0)
                 node.mesh.verticesAccessor.stride = Vector3f.sizeof;
 
-            //TODO: duplicates ShaderVertex buffer?
-            createGpuBufIfNeed(device, node.mesh.verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            node.mesh.verticesBuffer = createGpuBufIfNeed(device, node.mesh.verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         auto verticesRange = content.rangify!Vector3f(node.mesh.verticesAccessor);
@@ -264,40 +263,18 @@ class GlTF : DrawableByVulkan
             }
             else
                 assert(0);
-
-
-            {
-                node.mesh.verticesBuffer = device.create!TransferBuffer(ShaderVertex.sizeof * verticesRange.accessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-                auto dstRange = cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf[0 .. $];
-
-                if(texCoordsAccessor.viewIdx >= 0)
-                {
-                    auto texCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
-
-                    zip(verticesRange, texCoordsRange, dstRange)
-                        .each!((ref vert, ref tex, ref dst){
-                            dst.pos = vert;
-                            dst.texCoord = tex;
-                        });
-                }
-                else
-                {
-                    zip(verticesRange, dstRange)
-                        .each!((ref vert, ref dst){
-                            dst.pos = vert;
-                        });
-                }
-            }
         }
 
         // Fake texture or real one provided just to stub shader input
         node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];
     }
 
-    private void createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
+    private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
     {
         if(gpuBuffs[ac.viewIdx] is null)
             gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
+
+        return &gpuBuffs[ac.viewIdx];
     }
 
     void refreshBuffers(VkCommandBuffer buf)
@@ -329,7 +306,7 @@ class GlTF : DrawableByVulkan
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
-            node.mesh.drawingBufferFilling(gpuBuffs, buf, trans);
+            node.mesh.drawingBufferFilling(buf, trans);
         }
 
         foreach(c; node.children)

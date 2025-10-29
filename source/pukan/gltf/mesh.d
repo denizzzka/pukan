@@ -55,8 +55,7 @@ class Mesh
     string name;
     /*private*/ BufAccess verticesAccessor;
     package IndicesBuf indicesBuffer;
-    //TODO: remove or not?
-    package TransferBuffer verticesBuffer;
+    package BufferPieceOnGPU* verticesBuffer;
     //TODO: remove:
     /*private*/ TransferBuffer texCoordsBuf;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
@@ -109,7 +108,7 @@ class Mesh
         import pukan.gltf: ShaderVertex;
         import std.math: isNaN;
 
-        const slice = cast(ShaderVertex[]) verticesBuffer.cpuBuf;
+        const slice = cast(ShaderVertex[]) verticesBuffer.buffer.cpuBuf;
 
         if(box.min.x.isNaN)
         {
@@ -151,17 +150,15 @@ class Mesh
         uniformBuffer.recordUpload(buf);
     }
 
-    void drawingBufferFilling(BufferPieceOnGPU[] buffers, VkCommandBuffer buf, in Matrix4x4f trans)
+    package void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
     {
         assert(verticesAccessor.stride);
-        auto vertexBuffer = buffers[verticesAccessor.viewIdx];
-        assert(vertexBuffer.buffer.cpuBuf.length > 5);
 
         VkBuffer[2] vkbuffs = [
-            vertexBuffer.buffer.gpuBuffer.buf.getVal(),
+            verticesBuffer.buffer.gpuBuffer.buf.getVal(),
             texCoordsBuf
                 ? texCoordsBuf.gpuBuffer.buf.getVal()
-                : vertexBuffer.buffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
+                : verticesBuffer.buffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
         ];
         VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
         vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
