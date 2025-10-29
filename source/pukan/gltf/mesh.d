@@ -108,16 +108,16 @@ class Mesh
         import pukan.gltf: ShaderVertex;
         import std.math: isNaN;
 
-        const slice = cast(ShaderVertex[]) verticesBuffer.buffer.cpuBuf;
+        const slice = cast(Vector3f[]) verticesBuffer.buffer.cpuBuf;
 
         if(box.min.x.isNaN)
         {
-            box.min = slice[0].pos;
+            box.min = slice[0];
             box.max = box.min;
         }
 
         foreach(i; 1 .. slice.length)
-            expandAABB(box, slice[i].pos);
+            expandAABB(box, slice[i]);
     }
 
     private ref UBOContent ubo()
