@@ -284,6 +284,7 @@ class GlTF : DrawableByVulkan
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
     {
+        // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
