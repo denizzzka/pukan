@@ -36,17 +36,9 @@ struct IndicesBuf
             default: assert(0);
         }
 
-        buffer = device.create!TransferBuffer(sz * count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    }
+        import pukan.gltf.loader: componentSizeOf;
 
-    private uint sz() const
-    {
-        switch(indexType)
-        {
-            case VK_INDEX_TYPE_UINT16: return ushort.sizeof;
-            case VK_INDEX_TYPE_UINT32: return uint.sizeof;
-            default: assert(0);
-        }
+        buffer = device.create!TransferBuffer(componentSizeOf(t) * count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     }
 }
 

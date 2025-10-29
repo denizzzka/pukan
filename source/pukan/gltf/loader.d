@@ -383,18 +383,20 @@ struct Accessor
     debug string type;
     ComponentType componentType;
 
-    ubyte componentSizeOf() const
+    ubyte componentSizeOf() const => .componentSizeOf(componentType);
+}
+
+ubyte componentSizeOf(in ComponentType componentType)
+{
+    with(ComponentType)
+    final switch(componentType)
     {
-        with(ComponentType)
-        final switch(componentType)
-        {
-            case BYTE:          return 1;
-            case UNSIGNED_BYTE: return 1;
-            case SHORT:         return 2;
-            case UNSIGNED_SHORT:return 2;
-            case UNSIGNED_INT:  return 4;
-            case FLOAT:         return 4;
-        }
+        case BYTE:          return 1;
+        case UNSIGNED_BYTE: return 1;
+        case SHORT:         return 2;
+        case UNSIGNED_SHORT:return 2;
+        case UNSIGNED_INT:  return 4;
+        case FLOAT:         return 4;
     }
 }
 
