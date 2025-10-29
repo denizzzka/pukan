@@ -215,9 +215,6 @@ class GlTF : DrawableByVulkan
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
 
-            //TODO: move this check to rangify:
-            //~ enforce(ta.offset % ta.stride == 0);
-
             import std.algorithm;
             import std.array;
 

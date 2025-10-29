@@ -297,9 +297,11 @@ struct View
 {
     const ubyte[] buf;
     const ubyte stride; // distance between start points of each element
+    debug const uint buffOffset;
 
     this(in ubyte[] buffer, uint length, uint offset, ubyte stride)
     {
+        debug buffOffset = offset;
         buf = buffer[offset .. offset + length];
         this.stride = stride;
     }
@@ -328,6 +330,9 @@ struct View
             offset: accessor["byteOffset"].opt!uint,
             componentType: accessor["componentType"].get!ComponentType,
         );
+
+        debug enforce(buffOffset % r.componentSizeOf == 0);
+        enforce(r.offset % r.componentSizeOf == 0);
 
         debug
         {
@@ -377,6 +382,20 @@ struct Accessor
     Json min_max;
     debug string type;
     ComponentType componentType;
+
+    ubyte componentSizeOf() const
+    {
+        with(ComponentType)
+        final switch(componentType)
+        {
+            case BYTE:          return 1;
+            case UNSIGNED_BYTE: return 1;
+            case SHORT:         return 2;
+            case UNSIGNED_SHORT:return 2;
+            case UNSIGNED_INT:  return 4;
+            case FLOAT:         return 4;
+        }
+    }
 }
 
 struct Mesh
@@ -467,7 +486,8 @@ private struct AccessRange(T)
         currByte = a.offset;
         bufEnd = cast(uint) v.buf.length;
 
-        assert(accessor.stride >= T.sizeof);
+        enforce(accessor.stride >= T.sizeof);
+
         assert(!empty);
     }
 
