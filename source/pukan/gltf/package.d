@@ -197,8 +197,6 @@ class GlTF : DrawableByVulkan
             node.mesh.verticesBuffer = createGpuBufIfNeed(device, node.mesh.verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
-        auto verticesRange = content.rangify!Vector3f(node.mesh.verticesAccessor);
-
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         BufAccess texCoordsAccessor;
