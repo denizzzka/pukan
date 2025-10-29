@@ -256,7 +256,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.model = rotation.toMatrix4x4;
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(0, -0.5, -1), // camera position
+        Vector3f(0, -0.02, -1), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
         Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
     );
@@ -312,20 +312,27 @@ SceneTree createArena(Scene scene)
     const found = gltfFilesSearch("demo/assets/gltf_samples/");
     const sectorAngle = PI*2 / found.length;
 
-    const diameter = 2;
-    const startPlace = Vector3f(0, 0, diameter);
+    const radius = 0.2;
+    const startPlace = Vector3f(0, 0, radius);
 
     auto tree = new SceneTree;
 
     foreach(i, filename; found)
     {
-        auto rot_quat = rotationQuaternion(Vector3f(0, -1, 0), sectorAngle * i);
-
-        const scale = 0.1;
-        const place = rot_quat.rotate(startPlace);
-        auto trans = (Vector3f(1, 1, 1) * scale).scaleMatrix * place.translationMatrix;
-
         auto obj = scene.gltfFactory.create(filename);
+        const aabb = obj.calcAABB;
+        const size = aabb.max - aabb.min;
+        const center = aabb.min + size/2;
+        const scale = 1.0 / size.length * 0.1; // 1/5 size of object
+
+        auto trans = Matrix4x4f.identity;
+
+        trans *= rotationMatrix!float(Axis.y, sectorAngle * i);
+        trans *= startPlace.translationMatrix;
+
+        trans *= (Vector3f(1, 1, 1) * scale).scaleMatrix;
+        trans *= center.translationMatrix;
+
         tree.root
             .addChild(Bone(mat: trans))
             .addChild(obj);
@@ -357,16 +364,6 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         cubeRotator = n.payload.peek!Bone;
 
         n.addChild(cast(DrawablePrimitive) cube);
-    }
-
-    {
-        const scale = 3;
-        auto trans = (Vector3f(3, 3, 3) * scale).scaleMatrix * Vector3f(0.03, 0.03, 0).translationMatrix;
-
-        auto gltfObj = scene.gltfFactory.create("demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb");
-        tree.root
-            .addChild(Bone(mat: trans))
-            .addChild(gltfObj);
     }
 
     auto textureBranch = primitTree.addChild(scene.texturedMeshFactory.graphicsPipelineCfg);
