@@ -213,26 +213,15 @@ class GlTF : DrawableByVulkan
             texCoordsAccessor = content.getAccess(*texCoords);
             auto ta = &texCoordsAccessor;
 
-            if(ta.stride == 0)
-                texCoordsAccessor.stride = Vector2f.sizeof;
+            auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
 
-            enforce(ta.stride >= Vector2f.sizeof, ta.stride.to!string);
-
-            ubyte[] texCoordsSlice = cast(ubyte[]) content.bufferViews[ta.viewIdx]
-                .buf[ta.offset .. ta.offset + ta.stride * texCoords.count];
-
-            enforce(texCoordsSlice.length > 0);
-            enforce(texCoordsSlice.length % ta.stride == 0);
+            //TODO: move this check to rangify:
+            //~ enforce(ta.offset % ta.stride == 0);
 
             import std.algorithm;
             import std.array;
-            import std.range;
 
-            auto fetchedCoords = texCoordsSlice
-                .chunks(ta.stride)
-                .map!((ubyte[] b){
-                    return *cast(Vector2f*) &b[0];
-                });
+            node.mesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             // Need to normalize coordinates?
             if(texCoords.min_max != Json.emptyObject)
@@ -247,15 +236,14 @@ class GlTF : DrawableByVulkan
                     version(BigEndian)
                         static assert(false, "big endian arch isn't supported");
 
-                    fetchedCoords
-                        .each!((e){
-                            e = (e - min) / range;
-                        });
+                    textCoordsRange
+                        .map!((Vector2f e) => (e - min) / range)
+                        .copy(cast(Vector2f[]) node.mesh.texCoordsBuf.cpuBuf[0 .. $]);
                 }
             }
 
-            node.mesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) fetchedCoords.array;
+            if(!textCoordsRange.empty)
+                node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
         }
 
         // Fill buffers with a format specifically designed for out shaders
