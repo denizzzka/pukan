@@ -184,7 +184,7 @@ class GlTF : DrawableByVulkan
 
             enforce(vertices.count > 0);
             debug assert(vertices.type == "VEC3");
-            debug assert(vertices.componentType == ComponentType.FLOAT);
+            enforce(vertices.componentType == ComponentType.FLOAT);
 
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
