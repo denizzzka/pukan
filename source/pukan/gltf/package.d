@@ -116,6 +116,20 @@ class GlTF : DrawableByVulkan
             mesh.updateDescriptorSetsAndUniformBuffers(device);
     }
 
+    string name() const
+    {
+        if(rootSceneNode.name.length)
+            return rootSceneNode.name;
+
+        //looking for first mesh name
+        foreach(m; meshes)
+            if(m.name.length)
+                return m.name;
+
+        // no name found
+        return null;
+    }
+
     auto calcAABB() const
     {
         import pukan.misc: Boxf;
@@ -124,6 +138,8 @@ class GlTF : DrawableByVulkan
 
         foreach(m; meshes)
             m.calcAABB(r);
+
+        return r;
     }
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
