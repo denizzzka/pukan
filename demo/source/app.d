@@ -166,12 +166,9 @@ void main() {
     scope(exit) tree.destroy;
 
     {
-        auto arena = createArena(scene);
-
         auto trans = Vector3f(0, 0, 0).translationMatrix;
-        tree
-            .addChild(Bone(mat: trans))
-            .addChild(/* FIXME: cast(DrawableByVulkan) */ arena);
+        auto arenaNode = tree.addChild(Bone(mat: trans));
+        createArena(scene, arenaNode);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
@@ -305,7 +302,7 @@ private string[] gltfFilesSearch(string dir)
     return found;
 }
 
-SceneTree createArena(Scene scene)
+void createArena(T)(Scene scene, ref T node)
 {
     import std.math;
 
@@ -314,8 +311,6 @@ SceneTree createArena(Scene scene)
 
     const radius = 0.2;
     const startPlace = Vector3f(0, 0, radius);
-
-    auto tree = new SceneTree;
 
     foreach(i, filename; found)
     {
@@ -333,12 +328,10 @@ SceneTree createArena(Scene scene)
         trans *= (Vector3f(1, 1, 1) * scale).scaleMatrix;
         trans *= center.translationMatrix;
 
-        tree.root
+        node
             .addChild(Bone(mat: trans))
             .addChild(obj);
     }
-
-    return tree;
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
