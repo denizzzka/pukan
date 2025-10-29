@@ -171,7 +171,7 @@ void main() {
         auto trans = Vector3f(0, 0, 0).translationMatrix;
         tree
             .addChild(Bone(mat: trans))
-            .addChild(arena);
+            .addChild(/* FIXME: cast(DrawableByVulkan) */ arena);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
@@ -305,7 +305,7 @@ private string[] gltfFilesSearch(string dir)
     return found;
 }
 
-DrawableByVulkan createArena(Scene scene)
+SceneTree createArena(Scene scene)
 {
     import std.math;
 
