@@ -4,7 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf, TexturedMesh;
+import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf, JustColoredMesh, TexturedMesh;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -160,7 +160,7 @@ class GlTF : DrawableByVulkan
         if(textures.length > 0)
             node.mesh = new TexturedMesh(device, mesh.name, meshesDescriptorSets[node.meshIdx]);
         else
-            node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+            node.mesh = new JustColoredMesh(device, mesh.name, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
 
         meshes ~= node.mesh;
 

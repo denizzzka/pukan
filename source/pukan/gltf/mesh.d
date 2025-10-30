@@ -54,14 +54,10 @@ class Mesh
     private VkDescriptorBufferInfo bufferInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
 
-    //TODO: remove
-    private VkDescriptorImageInfo fakeTexture;
-
-    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
+    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
     {
         this.name = name;
         this.descriptorSet = &descriptorSet;
-        this.fakeTexture = fakeTexture;
 
         {
             // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -122,23 +118,7 @@ class Mesh
         return *cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
     }
 
-    void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
-    {
-        VkWriteDescriptorSet[] descriptorWrites = [
-            uboWriteDescriptor,
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: *descriptorSet,
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &fakeTexture,
-            ),
-        ];
-
-        device.updateDescriptorSets(descriptorWrites);
-    }
+    abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
 
     void refreshBuffers(VkCommandBuffer buf)
     {
@@ -161,7 +141,38 @@ class Mesh
     }
 }
 
-//TODO: implement non-textured Mesh
+///
+final class JustColoredMesh : Mesh
+{
+    private VkDescriptorImageInfo fakeTexture;
+
+    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
+    {
+        this.fakeTexture = fakeTexture;
+
+        super(device, name, descriptorSet);
+    }
+
+    override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
+    {
+        VkWriteDescriptorSet[] descriptorWrites = [
+            uboWriteDescriptor,
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: *descriptorSet,
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: &fakeTexture,
+            ),
+        ];
+
+        device.updateDescriptorSets(descriptorWrites);
+    }
+}
+
+///
 final class TexturedMesh : Mesh
 {
     /*private*/ TransferBuffer texCoordsBuf;
@@ -169,9 +180,7 @@ final class TexturedMesh : Mesh
 
     package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
     {
-        VkDescriptorImageInfo unused_fake_texture;
-
-        super(device, name, descriptorSet, unused_fake_texture);
+        super(device, name, descriptorSet);
         ubo.material.renderType.x = 1; // is textured
     }
 
