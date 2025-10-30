@@ -6,7 +6,6 @@ import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
 import std.array;
-import std.stdio;
 import std.exception: enforce;
 static import std.file;
 static import std.path;
@@ -452,8 +451,6 @@ struct GltfContent
     auto rangify(T)(BufAccess bufAccessor) const
     {
         assert(bufAccessor.viewIdx >= 0);
-        writeln("rangify bufferViews.length=", bufferViews.length);
-        writeln("rangify bufAccessor.viewIdx=", bufAccessor.viewIdx);
 
         return AccessRange!T(bufferViews[bufAccessor.viewIdx], bufAccessor);
     }
@@ -493,20 +490,7 @@ private struct AccessRange(T)
 
         enforce(accessor.stride >= T.sizeof);
 
-        const byteSize = bufEnd - currByte;
-        writeln("AccessRange buff view offset=", v.buffOffset);
-        writeln("AccessRange start byte=", currByte);
-        writeln("AccessRange   end byte=", bufEnd);
-        writeln("AccessRange byteSize=", byteSize);
-        writeln("AccessRange   stride=", accessor.stride);
-        writeln("AccessRange item count=", length);
-
-        //~ enforce(byteSize % accessor.stride == 0);
-        //~ enforce(byteSize / accessor.stride == length());
-
         assert(!empty);
-
-        writeln("AccessRange created, accessor=", accessor);
     }
 
     void popFront()

@@ -314,9 +314,6 @@ void createArena(T)(Scene scene, ref T node)
 
     foreach(i, filename; found)
     {
-        import std.stdio;
-        if(filename != "demo/assets/gltf_samples/MandarinOrange/glTF/MandarinOrange.gltf") continue;
-        writeln(filename);
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
