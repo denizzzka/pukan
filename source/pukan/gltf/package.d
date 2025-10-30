@@ -8,6 +8,9 @@ import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
+import std.algorithm;
+import std.array;
+import std.range;
 import std.conv: to;
 import std.exception: enforce;
 import vibe.data.json;
@@ -41,6 +44,7 @@ class GlTF : DrawableByVulkan
     private GltfContent content;
     alias this = content;
 
+    //FIXME: unused, remove
     private BufferPieceOnGPU[] gpuBuffs;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
@@ -151,6 +155,7 @@ class GlTF : DrawableByVulkan
         foreach(m; meshes)
         {
             m.indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
+            m.verticesBuffer.uploadImmediate(commandPool, commandBuffer);
 
             if(m.texCoordsBuf)
                 m.texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
@@ -189,12 +194,10 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            node.mesh.verticesAccessor = content.getAccess(*vertices);
-
-            if(node.mesh.verticesAccessor.stride == 0)
-                node.mesh.verticesAccessor.stride = Vector3f.sizeof;
-
-            node.mesh.verticesBuffer = createGpuBufIfNeed(device, node.mesh.verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            auto verticesAccessor = content.getAccess(*vertices);
+            auto range = content.rangify!Vector3f(verticesAccessor);
+            node.mesh.verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            range.copy(cast(Vector3f[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -218,9 +221,6 @@ class GlTF : DrawableByVulkan
             auto ta = &texCoordsAccessor;
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
-
-            import std.algorithm;
-            import std.array;
 
             node.mesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -250,8 +250,6 @@ class GlTF : DrawableByVulkan
         // Fill buffers with a format specifically designed for out shaders
         //TODO: move this block closer to index accessor creation
         {
-            import std.algorithm;
-            import std.range;
             import std.stdio;
 
             writeln(">>>>>>>>>>>>>>>>> INDICES RANGIFY:");
@@ -276,6 +274,7 @@ class GlTF : DrawableByVulkan
         node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];
     }
 
+    //FIXME: remove
     private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
     {
         if(gpuBuffs[ac.viewIdx] is null)
