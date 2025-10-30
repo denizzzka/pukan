@@ -54,10 +54,14 @@ class Mesh
     private VkDescriptorBufferInfo bufferInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
 
-    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet, bool isTextured)
+    //TODO: remove
+    private VkDescriptorImageInfo fakeTexture;
+
+    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
     {
         this.name = name;
         this.descriptorSet = &descriptorSet;
+        this.fakeTexture = fakeTexture;
 
         {
             // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -65,7 +69,7 @@ class Mesh
             uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
             ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
-            ubo.material.renderType.x = isTextured ? 1 : 0;
+            ubo.material.renderType.x = 0; // is not textured
 
             // Prepare descriptor
             bufferInfo = VkDescriptorBufferInfo(
@@ -120,6 +124,20 @@ class Mesh
 
     void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
+        VkWriteDescriptorSet[] descriptorWrites = [
+            uboWriteDescriptor,
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: *descriptorSet,
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: &fakeTexture,
+            ),
+        ];
+
+        device.updateDescriptorSets(descriptorWrites);
     }
 
     void refreshBuffers(VkCommandBuffer buf)
@@ -151,7 +169,10 @@ final class TexturedMesh : Mesh
 
     package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
     {
-        super(device, name, descriptorSet, true);
+        VkDescriptorImageInfo unused_fake_texture;
+
+        super(device, name, descriptorSet, unused_fake_texture);
+        ubo.material.renderType.x = 1; // is textured
     }
 
     override void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)

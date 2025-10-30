@@ -84,6 +84,7 @@ class GlTF : DrawableByVulkan
                 at all to substitute texture data that is unconditionally
                 passed to the shader.
                 */
+                //TODO: move to the factory:
                 fakeTexture = createFakeTexture1x1(device);
 
                 texturesDescrInfos.length = 1;
@@ -159,8 +160,7 @@ class GlTF : DrawableByVulkan
         if(textures.length > 0)
             node.mesh = new TexturedMesh(device, mesh.name, meshesDescriptorSets[node.meshIdx]);
         else
-            assert(false);
-            //~ node.mesh = new (device, mesh.name, meshesDescriptorSets[node.meshIdx], textures.length > 0);
+            node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
 
         meshes ~= node.mesh;
 
@@ -225,7 +225,8 @@ class GlTF : DrawableByVulkan
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
 
-            node.mesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            auto texturedMesh = cast(TexturedMesh) node.mesh;
+            texturedMesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             // Need to normalize coordinates?
             if(texCoords.min_max != Json.emptyObject)
@@ -242,12 +243,15 @@ class GlTF : DrawableByVulkan
 
                     textCoordsRange
                         .map!((Vector2f e) => (e - min) / range)
-                        .copy(cast(Vector2f[]) node.mesh.texCoordsBuf.cpuBuf[0 .. $]);
+                        .copy(cast(Vector2f[]) texturedMesh.texCoordsBuf.cpuBuf[0 .. $]);
                 }
             }
 
             if(!textCoordsRange.empty)
-                node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
+                texturedMesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
+
+            // Fake texture or real one provided just to stub shader input
+            texturedMesh.textureDescrImageInfo = &texturesDescrInfos[0];
         }
 
         {
@@ -263,9 +267,6 @@ class GlTF : DrawableByVulkan
                 //~ .map!((pos, tex) => ShaderVertex(posCoord: pos, texCoord: tex))
                 //~ .copy(cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
         }
-
-        // Fake texture or real one provided just to stub shader input
-        node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];
     }
 
     void refreshBuffers(VkCommandBuffer buf)
