@@ -91,6 +91,12 @@ class Mesh
         uniformBuffer.destroy;
     }
 
+    void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
+        verticesBuffer.uploadImmediate(commandPool, commandBuffer);
+    }
+
     package auto calcAABB(ref Boxf box) const
     {
         import std.math: isNaN;
@@ -146,6 +152,12 @@ final class TexturedMesh : Mesh
     package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, descriptorSet, true);
+    }
+
+    override void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        super.uploadImmediate(commandPool, commandBuffer);
+        texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)

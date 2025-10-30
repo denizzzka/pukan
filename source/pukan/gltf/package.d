@@ -145,13 +145,7 @@ class GlTF : DrawableByVulkan
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         foreach(m; meshes)
-        {
-            m.indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
-            m.verticesBuffer.uploadImmediate(commandPool, commandBuffer);
-
-            if(m.texCoordsBuf)
-                m.texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
-        }
+            m.uploadImmediate(commandPool, commandBuffer);
     }
 
     private void setUpEachNode(ref Node node, LogicalDevice device)
