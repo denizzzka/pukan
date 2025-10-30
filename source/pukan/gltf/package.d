@@ -203,6 +203,10 @@ class GlTF : DrawableByVulkan
 
         if(content.textures.length)
         {
+            import std.stdio;
+
+            writeln(">>>>>>>>>>>>>>>>> TEXTURES RANGIFY:");
+
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
             auto texCoords = &accessors[idx];
 
@@ -244,9 +248,13 @@ class GlTF : DrawableByVulkan
         }
 
         // Fill buffers with a format specifically designed for out shaders
+        //TODO: move this block closer to index accessor creation
         {
             import std.algorithm;
             import std.range;
+            import std.stdio;
+
+            writeln(">>>>>>>>>>>>>>>>> INDICES RANGIFY:");
 
             if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
             {

@@ -253,7 +253,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.model = rotation.toMatrix4x4;
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(0, -0.2, -1), // camera position
+        Vector3f(0, -0.2, -0.5), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
         Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
     );
@@ -314,6 +314,9 @@ void createArena(T)(Scene scene, ref T node)
 
     foreach(i, filename; found)
     {
+        import std.stdio;
+        if(filename != "demo/assets/gltf_samples/MandarinOrange/glTF/MandarinOrange.gltf") continue;
+        writeln(filename);
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
