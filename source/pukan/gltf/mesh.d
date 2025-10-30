@@ -45,10 +45,9 @@ struct IndicesBuf
 class Mesh
 {
     string name;
-    /*private*/ BufAccess verticesAccessor;
     package IndicesBuf indicesBuffer;
-    package BufferPieceOnGPU* verticesBuffer;
-    //TODO: remove:
+    package TransferBuffer verticesBuffer;
+    //TODO: remove (use struct with vertex coord):
     /*private*/ TransferBuffer texCoordsBuf;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
     /*private*/ VkDescriptorSet* descriptorSet;
@@ -100,7 +99,7 @@ class Mesh
         import pukan.gltf: ShaderVertex;
         import std.math: isNaN;
 
-        const slice = cast(Vector3f[]) verticesBuffer.buffer.cpuBuf;
+        const slice = cast(Vector3f[]) verticesBuffer.cpuBuf;
 
         if(box.min.x.isNaN)
         {
@@ -144,15 +143,13 @@ class Mesh
 
     package void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
     {
-        assert(verticesAccessor.stride);
-
         VkBuffer[2] vkbuffs = [
-            verticesBuffer.buffer.gpuBuffer.buf.getVal(),
+            verticesBuffer.gpuBuffer.buf.getVal(),
             texCoordsBuf
                 ? texCoordsBuf.gpuBuffer.buf.getVal()
-                : verticesBuffer.buffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
+                : verticesBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
         ];
-        VkDeviceSize[2] offsets = [verticesAccessor.offset, 0];
+        immutable VkDeviceSize[2] offsets = [0, 0];
         vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
 
         assert(indicesBuffer.count);

@@ -8,6 +8,9 @@ import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
+import std.algorithm;
+import std.array;
+import std.range;
 import std.conv: to;
 import std.exception: enforce;
 import vibe.data.json;
@@ -41,7 +44,6 @@ class GlTF : DrawableByVulkan
     private GltfContent content;
     alias this = content;
 
-    private BufferPieceOnGPU[] gpuBuffs;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
 
@@ -55,8 +57,6 @@ class GlTF : DrawableByVulkan
         this.pipeline = &pipeline;
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
-
-        gpuBuffs.length = content.bufferViews.length;
 
         {
             Node createNodeHier(ref LoaderNode ln)
@@ -144,13 +144,10 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        foreach(ref buf; gpuBuffs)
-            if(buf)
-                buf.uploadImmediate(commandPool, commandBuffer);
-
         foreach(m; meshes)
         {
             m.indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
+            m.verticesBuffer.uploadImmediate(commandPool, commandBuffer);
 
             if(m.texCoordsBuf)
                 m.texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
@@ -163,7 +160,7 @@ class GlTF : DrawableByVulkan
         if(node.meshIdx < 0) return;
 
         const mesh = &content.meshes[node.meshIdx];
-        assert(mesh.primitives.length == 1);
+        assert(mesh.primitives.length == 1, "FIXME: only one mesh primitive supported for now");
 
         node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], textures.length > 0);
         meshes ~= node.mesh;
@@ -189,12 +186,10 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            node.mesh.verticesAccessor = content.getAccess(*vertices);
-
-            if(node.mesh.verticesAccessor.stride == 0)
-                node.mesh.verticesAccessor.stride = Vector3f.sizeof;
-
-            node.mesh.verticesBuffer = createGpuBufIfNeed(device, node.mesh.verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            auto verticesAccessor = content.getAccess(*vertices);
+            auto range = content.rangify!Vector3f(verticesAccessor);
+            node.mesh.verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            range.copy(cast(Vector3f[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -214,9 +209,6 @@ class GlTF : DrawableByVulkan
             auto ta = &texCoordsAccessor;
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
-
-            import std.algorithm;
-            import std.array;
 
             node.mesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -244,10 +236,8 @@ class GlTF : DrawableByVulkan
         }
 
         // Fill buffers with a format specifically designed for out shaders
+        //TODO: move this block closer to index accessor creation
         {
-            import std.algorithm;
-            import std.range;
-
             if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
             {
                 auto indicesRange = content.rangify!ushort(indicesAccessor);
@@ -266,14 +256,6 @@ class GlTF : DrawableByVulkan
 
         // Fake texture or real one provided just to stub shader input
         node.mesh.textureDescrImageInfo = &texturesDescrInfos[0];
-    }
-
-    private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
-    {
-        if(gpuBuffs[ac.viewIdx] is null)
-            gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
-
-        return &gpuBuffs[ac.viewIdx];
     }
 
     void refreshBuffers(VkCommandBuffer buf)

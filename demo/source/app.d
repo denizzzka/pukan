@@ -253,7 +253,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.model = rotation.toMatrix4x4;
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(0, -0.2, -1), // camera position
+        Vector3f(0, -0.2, -0.8), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
         Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
     );
@@ -310,7 +310,7 @@ void createArena(T)(Scene scene, ref T node)
     const sectorAngle = PI*2 / found.length;
 
     const radius = 0.2;
-    const startPlace = Vector3f(0, 0, radius);
+    const startPlace = Vector3f(0, 0, -radius);
 
     foreach(i, filename; found)
     {
