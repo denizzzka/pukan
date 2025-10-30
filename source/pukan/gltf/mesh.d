@@ -42,14 +42,11 @@ struct IndicesBuf
     }
 }
 
-abstract class Mesh
+class Mesh
 {
     string name;
     package IndicesBuf indicesBuffer;
     package TransferBuffer verticesBuffer;
-    //TODO: remove (use struct with vertex coord):
-    /*private*/ TransferBuffer texCoordsBuf;
-    /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
     /*private*/ VkDescriptorSet* descriptorSet;
 
     private TransferBuffer uniformBuffer;
@@ -96,7 +93,6 @@ abstract class Mesh
 
     package auto calcAABB(ref Boxf box) const
     {
-        import pukan.gltf: ShaderVertex;
         import std.math: isNaN;
 
         const slice = cast(Vector3f[]) verticesBuffer.cpuBuf;
@@ -116,7 +112,9 @@ abstract class Mesh
         return *cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
     }
 
-    abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
+    void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
+    {
+    }
 
     void refreshBuffers(VkCommandBuffer buf)
     {
@@ -124,19 +122,16 @@ abstract class Mesh
         uniformBuffer.recordUpload(buf);
     }
 
-    package void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
     {
         VkBuffer[2] vkbuffs = [
             verticesBuffer.gpuBuffer.buf.getVal(),
-            texCoordsBuf
-                ? texCoordsBuf.gpuBuffer.buf.getVal()
-                : verticesBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
+            verticesBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
         ];
         immutable VkDeviceSize[2] offsets = [0, 0];
         vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
 
         assert(indicesBuffer.count);
-
         vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
         vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
     }
@@ -145,6 +140,9 @@ abstract class Mesh
 //TODO: implement non-textured Mesh
 final class TexturedMesh : Mesh
 {
+    /*private*/ TransferBuffer texCoordsBuf;
+    /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
+
     package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, descriptorSet, true);
@@ -167,5 +165,19 @@ final class TexturedMesh : Mesh
         ];
 
         device.updateDescriptorSets(descriptorWrites);
+    }
+
+    override void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
+    {
+        VkBuffer[2] vkbuffs = [
+            verticesBuffer.gpuBuffer.buf.getVal(),
+            texCoordsBuf.gpuBuffer.buf.getVal(),
+        ];
+        immutable VkDeviceSize[2] offsets = [0, 0];
+        vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
+
+        assert(indicesBuffer.count);
+        vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
+        vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
     }
 }
