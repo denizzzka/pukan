@@ -42,6 +42,7 @@ struct IndicesBuf
     }
 }
 
+//TODO: implement non-textured meshes?
 class Mesh
 {
     string name;

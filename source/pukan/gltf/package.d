@@ -192,6 +192,8 @@ class GlTF : DrawableByVulkan
                 assert(0);
         }
 
+        BufAccess verticesAccessor;
+
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
             auto vertices = &accessors[vertIdx];
@@ -203,10 +205,7 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            auto verticesAccessor = content.getAccess(*vertices);
-            auto range = content.rangify!Vector3f(verticesAccessor);
-            node.mesh.verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            range.copy(cast(Vector3f[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
+            verticesAccessor = content.getAccess(*vertices);
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -250,6 +249,20 @@ class GlTF : DrawableByVulkan
 
             if(!textCoordsRange.empty)
                 node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
+        }
+
+        {
+            auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
+
+            //~ node.mesh.verticesBuffer = device.create!TransferBuffer(ShaderVertex.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            node.mesh.verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            verticesRange
+                .copy(cast(Vector3f[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
+
+            //~ zip(verticesRange, textCoordsRange)
+                //~ .map!((pos, tex) => ShaderVertex(posCoord: pos, texCoord: tex))
+                //~ .copy(cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
         }
 
         // Fake texture or real one provided just to stub shader input
