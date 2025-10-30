@@ -168,12 +168,29 @@ class GlTF : DrawableByVulkan
         const primitive = &mesh.primitives[0];
         enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
 
-        auto indices = accessors[ primitive.indicesAccessorIdx ];
+        {
+            auto indices = accessors[ primitive.indicesAccessorIdx ];
 
-        debug enforce(indices.type == "SCALAR", indices.type.to!string);
+            debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
-        const indicesAccessor = content.getAccess(indices);
-        node.mesh.indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
+            const indicesAccessor = content.getAccess(indices);
+            node.mesh.indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
+
+            if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
+            {
+                auto indicesRange = content.rangify!ushort(indicesAccessor);
+                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
+                indicesRange.copy(dstRange);
+            }
+            else if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
+            {
+                auto indicesRange = content.rangify!uint(indicesAccessor);
+                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
+                indicesRange.copy(dstRange);
+            }
+            else
+                assert(0);
+        }
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -233,25 +250,6 @@ class GlTF : DrawableByVulkan
 
             if(!textCoordsRange.empty)
                 node.mesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
-        }
-
-        // Fill buffers with a format specifically designed for out shaders
-        //TODO: move this block closer to index accessor creation
-        {
-            if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
-            {
-                auto indicesRange = content.rangify!ushort(indicesAccessor);
-                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
-                indicesRange.copy(dstRange);
-            }
-            else if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
-            {
-                auto indicesRange = content.rangify!uint(indicesAccessor);
-                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
-                indicesRange.copy(dstRange);
-            }
-            else
-                assert(0);
         }
 
         // Fake texture or real one provided just to stub shader input
