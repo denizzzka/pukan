@@ -22,7 +22,7 @@ class Scene
 
     import pukan.primitives_tree: PrimitivesFactory;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
-    PrimitivesFactory!TexturedMesh texturedMeshFactory;
+    PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
     GltfFactory gltfFactory;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)

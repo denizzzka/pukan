@@ -4,7 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf;
+import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf, TexturedMesh;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -162,7 +162,12 @@ class GlTF : DrawableByVulkan
         const mesh = &content.meshes[node.meshIdx];
         assert(mesh.primitives.length == 1, "FIXME: only one mesh primitive supported for now");
 
-        node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], textures.length > 0);
+        if(textures.length > 0)
+            node.mesh = new TexturedMesh(device, mesh.name, meshesDescriptorSets[node.meshIdx]);
+        else
+            assert(false);
+            //~ node.mesh = new (device, mesh.name, meshesDescriptorSets[node.meshIdx], textures.length > 0);
+
         meshes ~= node.mesh;
 
         const primitive = &mesh.primitives[0];

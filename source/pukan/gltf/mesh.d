@@ -42,8 +42,7 @@ struct IndicesBuf
     }
 }
 
-//TODO: implement non-textured meshes?
-class Mesh
+abstract class Mesh
 {
     string name;
     package IndicesBuf indicesBuffer;
@@ -117,24 +116,7 @@ class Mesh
         return *cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
     }
 
-    package void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
-    {
-        //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
-        VkWriteDescriptorSet[] descriptorWrites = [
-            uboWriteDescriptor,
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: *descriptorSet,
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: textureDescrImageInfo,
-            ),
-        ];
-
-        device.updateDescriptorSets(descriptorWrites);
-    }
+    abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
 
     void refreshBuffers(VkCommandBuffer buf)
     {
@@ -157,5 +139,33 @@ class Mesh
 
         vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
         vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
+    }
+}
+
+//TODO: implement non-textured Mesh
+final class TexturedMesh : Mesh
+{
+    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
+    {
+        super(device, name, descriptorSet, true);
+    }
+
+    override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
+    {
+        //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
+        VkWriteDescriptorSet[] descriptorWrites = [
+            uboWriteDescriptor,
+            VkWriteDescriptorSet(
+                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                dstSet: *descriptorSet,
+                dstBinding: 1,
+                dstArrayElement: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                pImageInfo: textureDescrImageInfo,
+            ),
+        ];
+
+        device.updateDescriptorSets(descriptorWrites);
     }
 }
