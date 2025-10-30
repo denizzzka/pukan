@@ -237,7 +237,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             enforce(mime);
             enforce(
                 mime.get!string == "image/jpeg" || mime.get!string == "image/png",
-                (*mime).to!string
+                "Unsupported image type: "~(*mime).to!string
             );
 
             const View view = ret.bufferViews[viewIdxPtr.get!ushort];

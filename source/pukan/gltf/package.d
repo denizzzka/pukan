@@ -163,7 +163,7 @@ class GlTF : DrawableByVulkan
         if(node.meshIdx < 0) return;
 
         const mesh = &content.meshes[node.meshIdx];
-        assert(mesh.primitives.length == 1);
+        assert(mesh.primitives.length == 1, "FIXME: only one mesh primitive supported for now");
 
         node.mesh = new MeshClass(device, mesh.name, meshesDescriptorSets[node.meshIdx], textures.length > 0);
         meshes ~= node.mesh;
