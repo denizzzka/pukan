@@ -115,7 +115,7 @@ class Mesh
 
         //FIXME:
         box.min = Vector3f(0, 0, 0);
-        box.max = Vector3f(0.2, 0.2, 0.2);
+        box.max = Vector3f(2.2, 2.2, 2.2);
 
         //~ const slice = cast(Vector3f[]) verticesBuffer.cpuBuf;
 

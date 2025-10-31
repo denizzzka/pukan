@@ -309,18 +309,19 @@ void createArena(T)(Scene scene, ref T node)
     const found = gltfFilesSearch("demo/assets/gltf_samples/");
     const sectorAngle = PI*2 / found.length;
 
-    const radius = 0.2;
+    const radius = 0; //.2;
     const startPlace = Vector3f(0, 0, -radius);
 
     foreach(i, filename; found)
     {
         //~ if(filename != "demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf") continue;
         //~ if(filename != "demo/assets/gltf_samples/SimpleTexture/glTF/SimpleTexture.gltf") continue;
+        if(filename != "demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf") continue;
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
         const center = aabb.min + size/2;
-        const scale = 1.0 / size.length * 0.1;
+        const scale = 0.1; // 1.0 / size.length * 0.1;
 
         auto trans = Matrix4x4f.identity;
 

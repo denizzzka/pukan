@@ -226,7 +226,8 @@ class GlTF : DrawableByVulkan
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
-        if(content.textures.length)
+        //~ if(content.textures.length)
+        version(none)
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
             auto texCoords = &accessors[idx];
@@ -238,10 +239,17 @@ class GlTF : DrawableByVulkan
             BufAccess texCoordsAccessor = content.getAccess(*texCoords);
 
             // Need to normalize coordinates?
-            if(texCoords.min_max != Json.emptyObject)
+            //~ if(texCoords.min_max != Json.emptyObject)
+            //~ version(none)
             {
                 const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
                 const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
+
+                {
+                    import std.stdio;
+                    auto texRange = content.rangify!Vector2f(texCoordsAccessor);
+                    writeln(texRange);
+                }
 
                 //FIXME: enable
                  //~ if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
@@ -250,11 +258,17 @@ class GlTF : DrawableByVulkan
                     auto texRange = content.rangify!TexCoord(texCoordsAccessor);
                     auto texRangeOutput = content.rangify!(TexCoord, true)(texCoordsAccessor);
 
-                    const size = max - min;
+                    const range = max - min;
 
                     texRange
-                        .map!((TexCoord e) => (e - min) / size)
+                        .map!((TexCoord e) => (e - min) / range)
                         .copy(texRangeOutput);
+                }
+
+                {
+                    import std.stdio;
+                    auto texRange = content.rangify!Vector2f(texCoordsAccessor);
+                    writeln(texRange);
                 }
             }
 
