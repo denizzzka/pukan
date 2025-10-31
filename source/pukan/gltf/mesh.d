@@ -231,14 +231,4 @@ final class TexturedMesh : Mesh
 
         device.updateDescriptorSets(descriptorWrites);
     }
-
-    //~ override void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
-    //~ {
-        //~ immutable VkDeviceSize[2] offsets = [0, 0];
-        //~ vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
-
-        //~ assert(indicesBuffer.count);
-        //~ vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
-        //~ vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
-    //~ }
 }
