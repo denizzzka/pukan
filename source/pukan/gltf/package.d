@@ -154,10 +154,12 @@ class GlTF : DrawableByVulkan
         assert(mesh.primitives.length == 1, "FIXME: only one mesh primitive supported for now");
 
         const primitive = &mesh.primitives[0];
-        enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
 
+        uint elemCount;
         IndicesBuf indicesBuffer;
 
+        // If indexed mesh:
+        if(primitive.indicesAccessorIdx >= 0)
         {
             auto indices = accessors[ primitive.indicesAccessorIdx ];
 
@@ -165,6 +167,7 @@ class GlTF : DrawableByVulkan
 
             const indicesAccessor = content.getAccess(indices);
             indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
+            elemCount = indicesBuffer.count;
 
             if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
             {
@@ -181,8 +184,10 @@ class GlTF : DrawableByVulkan
             else
                 assert(0);
         }
+        //~ else
+            //~ elemCount = verticesAccessor.count;
 
-        BufAccess verticesAccessor;
+        TransferBuffer verticesBuffer;
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -195,12 +200,8 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            verticesAccessor = content.getAccess(*vertices);
-        }
+            BufAccess verticesAccessor = content.getAccess(*vertices);
 
-        TransferBuffer verticesBuffer;
-
-        {
             auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
 
             verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -214,6 +215,8 @@ class GlTF : DrawableByVulkan
                 node.mesh = new TexturedMesh(device, mesh.name, verticesBuffer, indicesBuffer, meshesDescriptorSets[node.meshIdx]);
             else
                 node.mesh = new JustColoredMesh(device, mesh.name, verticesBuffer, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+
+            node.mesh.elemCount = elemCount;
 
             meshes ~= node.mesh;
         }
@@ -292,7 +295,7 @@ class GlTF : DrawableByVulkan
 
         trans *= node.trans;
 
-        if(node.mesh && node.mesh.indicesBuffer.count)
+        if(node.mesh && node.mesh.elemCount)
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 

@@ -22,7 +22,7 @@ struct IndicesBuf
 {
     TransferBuffer buffer;
     VkIndexType indexType;
-    uint count;
+    uint count; //TODO: remove
 
     this(LogicalDevice device, ComponentType t, uint count)
     {
@@ -47,7 +47,9 @@ class Mesh
     string name;
     package IndicesBuf indicesBuffer;
     package TransferBuffer verticesBuffer;
+    package uint elemCount; /// Number of vertices or indices, depending of mesh type
     /*private*/ VkDescriptorSet* descriptorSet;
+    protected VkBuffer[2] vkBuffs;
 
     private TransferBuffer uniformBuffer;
     private VkDescriptorBufferInfo uboInfo;
@@ -60,6 +62,13 @@ class Mesh
         this.descriptorSet = &descriptorSet;
         verticesBuffer = vertices;
         indicesBuffer = indices;
+
+        assert(verticesBuffer && verticesBuffer.gpuBuffer);
+
+        vkBuffs = [
+            verticesBuffer.gpuBuffer.buf.getVal(),
+            verticesBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
+        ];
 
         {
             // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -95,7 +104,9 @@ class Mesh
 
     void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
+        if(indicesBuffer.buffer !is null)
+            indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
+
         verticesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
@@ -130,16 +141,22 @@ class Mesh
 
     void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
     {
-        VkBuffer[2] vkbuffs = [
-            verticesBuffer.gpuBuffer.buf.getVal(),
-            verticesBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
-        ];
-        immutable VkDeviceSize[2] offsets = [0, 0];
-        vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
+        assert(elemCount);
 
-        assert(indicesBuffer.count);
-        vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
-        vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
+        immutable VkDeviceSize[2] offsets = [0, 0];
+        vkCmdBindVertexBuffers(buf, 0, cast(uint) vkBuffs.length, vkBuffs.ptr, offsets.ptr);
+
+        if(indicesBuffer.buffer is null)
+        {
+            // Non-indexed mesh
+            vkCmdDraw(buf, elemCount, 1, 0, 0);
+        }
+        else
+        {
+            assert(indicesBuffer.count);
+            vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
+            vkCmdDrawIndexed(buf, elemCount, 1, 0, 0, 0);
+        }
     }
 }
 
@@ -183,6 +200,7 @@ final class TexturedMesh : Mesh
     package this(LogicalDevice device, string name, TransferBuffer vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, vertices, indices, descriptorSet);
+
         ubo.material.renderType.x = 1; // is textured
     }
 
@@ -194,6 +212,9 @@ final class TexturedMesh : Mesh
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
+        //TODO: move to ctor?
+        vkBuffs[1] = texCoordsBuf.gpuBuffer.buf.getVal();
+
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
         VkWriteDescriptorSet[] descriptorWrites = [
             uboWriteDescriptor,
@@ -211,17 +232,13 @@ final class TexturedMesh : Mesh
         device.updateDescriptorSets(descriptorWrites);
     }
 
-    override void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
-    {
-        VkBuffer[2] vkbuffs = [
-            verticesBuffer.gpuBuffer.buf.getVal(),
-            texCoordsBuf.gpuBuffer.buf.getVal(),
-        ];
-        immutable VkDeviceSize[2] offsets = [0, 0];
-        vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
+    //~ override void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
+    //~ {
+        //~ immutable VkDeviceSize[2] offsets = [0, 0];
+        //~ vkCmdBindVertexBuffers(buf, 0, cast(uint) vkbuffs.length, vkbuffs.ptr, offsets.ptr);
 
-        assert(indicesBuffer.count);
-        vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
-        vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
-    }
+        //~ assert(indicesBuffer.count);
+        //~ vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
+        //~ vkCmdDrawIndexed(buf, indicesBuffer.count, 1, 0, 0, 0);
+    //~ }
 }
