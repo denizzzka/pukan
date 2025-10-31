@@ -1,7 +1,7 @@
 module pukan.gltf.mesh;
 
 import dlib.math;
-public import pukan.gltf.loader: BufAccess, BufferPieceOnGPU, ComponentType, bindVertexBuffers;
+public import pukan.gltf.loader: BufAccess, BufferPieceOnGPU, ComponentType, bindVertexBuffers, AccessRange;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -109,24 +109,22 @@ class Mesh
         //~ verticesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
-    package auto calcAABB(ref Boxf box) const
+    package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
     {
         import std.math: isNaN;
 
-        //FIXME:
-        box.min = Vector3f(0, 0, 0);
-        box.max = Vector3f(0.2, 0.2, 0.2);
+        auto range = AccessRange!(Vector3f, false)(gpuBuffs[vertices.viewIdx].buffer.cpuBuf, vertices);
 
-        //~ const slice = cast(Vector3f[]) verticesBuffer.cpuBuf;
+        if(box.min.x.isNaN)
+        {
+            box.min = range.front;
+            box.max = box.min;
 
-        //~ if(box.min.x.isNaN)
-        //~ {
-            //~ box.min = slice[0];
-            //~ box.max = box.min;
-        //~ }
+            range.popFront;
+        }
 
-        //~ foreach(i; 1 .. slice.length)
-            //~ expandAABB(box, slice[i]);
+        foreach(e; range)
+            expandAABB(box, e);
     }
 
     private ref UBOContent ubo()
