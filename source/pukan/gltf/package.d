@@ -153,15 +153,10 @@ class GlTF : DrawableByVulkan
         const mesh = &content.meshes[node.meshIdx];
         assert(mesh.primitives.length == 1, "FIXME: only one mesh primitive supported for now");
 
-        if(textures.length > 0)
-            node.mesh = new TexturedMesh(device, mesh.name, meshesDescriptorSets[node.meshIdx]);
-        else
-            node.mesh = new JustColoredMesh(device, mesh.name, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
-
-        meshes ~= node.mesh;
-
         const primitive = &mesh.primitives[0];
         enforce(primitive.indicesAccessorIdx != -1, "non-indexed geometry isn't supported");
+
+        IndicesBuf indicesBuffer;
 
         {
             auto indices = accessors[ primitive.indicesAccessorIdx ];
@@ -169,18 +164,18 @@ class GlTF : DrawableByVulkan
             debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
             const indicesAccessor = content.getAccess(indices);
-            node.mesh.indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
+            indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
 
-            if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
+            if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
             {
                 auto indicesRange = content.rangify!ushort(indicesAccessor);
-                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
+                auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
                 indicesRange.copy(dstRange);
             }
-            else if(node.mesh.indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
+            else if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
             {
                 auto indicesRange = content.rangify!uint(indicesAccessor);
-                auto dstRange = cast(indicesRange.Elem[]) node.mesh.indicesBuffer.buffer.cpuBuf;
+                auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
                 indicesRange.copy(dstRange);
             }
             else
@@ -201,6 +196,26 @@ class GlTF : DrawableByVulkan
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
             verticesAccessor = content.getAccess(*vertices);
+        }
+
+        TransferBuffer verticesBuffer;
+
+        {
+            auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
+
+            verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            verticesRange
+                .copy(cast(Vector3f[]) verticesBuffer.cpuBuf[0 .. $]);
+        }
+
+        {
+            if(textures.length > 0)
+                node.mesh = new TexturedMesh(device, mesh.name, verticesBuffer, indicesBuffer, meshesDescriptorSets[node.meshIdx]);
+            else
+                node.mesh = new JustColoredMesh(device, mesh.name, verticesBuffer, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+
+            meshes ~= node.mesh;
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -248,20 +263,6 @@ class GlTF : DrawableByVulkan
 
             // Fake texture or real one provided just to stub shader input
             texturedMesh.textureDescrImageInfo = &texturesDescrInfos[0];
-        }
-
-        {
-            auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
-
-            //~ node.mesh.verticesBuffer = device.create!TransferBuffer(ShaderVertex.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            node.mesh.verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            verticesRange
-                .copy(cast(Vector3f[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
-
-            //~ zip(verticesRange, textCoordsRange)
-                //~ .map!((pos, tex) => ShaderVertex(posCoord: pos, texCoord: tex))
-                //~ .copy(cast(ShaderVertex[]) node.mesh.verticesBuffer.cpuBuf[0 .. $]);
         }
     }
 

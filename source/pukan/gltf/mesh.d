@@ -54,10 +54,12 @@ class Mesh
     private VkDescriptorBufferInfo bufferInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
 
-    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, TransferBuffer vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
     {
         this.name = name;
         this.descriptorSet = &descriptorSet;
+        verticesBuffer = vertices;
+        indicesBuffer = indices;
 
         {
             // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -146,11 +148,11 @@ final class JustColoredMesh : Mesh
 {
     private VkDescriptorImageInfo fakeTexture;
 
-    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
+    package this(LogicalDevice device, string name, TransferBuffer vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
     {
         this.fakeTexture = fakeTexture;
 
-        super(device, name, descriptorSet);
+        super(device, name, vertices, indices, descriptorSet);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
@@ -178,9 +180,9 @@ final class TexturedMesh : Mesh
     /*private*/ TransferBuffer texCoordsBuf;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, TransferBuffer vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
     {
-        super(device, name, descriptorSet);
+        super(device, name, vertices, indices, descriptorSet);
         ubo.material.renderType.x = 1; // is textured
     }
 
