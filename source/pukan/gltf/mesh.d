@@ -1,7 +1,7 @@
 module pukan.gltf.mesh;
 
 import dlib.math;
-public import pukan.gltf.loader: BufAccess, BufferPieceOnGPU, ComponentType;
+public import pukan.gltf.loader: BufAccess, BufferPieceOnGPU, ComponentType, bindVertexBuffers;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -43,28 +43,30 @@ class Mesh
 {
     string name;
     package IndicesBuf indicesBuffer;
-    package TransferBuffer verticesBuffer;
+    package BufAccess vertices;
+    //~ package TransferBuffer verticesBuffer;
     package uint elemCount; /// Number of vertices or indices, depending of mesh type
     /*private*/ VkDescriptorSet* descriptorSet;
-    protected VkBuffer[2] vkBuffs;
+    protected BufAccess[2] vertAndTex;
 
     private TransferBuffer uniformBuffer;
     private VkDescriptorBufferInfo uboInfo;
     private VkDescriptorBufferInfo bufferInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
 
-    package this(LogicalDevice device, string name, TransferBuffer vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
     {
         this.name = name;
         this.descriptorSet = &descriptorSet;
-        verticesBuffer = vertices;
+        this.vertices = vertices;
+        //~ verticesBuffer = vertices;
         indicesBuffer = indices;
 
-        assert(verticesBuffer && verticesBuffer.gpuBuffer);
+        assert(vertices.viewIdx >= 0);
 
-        vkBuffs = [
-            verticesBuffer.gpuBuffer.buf.getVal(),
-            verticesBuffer.gpuBuffer.buf.getVal(), // fake data to fill out texture coords buffer on non-textured objects
+        vertAndTex = [
+            vertices,
+            vertices, // fake data to fill out texture coords buffer on non-textured objects
         ];
 
         {
@@ -104,23 +106,27 @@ class Mesh
         if(indicesBuffer.buffer !is null)
             indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
 
-        verticesBuffer.uploadImmediate(commandPool, commandBuffer);
+        //~ verticesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
     package auto calcAABB(ref Boxf box) const
     {
         import std.math: isNaN;
 
-        const slice = cast(Vector3f[]) verticesBuffer.cpuBuf;
+        //FIXME:
+        box.min = Vector3f(0, 0, 0);
+        box.max = Vector3f(0.2, 0.2, 0.2);
 
-        if(box.min.x.isNaN)
-        {
-            box.min = slice[0];
-            box.max = box.min;
-        }
+        //~ const slice = cast(Vector3f[]) verticesBuffer.cpuBuf;
 
-        foreach(i; 1 .. slice.length)
-            expandAABB(box, slice[i]);
+        //~ if(box.min.x.isNaN)
+        //~ {
+            //~ box.min = slice[0];
+            //~ box.max = box.min;
+        //~ }
+
+        //~ foreach(i; 1 .. slice.length)
+            //~ expandAABB(box, slice[i]);
     }
 
     private ref UBOContent ubo()
@@ -136,12 +142,14 @@ class Mesh
         uniformBuffer.recordUpload(buf);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, in Matrix4x4f trans)
+    void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf, /* TODO: remove: */ in Matrix4x4f trans)
     {
         assert(elemCount);
 
-        immutable VkDeviceSize[2] offsets = [0, 0];
-        vkCmdBindVertexBuffers(buf, 0, cast(uint) vkBuffs.length, vkBuffs.ptr, offsets.ptr);
+        bindVertexBuffers(gpuBuffs, vertAndTex, buf);
+
+        //~ immutable VkDeviceSize[2] offsets = [0, 0];
+        //~ vkCmdBindVertexBuffers(buf, 0, cast(uint) vkBuffs.length, vkBuffs.ptr, offsets.ptr);
 
         if(indicesBuffer.buffer is null)
         {
@@ -161,7 +169,7 @@ final class JustColoredMesh : Mesh
 {
     private VkDescriptorImageInfo fakeTexture;
 
-    package this(LogicalDevice device, string name, TransferBuffer vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
     {
         this.fakeTexture = fakeTexture;
 
@@ -193,7 +201,7 @@ final class TexturedMesh : Mesh
     /*private*/ TransferBuffer texCoordsBuf;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, TransferBuffer vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, vertices, indices, descriptorSet);
 
@@ -208,8 +216,10 @@ final class TexturedMesh : Mesh
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        //TODO: move to ctor?
-        vkBuffs[1] = texCoordsBuf.gpuBuffer.buf.getVal();
+        assert(false);
+        //TODO: move to ctor
+        //FIXME:
+        //~ vertAndTex[1] = texCoordsBuf.gpuBuffer.buf.getVal();
 
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
         VkWriteDescriptorSet[] descriptorWrites = [
