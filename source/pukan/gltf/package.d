@@ -43,6 +43,7 @@ class GlTF : DrawableByVulkan
     private GltfContent content;
     alias this = content;
 
+    private BufferPieceOnGPU[] gpuBuffs;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private GraphicsPipelineCfg* pipeline;
 
@@ -56,6 +57,8 @@ class GlTF : DrawableByVulkan
         this.pipeline = &pipeline;
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
+
+        gpuBuffs.length = content.bufferViews.length;
 
         {
             Node createNodeHier(ref LoaderNode ln)
@@ -141,6 +144,10 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        foreach(ref buf; gpuBuffs)
+            if(buf)
+                buf.uploadImmediate(commandPool, commandBuffer);
+
         foreach(m; meshes)
             m.uploadImmediate(commandPool, commandBuffer);
     }
@@ -271,6 +278,14 @@ class GlTF : DrawableByVulkan
             // Fake texture or real one provided just to stub shader input
             texturedMesh.textureDescrImageInfo = &texturesDescrInfos[0];
         }
+    }
+
+    private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
+    {
+        if(gpuBuffs[ac.viewIdx] is null)
+            gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
+
+        return &gpuBuffs[ac.viewIdx];
     }
 
     void refreshBuffers(VkCommandBuffer buf)
