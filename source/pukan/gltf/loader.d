@@ -490,16 +490,7 @@ in(gpuBuffs.length > 0)
         strides[i] = acc.stride;
     }
 
-    //~ import std.stdio;
-    //~ writeln(buffers);
-    //~ writeln(offsets);
-    //~ writeln(sizes);
-    //~ writeln(strides);
-
-    //FIXME: enable
-    //~ vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
-
-    vkCmdBindVertexBuffers(cmdBuf, 0, cast(uint) buffers.length, buffers.ptr, offsets.ptr);
+    vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
 
 private struct AccessRange(T)
