@@ -191,7 +191,7 @@ class GlTF : DrawableByVulkan
 
             const indicesAccessor = content.getAccess(indices);
             indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
-            elemCount = indicesBuffer.count;
+            elemCount = indices.count;
 
             if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
             {

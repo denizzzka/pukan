@@ -22,12 +22,9 @@ struct IndicesBuf
 {
     TransferBuffer buffer;
     VkIndexType indexType;
-    uint count; //TODO: remove
 
     this(LogicalDevice device, ComponentType t, uint count)
     {
-        this.count = count;
-
         with(ComponentType)
         switch(t)
         {
@@ -153,7 +150,6 @@ class Mesh
         }
         else
         {
-            assert(indicesBuffer.count);
             vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
             vkCmdDrawIndexed(buf, elemCount, 1, 0, 0, 0);
         }
