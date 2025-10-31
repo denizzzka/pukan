@@ -155,6 +155,30 @@ class GlTF : DrawableByVulkan
 
         const primitive = &mesh.primitives[0];
 
+        BufAccess verticesAccessor;
+        TransferBuffer verticesBuffer;
+
+        {
+            const vertIdx = primitive.attributes["POSITION"].get!ushort;
+            auto vertices = &accessors[vertIdx];
+
+            enforce(vertices.count > 0);
+            debug assert(vertices.type == "VEC3");
+            enforce(vertices.componentType == ComponentType.FLOAT);
+
+            import dlib.math: Vector3f;
+            static assert(Vector3f.sizeof == float.sizeof * 3);
+
+            verticesAccessor = content.getAccess(*vertices);
+
+            auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
+
+            verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            verticesRange
+                .copy(cast(Vector3f[]) verticesBuffer.cpuBuf[0 .. $]);
+        }
+
         uint elemCount;
         IndicesBuf indicesBuffer;
 
@@ -184,30 +208,10 @@ class GlTF : DrawableByVulkan
             else
                 assert(0);
         }
-        //~ else
-            //~ elemCount = verticesAccessor.count;
-
-        TransferBuffer verticesBuffer;
-
+        else
         {
-            const vertIdx = primitive.attributes["POSITION"].get!ushort;
-            auto vertices = &accessors[vertIdx];
-
-            enforce(vertices.count > 0);
-            debug assert(vertices.type == "VEC3");
-            enforce(vertices.componentType == ComponentType.FLOAT);
-
-            import dlib.math: Vector3f;
-            static assert(Vector3f.sizeof == float.sizeof * 3);
-
-            BufAccess verticesAccessor = content.getAccess(*vertices);
-
-            auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
-
-            verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            verticesRange
-                .copy(cast(Vector3f[]) verticesBuffer.cpuBuf[0 .. $]);
+            // Non-indixed meshes:
+            elemCount = verticesAccessor.count;
         }
 
         {
