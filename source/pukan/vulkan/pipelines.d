@@ -70,17 +70,16 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
         );
     }
 
-    VkDynamicState[] dynamicStates;
-    VkPipelineDynamicStateCreateInfo dynamicState;
+    VkDynamicState[] dynamicStates = [
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+    ];
+
+    VkPipelineDynamicStateCreateInfo dynamicStateInfo;
 
     void initDynamicStates()
     {
-        dynamicStates = [
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR,
-        ];
-
-        dynamicState = VkPipelineDynamicStateCreateInfo(
+        dynamicStateInfo = VkPipelineDynamicStateCreateInfo(
             sType: VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
             dynamicStateCount: cast(uint) dynamicStates.length,
             pDynamicStates: dynamicStates.ptr,
@@ -132,7 +131,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
             pDepthStencilState: &depthStencil,
 
             pColorBlendState: &colorBlending,
-            pDynamicState: &dynamicState,
+            pDynamicState: &dynamicStateInfo,
             layout: pipelineLayout,
             renderPass: renderPass.vkRenderPass,
             subpass: 0,
