@@ -464,6 +464,19 @@ struct BufAccess
     uint offset;
     ubyte stride;
     uint count;
+
+    //TODO: bind whole bunch of object buffers?
+    void bindVertexBuffer(BufferPieceOnGPU gpuBuf, VkCommandBuffer cmdBuf)
+    in(viewIdx >= 0)
+    in(count)
+    {
+        VkBuffer[1] buffers = [gpuBuf.buffer.gpuBuffer.buf.getVal()];
+        immutable VkDeviceSize[1] offsets = [offset];
+        immutable VkDeviceSize[1] sizes = [count];
+        immutable VkDeviceSize[1] strides = [stride];
+
+        vkCmdBindVertexBuffers2(cmdBuf, 0, 1, buffers.ptr, offsets.ptr, sizes.ptr, strides.ptr);
+    }
 }
 
 private struct AccessRange(T)
