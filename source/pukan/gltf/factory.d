@@ -27,6 +27,7 @@ struct GltfFactory
     //TODO: contains part of poolAndLayout data. Deduplicate?
     private DefaultGraphicsPipelineInfoCreator!ShaderVertex pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
+    private Texture fakeTexture; /// Stub to fill texture shader arg of non-textured meshes
 
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
     {
@@ -40,12 +41,14 @@ struct GltfFactory
 
         auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
         graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineCreateInfo])[0];
+
+        fakeTexture = createFakeTexture1x1(device);
     }
 
     auto create(string filename)
     {
         assert(device);
 
-        return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg);
+        return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture);
     }
 }

@@ -40,7 +40,6 @@ class Node : BaseNode
 class GlTF : DrawableByVulkan
 {
     private Node rootSceneNode;
-    private Texture fakeTexture;
     private GltfContent content;
     alias this = content;
 
@@ -52,7 +51,7 @@ class GlTF : DrawableByVulkan
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
-    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode)
+    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
     {
         this.pipeline = &pipeline;
         content = cont;
@@ -84,9 +83,6 @@ class GlTF : DrawableByVulkan
                 at all to substitute texture data that is unconditionally
                 passed to the shader.
                 */
-                //TODO: move to the factory:
-                fakeTexture = createFakeTexture1x1(device);
-
                 texturesDescrInfos.length = 1;
                 texturesDescrInfos[0] = VkDescriptorImageInfo(
                     imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,

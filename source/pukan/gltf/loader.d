@@ -84,7 +84,7 @@ private struct ChunkHeader
 }
 
 ///
-package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline)
+package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline, Texture fakeTexture)
 {
     auto gltfFile = readGltfFile(filename);
     const json = gltfFile.json;
@@ -275,7 +275,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
-    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode);
+    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
 }
 
 struct Buffer
