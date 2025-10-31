@@ -456,7 +456,6 @@ struct GltfContent
     }
 }
 
-//TODO: private?
 struct BufAccess
 {
     //TODO: remove?
@@ -466,10 +465,12 @@ struct BufAccess
     uint count;
 
     //TODO: bind whole bunch of object buffers?
-    void bindVertexBuffer(BufferPieceOnGPU gpuBuf, VkCommandBuffer cmdBuf)
+    void bindVertexBuffer(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer cmdBuf)
     in(viewIdx >= 0)
     in(count)
     {
+        auto gpuBuf = gpuBuffs[viewIdx];
+
         VkBuffer[1] buffers = [gpuBuf.buffer.gpuBuffer.buf.getVal()];
         immutable VkDeviceSize[1] offsets = [offset];
         immutable VkDeviceSize[1] sizes = [count];
