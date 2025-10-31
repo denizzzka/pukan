@@ -448,11 +448,11 @@ struct GltfContent
         );
     }
 
-    auto rangify(T)(BufAccess bufAccessor) const
+    auto rangify(T, bool isOutput = false)(BufAccess bufAccessor) const
     {
         assert(bufAccessor.viewIdx >= 0);
 
-        return AccessRange!T(bufferViews[bufAccessor.viewIdx], bufAccessor);
+        return AccessRange!(T, isOutput)(bufferViews[bufAccessor.viewIdx], bufAccessor);
     }
 }
 
@@ -493,7 +493,7 @@ in(gpuBuffs.length > 0)
     vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
 
-private struct AccessRange(T)
+private struct AccessRange(T, bool isOutput)
 {
     private const View view;
     const BufAccess accessor;
@@ -533,12 +533,21 @@ private struct AccessRange(T)
     bool empty() const => currStep >= length;
 
     version(LittleEndian)
-    ref T front() const
+    private T* frontPtr() inout
     {
-        return *(cast(T*) cast(void*) &view.buf[currByte]);
+        return cast(T*) cast(void*) &view.buf[currByte];
     }
     else
         static assert(false, "big endian not implemented");
+
+    ref T front() const => *frontPtr();
+
+    static if(isOutput)
+    void put(T val)
+    {
+        *frontPtr = val;
+        popFront;
+    }
 }
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
