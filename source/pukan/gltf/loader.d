@@ -456,16 +456,18 @@ struct GltfContent
     }
 }
 
+//TODO: move to mesh module?
 struct BufAccess
 {
-    //TODO: remove?
     ptrdiff_t viewIdx = -1;
     uint offset;
     ubyte stride;
     uint count;
 }
 
+//TODO: move to Mesh
 void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
+in(gpuBuffs.length > 0)
 {
     const len = accessors.length;
     assert(len > 0);
@@ -475,17 +477,20 @@ void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, Vk
     auto sizes = new VkDeviceSize[len];
     auto strides = new VkDeviceSize[len];
 
-    foreach(i, acc; accessors)
+    foreach(i, const acc; accessors)
     {
         assert(acc.viewIdx >= 0);
 
-        buffers[i] = gpuBuffs[acc.viewIdx].buffer.gpuBuffer.buf.getVal();
+        auto gpuBuf = gpuBuffs[acc.viewIdx];
+        assert(gpuBuf);
+
+        buffers[i] = gpuBuf.buffer.gpuBuffer.buf.getVal();
         offsets[i] = acc.offset;
-        sizes[i] = acc.count; //??
+        sizes[i] = acc.stride * acc.count;
         strides[i] = acc.stride;
     }
 
-    vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, buffers.ptr, offsets.ptr, sizes.ptr, strides.ptr);
+    vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
 
 private struct AccessRange(T)

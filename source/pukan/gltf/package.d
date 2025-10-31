@@ -163,6 +163,7 @@ class GlTF : DrawableByVulkan
         const primitive = &mesh.primitives[0];
 
         BufAccess verticesAccessor;
+        //TODO: remove
         TransferBuffer verticesBuffer;
 
         {
@@ -177,6 +178,8 @@ class GlTF : DrawableByVulkan
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
             verticesAccessor = content.getAccess(*vertices);
+
+            createGpuBufIfNeed(device, verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
 
@@ -223,9 +226,9 @@ class GlTF : DrawableByVulkan
 
         {
             if(textures.length > 0)
-                node.mesh = new TexturedMesh(device, mesh.name, verticesBuffer, indicesBuffer, meshesDescriptorSets[node.meshIdx]);
+                node.mesh = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx]);
             else
-                node.mesh = new JustColoredMesh(device, mesh.name, verticesBuffer, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+                node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
 
             node.mesh.elemCount = elemCount;
 
@@ -318,7 +321,7 @@ class GlTF : DrawableByVulkan
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
-            node.mesh.drawingBufferFilling(buf, trans);
+            node.mesh.drawingBufferFilling(gpuBuffs, buf, trans);
         }
 
         foreach(c; node.children)

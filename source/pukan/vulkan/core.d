@@ -22,7 +22,7 @@ class Instance
 {
     VkApplicationInfo info = {
          sType: VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
-         apiVersion: makeApiVersion(0, 1, 2, 0),
+         apiVersion: makeApiVersion(0, 1, 3, 0),
          pEngineName: "pukan",
          engineVersion: makeApiVersion(0, 0, 0, 1),
     };
