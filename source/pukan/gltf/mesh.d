@@ -198,25 +198,27 @@ final class JustColoredMesh : Mesh
 ///
 final class TexturedMesh : Mesh
 {
-    /*private*/ TransferBuffer texCoordsBuf;
+    //~ /*private*/ TransferBuffer texCoordsBuf;
+    private BufAccess texCoords;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, BufAccess texCoords, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, vertices, indices, descriptorSet);
 
+        this.texCoords = texCoords;
         ubo.material.renderType.x = 1; // is textured
     }
 
+    //TODO: remove?
     override void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         super.uploadImmediate(commandPool, commandBuffer);
-        texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        assert(false);
+        //~ assert(false);
         //TODO: move to ctor
         //FIXME:
         //~ vertAndTex[1] = texCoordsBuf.gpuBuffer.buf.getVal();

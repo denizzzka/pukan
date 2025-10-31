@@ -224,20 +224,7 @@ class GlTF : DrawableByVulkan
             elemCount = verticesAccessor.count;
         }
 
-        {
-            if(textures.length > 0)
-                node.mesh = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx]);
-            else
-                node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
-
-            node.mesh.elemCount = elemCount;
-
-            meshes ~= node.mesh;
-        }
-
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
-
-        BufAccess texCoordsAccessor;
 
         if(content.textures.length)
         {
@@ -248,13 +235,7 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            texCoordsAccessor = content.getAccess(*texCoords);
-            auto ta = &texCoordsAccessor;
-
-            auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
-
-            auto texturedMesh = cast(TexturedMesh) node.mesh;
-            texturedMesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            BufAccess texCoordsAccessor = content.getAccess(*texCoords);
 
             // Need to normalize coordinates?
             if(texCoords.min_max != Json.emptyObject)
@@ -262,25 +243,36 @@ class GlTF : DrawableByVulkan
                 const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
                 const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
 
-                if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
+                //FIXME: enable
+                 //~ if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
                 {
-                    const range = max - min;
+                    alias TexCoord = Vector2f;
+                    auto texRange = content.rangify!TexCoord(texCoordsAccessor);
+                    auto texRangeOutput = content.rangify!(TexCoord, true)(texCoordsAccessor);
 
-                    version(BigEndian)
-                        static assert(false, "big endian arch isn't supported");
+                    const size = max - min;
 
-                    textCoordsRange
-                        .map!((Vector2f e) => (e - min) / range)
-                        .copy(cast(Vector2f[]) texturedMesh.texCoordsBuf.cpuBuf[0 .. $]);
+                    texRange
+                        .map!((TexCoord e) => (e - min) / size)
+                        .copy(texRangeOutput);
                 }
             }
 
-            if(!textCoordsRange.empty)
-                texturedMesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
+            createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-            // Fake texture or real one provided just to stub shader input
-            texturedMesh.textureDescrImageInfo = &texturesDescrInfos[0];
+            auto m = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
+            m.textureDescrImageInfo = &texturesDescrInfos[0];
+
+            node.mesh = m;
         }
+        else
+        {
+            node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+        }
+
+        node.mesh.elemCount = elemCount;
+
+        meshes ~= node.mesh;
     }
 
     private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
