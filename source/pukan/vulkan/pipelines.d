@@ -78,6 +78,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
         dynamicStates = [
             VK_DYNAMIC_STATE_VIEWPORT,
             VK_DYNAMIC_STATE_SCISSOR,
+            //~ VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, //TODO: enable only for glTF pipelines
         ];
 
         dynamicState = VkPipelineDynamicStateCreateInfo(
