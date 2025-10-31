@@ -137,7 +137,7 @@ class GlTF : DrawableByVulkan
         Boxf r;
 
         foreach(m; meshes)
-            m.calcAABB(r);
+            m.calcAABB(gpuBuffs, r);
 
         return r;
     }
