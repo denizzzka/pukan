@@ -463,21 +463,30 @@ struct BufAccess
     uint offset;
     ubyte stride;
     uint count;
+}
 
-    //TODO: bind whole bunch of object buffers?
-    void bindVertexBuffer(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer cmdBuf)
-    in(viewIdx >= 0)
-    in(count)
+//TODO: bind whole bunch of object buffers?
+void bindVertexBuffer(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
+{
+    const len = accessors.length;
+    assert(len > 0);
+
+    auto buffers = new VkBuffer[len];
+    auto offsets = new VkDeviceSize[len];
+    auto sizes = new VkDeviceSize[len];
+    auto strides = new VkDeviceSize[len];
+
+    foreach(i, acc; accessors)
     {
-        auto gpuBuf = gpuBuffs[viewIdx];
+        assert(acc.viewIdx >= 0);
 
-        VkBuffer[1] buffers = [gpuBuf.buffer.gpuBuffer.buf.getVal()];
-        immutable VkDeviceSize[1] offsets = [offset];
-        immutable VkDeviceSize[1] sizes = [count];
-        immutable VkDeviceSize[1] strides = [stride];
-
-        vkCmdBindVertexBuffers2(cmdBuf, 0, 1, buffers.ptr, offsets.ptr, sizes.ptr, strides.ptr);
+        buffers[i] = gpuBuffs[acc.viewIdx].buffer.gpuBuffer.buf.getVal();
+        offsets[i] = acc.offset;
+        sizes[i] = acc.count; //??
+        strides[i] = acc.stride;
     }
+
+    vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, buffers.ptr, offsets.ptr, sizes.ptr, strides.ptr);
 }
 
 private struct AccessRange(T)
