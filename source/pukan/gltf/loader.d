@@ -465,8 +465,7 @@ struct BufAccess
     uint count;
 }
 
-//TODO: bind whole bunch of object buffers?
-void bindVertexBuffer(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
+void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
 {
     const len = accessors.length;
     assert(len > 0);
