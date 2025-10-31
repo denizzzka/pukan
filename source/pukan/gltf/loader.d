@@ -452,7 +452,7 @@ struct GltfContent
     {
         assert(bufAccessor.viewIdx >= 0);
 
-        return AccessRange!(T, isOutput)(bufferViews[bufAccessor.viewIdx], bufAccessor);
+        return AccessRange!(T, isOutput)(bufferViews[bufAccessor.viewIdx].buf, bufAccessor);
     }
 }
 
@@ -493,9 +493,9 @@ in(gpuBuffs.length > 0)
     vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
 
-private struct AccessRange(T, bool isOutput)
+package struct AccessRange(T, bool isOutput)
 {
-    private const View view;
+    private const void[] buf;
     const BufAccess accessor;
     private const uint bufEnd;
     private uint currByte;
@@ -503,9 +503,9 @@ private struct AccessRange(T, bool isOutput)
 
     alias Elem = T;
 
-    package this(in View v, in BufAccess a)
+    package this(in void[] b, in BufAccess a)
     {
-        view = v;
+        buf = b;
 
         BufAccess tmp = a;
         if(tmp.stride == 0)
@@ -513,7 +513,7 @@ private struct AccessRange(T, bool isOutput)
 
         accessor = tmp;
         currByte = accessor.offset;
-        bufEnd = cast(uint) v.buf.length;
+        bufEnd = cast(uint) buf.length;
 
         enforce(accessor.stride >= T.sizeof);
 
@@ -537,7 +537,7 @@ private struct AccessRange(T, bool isOutput)
 
     private T* frontPtr() inout
     {
-        return cast(T*) cast(void*) &view.buf[currByte];
+        return cast(T*) cast(void*) &buf[currByte];
     }
 
     ref T front() const => *frontPtr();
