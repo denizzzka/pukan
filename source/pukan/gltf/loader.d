@@ -532,18 +532,18 @@ private struct AccessRange(T, bool isOutput)
     uint length() const => accessor.count;
     bool empty() const => currStep >= length;
 
-    version(LittleEndian)
+    version(BigEndian)
+    static assert(false, "big endian not implemented");
+
     private T* frontPtr() inout
     {
         return cast(T*) cast(void*) &view.buf[currByte];
     }
-    else
-        static assert(false, "big endian not implemented");
 
     ref T front() const => *frontPtr();
 
     static if(isOutput)
-    void put(T val)
+    void put(ref T val)
     {
         *frontPtr = val;
         popFront;
