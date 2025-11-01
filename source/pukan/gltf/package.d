@@ -228,7 +228,9 @@ class GlTF : DrawableByVulkan
 
         BufAccess texCoordsAccessor;
 
-        if(content.textures.length)
+        if(!content.textures.length)
+            node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+        else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
             auto texCoords = &accessors[idx];
@@ -272,8 +274,6 @@ class GlTF : DrawableByVulkan
                 node.mesh = m;
             }
         }
-        else
-            node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
 
         //TODO: move to ctor
         node.mesh.elemCount = elemCount;
