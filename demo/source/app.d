@@ -315,6 +315,7 @@ void createArena(T)(Scene scene, ref T node)
     foreach(i, filename; found)
     {
         //~ if(filename != "demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf") continue;
+        //~ if(filename != "demo/assets/gltf_samples/BoxTextured/glTF-Binary/BoxTextured.glb") continue;
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
