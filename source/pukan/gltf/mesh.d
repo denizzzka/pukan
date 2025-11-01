@@ -142,7 +142,7 @@ class Mesh
 
     void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf, /* TODO: remove: */ in Matrix4x4f trans)
     {
-        assert(elemCount);
+        assert(elemCount > 0);
 
         bindVertexBuffers(gpuBuffs, vertAndTex, buf);
 

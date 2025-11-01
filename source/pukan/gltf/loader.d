@@ -436,13 +436,24 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
 
-    const BufAccess getAccess(in Accessor accessor)
+    const BufAccess getAccess(T = void)(in Accessor accessor)
     {
         const view = bufferViews[accessor.viewIdx];
 
+        static if(!is(T == void))
+        {
+            const stride = view.stride ? view.stride : T.sizeof;
+            assert(stride >= T.sizeof);
+        }
+        else
+        {
+            // tightly packed data of unknown type
+            const stride = 0;
+        }
+
         return BufAccess(
             offset: accessor.offset,
-            stride: view.stride,
+            stride: stride,
             viewIdx: accessor.viewIdx,
             count: accessor.count,
         );
@@ -469,8 +480,9 @@ struct BufAccess
 void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
 in(gpuBuffs.length > 0)
 {
-    const len = accessors.length;
+    const len = cast(uint) accessors.length;
     assert(len > 0);
+    assert(len == 2);
 
     auto buffers = new VkBuffer[len];
     auto offsets = new VkDeviceSize[len];
@@ -480,6 +492,7 @@ in(gpuBuffs.length > 0)
     foreach(i, const acc; accessors)
     {
         assert(acc.viewIdx >= 0);
+        assert(acc.stride > 0);
 
         auto gpuBuf = gpuBuffs[acc.viewIdx];
         assert(gpuBuf !is null);
@@ -490,7 +503,7 @@ in(gpuBuffs.length > 0)
         strides[i] = acc.stride;
     }
 
-    vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
+    vkCmdBindVertexBuffers2(cmdBuf, 0, len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
 
 package struct AccessRange(T, bool isOutput)
@@ -509,7 +522,10 @@ package struct AccessRange(T, bool isOutput)
 
         BufAccess tmp = a;
         if(tmp.stride == 0)
+        {
+            // tightly packed data
             tmp.stride = T.sizeof;
+        }
 
         accessor = tmp;
         currByte = accessor.offset;
