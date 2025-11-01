@@ -177,7 +177,7 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            verticesAccessor = content.getAccess(*vertices);
+            verticesAccessor = content.getAccess!Vector3f(*vertices);
 
             createGpuBufIfNeed(device, verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -199,7 +199,7 @@ class GlTF : DrawableByVulkan
 
             debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
-            const indicesAccessor = content.getAccess(indices);
+            const indicesAccessor = content.getAccess!ushort(indices);
             indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
             elemCount = indices.count;
 

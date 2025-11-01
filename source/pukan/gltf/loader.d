@@ -436,13 +436,16 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
 
-    const BufAccess getAccess(in Accessor accessor)
+    const BufAccess getAccess(T)(in Accessor accessor)
     {
         const view = bufferViews[accessor.viewIdx];
 
+        const stride = view.stride ? view.stride : T.sizeof;
+        assert(stride >= T.sizeof);
+
         return BufAccess(
             offset: accessor.offset,
-            stride: view.stride,
+            stride: stride,
             viewIdx: accessor.viewIdx,
             count: accessor.count,
         );
@@ -484,6 +487,7 @@ in(gpuBuffs.length > 0)
     foreach(i, const acc; accessors)
     {
         assert(acc.viewIdx >= 0);
+        assert(acc.stride > 0);
 
         auto gpuBuf = gpuBuffs[acc.viewIdx];
         assert(gpuBuf !is null);
