@@ -196,7 +196,8 @@ final class JustColoredMesh : Mesh
 ///
 final class TexturedMesh : Mesh
 {
-    /*private*/ TransferBuffer texCoordsBuf;
+    //~ /*private*/ TransferBuffer texCoordsBuf;
+    BufAccess texCoords;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
     package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
@@ -209,15 +210,13 @@ final class TexturedMesh : Mesh
     override void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         super.uploadImmediate(commandPool, commandBuffer);
-        texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
+        //~ texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        assert(false);
         //TODO: move to ctor
-        //FIXME:
-        //~ vertAndTex[1] = texCoordsBuf.gpuBuffer.buf.getVal();
+        vertAndTex[1] = texCoords;
 
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
         VkWriteDescriptorSet[] descriptorWrites = [
