@@ -264,24 +264,21 @@ class GlTF : DrawableByVulkan
             }
 
             createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        }
 
-        {
-            if(textures.length > 0)
             {
                 auto m = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
             }
-            else
-                node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
-
-            //TODO: move to ctor
-            node.mesh.elemCount = elemCount;
-
-            meshes ~= node.mesh;
         }
+        else
+            node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+
+        //TODO: move to ctor
+        node.mesh.elemCount = elemCount;
+
+        meshes ~= node.mesh;
     }
 
     private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
