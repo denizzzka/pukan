@@ -226,8 +226,6 @@ class GlTF : DrawableByVulkan
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
-        BufAccess texCoordsAccessor;
-
         if(!content.textures.length)
             node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
         else
@@ -239,7 +237,7 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            texCoordsAccessor = content.getAccess(*texCoords);
+            BufAccess texCoordsAccessor = content.getAccess(*texCoords);
             auto ta = &texCoordsAccessor;
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
