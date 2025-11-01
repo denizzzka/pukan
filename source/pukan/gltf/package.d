@@ -177,7 +177,7 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            verticesAccessor = content.getAccess(*vertices);
+            verticesAccessor = content.getAccess!Vector3f(*vertices);
 
             createGpuBufIfNeed(device, verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -237,7 +237,7 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            BufAccess texCoordsAccessor = content.getAccess(*texCoords);
+            BufAccess texCoordsAccessor = content.getAccess!Vector2f(*texCoords);
             auto ta = &texCoordsAccessor;
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);

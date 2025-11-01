@@ -436,13 +436,24 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
 
-    const BufAccess getAccess(in Accessor accessor)
+    const BufAccess getAccess(T = void)(in Accessor accessor)
     {
         const view = bufferViews[accessor.viewIdx];
 
+        static if(!is(T == void))
+        {
+            const stride = view.stride ? view.stride : T.sizeof;
+            assert(stride >= T.sizeof);
+        }
+        else
+        {
+            // tightly packed data of unknown type
+            const stride = 0;
+        }
+
         return BufAccess(
             offset: accessor.offset,
-            stride: view.stride,
+            stride: stride,
             viewIdx: accessor.viewIdx,
             count: accessor.count,
         );
