@@ -270,7 +270,7 @@ class GlTF : DrawableByVulkan
             if(textures.length > 0)
             {
                 auto m = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
-                //FIXME:
+                //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
             }
