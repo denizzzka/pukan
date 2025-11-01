@@ -224,17 +224,6 @@ class GlTF : DrawableByVulkan
             elemCount = verticesAccessor.count;
         }
 
-        {
-            if(textures.length > 0)
-                node.mesh = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx]);
-            else
-                node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
-
-            node.mesh.elemCount = elemCount;
-
-            meshes ~= node.mesh;
-        }
-
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         BufAccess texCoordsAccessor;
@@ -252,10 +241,6 @@ class GlTF : DrawableByVulkan
             auto ta = &texCoordsAccessor;
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
-
-            auto texturedMesh = cast(TexturedMesh) node.mesh;
-            //~ texturedMesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            texturedMesh.texCoords = texCoordsAccessor;
 
             // Need to normalize coordinates?
             if(texCoords.min_max != Json.emptyObject)
@@ -278,13 +263,24 @@ class GlTF : DrawableByVulkan
                 }
             }
 
-            //~ if(!textCoordsRange.empty)
-                //~ texturedMesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
-
-            // Fake texture or real one provided just to stub shader input
-            texturedMesh.textureDescrImageInfo = &texturesDescrInfos[0];
-
             createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        }
+
+        {
+            if(textures.length > 0)
+            {
+                auto m = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
+                //FIXME:
+                m.textureDescrImageInfo = &texturesDescrInfos[0];
+                node.mesh = m;
+            }
+            else
+                node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+
+            //TODO: move to ctor
+            node.mesh.elemCount = elemCount;
+
+            meshes ~= node.mesh;
         }
     }
 
