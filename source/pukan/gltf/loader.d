@@ -469,13 +469,17 @@ struct BufAccess
 void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
 in(gpuBuffs.length > 0)
 {
-    const len = accessors.length;
+    const len = cast(uint) accessors.length;
     assert(len > 0);
+    assert(len == 2);
 
     auto buffers = new VkBuffer[len];
     auto offsets = new VkDeviceSize[len];
     auto sizes = new VkDeviceSize[len];
     auto strides = new VkDeviceSize[len];
+
+    //~ import std.stdio;
+    //~ writeln("bind vertices: ============");
 
     foreach(i, const acc; accessors)
     {
@@ -484,13 +488,19 @@ in(gpuBuffs.length > 0)
         auto gpuBuf = gpuBuffs[acc.viewIdx];
         assert(gpuBuf !is null);
 
+        //~ writeln(gpuBuf.buffer.cpuBuf);
+
         buffers[i] = gpuBuf.buffer.gpuBuffer.buf.getVal();
         offsets[i] = acc.offset;
         sizes[i] = gpuBuf.buffer.cpuBuf.length - acc.offset; // means buffer isn't more than this size
         strides[i] = acc.stride;
     }
 
-    vkCmdBindVertexBuffers2(cmdBuf, 0, cast(uint) len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
+    //~ writeln(offsets);
+    //~ writeln(sizes);
+    //~ writeln(strides);
+
+    vkCmdBindVertexBuffers2(cmdBuf, 0, len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
 
 package struct AccessRange(T, bool isOutput)

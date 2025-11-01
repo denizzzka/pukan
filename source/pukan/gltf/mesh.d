@@ -142,7 +142,7 @@ class Mesh
 
     void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf, /* TODO: remove: */ in Matrix4x4f trans)
     {
-        assert(elemCount);
+        assert(elemCount > 0);
 
         bindVertexBuffers(gpuBuffs, vertAndTex, buf);
 
@@ -156,6 +156,10 @@ class Mesh
         }
         else
         {
+            //~ import std.stdio;
+            //~ writeln(indicesBuffer.indexType);
+            //~ writeln(indicesBuffer.buffer.cpuBuf);
+
             vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
             vkCmdDrawIndexed(buf, elemCount, 1, 0, 0, 0);
         }
@@ -172,6 +176,9 @@ final class JustColoredMesh : Mesh
         this.fakeTexture = fakeTexture;
 
         super(device, name, vertices, indices, descriptorSet);
+
+        import std.stdio;
+        writeln(name, " created");
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)

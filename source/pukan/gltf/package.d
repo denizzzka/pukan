@@ -218,17 +218,18 @@ class GlTF : DrawableByVulkan
             else
                 assert(0);
         }
-        else
-        {
-            // Non-indixed meshes:
-            elemCount = verticesAccessor.count;
-        }
+        //~ else
+        //~ {
+            //~ // Non-indixed meshes:
+            //~ elemCount = verticesAccessor.count;
+        //~ }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
-        if(!content.textures.length)
+        //~ if(!content.textures.length)
             node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
-        else
+        //~ else
+        version(none)
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
             auto texCoords = &accessors[idx];

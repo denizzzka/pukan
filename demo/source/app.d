@@ -316,11 +316,16 @@ void createArena(T)(Scene scene, ref T node)
     {
         //~ if(filename != "demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf") continue;
         //~ if(filename != "demo/assets/gltf_samples/BoxTextured/glTF-Binary/BoxTextured.glb") continue;
+        if(filename != "demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf") continue;
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
         const center = aabb.min + size/2;
         const scale = 1.0 / size.length * 0.1;
+
+        import std.stdio;
+        writeln("aabb ", aabb);
+        writeln("scale ", scale);
 
         auto trans = Matrix4x4f.identity;
 
