@@ -200,9 +200,12 @@ final class TexturedMesh : Mesh
     BufAccess texCoords;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, BufAccess texCoords, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, vertices, indices, descriptorSet);
+
+        this.texCoords = texCoords;
+        vertAndTex[1] = this.texCoords;
 
         ubo.material.renderType.x = 1; // is textured
     }
@@ -215,9 +218,6 @@ final class TexturedMesh : Mesh
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        //TODO: move to ctor
-        vertAndTex[1] = texCoords;
-
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
         VkWriteDescriptorSet[] descriptorWrites = [
             uboWriteDescriptor,
