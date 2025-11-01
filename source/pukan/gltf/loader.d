@@ -486,7 +486,7 @@ in(gpuBuffs.length > 0)
 
         buffers[i] = gpuBuf.buffer.gpuBuffer.buf.getVal();
         offsets[i] = acc.offset;
-        sizes[i] = acc.stride * acc.count;
+        sizes[i] = gpuBuf.buffer.cpuBuf.length - acc.offset; // means buffer isn't more than this size
         strides[i] = acc.stride;
     }
 
