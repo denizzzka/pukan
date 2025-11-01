@@ -436,16 +436,13 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
 
-    const BufAccess getAccess(T)(in Accessor accessor)
+    const BufAccess getAccess(in Accessor accessor)
     {
         const view = bufferViews[accessor.viewIdx];
 
-        const stride = view.stride ? view.stride : T.sizeof;
-        assert(stride >= T.sizeof);
-
         return BufAccess(
             offset: accessor.offset,
-            stride: stride,
+            stride: view.stride,
             viewIdx: accessor.viewIdx,
             count: accessor.count,
         );
@@ -481,9 +478,6 @@ in(gpuBuffs.length > 0)
     auto sizes = new VkDeviceSize[len];
     auto strides = new VkDeviceSize[len];
 
-    //~ import std.stdio;
-    //~ writeln("bind vertices: ============");
-
     foreach(i, const acc; accessors)
     {
         assert(acc.viewIdx >= 0);
@@ -492,17 +486,11 @@ in(gpuBuffs.length > 0)
         auto gpuBuf = gpuBuffs[acc.viewIdx];
         assert(gpuBuf !is null);
 
-        //~ writeln(gpuBuf.buffer.cpuBuf);
-
         buffers[i] = gpuBuf.buffer.gpuBuffer.buf.getVal();
         offsets[i] = acc.offset;
         sizes[i] = gpuBuf.buffer.cpuBuf.length - acc.offset; // means buffer isn't more than this size
         strides[i] = acc.stride;
     }
-
-    //~ writeln(offsets);
-    //~ writeln(sizes);
-    //~ writeln(strides);
 
     vkCmdBindVertexBuffers2(cmdBuf, 0, len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
@@ -523,7 +511,10 @@ package struct AccessRange(T, bool isOutput)
 
         BufAccess tmp = a;
         if(tmp.stride == 0)
+        {
+            // tightly packed data
             tmp.stride = T.sizeof;
+        }
 
         accessor = tmp;
         currByte = accessor.offset;

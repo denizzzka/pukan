@@ -177,7 +177,7 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            verticesAccessor = content.getAccess!Vector3f(*vertices);
+            verticesAccessor = content.getAccess(*vertices);
 
             createGpuBufIfNeed(device, verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -199,7 +199,7 @@ class GlTF : DrawableByVulkan
 
             debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
-            const indicesAccessor = content.getAccess!ushort(indices);
+            const indicesAccessor = content.getAccess(indices);
             indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
             elemCount = indices.count;
 
@@ -218,18 +218,17 @@ class GlTF : DrawableByVulkan
             else
                 assert(0);
         }
-        //~ else
-        //~ {
-            //~ // Non-indixed meshes:
-            //~ elemCount = verticesAccessor.count;
-        //~ }
+        else
+        {
+            // Non-indixed meshes:
+            elemCount = verticesAccessor.count;
+        }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
-        //~ if(!content.textures.length)
+        if(!content.textures.length)
             node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
-        //~ else
-        version(none)
+        else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
             auto texCoords = &accessors[idx];
