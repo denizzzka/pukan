@@ -244,9 +244,21 @@ class GlTF : DrawableByVulkan
 
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
 
-            // Need to normalize coordinates?
-            if(texCoords.min_max != Json.emptyObject)
+            import std.stdio;
+
+            void displayCoords()
             {
+                auto texOutput = content.rangify!(Vector2f)(texCoordsAccessor);
+
+                writeln(texOutput);
+            }
+
+            // Need to normalize coordinates?
+            //~ if(texCoords.min_max != Json.emptyObject)
+            version(none)
+            {
+                texCoords.min_max.writeln;
+
                 const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
                 const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
 
@@ -254,11 +266,15 @@ class GlTF : DrawableByVulkan
                 {
                     const range = max - min;
 
+                    //~ displayCoords();
+
                     auto texOutput = content.rangify!(Vector2f, true)(texCoordsAccessor);
 
                     textCoordsRange
                         .map!((Vector2f e) => (e - min) / range)
                         .copy(texOutput);
+
+                    //~ displayCoords();
                 }
             }
 
