@@ -254,7 +254,8 @@ class GlTF : DrawableByVulkan
             auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
 
             auto texturedMesh = cast(TexturedMesh) node.mesh;
-            texturedMesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            //~ texturedMesh.texCoordsBuf = device.create!TransferBuffer(Vector2f.sizeof * texCoords.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            texturedMesh.texCoords = texCoordsAccessor;
 
             // Need to normalize coordinates?
             if(texCoords.min_max != Json.emptyObject)
@@ -269,17 +270,21 @@ class GlTF : DrawableByVulkan
                     version(BigEndian)
                         static assert(false, "big endian arch isn't supported");
 
+                    auto texOutput = content.rangify!(Vector2f, true)(texCoordsAccessor);
+
                     textCoordsRange
                         .map!((Vector2f e) => (e - min) / range)
-                        .copy(cast(Vector2f[]) texturedMesh.texCoordsBuf.cpuBuf[0 .. $]);
+                        .copy(texOutput);
                 }
             }
 
-            if(!textCoordsRange.empty)
-                texturedMesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
+            //~ if(!textCoordsRange.empty)
+                //~ texturedMesh.texCoordsBuf.cpuBuf[0 .. $] = cast(ubyte[]) textCoordsRange.array;
 
             // Fake texture or real one provided just to stub shader input
             texturedMesh.textureDescrImageInfo = &texturesDescrInfos[0];
+
+            createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
     }
 
