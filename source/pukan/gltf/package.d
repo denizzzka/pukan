@@ -254,9 +254,6 @@ class GlTF : DrawableByVulkan
                 {
                     const range = max - min;
 
-                    version(BigEndian)
-                        static assert(false, "big endian arch isn't supported");
-
                     auto texOutput = content.rangify!(Vector2f, true)(texCoordsAccessor);
 
                     textCoordsRange
