@@ -20,7 +20,6 @@ struct UBOContent
 
 struct IndicesDescr
 {
-    //~ TransferBuffer buffer;
     BufAccess accessor;
     VkIndexType indexType;
 
@@ -100,8 +99,6 @@ class Mesh
     //TODO: remove?
     void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        //~ if(indicesBuffer.buffer !is null)
-            //~ indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
