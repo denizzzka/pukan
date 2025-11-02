@@ -556,6 +556,7 @@ package struct AccessRange(T, bool isOutput)
         return cast(T*) cast(void*) &buf[currByte];
     }
 
+    static if(!isOutput)
     ref T front() const => *frontPtr();
 
     static if(isOutput)
