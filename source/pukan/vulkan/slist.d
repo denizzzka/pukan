@@ -1,6 +1,7 @@
 module pukan.vulkan.slist;
 
 import std.container.slist;
+import std.traits;
 
 struct SimpleSList(T, alias elementDtor = null)
 {
@@ -23,11 +24,10 @@ struct SimpleSList(T, alias elementDtor = null)
 
     static struct Elem
     {
-        import std.traits;
-
         ReturnType!(list.opSlice) val;
 
-        ref getVal(ET = T)() => cast(ET) val.front;
+        //TODO: rename to payload?
+        ref getVal() => val.front;
         alias this = getVal;
 
         void detach() { /* TODO: implement */ }
