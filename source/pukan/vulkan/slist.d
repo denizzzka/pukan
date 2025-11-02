@@ -9,6 +9,15 @@ struct SimpleSList(T, alias elementDtor = null)
 
     alias ElemType = Elem;
 
+    ~this()
+    {
+        static if(elementDtor !is null)
+        {
+            foreach(ref e; list)
+                e.elementDtor;
+        }
+    }
+
     void insert(T val) { list.insert(val); }
     Elem front() => Elem(&list, list.opSlice);
     bool empty() => list.empty;
@@ -34,6 +43,14 @@ struct SimpleSList(T, alias elementDtor = null)
         void detach()
         {
             //~ list.linearRemove(oneElemRange);
+        }
+
+        void dispose()
+        {
+            static if(elementDtor !is null)
+                getVal.elementDtor;
+
+            detach();
         }
     }
 }
