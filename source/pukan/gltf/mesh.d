@@ -44,7 +44,6 @@ class Mesh
     string name;
     package IndicesBuf indicesBuffer;
     package BufAccess vertices;
-    //~ package TransferBuffer verticesBuffer;
     package uint elemCount; /// Number of vertices or indices, depending of mesh type
     /*private*/ VkDescriptorSet* descriptorSet;
     protected BufAccess[2] vertAndTex;
@@ -59,7 +58,6 @@ class Mesh
         this.name = name;
         this.descriptorSet = &descriptorSet;
         this.vertices = vertices;
-        //~ verticesBuffer = vertices;
         indicesBuffer = indices;
 
         assert(vertices.viewIdx >= 0);
@@ -105,8 +103,6 @@ class Mesh
     {
         if(indicesBuffer.buffer !is null)
             indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
-
-        //~ verticesBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
@@ -145,9 +141,6 @@ class Mesh
         assert(elemCount > 0);
 
         bindVertexBuffers(gpuBuffs, vertAndTex, buf);
-
-        //~ immutable VkDeviceSize[2] offsets = [0, 0];
-        //~ vkCmdBindVertexBuffers(buf, 0, cast(uint) vkBuffs.length, vkBuffs.ptr, offsets.ptr);
 
         if(indicesBuffer.buffer is null)
         {
@@ -196,7 +189,6 @@ final class JustColoredMesh : Mesh
 ///
 final class TexturedMesh : Mesh
 {
-    //~ /*private*/ TransferBuffer texCoordsBuf;
     BufAccess texCoords;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
@@ -213,7 +205,6 @@ final class TexturedMesh : Mesh
     override void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         super.uploadImmediate(commandPool, commandBuffer);
-        //~ texCoordsBuf.uploadImmediate(commandPool, commandBuffer);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
