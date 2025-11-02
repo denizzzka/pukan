@@ -200,23 +200,9 @@ class GlTF : DrawableByVulkan
             debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
             const indicesAccessor = content.getAccess(indices);
-            indicesBuffer = IndicesBuf(device, indicesAccessor, indices.componentType);
-            //~ elemCount = indices.count;
+            createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-            //~ if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
-            //~ {
-                //~ auto indicesRange = content.rangify!ushort(indicesAccessor);
-                //~ auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
-                //~ indicesRange.copy(dstRange);
-            //~ }
-            //~ else if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
-            //~ {
-                //~ auto indicesRange = content.rangify!uint(indicesAccessor);
-                //~ auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
-                //~ indicesRange.copy(dstRange);
-            //~ }
-            //~ else
-                //~ assert(0);
+            indicesBuffer = IndicesBuf(device, indicesAccessor, indices.componentType);
         }
         else
         {

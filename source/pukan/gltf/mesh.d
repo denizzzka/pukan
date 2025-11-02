@@ -27,6 +27,8 @@ struct IndicesBuf
 
     this(LogicalDevice device, BufAccess acc, ComponentType t)
     {
+        accessor = acc;
+
         with(ComponentType)
         switch(t)
         {
@@ -149,7 +151,7 @@ class Mesh
             auto indicesBuffer = gpuBuffs[indices.accessor.viewIdx];
             assert(indicesBuffer !is null);
 
-            vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indices.indexType);
+            vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), indices.accessor.offset, indices.indexType);
             vkCmdDrawIndexed(buf, indices.accessor.count, 1, 0, 0, 0);
         }
     }
