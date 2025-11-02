@@ -18,8 +18,7 @@ struct UBOContent
     Material material;
 }
 
-//TODO: rename to IndicesDescr?
-struct IndicesBuf
+struct IndicesDescr
 {
     //~ TransferBuffer buffer;
     BufAccess accessor;
@@ -42,7 +41,7 @@ struct IndicesBuf
 class Mesh
 {
     string name;
-    package IndicesBuf indices;
+    package IndicesDescr indices;
     package BufAccess vertices;
     //~ package uint elemCount; /// Number of vertices or indices, depending of mesh type
     /*private*/ VkDescriptorSet* descriptorSet;
@@ -53,7 +52,7 @@ class Mesh
     private VkDescriptorBufferInfo bufferInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesDescr indices, ref VkDescriptorSet descriptorSet)
     {
         this.name = name;
         this.descriptorSet = &descriptorSet;
@@ -162,7 +161,7 @@ final class JustColoredMesh : Mesh
 {
     private VkDescriptorImageInfo fakeTexture;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesDescr indices, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
     {
         this.fakeTexture = fakeTexture;
 
@@ -194,7 +193,7 @@ final class TexturedMesh : Mesh
     BufAccess texCoords;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesBuf indices, BufAccess texCoords, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, BufAccess vertices, IndicesDescr indices, BufAccess texCoords, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, vertices, indices, descriptorSet);
 

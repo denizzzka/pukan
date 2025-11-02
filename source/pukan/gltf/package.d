@@ -4,7 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = Mesh, IndicesBuf, JustColoredMesh, TexturedMesh;
+import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, TexturedMesh;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -190,7 +190,7 @@ class GlTF : DrawableByVulkan
         }
 
         uint elemCount;
-        IndicesBuf indicesBuffer;
+        IndicesDescr indicesBuffer;
 
         // If indexed mesh:
         if(primitive.indicesAccessorIdx >= 0)
@@ -202,7 +202,7 @@ class GlTF : DrawableByVulkan
             const indicesAccessor = content.getAccess(indices);
             createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-            indicesBuffer = IndicesBuf(device, indicesAccessor, indices.componentType);
+            indicesBuffer = IndicesDescr(device, indicesAccessor, indices.componentType);
         }
         else
         {
