@@ -163,8 +163,6 @@ class GlTF : DrawableByVulkan
         const primitive = &mesh.primitives[0];
 
         BufAccess verticesAccessor;
-        //TODO: remove
-        TransferBuffer verticesBuffer;
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -180,13 +178,6 @@ class GlTF : DrawableByVulkan
             verticesAccessor = content.getAccess!Vector3f(*vertices);
 
             createGpuBufIfNeed(device, verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            auto verticesRange = content.rangify!(typeof(ShaderVertex.pos))(verticesAccessor);
-
-            verticesBuffer = device.create!TransferBuffer(Vector3f.sizeof * verticesAccessor.count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            verticesRange
-                .copy(cast(Vector3f[]) verticesBuffer.cpuBuf[0 .. $]);
         }
 
         IndicesDescr indicesBuffer;
