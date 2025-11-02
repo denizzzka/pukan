@@ -112,7 +112,7 @@ class MemoryBuffer : DeviceMemory
 
     ~this()
     {
-        buf.free();
+        buf.detach();
     }
 
     //TODO: static?
@@ -153,7 +153,7 @@ class DeviceMemory
 
     this()
     {
-        deviceMemory.free;
+        deviceMemory.detach();
     }
 }
 

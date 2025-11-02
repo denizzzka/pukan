@@ -244,6 +244,6 @@ struct SimpleSList(T, alias elementDtor = null)
         ref getVal(ET = T)() => cast(ET) val.front;
         alias this = getVal;
 
-        void free() { /* TODO: implement */ }
+        void detach() { /* TODO: implement */ }
     }
 }
