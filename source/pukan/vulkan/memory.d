@@ -2,7 +2,7 @@ module pukan.vulkan.memory;
 
 package mixin template Memory()
 {
-    import pukan.vulkan.helpers: SimpleSList;
+    import pukan.vulkan.slist: SimpleSList;
 
     private SimpleSList!VkDeviceMemory deviceMemoryChunks;
 
@@ -54,12 +54,13 @@ package mixin template Memory()
     }
 }
 
+import pukan.vulkan.slist: SimpleSList;
+
 alias MemChunk = SimpleSList!VkDeviceMemory.ElemType;
 alias BufChunk = SimpleSList!VkBuffer.ElemType;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.helpers;
 
 class MemoryBufferMappedToCPU : MemoryBuffer
 {

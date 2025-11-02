@@ -2,7 +2,8 @@ module pukan.vulkan.image;
 
 package mixin template Images()
 {
-    import pukan.vulkan.helpers: SimpleSList;
+    import pukan.vulkan.slist: SimpleSList;
+
     private SimpleSList!VkImage images;
 
     auto createImage(ref VkImageCreateInfo createInfo)
