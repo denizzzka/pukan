@@ -42,6 +42,7 @@ struct SimpleSList(T, alias elementDtor = null)
 
         void detach()
         {
+            //FIXME: enable
             //~ list.linearRemove(oneElemRange);
         }
 
