@@ -136,7 +136,7 @@ class Mesh
         uniformBuffer.recordUpload(buf);
     }
 
-    void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf, /* TODO: remove: */ in Matrix4x4f trans)
+    void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf)
     {
         assert(elemCount > 0);
 

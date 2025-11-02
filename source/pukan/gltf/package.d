@@ -317,7 +317,7 @@ class GlTF : DrawableByVulkan
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
-            node.mesh.drawingBufferFilling(gpuBuffs, buf, trans);
+            node.mesh.drawingBufferFilling(gpuBuffs, buf);
         }
 
         foreach(c; node.children)
