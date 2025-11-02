@@ -3,6 +3,7 @@ module pukan.gltf;
 import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
+import pukan.gltf.accessor;
 import pukan.gltf.loader;
 import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, TexturedMesh;
 import pukan.tree: BaseNode = Node;

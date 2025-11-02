@@ -1,7 +1,8 @@
 module pukan.gltf.mesh;
 
 import dlib.math;
-public import pukan.gltf.loader: BufAccess, BufferPieceOnGPU, ComponentType, bindVertexBuffers, AccessRange;
+import pukan.gltf.accessor;
+public import pukan.gltf.loader: ComponentType, bindVertexBuffers;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;

@@ -2,6 +2,7 @@ module pukan.gltf.loader;
 
 import dlib.math;
 import pukan.gltf: GlTF;
+import pukan.gltf.accessor;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
@@ -353,17 +354,6 @@ struct View
     }
 }
 
-class BufferPieceOnGPU
-{
-    TransferBuffer buffer;
-
-    //TODO: add flag if CPU buf is not needed after uploading
-    void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
-    {
-        buffer.uploadImmediate(commandPool, commandBuffer);
-    }
-}
-
 enum ComponentType : short
 {
     BYTE = 5120,
@@ -467,15 +457,6 @@ struct GltfContent
     }
 }
 
-//TODO: move to mesh module?
-struct BufAccess
-{
-    ptrdiff_t viewIdx = -1;
-    uint offset;
-    ubyte stride;
-    uint count;
-}
-
 //TODO: move to Mesh
 void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
 in(gpuBuffs.length > 0)
@@ -504,67 +485,6 @@ in(gpuBuffs.length > 0)
     }
 
     vkCmdBindVertexBuffers2(cmdBuf, 0, len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
-}
-
-package struct AccessRange(T, bool isOutput)
-{
-    private const void[] buf;
-    const BufAccess accessor;
-    private const uint bufEnd;
-    private uint currByte;
-    private uint currStep;
-
-    alias Elem = T;
-
-    package this(in void[] b, in BufAccess a)
-    {
-        buf = b;
-
-        BufAccess tmp = a;
-        if(tmp.stride == 0)
-        {
-            // tightly packed data
-            tmp.stride = T.sizeof;
-        }
-
-        accessor = tmp;
-        currByte = accessor.offset;
-        bufEnd = cast(uint) buf.length;
-
-        enforce(accessor.stride >= T.sizeof);
-
-        assert(!empty);
-    }
-
-    void popFront()
-    {
-        enforce(currByte <= bufEnd - T.sizeof);
-        enforce(!empty);
-
-        currStep++;
-        currByte += accessor.stride;
-    }
-
-    uint length() const => accessor.count;
-    bool empty() const => currStep >= length;
-
-    version(BigEndian)
-    static assert(false, "big endian not implemented");
-
-    private T* frontPtr() inout
-    {
-        return cast(T*) cast(void*) &buf[currByte];
-    }
-
-    static if(!isOutput)
-    ref T front() const => *frontPtr();
-
-    static if(isOutput)
-    void put(ref T val)
-    {
-        *frontPtr = val;
-        popFront;
-    }
 }
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
