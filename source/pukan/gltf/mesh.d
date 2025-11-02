@@ -43,7 +43,6 @@ class Mesh
     string name;
     package IndicesDescr indices;
     package BufAccess vertices;
-    //~ package uint elemCount; /// Number of vertices or indices, depending of mesh type
     /*private*/ VkDescriptorSet* descriptorSet;
     protected BufAccess[2] vertAndTex;
 

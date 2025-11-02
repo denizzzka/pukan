@@ -189,7 +189,6 @@ class GlTF : DrawableByVulkan
                 .copy(cast(Vector3f[]) verticesBuffer.cpuBuf[0 .. $]);
         }
 
-        uint elemCount;
         IndicesDescr indicesBuffer;
 
         // If indexed mesh:
@@ -203,11 +202,6 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
             indicesBuffer = IndicesDescr(device, indicesAccessor, indices.componentType);
-        }
-        else
-        {
-            // Non-indixed meshes:
-            elemCount = verticesAccessor.count;
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
