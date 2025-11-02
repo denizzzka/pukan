@@ -200,23 +200,23 @@ class GlTF : DrawableByVulkan
             debug enforce(indices.type == "SCALAR", indices.type.to!string);
 
             const indicesAccessor = content.getAccess(indices);
-            indicesBuffer = IndicesBuf(device, indices.componentType, indices.count);
-            elemCount = indices.count;
+            indicesBuffer = IndicesBuf(device, indicesAccessor, indices.componentType);
+            //~ elemCount = indices.count;
 
-            if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
-            {
-                auto indicesRange = content.rangify!ushort(indicesAccessor);
-                auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
-                indicesRange.copy(dstRange);
-            }
-            else if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
-            {
-                auto indicesRange = content.rangify!uint(indicesAccessor);
-                auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
-                indicesRange.copy(dstRange);
-            }
-            else
-                assert(0);
+            //~ if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT16)
+            //~ {
+                //~ auto indicesRange = content.rangify!ushort(indicesAccessor);
+                //~ auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
+                //~ indicesRange.copy(dstRange);
+            //~ }
+            //~ else if(indicesBuffer.indexType == VK_INDEX_TYPE_UINT32)
+            //~ {
+                //~ auto indicesRange = content.rangify!uint(indicesAccessor);
+                //~ auto dstRange = cast(indicesRange.Elem[]) indicesBuffer.buffer.cpuBuf;
+                //~ indicesRange.copy(dstRange);
+            //~ }
+            //~ else
+                //~ assert(0);
         }
         else
         {
@@ -273,9 +273,6 @@ class GlTF : DrawableByVulkan
             }
         }
 
-        //TODO: move to ctor
-        node.mesh.elemCount = elemCount;
-
         meshes ~= node.mesh;
     }
 
@@ -313,7 +310,7 @@ class GlTF : DrawableByVulkan
 
         trans *= node.trans;
 
-        if(node.mesh && node.mesh.elemCount)
+        if(node.mesh)
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 

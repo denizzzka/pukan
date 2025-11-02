@@ -18,12 +18,14 @@ struct UBOContent
     Material material;
 }
 
+//TODO: rename to IndicesDescr?
 struct IndicesBuf
 {
-    TransferBuffer buffer;
+    //~ TransferBuffer buffer;
+    BufAccess accessor;
     VkIndexType indexType;
 
-    this(LogicalDevice device, ComponentType t, uint count)
+    this(LogicalDevice device, BufAccess acc, ComponentType t)
     {
         with(ComponentType)
         switch(t)
@@ -32,19 +34,15 @@ struct IndicesBuf
             case UNSIGNED_INT: indexType = VK_INDEX_TYPE_UINT32; break;
             default: assert(0);
         }
-
-        import pukan.gltf.loader: componentSizeOf;
-
-        buffer = device.create!TransferBuffer(componentSizeOf(t) * count, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     }
 }
 
 class Mesh
 {
     string name;
-    package IndicesBuf indicesBuffer;
+    package IndicesBuf indices;
     package BufAccess vertices;
-    package uint elemCount; /// Number of vertices or indices, depending of mesh type
+    //~ package uint elemCount; /// Number of vertices or indices, depending of mesh type
     /*private*/ VkDescriptorSet* descriptorSet;
     protected BufAccess[2] vertAndTex;
 
@@ -58,7 +56,7 @@ class Mesh
         this.name = name;
         this.descriptorSet = &descriptorSet;
         this.vertices = vertices;
-        indicesBuffer = indices;
+        this.indices = indices;
 
         assert(vertices.viewIdx >= 0);
 
@@ -99,10 +97,11 @@ class Mesh
         uniformBuffer.destroy;
     }
 
+    //TODO: remove?
     void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        if(indicesBuffer.buffer !is null)
-            indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
+        //~ if(indicesBuffer.buffer !is null)
+            //~ indicesBuffer.buffer.uploadImmediate(commandPool, commandBuffer);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
@@ -138,19 +137,20 @@ class Mesh
 
     void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf)
     {
-        assert(elemCount > 0);
-
         bindVertexBuffers(gpuBuffs, vertAndTex, buf);
 
-        if(indicesBuffer.buffer is null)
+        if(indices.accessor.count == 0)
         {
             // Non-indexed mesh
-            vkCmdDraw(buf, elemCount, 1, 0, 0);
+            vkCmdDraw(buf, vertices.count, 1, 0, 0);
         }
         else
         {
-            vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indicesBuffer.indexType);
-            vkCmdDrawIndexed(buf, elemCount, 1, 0, 0, 0);
+            auto indicesBuffer = gpuBuffs[indices.accessor.viewIdx];
+            assert(indicesBuffer !is null);
+
+            vkCmdBindIndexBuffer(buf, indicesBuffer.buffer.gpuBuffer.buf.getVal(), 0, indices.indexType);
+            vkCmdDrawIndexed(buf, indices.accessor.count, 1, 0, 0, 0);
         }
     }
 }
