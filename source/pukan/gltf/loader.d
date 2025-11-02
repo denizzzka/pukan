@@ -457,36 +457,6 @@ struct GltfContent
     }
 }
 
-//TODO: move to Mesh
-void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
-in(gpuBuffs.length > 0)
-{
-    const len = cast(uint) accessors.length;
-    assert(len > 0);
-    assert(len == 2);
-
-    auto buffers = new VkBuffer[len];
-    auto offsets = new VkDeviceSize[len];
-    auto sizes = new VkDeviceSize[len];
-    auto strides = new VkDeviceSize[len];
-
-    foreach(i, const acc; accessors)
-    {
-        assert(acc.viewIdx >= 0);
-        assert(acc.stride > 0);
-
-        auto gpuBuf = gpuBuffs[acc.viewIdx];
-        assert(gpuBuf !is null);
-
-        buffers[i] = gpuBuf.buffer.gpuBuffer.buf.getVal();
-        offsets[i] = acc.offset;
-        sizes[i] = gpuBuf.buffer.cpuBuf.length - acc.offset; // means buffer isn't more than this size
-        strides[i] = acc.stride;
-    }
-
-    vkCmdBindVertexBuffers2(cmdBuf, 0, len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
-}
-
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
 
 private Buffer readBufFile(string dir, in Json fileDescr)

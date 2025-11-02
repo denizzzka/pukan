@@ -2,7 +2,7 @@ module pukan.gltf.mesh;
 
 import dlib.math;
 import pukan.gltf.accessor;
-public import pukan.gltf.loader: ComponentType, bindVertexBuffers;
+public import pukan.gltf.loader: ComponentType;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -151,6 +151,35 @@ class Mesh
             vkCmdDrawIndexed(buf, indices.accessor.count, 1, 0, 0, 0);
         }
     }
+}
+
+private void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
+in(gpuBuffs.length > 0)
+{
+    const len = cast(uint) accessors.length;
+    assert(len > 0);
+    assert(len == 2);
+
+    auto buffers = new VkBuffer[len];
+    auto offsets = new VkDeviceSize[len];
+    auto sizes = new VkDeviceSize[len];
+    auto strides = new VkDeviceSize[len];
+
+    foreach(i, const acc; accessors)
+    {
+        assert(acc.viewIdx >= 0);
+        assert(acc.stride > 0);
+
+        auto gpuBuf = gpuBuffs[acc.viewIdx];
+        assert(gpuBuf !is null);
+
+        buffers[i] = gpuBuf.buffer.gpuBuffer.buf.getVal();
+        offsets[i] = acc.offset;
+        sizes[i] = gpuBuf.buffer.cpuBuf.length - acc.offset; // means buffer isn't more than this size
+        strides[i] = acc.stride;
+    }
+
+    vkCmdBindVertexBuffers2(cmdBuf, 0, len, &buffers[0], &offsets[0], &sizes[0], &strides[0]);
 }
 
 ///
