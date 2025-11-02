@@ -10,7 +10,7 @@ struct SimpleSList(T, alias elementDtor = null)
     alias ElemType = Elem;
 
     void insert(T val) { list.insert(val); }
-    Elem front() => Elem(list.opSlice);
+    Elem front() => Elem(&list, list.opSlice);
     bool empty() => list.empty;
     auto opSlice() => list.opSlice();
     auto insertOne(void delegate(ref T) dg)
@@ -24,12 +24,16 @@ struct SimpleSList(T, alias elementDtor = null)
 
     static struct Elem
     {
-        ReturnType!(list.opSlice) val;
+        private SList!T* list;
+        private ReturnType!(list.opSlice) oneElemRange;
 
         //TODO: rename to payload?
-        ref getVal() => val.front;
+        ref getVal() => oneElemRange.front;
         alias this = getVal;
 
-        void detach() { /* TODO: implement */ }
+        void detach()
+        {
+            //~ list.linearRemove(oneElemRange);
+        }
     }
 }
