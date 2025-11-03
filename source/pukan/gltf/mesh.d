@@ -26,6 +26,8 @@ struct IndicesDescr
 
     this(LogicalDevice device, BufAccess acc, ComponentType t)
     {
+        assert(acc.stride == 0 || acc.stride == 2 || acc.stride == 4);
+
         accessor = acc;
 
         with(ComponentType)
