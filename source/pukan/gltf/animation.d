@@ -61,4 +61,5 @@ struct Animation
 
 package mixin template GltfAnimation()
 {
+    private Matrix4x4f[] perNodeTranslations;
 }
