@@ -292,6 +292,9 @@ class GlTF : DrawableByVulkan
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
     }
+
+    import pukan.gltf.animation: GltfAnimation;
+    mixin GltfAnimation;
 }
 
 //TODO: use as mandatory vertex shader creation argument?
