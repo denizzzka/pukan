@@ -7,17 +7,17 @@ import pukan.gltf: Node;
 enum InterpolationType: string
 {
     Undefined = "Undefined, error",
-    Linear = "LINEAR",
-    Step = "STEP",
-    CubicSpline = "CUBICSPLINE"
+    LINEAR = "LINEAR",
+    STEP = "STEP",
+    CUBICSPLINE = "CUBICSPLINE"
 }
 
 /// Animation target property types (translation, rotation, scale)
 enum TRSType: string
 {
-    Translation = "translation",
-    Rotation = "rotation",
-    Scale = "scale",
+    translation = "translation",
+    rotation = "rotation",
+    scale = "scale",
 }
 
 /// Defines keyframe times, values, and interpolation
@@ -28,24 +28,26 @@ struct AnimationSampler
 
     /// Accessor for keyframe times (in seconds)
     //~ BufAccess input;
-    size_t input;
+    uint input;
 
     /// Accessor for keyframe values
     //~ BufAccess output;
-    size_t output;
+    uint output;
 }
 
 /// Represents a GLTF animation channel, which targets a node and property (TRS)
 struct Channel
 {
     /// The animation sampler for this channel
-    AnimationSampler sampler;
+    //~ AnimationSampler sampler;
+    uint sampler;
 
     /// The property being animated (translation, rotation, scale)
     TRSType targetPath;
 
     /// The node being animated
-    Node targetNode;
+    //~ Node targetNode;
+    uint targetNode;
 }
 
 ///
