@@ -6,6 +6,7 @@ import pukan.gltf: Node;
 /// Interpolation types supported by GLTF animation samplers
 enum InterpolationType: string
 {
+    Undefined = "Undefined, error",
     Linear = "LINEAR",
     Step = "STEP",
     CubicSpline = "CUBICSPLINE"
@@ -26,10 +27,12 @@ struct AnimationSampler
     InterpolationType interpolation;
 
     /// Accessor for keyframe times (in seconds)
-    BufAccess input;
+    //~ BufAccess input;
+    size_t input;
 
     /// Accessor for keyframe values
-    BufAccess output;
+    //~ BufAccess output;
+    size_t output;
 }
 
 /// Represents a GLTF animation channel, which targets a node and property (TRS)
