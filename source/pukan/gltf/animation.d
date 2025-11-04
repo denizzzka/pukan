@@ -93,4 +93,18 @@ package struct AnimationSupport
         perNodeTranslations.length = nodesNum;
         animations = content.animations;
     }
+
+    Matrix4x4f[] calculatePose(const Animation* currAnimation)
+    {
+        Matrix4x4f[] translations;
+        translations.length = perNodeTranslations.length;
+
+        foreach(ref e; translations)
+        {
+            // Negative scale to avoid mirroring when loaded OpenGL mesh into Vulkan
+            e = Matrix4x4f.identity * Vector3f(-1, -1, -1).scaleMatrix;
+        }
+
+        return translations;
+    }
 }
