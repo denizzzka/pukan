@@ -68,6 +68,13 @@ package struct AccessRange(T, bool isOutput)
     version(BigEndian)
     static assert(false, "big endian not implemented");
 
+    //TODO: currByte and currStep is not need for random access range implementation
+    ref T opIndex(size_t idx) const
+    {
+        auto i = accessor.offset + accessor.stride * idx;
+        return *cast(T*) cast(void*) &buf[i];
+    }
+
     private T* frontPtr() inout
     {
         return cast(T*) cast(void*) &buf[currByte];
