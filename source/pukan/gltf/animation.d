@@ -28,11 +28,9 @@ struct AnimationSampler
 
     /// Accessor for keyframe times (in seconds)
     BufAccess input;
-    //~ uint input;
 
     /// Accessor for keyframe values
-    //~ BufAccess output;
-    uint output;
+    BufAccess output;
 }
 
 /// Represents a GLTF animation channel, which targets a node and property (TRS)
