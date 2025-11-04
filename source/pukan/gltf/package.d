@@ -62,7 +62,7 @@ class GlTF : DrawableByVulkan
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
-        animation.perNodeTranslations.length = nodes.length;
+        animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
 
         {
