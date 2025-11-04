@@ -44,12 +44,14 @@ struct AnimationSampler
      * Returns:
      *   Index of the previous keyframe.
      */
-    size_t getSampleByTime(GltfContent* content, in float t, out float previousTime, out float nextTime, out float loopTime)
+    size_t getSampleByTime(GltfContent* content, in float t, out float previousTime, out float nextTime, out float loopTime) const
     {
         assert(inputAcc.viewIdx >= 0);
 
         auto timeline = content.rangify!float(inputAcc);
         assert(timeline.length > 1, "GLTF animation sampler input must have at least two keyframes");
+
+        //FIXME: implement
 
         return 0; // No translation found, so using first translation
     }
@@ -94,7 +96,7 @@ package struct AnimationSupport
         animations = content.animations;
     }
 
-    Matrix4x4f[] calculatePose(const Animation* currAnimation)
+    Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime)
     {
         Matrix4x4f[] translations;
         translations.length = perNodeTranslations.length;
@@ -103,6 +105,16 @@ package struct AnimationSupport
         {
             // Negative scale to avoid mirroring when loaded OpenGL mesh into Vulkan
             e = Matrix4x4f.identity * Vector3f(-1, -1, -1).scaleMatrix;
+        }
+
+        foreach(chan; currAnimation.channels)
+        {
+            float prevTime = 0.0f;
+            float nextTime = 0.0f;
+            float loopTime = 0.0f;
+
+            auto sampler = currAnimation.samplers[chan.samplerIdx];
+            const prevIdx = sampler.getSampleByTime(content, currTime, prevTime, nextTime, loopTime);
         }
 
         return translations;
