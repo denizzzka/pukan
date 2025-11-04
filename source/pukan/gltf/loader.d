@@ -290,7 +290,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             foreach(sampler; animation["samplers"])
             {
                 r.samplers ~= AnimationSampler(
-                    input: content.getAccess(sampler["input"].get!uint),
+                    input: content.getAccess!(Type.SCALAR)(sampler["input"].get!uint),
                     output: content.getAccess(sampler["output"].get!uint),
                     interpolation: sampler["interpolation"].opt!string(InterpolationType.LINEAR).to!InterpolationType,
                 );
@@ -372,7 +372,7 @@ struct View
 
         debug
         {
-            r.type = accessor["type"].get!string;
+            r.type = accessor["type"].get!string.to!Type;
         }
 
         return r;
@@ -399,13 +399,25 @@ enum ComponentType : short
     FLOAT = 5126,
 }
 
+enum Type : string
+{
+    undef = null,
+    SCALAR = "SCALAR",
+    VEC2 = "VEC2",
+    VEC3 = "VEC3",
+    VEC4 = "VEC4",
+    MAT2 = "MAT2",
+    MAT3 = "MAT3",
+    MAT4 = "MAT4",
+}
+
 struct Accessor
 {
     const size_t viewIdx;
     uint offset;
     uint count;
     Json min_max;
-    debug string type;
+    debug Type type;
     ComponentType componentType;
 
     ubyte componentSizeOf() const => .componentSizeOf(componentType);
@@ -462,9 +474,14 @@ struct GltfContent
     Texture[] textures;
     Animation[] animations;
 
-    const BufAccess getAccess(T = void)(in uint accessorIdx)
+    const BufAccess getAccess(Type type = Type.undef, T = void)(in uint accessorIdx)
     {
-        return getAccess!T(accessors[accessorIdx]);
+        auto acc = accessors[accessorIdx];
+
+        static if(type != Type.undef)
+            debug assert(acc.type == type, acc.type~" != "~type);
+
+        return getAccess!T(acc);
     }
 
     const BufAccess getAccess(T = void)(in Accessor accessor)
