@@ -27,8 +27,8 @@ struct AnimationSampler
     InterpolationType interpolation;
 
     /// Accessor for keyframe times (in seconds)
-    //~ BufAccess input;
-    uint input;
+    BufAccess input;
+    //~ uint input;
 
     /// Accessor for keyframe values
     //~ BufAccess output;

@@ -100,6 +100,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
 
     Buffer[] buffers;
     GltfContent ret;
+    auto content = &ret; //TODO: replace by ref
     Node[] nodes;
     Node rootSceneNode;
 
@@ -289,7 +290,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             foreach(sampler; animation["samplers"])
             {
                 r.samplers ~= AnimationSampler(
-                    input: sampler["input"].get!uint,
+                    input: content.getAccess(sampler["input"].get!uint),
                     output: sampler["output"].get!uint,
                     interpolation: sampler["interpolation"].opt!string(InterpolationType.LINEAR).to!InterpolationType,
                 );
@@ -460,6 +461,11 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
     Animation[] animations;
+
+    const BufAccess getAccess(T = void)(in uint accessorIdx)
+    {
+        return getAccess!T(accessors[accessorIdx]);
+    }
 
     const BufAccess getAccess(T = void)(in Accessor accessor)
     {
