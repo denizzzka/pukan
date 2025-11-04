@@ -301,7 +301,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
                 const target = channel["target"];
 
                 r.channels ~= Channel(
-                    sampler: channel["sampler"].get!uint,
+                    samplerIdx: channel["sampler"].get!uint,
                     targetPath: target["path"].get!string.to!TRSType,
                     targetNode: target["node"].get!uint,
                 );

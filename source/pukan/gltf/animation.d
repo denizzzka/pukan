@@ -37,8 +37,7 @@ struct AnimationSampler
 struct Channel
 {
     /// The animation sampler for this channel
-    //~ AnimationSampler sampler;
-    uint sampler;
+    uint samplerIdx;
 
     /// The property being animated (translation, rotation, scale)
     TRSType targetPath;
