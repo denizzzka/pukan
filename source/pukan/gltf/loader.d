@@ -291,7 +291,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             {
                 r.samplers ~= AnimationSampler(
                     input: content.getAccess(sampler["input"].get!uint),
-                    output: sampler["output"].get!uint,
+                    output: content.getAccess(sampler["output"].get!uint),
                     interpolation: sampler["interpolation"].opt!string(InterpolationType.LINEAR).to!InterpolationType,
                 );
             }
