@@ -8,6 +8,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
 import std.array;
+import std.conv: to;
 import std.exception: enforce;
 static import std.file;
 static import std.path;
@@ -284,6 +285,15 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         {
             Animation r;
             r.name = animation["name"].opt!string;
+
+            foreach(sampler; animation["samplers"])
+            {
+                r.samplers ~= AnimationSampler(
+                    input: animation["input"].get!uint,
+                    output: animation["output"].get!uint,
+                    interpolation: animation["interpolation"].opt!string(InterpolationType.Linear).to!InterpolationType,
+                );
+            }
 
             ret.animations ~= r;
         }
