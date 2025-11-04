@@ -45,6 +45,15 @@ struct Channel
     Node targetNode;
 }
 
+///
+struct Animation
+{
+    /// Optional name
+    string name;
+    AnimationSampler[] samplers;
+    Channel[] channels;
+}
+
 package mixin template GltfAnimation()
 {
 }

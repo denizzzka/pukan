@@ -3,6 +3,7 @@ module pukan.gltf.loader;
 import dlib.math;
 import pukan.gltf: GlTF;
 import pukan.gltf.accessor;
+import pukan.gltf.animation;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
@@ -276,6 +277,18 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         ret.textures ~= device.create!Texture(image, defaultSampler);
     }
 
+    // Load animations
+    {
+        auto animations = "animations" in json;
+        if(animations) foreach(animation; *animations)
+        {
+            Animation r;
+            r.name = animation["name"].opt!string;
+
+            ret.animations ~= r;
+        }
+    }
+
     return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
 }
 
@@ -425,6 +438,7 @@ struct GltfContent
     Mesh[] meshes;
     ImageMemory[] images;
     Texture[] textures;
+    Animation[] animations;
 
     const BufAccess getAccess(T = void)(in Accessor accessor)
     {
