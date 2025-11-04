@@ -478,14 +478,14 @@ struct GltfContent
     {
         auto acc = accessors[accessorIdx];
 
-        static if(type != Type.undef)
-            debug assert(acc.type == type, acc.type~" != "~type);
-
-        return getAccess!T(acc);
+        return getAccess!(type, T)(acc);
     }
 
-    const BufAccess getAccess(T = void)(in Accessor accessor)
+    const BufAccess getAccess(Type type = Type.undef, T = void)(in Accessor accessor)
     {
+        static if(type != Type.undef)
+            debug assert(accessor.type == type, accessor.type~" != "~type);
+
         const view = bufferViews[accessor.viewIdx];
 
         static if(!is(T == void))
