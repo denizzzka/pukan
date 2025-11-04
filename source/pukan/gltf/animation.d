@@ -27,10 +27,10 @@ struct AnimationSampler
     InterpolationType interpolation;
 
     /// Accessor for keyframe times (in seconds)
-    BufAccess input;
+    BufAccess inputAcc;
 
     /// Accessor for keyframe values
-    BufAccess output;
+    BufAccess outputAcc;
 
     /**
      * Finds the keyframe sample indices and times for a given animation time.
@@ -45,7 +45,7 @@ struct AnimationSampler
      */
     size_t getSampleByTime(in float t, out float previousTime, out float nextTime, out float loopTime)
     {
-        assert(input.viewIdx >= 0);
+        assert(inputAcc.viewIdx >= 0);
 
         return 0; // No translation found, so using first translation
     }
