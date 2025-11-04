@@ -289,9 +289,20 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             foreach(sampler; animation["samplers"])
             {
                 r.samplers ~= AnimationSampler(
-                    input: animation["input"].get!uint,
-                    output: animation["output"].get!uint,
-                    interpolation: animation["interpolation"].opt!string(InterpolationType.Linear).to!InterpolationType,
+                    input: sampler["input"].get!uint,
+                    output: sampler["output"].get!uint,
+                    interpolation: sampler["interpolation"].opt!string(InterpolationType.LINEAR).to!InterpolationType,
+                );
+            }
+
+            foreach(channel; animation["channels"])
+            {
+                const target = channel["target"];
+
+                r.channels ~= Channel(
+                    sampler: channel["sampler"].get!uint,
+                    targetPath: target["path"].get!string.to!TRSType,
+                    targetNode: target["node"].get!uint,
                 );
             }
 
