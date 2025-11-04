@@ -192,7 +192,7 @@ class GlTF : DrawableByVulkan
         {
             auto indices = accessors[ primitive.indicesAccessorIdx ];
 
-            debug enforce(indices.type == "SCALAR", indices.type.to!string);
+            debug enforce(indices.type == Type.SCALAR, indices.type);
 
             const indicesAccessor = content.getAccess(indices);
             createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
