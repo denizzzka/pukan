@@ -1,7 +1,8 @@
 module pukan.gltf.animation;
 
-import pukan.gltf.accessor: BufAccess;
 import pukan.gltf: Node;
+import pukan.gltf.accessor: BufAccess;
+import pukan.gltf.loader;
 
 /// Interpolation types supported by GLTF animation samplers
 enum InterpolationType: string
@@ -43,9 +44,12 @@ struct AnimationSampler
      * Returns:
      *   Index of the previous keyframe.
      */
-    size_t getSampleByTime(in float t, out float previousTime, out float nextTime, out float loopTime)
+    size_t getSampleByTime(GltfContent* content, in float t, out float previousTime, out float nextTime, out float loopTime)
     {
         assert(inputAcc.viewIdx >= 0);
+
+        auto timeline = content.rangify!float(inputAcc);
+        assert(timeline.length > 1, "GLTF animation sampler input must have at least two keyframes");
 
         return 0; // No translation found, so using first translation
     }
@@ -76,8 +80,6 @@ struct Animation
 
 package struct AnimationSupport
 {
-    import pukan.gltf.loader;
-
     private GltfContent* content;
 
     import dlib.math;
