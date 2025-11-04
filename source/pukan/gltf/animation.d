@@ -81,6 +81,7 @@ struct Animation
 package struct AnimationSupport
 {
     private GltfContent* content;
+    private Animation[] animations;
 
     import dlib.math;
 
@@ -90,5 +91,6 @@ package struct AnimationSupport
     {
         content = c;
         perNodeTranslations.length = nodesNum;
+        animations = content.animations;
     }
 }
