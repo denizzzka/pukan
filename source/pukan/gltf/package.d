@@ -4,6 +4,7 @@ import dlib.math;
 public import pukan.gltf.loader: loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
+import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, TexturedMesh;
 import pukan.tree: BaseNode = Node;
@@ -51,6 +52,8 @@ class GlTF : DrawableByVulkan
     private MeshClass[] meshes;
     private VkDescriptorSet[] meshesDescriptorSets;
 
+    private AnimationSupport animation;
+
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
     package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
@@ -59,7 +62,7 @@ class GlTF : DrawableByVulkan
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
-        perNodeTranslations.length = nodes.length;
+        animation.perNodeTranslations.length = nodes.length;
         gpuBuffs.length = content.bufferViews.length;
 
         {
@@ -293,9 +296,6 @@ class GlTF : DrawableByVulkan
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
     }
-
-    import pukan.gltf.animation: GltfAnimation;
-    mixin GltfAnimation;
 }
 
 //TODO: use as mandatory vertex shader creation argument?

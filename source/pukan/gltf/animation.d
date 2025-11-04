@@ -56,7 +56,9 @@ struct Animation
     Channel[] channels;
 }
 
-package mixin template GltfAnimation()
+package struct AnimationSupport
 {
-    private Matrix4x4f[] perNodeTranslations;
+    import dlib.math;
+
+    Matrix4x4f[] perNodeTranslations;
 }
