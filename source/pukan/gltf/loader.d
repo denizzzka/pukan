@@ -290,8 +290,8 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             foreach(sampler; animation["samplers"])
             {
                 r.samplers ~= AnimationSampler(
-                    input: content.getAccess!(Type.SCALAR)(sampler["input"].get!uint),
-                    output: content.getAccess(sampler["output"].get!uint),
+                    inputAcc: content.getAccess!(Type.SCALAR)(sampler["input"].get!uint),
+                    outputAcc: content.getAccess(sampler["output"].get!uint),
                     interpolation: sampler["interpolation"].opt!string(InterpolationType.LINEAR).to!InterpolationType,
                 );
             }
