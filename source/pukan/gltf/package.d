@@ -65,6 +65,8 @@ class GlTF : DrawableByVulkan
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
 
+        animation.perNodeTranslations[i] = Matrix4x4f.identity;
+
         {
             Node createNodeHier(ref LoaderNode ln)
             {
@@ -268,6 +270,10 @@ class GlTF : DrawableByVulkan
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
     {
+        import std;
+        const pose = animation.calculatePose(&animations[0], 0.0);
+        writeln("pose=", pose);
+
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
