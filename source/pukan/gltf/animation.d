@@ -44,7 +44,7 @@ struct AnimationSampler
      * Returns:
      *   Index of the previous keyframe.
      */
-    size_t getSampleByTime(GltfContent* content, in float t, out float previousTime, out float nextTime, out float loopTime) const
+    size_t getSampleByTime(GltfContent* content, in float currTime, out float previousTime, out float nextTime, out float loopTime) const
     {
         assert(inputAcc.viewIdx >= 0);
 
@@ -53,8 +53,35 @@ struct AnimationSampler
 
         float duration = timeline[$ - 1];
 
-        //FIXME: implement
+        loopTime = currTime % duration;
 
+        // Clamp to the input interval
+        if (loopTime < timeline[0])
+        {
+            previousTime = timeline[0];
+            nextTime = timeline[1];
+            return 0;
+        }
+        if (loopTime >= timeline[$ - 1])
+        {
+            previousTime = timeline[$ - 2];
+            nextTime = timeline[$ - 1];
+            return timeline.length - 2;
+        }
+
+        foreach (i; 0..timeline.length - 1)
+        {
+            if (timeline[i] <= loopTime && loopTime < timeline[i + 1])
+            {
+                previousTime = timeline[i];
+                nextTime = timeline[i + 1];
+                return i;
+            }
+        }
+
+        // Fallback
+        previousTime = timeline[0];
+        nextTime = timeline[1];
         return 0; // No translation found, so using first translation
     }
 }
