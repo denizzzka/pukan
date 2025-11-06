@@ -142,8 +142,15 @@ package struct AnimationSupport
             float nextTime = 0.0f;
             float loopTime = 0.0f;
 
-            auto sampler = currAnimation.samplers[chan.samplerIdx];
+            const sampler = currAnimation.samplers[chan.samplerIdx];
             const prevIdx = sampler.getSampleByTime(content, currTime, prevTime, nextTime, loopTime);
+
+            import std.stdio;
+            writeln(sampler);
+            writeln(prevIdx);
+            writeln(loopTime);
+            writeln(prevTime);
+            writeln(nextTime);
         }
 
         return translations;
