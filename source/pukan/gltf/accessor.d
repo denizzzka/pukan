@@ -75,6 +75,8 @@ package struct AccessRange(T, bool isOutput)
         return *cast(T*) cast(void*) &buf[i];
     }
 
+    int opDollar(uint i)() => length - i;
+
     private T* frontPtr() inout
     {
         return cast(T*) cast(void*) &buf[currByte];
