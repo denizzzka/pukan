@@ -313,6 +313,8 @@ void createArena(T)(Scene scene, ref T node)
 
     foreach(i, filename; found)
     {
+        if(filename != "demo/assets/gltf_samples/Fox/glTF/Fox.gltf") continue;
+
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
