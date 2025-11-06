@@ -51,6 +51,8 @@ struct AnimationSampler
         auto timeline = content.rangify!float(inputAcc);
         assert(timeline.length > 1, "GLTF animation sampler input must have at least two keyframes");
 
+        float duration = timeline[$ - 1];
+
         //FIXME: implement
 
         return 0; // No translation found, so using first translation
