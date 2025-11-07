@@ -134,6 +134,10 @@ package struct AnimationSupport
             e = Matrix4x4f.identity; // * Vector3f(-1, -1, -1).scaleMatrix;
         }
 
+        auto trans = Vector3f(0, 0, 0);
+        auto rot = Quaternionf.identity;
+        auto scaling = Vector3f(1, 1, 1);
+
         foreach(chan; currAnimation.channels)
         {
             float prevTime = 0.0f;
@@ -142,6 +146,33 @@ package struct AnimationSupport
 
             const sampler = currAnimation.samplers[chan.samplerIdx];
             const prevIdx = sampler.getSampleByTime(content, currTime, prevTime, nextTime, loopTime);
+            const nextIdx = prevIdx + 1;
+
+            const float interpRatio = (loopTime - prevTime) / (nextTime - prevTime);
+
+            // TODO: support all interpolation types
+
+            if (chan.targetPath == TRSType.translation)
+            {
+                const output = content.rangify!Vector3f(sampler.outputAcc);
+                const Vector3f prevTrans = output[prevIdx];
+                const Vector3f nextTrans = output[nextIdx];
+                trans = lerp(prevTrans, nextTrans, interpRatio);
+            }
+            else if (chan.targetPath == TRSType.rotation)
+            {
+                const output = content.rangify!Quaternionf(sampler.outputAcc);
+                const Quaternionf prevRot = output[prevIdx];
+                const Quaternionf nextRot = output[nextIdx];
+                rot = slerp(prevRot, nextRot, interpRatio);
+            }
+            else if (chan.targetPath == TRSType.scale)
+            {
+                const output = content.rangify!Vector3f(sampler.outputAcc);
+                const Vector3f prevScale = output[prevIdx];
+                const Vector3f nextScale = output[nextIdx];
+                scaling = lerp(prevScale, nextScale, interpRatio);
+            }
 
             //~ import std.stdio;
             //~ writeln(sampler);
