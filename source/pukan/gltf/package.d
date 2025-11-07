@@ -81,6 +81,7 @@ class GlTF : DrawableByVulkan
                 foreach(idx; ln.childrenNodeIndices)
                 {
                     auto c = createNodeHier(nodes[idx]);
+                    c.trans = &animation.perNodeTranslations[idx];
                     nn.addChildNode(c);
                 }
 
