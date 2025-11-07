@@ -145,12 +145,12 @@ package struct AnimationSupport
             const sampler = currAnimation.samplers[chan.samplerIdx];
             const prevIdx = sampler.getSampleByTime(content, currTime, prevTime, nextTime, loopTime);
 
-            import std.stdio;
-            writeln(sampler);
-            writeln(prevIdx);
-            writeln(loopTime);
-            writeln(prevTime);
-            writeln(nextTime);
+            //~ import std.stdio;
+            //~ writeln(sampler);
+            //~ writeln(prevIdx);
+            //~ writeln(loopTime);
+            //~ writeln(prevTime);
+            //~ writeln(nextTime);
         }
 
         return translations;
