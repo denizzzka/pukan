@@ -280,9 +280,21 @@ class GlTF : DrawableByVulkan
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
     {
-        import std;
-        const pose = animation.calculatePose(&animations[0], 0.0);
-        //~ writeln("pose=", pose);
+        if(isAnimated)
+        {
+            // Update animation
+            static float time = 0;
+            time += 0.005;
+
+            import std;
+
+            const pose = animation.calculatePose(&animations[0], time);
+            writeln(pose.length);
+            writeln(animation.perNodeTranslations.length);
+            animation.perNodeTranslations[0 .. $-1] = pose[];
+
+            //~ writeln("pose=", pose);
+        }
 
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
