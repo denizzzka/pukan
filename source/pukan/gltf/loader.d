@@ -197,10 +197,10 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
 
         nodes ~= Node(
             childrenNodeIndices: childrenIdxs,
+            trans: trans,
             payload: NodePayload(
                 name: node["name"].opt!string,
                 meshIdx: node["mesh"].opt!int(-1),
-                trans: trans,
             ),
         );
     }
@@ -453,13 +453,13 @@ struct Primitive
 struct NodePayload
 {
     string name; /// Not a unique name
-    Matrix4x4f trans;
     int meshIdx = -1;
 }
 
 struct Node
 {
     ushort[] childrenNodeIndices;
+    Matrix4x4f trans;
     NodePayload payload;
     alias this = payload;
 }
