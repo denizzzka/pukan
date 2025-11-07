@@ -24,6 +24,7 @@ class Node : BaseNode
     NodePayload payload;
     alias this = payload;
 
+    Matrix4x4f* trans;
     MeshClass mesh;
 
     this(NodePayload pa)
@@ -87,6 +88,7 @@ class GlTF : DrawableByVulkan
             }
 
             this.rootSceneNode = createNodeHier(rootSceneNode);
+            this.rootSceneNode.trans = &animation.perNodeTranslations[$-1];
         }
 
         // Textures:
@@ -293,9 +295,9 @@ class GlTF : DrawableByVulkan
     {
         import std.math;
 
-        assert(!node.trans[0].isNaN);
+        assert(node.trans !is null);
 
-        trans *= node.trans;
+        trans *= *node.trans;
 
         if(node.mesh)
         {
