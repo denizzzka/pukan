@@ -280,7 +280,7 @@ class GlTF : DrawableByVulkan
     {
         import std;
         const pose = animation.calculatePose(&animations[0], 0.0);
-        writeln("pose=", pose);
+        //~ writeln("pose=", pose);
 
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
