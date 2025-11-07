@@ -145,6 +145,8 @@ class GlTF : DrawableByVulkan
         return null;
     }
 
+    bool isAnimated() const => animation.animations.length > 0;
+
     auto calcAABB() const
     {
         import pukan.misc: Boxf;
