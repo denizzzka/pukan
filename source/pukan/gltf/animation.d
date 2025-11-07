@@ -126,12 +126,12 @@ package struct AnimationSupport
     Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime)
     {
         Matrix4x4f[] translations;
-        translations.length = perNodeTranslations.length;
+        translations.length = perNodeTranslations.length - 1; //TODO: except root node, not oblivious
 
         foreach(ref e; translations)
         {
-            // Negative scale to avoid mirroring when loaded OpenGL mesh into Vulkan
-            e = Matrix4x4f.identity * Vector3f(-1, -1, -1).scaleMatrix;
+            //~ // Negative scale to avoid mirroring when loaded OpenGL mesh into Vulkan
+            e = Matrix4x4f.identity; // * Vector3f(-1, -1, -1).scaleMatrix;
         }
 
         foreach(chan; currAnimation.channels)
