@@ -65,6 +65,8 @@ class GlTF : DrawableByVulkan
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
 
+        animation.perNodeTranslations[i] = Matrix4x4f.identity;
+
         {
             Node createNodeHier(ref LoaderNode ln)
             {

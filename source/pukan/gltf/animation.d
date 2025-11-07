@@ -121,7 +121,7 @@ package struct AnimationSupport
     package this(GltfContent* c, size_t nodesNum)
     {
         content = c;
-        perNodeTranslations.length = nodesNum;
+        perNodeTranslations.length = nodesNum + 1 /* is for rootSceneNode */;
         animations = content.animations;
     }
 
