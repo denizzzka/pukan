@@ -1,5 +1,6 @@
 module pukan.gltf.animation;
 
+import dlib.math;
 import pukan.gltf: Node;
 import pukan.gltf.accessor: BufAccess;
 import pukan.gltf.loader;
@@ -112,11 +113,8 @@ struct Animation
 package struct AnimationSupport
 {
     private GltfContent* content;
-    private Animation[] animations;
-
-    import dlib.math;
-
-    Matrix4x4f[] perNodeTranslations;
+    package Animation[] animations;
+    package Matrix4x4f[] perNodeTranslations;
 
     package this(GltfContent* c, size_t nodesNum)
     {
