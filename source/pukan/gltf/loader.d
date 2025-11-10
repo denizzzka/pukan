@@ -151,7 +151,9 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             joints ~= j.get!uint;
 
         ret.skins ~= Skin(
-            inverseBindMatricesAccessorIdx: skin["inverseBindMatrices"].get!uint,
+            inverseBindMatrices: content.getAccess!(Type.MAT4)(
+                skin["inverseBindMatrices"].get!uint
+            ),
             nodesIndices: joints,
         );
     }
@@ -465,7 +467,7 @@ struct Primitive
 
 struct Skin
 {
-    uint inverseBindMatricesAccessorIdx; ///
+    BufAccess inverseBindMatrices; ///
     uint[] nodesIndices; /// joints
 }
 
