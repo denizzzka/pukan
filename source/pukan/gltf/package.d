@@ -216,6 +216,16 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
+        if(content.skins.length)
+        {
+            const jointsAccessor = content.getAccess!(Type.VEC4, Vector4us)(
+                primitive.attributes["JOINTS_0"].get!uint
+            );
+            const weightsAccessor = content.getAccess!(Type.VEC4, Vector4f)(
+                primitive.attributes["WEIGHTS_0"].get!uint
+            );
+        }
+
         IndicesDescr indicesBuffer;
 
         // If indexed mesh:
@@ -345,6 +355,9 @@ class GlTF : DrawableByVulkan
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
     }
 }
+
+///
+alias Vector4us = Vector!(ushort, 4);
 
 //TODO: use as mandatory vertex shader creation argument?
 //TODO: move to C header and use from GLSL code too
