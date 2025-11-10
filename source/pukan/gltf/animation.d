@@ -138,7 +138,7 @@ package struct AnimationSupport
         auto rot = Quaternionf.identity;
         auto scaling = Vector3f(1, 1, 1);
 
-        foreach(chan; currAnimation.channels)
+        foreach(const scope chan; currAnimation.channels)
         {
             float prevTime = 0.0f;
             float nextTime = 0.0f;
@@ -174,8 +174,13 @@ package struct AnimationSupport
                 scaling = lerp(prevScale, nextScale, interpRatio);
             }
 
+            translations[chan.targetNode] =
+                trans.translationMatrix *
+                rot.toMatrix4x4 *
+                scaling.scaleMatrix;
+
             //~ import std.stdio;
-            //~ writeln(sampler);
+            //~ writeln("chan.targetNode=", chan.targetNode, " trans=\n", translations[chan.targetNode]);
             //~ writeln(prevIdx);
             //~ writeln(loopTime);
             //~ writeln(prevTime);

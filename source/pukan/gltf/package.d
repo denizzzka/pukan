@@ -289,9 +289,10 @@ class GlTF : DrawableByVulkan
             import std;
 
             const pose = animation.calculatePose(&animations[0], time);
-            writeln(pose.length);
-            writeln(animation.perNodeTranslations.length);
-            animation.perNodeTranslations[0 .. $-1] = pose[];
+            //~ writeln("\n\n\n>>>>>>>>>\npose.length=", pose.length);
+            //~ writeln("time=", time);
+            animation.perNodeTranslations[0 .. $-1] = pose[0 .. $];
+            //~ writeln(animation.perNodeTranslations);
 
             //~ writeln("pose=", pose);
         }
