@@ -25,11 +25,13 @@ class Node : BaseNode
     alias this = payload;
 
     Matrix4x4f* trans;
+    package Matrix4x4f skinInverseBind;
     MeshClass mesh;
 
     this(NodePayload pa)
     {
         payload = pa;
+        skinInverseBind = Matrix4x4f.identity;
     }
 
     void traversal(void delegate(Node) dg)
@@ -284,7 +286,7 @@ class GlTF : DrawableByVulkan
         {
             // Update animation
             static float time = 0;
-            time += 0.005;
+            time += 0.003;
 
             import std;
 
