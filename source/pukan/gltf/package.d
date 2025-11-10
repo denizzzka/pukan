@@ -31,7 +31,6 @@ class Node : BaseNode
     this(NodePayload pa)
     {
         payload = pa;
-        skinInverseBind = Matrix4x4f.identity;
     }
 
     void traversal(void delegate(Node) dg)
@@ -76,6 +75,22 @@ class GlTF : DrawableByVulkan
         }
 
         {
+            Matrix4x4f getSkinInverseBin(uint nodeIdx)
+            {
+                if(content.skins.length == 0)
+                    return Matrix4x4f.identity;
+
+                //TODO: implement skin switching
+                const skin = content.skins[0];
+                auto invRange = content.rangify!Matrix4x4f(skin.inverseBindMatrices);
+
+                foreach(i, idx; skin.nodesIndices)
+                    if(idx == nodeIdx)
+                        return invRange[i];
+
+                return Matrix4x4f.identity;
+            }
+
             Node createNodeHier(ref LoaderNode ln)
             {
                 auto nn = new Node(ln.payload);
@@ -83,6 +98,7 @@ class GlTF : DrawableByVulkan
                 foreach(idx; ln.childrenNodeIndices)
                 {
                     auto c = createNodeHier(nodes[idx]);
+                    c.skinInverseBind = getSkinInverseBin(idx);
                     c.trans = &animation.perNodeTranslations[idx];
                     nn.addChildNode(c);
                 }
@@ -91,6 +107,7 @@ class GlTF : DrawableByVulkan
             }
 
             this.rootSceneNode = createNodeHier(rootSceneNode);
+            this.rootSceneNode.skinInverseBind = Matrix4x4f.identity;
             this.rootSceneNode.trans = &animation.perNodeTranslations[$-1];
         }
 
@@ -315,11 +332,11 @@ class GlTF : DrawableByVulkan
 
         assert(node.trans !is null);
 
-        trans *= *node.trans;
+        auto localTrans = trans * node.skinInverseBind * *node.trans;
 
         if(node.mesh)
         {
-            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
+            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) localTrans.sizeof, cast(void*) &localTrans);
 
             node.mesh.drawingBufferFilling(gpuBuffs, buf);
         }
