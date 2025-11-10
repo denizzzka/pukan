@@ -143,6 +143,19 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         );
     }
 
+    const skins = "skins" in json;
+    if(skins) foreach(ref skin; *skins)
+    {
+        uint[] joints;
+        foreach(j; skin["joints"])
+            joints ~= j.get!uint;
+
+        ret.skins ~= Skin(
+            inverseBindMatricesAccessorIdx: skin["inverseBindMatrices"].get!uint,
+            nodesIndices: joints,
+        );
+    }
+
     foreach(node; json["nodes"])
     {
         ushort[] childrenIdxs;
@@ -450,6 +463,12 @@ struct Primitive
     Json material;
 }
 
+struct Skin
+{
+    uint inverseBindMatricesAccessorIdx; ///
+    uint[] nodesIndices; /// joints
+}
+
 struct NodePayload
 {
     string name; /// Not a unique name
@@ -473,6 +492,7 @@ struct GltfContent
     ImageMemory[] images;
     Texture[] textures;
     Animation[] animations;
+    Skin[] skins;
 
     const BufAccess getAccess(Type type = Type.undef, T = void)(in uint accessorIdx)
     {
