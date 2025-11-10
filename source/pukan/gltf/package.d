@@ -224,6 +224,9 @@ class GlTF : DrawableByVulkan
             const weightsAccessor = content.getAccess!(Type.VEC4, Vector4f)(
                 primitive.attributes["WEIGHTS_0"].get!uint
             );
+
+            createGpuBufIfNeed(device, jointsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            createGpuBufIfNeed(device, weightsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         IndicesDescr indicesBuffer;
