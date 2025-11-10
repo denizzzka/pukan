@@ -145,12 +145,12 @@ package struct AnimationSupport
             float loopTime = 0.0f;
 
             const sampler = currAnimation.samplers[chan.samplerIdx];
+            assert(sampler.interpolation == InterpolationType.LINEAR, "TODO: support all interpolation types");
+
             const prevIdx = sampler.getSampleByTime(content, currTime, prevTime, nextTime, loopTime);
             const nextIdx = prevIdx + 1;
 
             const float interpRatio = (loopTime - prevTime) / (nextTime - prevTime);
-
-            // TODO: support all interpolation types
 
             if (chan.targetPath == TRSType.translation)
             {
