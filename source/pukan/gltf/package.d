@@ -6,7 +6,7 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, TexturedMesh;
+import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, TexturedMesh, UploadedVertices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -198,7 +198,7 @@ class GlTF : DrawableByVulkan
 
         const primitive = &mesh.primitives[0];
 
-        BufAccess verticesAccessor;
+        UploadedVertices uplVert;
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -211,9 +211,9 @@ class GlTF : DrawableByVulkan
             import dlib.math: Vector3f;
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
-            verticesAccessor = content.getAccess!(Type.VEC3, Vector3f)(*vertices);
+            uplVert.vertices = content.getAccess!(Type.VEC3, Vector3f)(*vertices);
 
-            createGpuBufIfNeed(device, verticesAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         if(content.skins.length)
@@ -247,7 +247,7 @@ class GlTF : DrawableByVulkan
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         if(!content.textures.length)
-            node.mesh = new JustColoredMesh(device, mesh.name, verticesAccessor, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+            node.mesh = new JustColoredMesh(device, mesh.name, uplVert.vertices, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
         else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
@@ -286,7 +286,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(device, mesh.name, verticesAccessor, indicesBuffer, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
+                auto m = new TexturedMesh(device, mesh.name, uplVert.vertices, indicesBuffer, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
