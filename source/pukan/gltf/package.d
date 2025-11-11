@@ -218,15 +218,15 @@ class GlTF : DrawableByVulkan
 
         if(content.skins.length)
         {
-            const jointsAccessor = content.getAccess!(Type.VEC4, Vector4us)(
+            uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(
                 primitive.attributes["JOINTS_0"].get!uint
             );
-            const weightsAccessor = content.getAccess!(Type.VEC4, Vector4f)(
+            uplVert.weights = content.getAccess!(Type.VEC4, Vector4f)(
                 primitive.attributes["WEIGHTS_0"].get!uint
             );
 
-            createGpuBufIfNeed(device, jointsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            createGpuBufIfNeed(device, weightsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            createGpuBufIfNeed(device, uplVert.joints, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            createGpuBufIfNeed(device, uplVert.weights, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         // If indexed mesh:
