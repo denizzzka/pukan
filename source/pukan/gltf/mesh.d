@@ -40,13 +40,27 @@ struct IndicesDescr
     }
 }
 
+/// Vertices, uploaded to GPU
+package struct UploadedVertices
+{
+    IndicesDescr indices;
+    union
+    {
+        BufAccess[2] vertAndTex;
+        struct
+        {
+            BufAccess vertices;
+            BufAccess texCoords;
+        }
+    }
+}
+
 class Mesh
 {
     string name;
-    package IndicesDescr indices;
-    package BufAccess vertices;
+    package UploadedVertices vert;
+    alias this = vert;
     /*private*/ VkDescriptorSet* descriptorSet;
-    protected BufAccess[2] vertAndTex;
 
     private TransferBuffer uniformBuffer;
     private VkDescriptorBufferInfo uboInfo;
@@ -62,10 +76,7 @@ class Mesh
 
         assert(vertices.viewIdx >= 0);
 
-        vertAndTex = [
-            vertices,
-            vertices, // fake data to fill out texture coords buffer on non-textured objects
-        ];
+        vert.texCoords = vertices; // fake data to fill out texture coords buffer on non-textured objects
 
         {
             // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
