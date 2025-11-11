@@ -255,10 +255,10 @@ class GlTF : DrawableByVulkan
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
-            BufAccess texCoordsAccessor = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
-            auto ta = &texCoordsAccessor;
+            uplVert.texCoords = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
+            auto ta = &uplVert.texCoords;
 
-            auto textCoordsRange = content.rangify!Vector2f(texCoordsAccessor);
+            //~ auto textCoordsRange = content.rangify!Vector2f(uplVert.texCoords);
 
             // Need to normalize coordinates?
             //~ if(texCoords.min_max != Json.emptyObject)
@@ -281,10 +281,10 @@ class GlTF : DrawableByVulkan
                 }
             }
 
-            createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(device, mesh.name, uplVert.vertices, uplVert.indices, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
+                auto m = new TexturedMesh(device, mesh.name, uplVert.vertices, uplVert.indices, uplVert.texCoords, meshesDescriptorSets[node.meshIdx]);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
