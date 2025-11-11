@@ -67,16 +67,15 @@ class Mesh
     private VkDescriptorBufferInfo bufferInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesDescr indices, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet)
     {
         this.name = name;
         this.descriptorSet = &descriptorSet;
-        this.vertices = vertices;
-        this.indices = indices;
+        this.vert = vert;
 
         assert(vertices.viewIdx >= 0);
 
-        vert.texCoords = vertices; // fake data to fill out texture coords buffer on non-textured objects
+        vert.texCoords = vert.vertices; // fake data to fill out texture coords buffer on non-textured objects
 
         {
             // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -200,11 +199,11 @@ final class JustColoredMesh : Mesh
 {
     private VkDescriptorImageInfo fakeTexture;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesDescr indices, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture)
     {
         this.fakeTexture = fakeTexture;
 
-        super(device, name, vertices, indices, descriptorSet);
+        super(device, name, vert, descriptorSet);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
@@ -229,15 +228,13 @@ final class JustColoredMesh : Mesh
 ///
 final class TexturedMesh : Mesh
 {
-    BufAccess texCoords;
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, BufAccess vertices, IndicesDescr indices, BufAccess texCoords, ref VkDescriptorSet descriptorSet)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet)
     {
-        super(device, name, vertices, indices, descriptorSet);
+        super(device, name, vert, descriptorSet);
 
-        this.texCoords = texCoords;
-        vertAndTex[1] = this.texCoords;
+        this.vert = vert;
 
         ubo.material.renderType.x = 1; // is textured
     }

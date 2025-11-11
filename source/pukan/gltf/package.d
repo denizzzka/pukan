@@ -245,7 +245,7 @@ class GlTF : DrawableByVulkan
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         if(!content.textures.length)
-            node.mesh = new JustColoredMesh(device, mesh.name, uplVert.vertices, uplVert.indices, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+            node.mesh = new JustColoredMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
         else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
@@ -284,7 +284,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(device, mesh.name, uplVert.vertices, uplVert.indices, uplVert.texCoords, meshesDescriptorSets[node.meshIdx]);
+                auto m = new TexturedMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx]);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
