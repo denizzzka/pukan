@@ -229,8 +229,6 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, weightsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
-        IndicesDescr indicesBuffer;
-
         // If indexed mesh:
         if(primitive.indicesAccessorIdx >= 0)
         {
@@ -241,13 +239,13 @@ class GlTF : DrawableByVulkan
             const indicesAccessor = content.getAccess(indices);
             createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-            indicesBuffer = IndicesDescr(device, indicesAccessor, indices.componentType);
+            uplVert.indices = IndicesDescr(device, indicesAccessor, indices.componentType);
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         if(!content.textures.length)
-            node.mesh = new JustColoredMesh(device, mesh.name, uplVert.vertices, indicesBuffer, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+            node.mesh = new JustColoredMesh(device, mesh.name, uplVert.vertices, uplVert.indices, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
         else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
@@ -286,7 +284,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, texCoordsAccessor, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(device, mesh.name, uplVert.vertices, indicesBuffer, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
+                auto m = new TexturedMesh(device, mesh.name, uplVert.vertices, uplVert.indices, texCoordsAccessor, meshesDescriptorSets[node.meshIdx]);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
