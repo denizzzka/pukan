@@ -53,6 +53,10 @@ package struct UploadedVertices
             BufAccess texCoords;
         }
     }
+
+    // Skins support
+    BufAccess joints;
+    BufAccess weights;
 }
 
 class Mesh
