@@ -158,6 +158,8 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         );
     }
 
+    Matrix4x4f[] jointMatrices;
+
     foreach(node; json["nodes"])
     {
         ushort[] childrenIdxs;
@@ -218,6 +220,8 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
                 meshIdx: node["mesh"].opt!int(-1),
             ),
         );
+
+        jointMatrices ~= trans;
     }
 
     auto scenes = json["scenes"].byValue.array;
@@ -326,7 +330,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         }
     }
 
-    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, jointMatrices, rootSceneNode, fakeTexture);
 }
 
 struct Buffer
