@@ -46,17 +46,17 @@ package struct UploadedVertices
     IndicesDescr indices;
     union
     {
-        BufAccess[2] vertAndTex;
+        BufAccess[4] allBuffers;
         struct
         {
             BufAccess vertices;
             BufAccess texCoords;
+
+            // Skin support
+            BufAccess joints;
+            BufAccess weights;
         }
     }
-
-    // Skins support
-    BufAccess joints;
-    BufAccess weights;
 }
 
 class Mesh
@@ -79,7 +79,14 @@ class Mesh
 
         assert(vertices.viewIdx >= 0);
 
-        vert.texCoords = vert.vertices; // fake data to fill out texture coords buffer on non-textured objects
+        if(vert.texCoords.viewIdx < 0)
+            this.vert.texCoords = vert.vertices; // fake data to fill out texture coords buffer on non-textured objects
+
+        if(vert.weights.viewIdx < 0)
+        {
+            this.vert.weights = vert.vertices; // ditto
+            this.vert.joints = vert.vertices; // ditto
+        }
 
         {
             // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
@@ -151,7 +158,7 @@ class Mesh
 
     void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf)
     {
-        bindVertexBuffers(gpuBuffs, vertAndTex, buf);
+        bindVertexBuffers(gpuBuffs, vert.allBuffers, buf);
 
         if(indices.accessor.count == 0)
         {
@@ -174,7 +181,6 @@ in(gpuBuffs.length > 0)
 {
     const len = cast(uint) accessors.length;
     assert(len > 0);
-    assert(len == 2);
 
     auto buffers = new VkBuffer[len];
     auto offsets = new VkDeviceSize[len];
@@ -237,8 +243,6 @@ final class TexturedMesh : Mesh
     package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet)
     {
         super(device, name, vert, descriptorSet);
-
-        this.vert = vert;
 
         ubo.material.renderType.x = 1; // is textured
     }
