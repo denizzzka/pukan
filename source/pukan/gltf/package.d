@@ -54,6 +54,8 @@ class GlTF : DrawableByVulkan
     private MeshClass[] meshes;
     private VkDescriptorSet[] meshesDescriptorSets;
 
+    package TransferBuffer jointMatricesUniformBuf;
+
     private AnimationSupport animation;
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
@@ -63,6 +65,9 @@ class GlTF : DrawableByVulkan
         this.pipeline = &pipeline;
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
+
+        jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        jointMatricesUniformBuf.cpuBuf = jointMatrices[0 .. $];
 
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
@@ -180,6 +185,8 @@ class GlTF : DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        jointMatricesUniformBuf.uploadImmediate(commandPool, commandBuffer);
+
         foreach(ref buf; gpuBuffs)
             if(buf)
                 buf.uploadImmediate(commandPool, commandBuffer);
