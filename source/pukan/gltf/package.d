@@ -396,13 +396,18 @@ struct ShaderVertex
                 stride: texCoord.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            // joints:
+            VkVertexInputBindingDescription(
+                binding: 2,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            )
         ];
     }
 
     //TODO: convert to enum?
     static auto getAttributeDescriptions()
     {
-        VkVertexInputAttributeDescription[2] ad = [
+        return [
             // position:
             VkVertexInputAttributeDescription(
                 binding: 0,
@@ -417,8 +422,12 @@ struct ShaderVertex
                 format: VK_FORMAT_R32G32_SFLOAT,
                 //~ offset: texCoord.offsetof,
             ),
+            // joints:
+            VkVertexInputAttributeDescription(
+                binding: 2,
+                location: 2,
+                format: VK_FORMAT_R16G16B16A16_UINT,
+            ),
         ];
-
-        return ad;
     }
 };

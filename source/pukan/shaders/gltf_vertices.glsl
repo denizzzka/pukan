@@ -7,6 +7,7 @@ layout(push_constant) uniform PushConsts
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 vertTextureCoord;
+layout(location = 2) in uvec4 jointIndices; // four indices of the joints that should have an influence on the vertex during the skinning process
 
 layout(location = 0) out vec2 fragTextureCoord;
 
