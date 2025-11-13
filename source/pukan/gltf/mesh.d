@@ -68,7 +68,6 @@ class Mesh
 
     private TransferBuffer uniformBuffer;
     private VkDescriptorBufferInfo uboInfo;
-    private VkDescriptorBufferInfo bufferInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
 
     package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet)
@@ -97,7 +96,7 @@ class Mesh
             ubo.material.renderType.x = 0; // is not textured
 
             // Prepare descriptor
-            bufferInfo = VkDescriptorBufferInfo(
+            uboInfo = VkDescriptorBufferInfo(
                 buffer: uniformBuffer.gpuBuffer,
                 offset: 0,
                 range: UBOContent.sizeof,
@@ -110,7 +109,7 @@ class Mesh
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 descriptorCount: 1,
-                pBufferInfo: &bufferInfo,
+                pBufferInfo: &uboInfo,
             );
         }
     }
