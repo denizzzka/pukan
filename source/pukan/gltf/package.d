@@ -68,6 +68,7 @@ class GlTF : DrawableByVulkan
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
 
         jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        assert(jointMatricesUniformBuf.length > 0);
         jointMatricesUniformBuf.cpuBuf = jointMatrices[0 .. $];
         jointsUboInfo = VkDescriptorBufferInfo(
             buffer: jointMatricesUniformBuf.gpuBuffer,
@@ -156,9 +157,6 @@ class GlTF : DrawableByVulkan
         });
 
         assert(meshesDescriptorSets.length == 1);
-
-        foreach(ref mesh; meshes)
-            mesh.updateDescriptorSetsAndUniformBuffers(device);
     }
 
     string name() const
@@ -189,9 +187,13 @@ class GlTF : DrawableByVulkan
         return r;
     }
 
+    //TODO: private
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         jointMatricesUniformBuf.uploadImmediate(commandPool, commandBuffer);
+
+        foreach(ref mesh; meshes)
+            mesh.updateDescriptorSetsAndUniformBuffers(device);
 
         foreach(ref buf; gpuBuffs)
             if(buf)
