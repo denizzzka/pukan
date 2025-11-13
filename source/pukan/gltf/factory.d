@@ -30,6 +30,7 @@ struct GltfFactory
     GraphicsPipelineCfg graphicsPipelineCfg;
     private Texture fakeTexture; /// Stub to fill texture shader arg of non-textured meshes
 
+    //TODO: remove shaderStages arg, set it implicitly
     this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
     {
         this.device = device;

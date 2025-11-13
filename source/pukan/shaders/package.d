@@ -46,7 +46,14 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
     gltf_vertShader = device.uploadShaderToGPU(
         cast(ubyte[]) import("gltf_vertices.spv"),
         VK_SHADER_STAGE_VERTEX_BIT,
-        null,
+        [
+            VkDescriptorSetLayoutBinding(
+                binding: 2,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            ),
+        ],
         VkPushConstantRange(
             stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
             offset: 0,

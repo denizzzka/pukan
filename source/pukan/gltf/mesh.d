@@ -229,6 +229,7 @@ final class JustColoredMesh : Mesh
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
         VkWriteDescriptorSet[] descriptorWrites = [
+            jointsUboWriteDescr,
             uboWriteDescriptor,
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -239,7 +240,6 @@ final class JustColoredMesh : Mesh
                 descriptorCount: 1,
                 pImageInfo: &fakeTexture,
             ),
-            jointsUboWriteDescr,
         ];
 
         device.updateDescriptorSets(descriptorWrites);
@@ -267,6 +267,7 @@ final class TexturedMesh : Mesh
     {
         //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
         VkWriteDescriptorSet[] descriptorWrites = [
+            jointsUboWriteDescr,
             uboWriteDescriptor,
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -277,7 +278,6 @@ final class TexturedMesh : Mesh
                 descriptorCount: 1,
                 pImageInfo: textureDescrImageInfo,
             ),
-            jointsUboWriteDescr,
         ];
 
         device.updateDescriptorSets(descriptorWrites);
