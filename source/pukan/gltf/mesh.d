@@ -84,8 +84,8 @@ class Mesh
 
         if(vert.weights.viewIdx < 0)
         {
-            this.vert.weights = vert.vertices; // ditto
             this.vert.joints = vert.vertices; // ditto
+            this.vert.weights = this.vert.joints; // ditto
         }
 
         {
