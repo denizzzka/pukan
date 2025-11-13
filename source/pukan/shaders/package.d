@@ -49,7 +49,7 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
         [
             VkDescriptorSetLayoutBinding(
                 binding: 2,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
             ),

@@ -118,7 +118,7 @@ class Mesh
                 dstSet: descriptorSet,
                 dstBinding: 2,
                 dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                 descriptorCount: 1,
                 pBufferInfo: &jointsUboInfo,
             );
