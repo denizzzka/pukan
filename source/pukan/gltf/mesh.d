@@ -71,7 +71,7 @@ class Mesh
     private VkWriteDescriptorSet uboWriteDescriptor;
     private VkWriteDescriptorSet jointsUboWriteDescr;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, VkDescriptorBufferInfo jointsUboInfo)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, ref VkDescriptorBufferInfo jointsUboInfo)
     {
         this.name = name;
         this.descriptorSet = &descriptorSet;
