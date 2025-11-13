@@ -1,5 +1,10 @@
 #version 460
 
+layout(binding = 2) uniform UniformBufferObject
+{
+    mat4 jointMatrices[777]; //FIXME
+} ubo;
+
 layout(push_constant) uniform PushConsts
 {
     mat4 transl;
@@ -15,5 +20,12 @@ layout(location = 0) out vec2 fragTextureCoord;
 void main()
 {
     fragTextureCoord = vertTextureCoord;
-    gl_Position = pushConsts.transl * vec4(position, 1.0);
+
+    const mat4 skinned =
+        weight.x * ubo.jointMatrices[jointIndices.x] +
+        weight.y * ubo.jointMatrices[jointIndices.y] +
+        weight.z * ubo.jointMatrices[jointIndices.z] +
+        weight.w * ubo.jointMatrices[jointIndices.w];
+
+    gl_Position = skinned * pushConsts.transl * vec4(position, 1.0);
 }

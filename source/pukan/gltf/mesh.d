@@ -116,7 +116,7 @@ class Mesh
             jointsUboWriteDescr = VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 dstSet: descriptorSet,
-                dstBinding: 0,
+                dstBinding: 2,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 descriptorCount: 1,
