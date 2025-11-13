@@ -199,6 +199,7 @@ class TransferBuffer
 
     auto ref cpuBuf() => cpuBuffer.cpuBuf;
     auto cpuBuf() const => cpuBuffer.cpuBuf;
+    uint length() const => cast(uint) cpuBuffer.cpuBuf.length;
 
     void uploadImmediate(CommandPool commandPool, ref VkCommandBuffer buf)
     {

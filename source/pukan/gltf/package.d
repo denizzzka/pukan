@@ -55,6 +55,7 @@ class GlTF : DrawableByVulkan
     private VkDescriptorSet[] meshesDescriptorSets;
 
     package TransferBuffer jointMatricesUniformBuf;
+    private VkDescriptorBufferInfo jointsUboInfo;
 
     private AnimationSupport animation;
 
@@ -68,6 +69,11 @@ class GlTF : DrawableByVulkan
 
         jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
         jointMatricesUniformBuf.cpuBuf = jointMatrices[0 .. $];
+        jointsUboInfo = VkDescriptorBufferInfo(
+            buffer: jointMatricesUniformBuf.gpuBuffer,
+            offset: 0,
+            range: jointMatricesUniformBuf.length,
+        );
 
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
@@ -252,7 +258,7 @@ class GlTF : DrawableByVulkan
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         if(!content.textures.length)
-            node.mesh = new JustColoredMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */);
+            node.mesh = new JustColoredMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
         else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
@@ -291,7 +297,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx]);
+                auto m = new TexturedMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx], jointsUboInfo);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
