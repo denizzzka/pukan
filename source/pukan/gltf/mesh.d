@@ -130,9 +130,9 @@ class Mesh
         uniformBuffer.destroy;
     }
 
-    //TODO: remove?
     void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        uniformBuffer.uploadImmediate(commandPool, commandBuffer);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
@@ -160,10 +160,9 @@ class Mesh
 
     abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
 
+    //TODO: remove?
     void refreshBuffers(VkCommandBuffer buf)
     {
-        // TODO: move to updateDescriptorSetsAndUniformBuffers?
-        uniformBuffer.recordUpload(buf);
     }
 
     void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf)
