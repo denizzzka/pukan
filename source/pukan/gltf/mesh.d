@@ -218,7 +218,7 @@ final class JustColoredMesh : Mesh
 {
     private VkDescriptorImageInfo fakeTexture;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture, VkDescriptorBufferInfo jointsUboInfo)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture, ref VkDescriptorBufferInfo jointsUboInfo)
     {
         this.fakeTexture = fakeTexture;
 
@@ -250,7 +250,7 @@ final class TexturedMesh : Mesh
 {
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, VkDescriptorBufferInfo jointsUboInfo)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, ref VkDescriptorBufferInfo jointsUboInfo)
     {
         super(device, name, vert, descriptorSet, jointsUboInfo);
 
