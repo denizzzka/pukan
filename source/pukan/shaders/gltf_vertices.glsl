@@ -1,9 +1,9 @@
 #version 460
 
-layout(binding = 2) readonly buffer StorageBuf
+layout(binding = 2) readonly buffer JointMatrices
 {
     mat4 jointMatrices[];
-} storBuf;
+};
 
 layout(push_constant) uniform PushConsts
 {
@@ -22,10 +22,10 @@ void main()
     fragTextureCoord = vertTextureCoord;
 
     const mat4 skinned =
-        weight.x * storBuf.jointMatrices[jointIndices.x] +
-        weight.y * storBuf.jointMatrices[jointIndices.y] +
-        weight.z * storBuf.jointMatrices[jointIndices.z] +
-        weight.w * storBuf.jointMatrices[jointIndices.w];
+        weight.x * jointMatrices[jointIndices.x] +
+        weight.y * jointMatrices[jointIndices.y] +
+        weight.z * jointMatrices[jointIndices.z] +
+        weight.w * jointMatrices[jointIndices.w];
 
     gl_Position = skinned * pushConsts.transl * vec4(position, 1.0);
 }
