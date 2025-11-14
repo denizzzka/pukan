@@ -192,12 +192,12 @@ class GlTF : DrawableByVulkan
     {
         jointMatricesUniformBuf.uploadImmediate(commandPool, commandBuffer);
 
-        foreach(ref mesh; meshes)
-            mesh.updateDescriptorSetsAndUniformBuffers(device);
-
         foreach(ref buf; gpuBuffs)
             if(buf)
                 buf.uploadImmediate(commandPool, commandBuffer);
+
+        foreach(ref mesh; meshes)
+            mesh.updateDescriptorSetsAndUniformBuffers(device);
 
         foreach(m; meshes)
             m.uploadImmediate(commandPool, commandBuffer);
@@ -319,6 +319,8 @@ class GlTF : DrawableByVulkan
 
     void refreshBuffers(VkCommandBuffer buf)
     {
+        //~ jointMatricesUniformBuf.recordUpload(buf);
+
         foreach(e; meshes)
             e.refreshBuffers(buf);
     }
