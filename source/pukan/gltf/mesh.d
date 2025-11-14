@@ -161,7 +161,7 @@ class Mesh
     abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
 
     //TODO: remove?
-    void refreshBuffers(VkCommandBuffer buf)
+    package void refreshBuffers(VkCommandBuffer buf)
     {
     }
 
