@@ -319,8 +319,6 @@ class GlTF : DrawableByVulkan
 
     void refreshBuffers(VkCommandBuffer buf)
     {
-        //~ jointMatricesUniformBuf.recordUpload(buf);
-
         foreach(e; meshes)
             e.refreshBuffers(buf);
     }
