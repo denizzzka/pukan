@@ -68,7 +68,7 @@ class GlTF : DrawableByVulkan
 
         jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         assert(jointMatricesUniformBuf.length > 0);
-        jointMatricesUniformBuf.cpuBuf = jointMatrices[0 .. $];
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = jointMatrices;
         jointsUboInfo = VkDescriptorBufferInfo(
             buffer: jointMatricesUniformBuf.gpuBuffer,
             offset: 0,
@@ -86,7 +86,9 @@ class GlTF : DrawableByVulkan
         }
 
         {
-            Matrix4x4f getSkinInverseBin(uint nodeIdx)
+            //TODO: unused, remove
+            //~ Matrix4x4f getSkinInverseBin_(uint nodeIdx)
+            version(none)
             {
                 if(content.skins.length == 0)
                     return Matrix4x4f.identity;

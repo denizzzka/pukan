@@ -158,8 +158,6 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         );
     }
 
-    Matrix4x4f[] jointMatrices;
-
     foreach(node; json["nodes"])
     {
         ushort[] childrenIdxs;
@@ -220,9 +218,14 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
                 meshIdx: node["mesh"].opt!int(-1),
             ),
         );
-
-        jointMatrices ~= trans;
     }
+
+    //FIXME: hardcoded skin is used
+    const skin = ret.skins[0];
+    const skinNodeIdx = 0; //FIXME: hardcoded
+    Matrix4x4f[] jointMatrices = skin.calculateJointMatrices(content, nodes, skinNodeIdx);
+    //~ import std;
+    //~ writeln(jointMatrices);
 
     auto scenes = json["scenes"].byValue.array;
     enforce(scenes.length == 1);
@@ -469,10 +472,30 @@ struct Primitive
     Json material;
 }
 
+//TODO: (dlib) make Matrix4x4f.inverse() const:
+
 struct Skin
 {
     BufAccess inverseBindMatrices; ///
     uint[] nodesIndices; /// joints
+
+    Matrix4x4f[] calculateJointMatrices(in GltfContent* content, ref /*TODO: in*/ Node[] nodes, in ushort skinNodeIdx) const
+    {
+        Matrix4x4f[] jointMatrices;
+        jointMatrices.length = nodesIndices.length;
+
+        auto invRange = content.rangify!Matrix4x4f(inverseBindMatrices);
+        assert(invRange.length == jointMatrices.length);
+
+        auto skinNode = nodes[skinNodeIdx];
+        const inverseTransform = skinNode.trans.inverse;
+
+        foreach(i, jointIdx; nodesIndices)
+            jointMatrices[i] = inverseTransform * nodes[jointIdx].trans* invRange[i];
+            //~ jointMatrices[i] = Matrix4x4f.identity;
+
+        return jointMatrices;
+    }
 }
 
 struct NodePayload
