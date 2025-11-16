@@ -28,4 +28,5 @@ void main()
         weight.w * jointMatrices[jointIndices.w];
 
     gl_Position = pushConsts.transl * skinMatrix * vec4(position, 1.0);
+    //~ gl_Position = pushConsts.transl * vec4(position, 1.0);
 }

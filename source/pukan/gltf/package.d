@@ -86,7 +86,9 @@ class GlTF : DrawableByVulkan
         }
 
         {
-            Matrix4x4f getSkinInverseBin(uint nodeIdx)
+            //TODO: unused, remove
+            //~ Matrix4x4f getSkinInverseBin_(uint nodeIdx)
+            version(none)
             {
                 if(content.skins.length == 0)
                     return Matrix4x4f.identity;
