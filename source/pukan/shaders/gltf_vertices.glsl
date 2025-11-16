@@ -21,11 +21,11 @@ void main()
 {
     fragTextureCoord = vertTextureCoord;
 
-    const mat4 skinned =
+    const mat4 skinMatrix =
         weight.x * jointMatrices[jointIndices.x] +
         weight.y * jointMatrices[jointIndices.y] +
         weight.z * jointMatrices[jointIndices.z] +
         weight.w * jointMatrices[jointIndices.w];
 
-    gl_Position = skinned * pushConsts.transl * vec4(position, 1.0);
+    gl_Position = pushConsts.transl * skinMatrix * vec4(position, 1.0);
 }
