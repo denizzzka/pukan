@@ -25,7 +25,6 @@ class Node : BaseNode
     alias this = payload;
 
     Matrix4x4f* trans;
-    package Matrix4x4f skinInverseBind;
     MeshClass mesh;
 
     this(NodePayload pa)
@@ -110,7 +109,6 @@ class GlTF : DrawableByVulkan
                 foreach(idx; ln.childrenNodeIndices)
                 {
                     auto c = createNodeHier(nodes[idx]);
-                    c.skinInverseBind = getSkinInverseBin(idx);
                     c.trans = &animation.perNodeTranslations[idx];
                     nn.addChildNode(c);
                 }
@@ -119,7 +117,6 @@ class GlTF : DrawableByVulkan
             }
 
             this.rootSceneNode = createNodeHier(rootSceneNode);
-            this.rootSceneNode.skinInverseBind = Matrix4x4f.identity;
             this.rootSceneNode.trans = &animation.perNodeTranslations[$-1];
         }
 
@@ -358,7 +355,7 @@ class GlTF : DrawableByVulkan
 
         assert(node.trans !is null);
 
-        auto localTrans = trans * node.skinInverseBind * *node.trans;
+        auto localTrans = trans * *node.trans;
 
         if(node.mesh)
         {
