@@ -471,7 +471,7 @@ struct Primitive
 
 struct Skin
 {
-    private uint[] nodesIndices; /// joints
+    package uint[] nodesIndices; /// joints
     //TODO: const
     private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
 
