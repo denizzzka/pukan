@@ -222,13 +222,6 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         );
     }
 
-    //FIXME: hardcoded skin is used
-    const skin = ret.skins[0];
-    const skinNodeIdx = 0; //FIXME: hardcoded
-    Matrix4x4f[] jointMatrices = skin.calculateJointMatrices(content, nodes, skinNodeIdx);
-    //~ import std;
-    //~ writeln(jointMatrices);
-
     auto scenes = json["scenes"].byValue.array;
     enforce(scenes.length == 1);
 
@@ -335,7 +328,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         }
     }
 
-    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, jointMatrices, rootSceneNode, fakeTexture);
+    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
 }
 
 struct Buffer

@@ -60,20 +60,11 @@ class GlTF : DrawableByVulkan
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
-    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, Matrix4x4f[] jointMatrices, LoaderNode rootSceneNode, Texture fakeTexture)
+    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
     {
         this.pipeline = &pipeline;
         content = cont;
         meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
-
-        jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        assert(jointMatricesUniformBuf.length > 0);
-        jointMatricesUniformBuf.cpuBuf[0 .. $] = jointMatrices;
-        jointsUboInfo = VkDescriptorBufferInfo(
-            buffer: jointMatricesUniformBuf.gpuBuffer,
-            offset: 0,
-            range: jointMatricesUniformBuf.length,
-        );
 
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
@@ -86,6 +77,24 @@ class GlTF : DrawableByVulkan
         }
 
         {
+            if(content.skins.length > 0)
+            {
+                //FIXME: hardcoded skin is used
+                const skin = content.skins[0];
+                const ushort skinNodeIdx = 0; //FIXME: hardcoded
+                Matrix4x4f[] jointMatrices = skin.calculateJointMatrices(&content, nodes, skinNodeIdx);
+
+                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                assert(jointMatricesUniformBuf.length > 0);
+                jointMatricesUniformBuf.cpuBuf[0 .. $] = jointMatrices;
+
+                jointsUboInfo = VkDescriptorBufferInfo(
+                    buffer: jointMatricesUniformBuf.gpuBuffer,
+                    offset: 0,
+                    range: jointMatricesUniformBuf.length,
+                );
+            }
+
             //TODO: unused, remove
             //~ Matrix4x4f getSkinInverseBin_(uint nodeIdx)
             version(none)
