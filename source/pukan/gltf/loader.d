@@ -491,8 +491,8 @@ struct Skin
         const inverseTransform = skinNode.trans.inverse;
 
         foreach(i, jointIdx; nodesIndices)
-            //~ jointMatrices[i] = /*inverseTransform * */ nodes[jointIdx].trans; // * invRange[i];
-            jointMatrices[i] = Matrix4x4f.identity;
+            jointMatrices[i] = inverseTransform * nodes[jointIdx].trans* invRange[i];
+            //~ jointMatrices[i] = Matrix4x4f.identity;
 
         return jointMatrices;
     }

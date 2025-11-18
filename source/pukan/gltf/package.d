@@ -68,7 +68,7 @@ class GlTF : DrawableByVulkan
 
         jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         assert(jointMatricesUniformBuf.length > 0);
-        jointMatricesUniformBuf.cpuBuf = jointMatrices[0 .. $];
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = jointMatrices;
         jointsUboInfo = VkDescriptorBufferInfo(
             buffer: jointMatricesUniformBuf.gpuBuffer,
             offset: 0,
