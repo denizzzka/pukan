@@ -81,12 +81,9 @@ class GlTF : DrawableByVulkan
             {
                 //FIXME: hardcoded skin is used
                 const skin = content.skins[0];
-                const ushort skinNodeIdx = 0; //FIXME: hardcoded
-                Matrix4x4f[] jointMatrices = skin.calculateJointMatrices(&content, animation.perNodeTranslations, skinNodeIdx);
 
-                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
                 assert(jointMatricesUniformBuf.length > 0);
-                jointMatricesUniformBuf.cpuBuf[0 .. $] = jointMatrices;
 
                 jointsUboInfo = VkDescriptorBufferInfo(
                     buffer: jointMatricesUniformBuf.gpuBuffer,
@@ -167,6 +164,19 @@ class GlTF : DrawableByVulkan
         assert(meshesDescriptorSets.length == 1);
     }
 
+    private void recalcSkin()
+    {
+        assert(content.skins.length > 0);
+        assert(jointMatricesUniformBuf.length > 0);
+
+        //FIXME: hardcoded skin is used
+        const skin = content.skins[0];
+        //FIXME: hardcoded skin node
+        const ushort skinNodeIdx = 0;
+
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, animation.perNodeTranslations, skinNodeIdx);
+    }
+
     string name() const
     {
         if(rootSceneNode.name.length)
@@ -198,8 +208,6 @@ class GlTF : DrawableByVulkan
     //TODO: private
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        jointMatricesUniformBuf.uploadImmediate(commandPool, commandBuffer);
-
         foreach(ref buf; gpuBuffs)
             if(buf)
                 buf.uploadImmediate(commandPool, commandBuffer);
@@ -328,6 +336,8 @@ class GlTF : DrawableByVulkan
     void refreshBuffers(VkCommandBuffer buf)
     {
         applyAnimation();
+        recalcSkin();
+        jointMatricesUniformBuf.recordUpload(buf);
 
         foreach(e; meshes)
             e.refreshBuffers(buf);
