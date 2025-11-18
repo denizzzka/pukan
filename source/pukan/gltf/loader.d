@@ -482,12 +482,8 @@ struct Skin
 
         assert(inverseBindMatrices.length == jointMatrices.length);
 
-        auto skinNodeTrans = perNodeTranslations[skinNodeIdx];
-        const inverseTransform = skinNodeTrans.inverse;
-
         foreach(i, jointIdx; nodesIndices)
-            jointMatrices[i] = inverseBindMatrices[i] * perNodeTranslations[jointIdx]; //* inverseTransform;
-            //~ jointMatrices[i] = Matrix4x4f.identity;
+            jointMatrices[i] = inverseBindMatrices[i].inverse * perNodeTranslations[jointIdx] * inverseBindMatrices[i];
 
         return jointMatrices;
     }
