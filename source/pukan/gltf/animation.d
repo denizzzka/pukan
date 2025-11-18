@@ -119,26 +119,19 @@ package struct AnimationSupport
     package this(GltfContent* c, size_t nodesNum)
     {
         content = c;
-        perNodeTranslations.length = nodesNum + 1 /* is for rootSceneNode */;
+        perNodeTranslations.length = nodesNum;
         animations = content.animations;
     }
 
-    void setPose(const Animation* currAnimation, float time)
+    void setPose(const Animation* currAnimation, float time, in Matrix4x4f[] baseNodeTranslations)
     {
-        const pose = calculatePose(&animations[0], time);
-        perNodeTranslations[0 .. $-1] = pose;
+        perNodeTranslations[0 .. $] = calculatePose(&animations[0], time, baseNodeTranslations);
     }
 
-    private Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime)
+    private Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime, in Matrix4x4f[] baseNodeTranslations)
     {
-        Matrix4x4f[] translations;
-        translations.length = perNodeTranslations.length - 1; //TODO: except root node, not oblivious
-
-        foreach(ref e; translations)
-        {
-            //~ // Negative scale to avoid mirroring when loaded OpenGL mesh into Vulkan
-            e = Matrix4x4f.identity; // * Vector3f(-1, -1, -1).scaleMatrix;
-        }
+        Matrix4x4f[] translations = baseNodeTranslations.dup;
+        assert(baseNodeTranslations.length == perNodeTranslations.length);
 
         auto trans = Vector3f(0, 0, 0);
         auto rot = Quaternionf.identity;

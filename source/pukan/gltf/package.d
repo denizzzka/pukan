@@ -56,6 +56,7 @@ class GlTF : DrawableByVulkan
     package TransferBuffer jointMatricesUniformBuf;
     private VkDescriptorBufferInfo jointsUboInfo;
 
+    private Matrix4x4f[] baseNodeTranslations;
     private AnimationSupport animation;
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
@@ -70,10 +71,14 @@ class GlTF : DrawableByVulkan
         gpuBuffs.length = content.bufferViews.length;
 
         {
-            animation.perNodeTranslations[$-1] = rootSceneNode.trans;
+            baseNodeTranslations.length = nodes.length + 1; // +1 is for rootSceneNode
+            baseNodeTranslations[$-1] = rootSceneNode.trans;
 
             foreach(i, ref node; nodes)
-                animation.perNodeTranslations[i] = node.trans;
+                baseNodeTranslations[i] = node.trans;
+
+            // Vaules if object is not animated:
+            animation.perNodeTranslations[0 .. $] = baseNodeTranslations[0 .. $-1];
         }
 
         {
@@ -351,7 +356,7 @@ class GlTF : DrawableByVulkan
             static float time = 0;
             time += 0.003;
 
-            animation.setPose(&animations[0], time);
+            animation.setPose(&animations[0], time, baseNodeTranslations[0 .. $-1]);
         }
     }
 
