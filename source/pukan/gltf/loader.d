@@ -475,18 +475,18 @@ struct Skin
     //TODO: const
     private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
 
-    Matrix4x4f[] calculateJointMatrices(in GltfContent* content, ref /*TODO: in*/ Node[] nodes, in ushort skinNodeIdx) const
+    Matrix4x4f[] calculateJointMatrices(in GltfContent* content, ref /*TODO: in*/ Matrix4x4f[] perNodeTranslations, in ushort skinNodeIdx) const
     {
         Matrix4x4f[] jointMatrices;
         jointMatrices.length = nodesIndices.length;
 
         assert(inverseBindMatrices.length == jointMatrices.length);
 
-        auto skinNode = nodes[skinNodeIdx];
-        const inverseTransform = skinNode.trans.inverse;
+        auto skinNodeTrans = perNodeTranslations[skinNodeIdx];
+        const inverseTransform = skinNodeTrans.inverse;
 
         foreach(i, jointIdx; nodesIndices)
-            jointMatrices[i] = inverseBindMatrices[i] * nodes[jointIdx].trans; //* inverseTransform;
+            jointMatrices[i] = inverseBindMatrices[i] * perNodeTranslations[jointIdx]; //* inverseTransform;
             //~ jointMatrices[i] = Matrix4x4f.identity;
 
         return jointMatrices;

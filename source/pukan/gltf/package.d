@@ -82,7 +82,7 @@ class GlTF : DrawableByVulkan
                 //FIXME: hardcoded skin is used
                 const skin = content.skins[0];
                 const ushort skinNodeIdx = 0; //FIXME: hardcoded
-                Matrix4x4f[] jointMatrices = skin.calculateJointMatrices(&content, nodes, skinNodeIdx);
+                Matrix4x4f[] jointMatrices = skin.calculateJointMatrices(&content, animation.perNodeTranslations, skinNodeIdx);
 
                 jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * jointMatrices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
                 assert(jointMatricesUniformBuf.length > 0);
