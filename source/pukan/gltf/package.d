@@ -318,11 +318,13 @@ class GlTF : DrawableByVulkan
 
     void refreshBuffers(VkCommandBuffer buf)
     {
+        applyAnimation();
+
         foreach(e; meshes)
             e.refreshBuffers(buf);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
+    private void applyAnimation()
     {
         if(isAnimated)
         {
@@ -340,7 +342,10 @@ class GlTF : DrawableByVulkan
 
             //~ writeln("pose=", pose);
         }
+    }
 
+    void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
+    {
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
