@@ -123,7 +123,13 @@ package struct AnimationSupport
         animations = content.animations;
     }
 
-    Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime)
+    void setPose(const Animation* currAnimation, float time)
+    {
+        const pose = calculatePose(&animations[0], time);
+        perNodeTranslations[0 .. $-1] = pose;
+    }
+
+    private Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime)
     {
         Matrix4x4f[] translations;
         translations.length = perNodeTranslations.length - 1; //TODO: except root node, not oblivious
