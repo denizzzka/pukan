@@ -150,10 +150,12 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         foreach(j; skin["joints"])
             joints ~= j.get!uint;
 
-        ret.skins ~= Skin(
-            inverseBindMatrices: content.getAccess!(Type.MAT4)(
+            auto invAcc = content.getAccess!(Type.MAT4)(
                 skin["inverseBindMatrices"].get!uint
-            ),
+            );
+
+        ret.skins ~= Skin(
+            inverseBindMatrices: content.rangify!Matrix4x4f(invAcc),
             nodesIndices: joints,
         );
     }
@@ -476,22 +478,22 @@ struct Primitive
 
 struct Skin
 {
-    BufAccess inverseBindMatrices; ///
     uint[] nodesIndices; /// joints
+    //TODO: const
+    private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
 
     Matrix4x4f[] calculateJointMatrices(in GltfContent* content, ref /*TODO: in*/ Node[] nodes, in ushort skinNodeIdx) const
     {
         Matrix4x4f[] jointMatrices;
         jointMatrices.length = nodesIndices.length;
 
-        auto invRange = content.rangify!Matrix4x4f(inverseBindMatrices);
-        assert(invRange.length == jointMatrices.length);
+        assert(inverseBindMatrices.length == jointMatrices.length);
 
         auto skinNode = nodes[skinNodeIdx];
         const inverseTransform = skinNode.trans.inverse;
 
         foreach(i, jointIdx; nodesIndices)
-            jointMatrices[i] = invRange[i] * nodes[jointIdx].trans; //* inverseTransform;
+            jointMatrices[i] = inverseBindMatrices[i] * nodes[jointIdx].trans; //* inverseTransform;
             //~ jointMatrices[i] = Matrix4x4f.identity;
 
         return jointMatrices;
