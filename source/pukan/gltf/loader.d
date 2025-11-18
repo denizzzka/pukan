@@ -105,7 +105,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         buffers ~= Buffer(buf: gltfFile.buffer);
     else
         foreach(buf; json["buffers"])
-            buffers ~= readBufFile(dir, buf);
+            buffers ~= readBufUri(dir, buf);
 
     foreach(v; json["bufferViews"])
     {
@@ -459,13 +459,24 @@ struct GltfContent
 
 private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
 
-private Buffer readBufFile(string dir, in Json fileDescr)
+private Buffer readBufUri(string dir, in Json fileDescr)
 {
-    const len = fileDescr["byteLength"].get!ulong;
-    const filename = fileDescr["uri"].get!string;
+    import std.algorithm.searching: startsWith;
+    import std.base64;
 
+    const len = fileDescr["byteLength"].get!ulong;
+    const uri = fileDescr["uri"].get!string;
+
+    immutable magic = "data:application/gltf-buffer;base64,";
     Buffer ret;
-    ret.buf = cast(ubyte[]) std.file.read(build_path(dir, filename));
+
+    if(!uri.startsWith(magic))
+        ret.buf = cast(ubyte[]) std.file.read(build_path(dir, uri));
+    else
+    {
+        const based = uri[magic.length .. $];
+        ret.buf = Base64.decode(based);
+    }
 
     enforce(ret.buf.length == len);
 
