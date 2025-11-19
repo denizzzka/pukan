@@ -77,6 +77,21 @@ package mixin template DescriptorPools()
         return ret;
     }
 
+    VkDescriptorSet allocateDescriptorSet(ref PoolAndLayoutInfo layout)
+    {
+        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+            sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            descriptorPool: layout.descriptorPool,
+            descriptorSetCount: 1,
+            pSetLayouts: &layout.descriptorSetLayout,
+        };
+
+        VkDescriptorSet ret;
+        vkAllocateDescriptorSets(this.device, &descriptorSetAllocateInfo, &ret).vkCheck;
+
+        return ret;
+    }
+
     void updateDescriptorSets(ref scope VkWriteDescriptorSet[] writeDescriptorSets)
     {
         vkUpdateDescriptorSets(device, cast(uint) writeDescriptorSets.length, writeDescriptorSets.ptr, 0, null);

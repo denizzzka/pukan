@@ -65,7 +65,11 @@ class GlTF : DrawableByVulkan
     {
         this.pipeline = &pipeline;
         content = cont;
-        meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
+
+        assert(content.meshes.length > 0);
+        meshesDescriptorSets.length = content.meshes.length;
+        foreach(ref ds; meshesDescriptorSets)
+            ds = device.allocateDescriptorSet(poolAndLayout);
 
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
@@ -147,8 +151,6 @@ class GlTF : DrawableByVulkan
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device);
         });
-
-        assert(meshesDescriptorSets.length == 1);
     }
 
     private void recalcSkin()
@@ -234,7 +236,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
-        if(content.skins.length)
+        if("WEIGHTS_0" in primitive.attributes)
         {
             uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(
                 primitive.attributes["JOINTS_0"].get!uint
