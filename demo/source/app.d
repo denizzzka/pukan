@@ -245,6 +245,7 @@ import dlib.math;
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
+    //~ currDeltaTime = 11;
     auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.1);
 
     WorldTransformation wtb;
@@ -314,14 +315,16 @@ void createArena(T)(Scene scene, ref T node)
     foreach(i, filename; found)
     {
         //~ if(filename != "demo/assets/gltf_samples/Fox/glTF/Fox.gltf") continue;
+        //~ if(filename != "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb") continue;
+        if(filename != "demo/assets/gltf_samples/AnimationSkin04/glTF/Animation_Skin_04.gltf") continue;
         //~ if(filename != "demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf") continue;
-        if(filename != "demo/assets/gltf_samples/Palka/glTF/palka.gltf") continue;
+        //~ if(filename != "demo/assets/gltf_samples/Palka/glTF/palka.gltf") continue;
 
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
         const center = aabb.min + size/2;
-        const scale = 1.0 / size.length * 0.1;
+        const scale = 1.0 / size.length * 0.3;
 
         auto trans = Matrix4x4f.identity;
 
