@@ -97,24 +97,6 @@ class GlTF : DrawableByVulkan
                 );
             }
 
-            //TODO: unused, remove
-            //~ Matrix4x4f getSkinInverseBin_(uint nodeIdx)
-            version(none)
-            {
-                if(content.skins.length == 0)
-                    return Matrix4x4f.identity;
-
-                //TODO: implement skin switching
-                const skin = content.skins[0];
-                auto invRange = content.rangify!Matrix4x4f(skin.inverseBindMatrices);
-
-                foreach(i, idx; skin.nodesIndices)
-                    if(idx == nodeIdx)
-                        return invRange[i];
-
-                return Matrix4x4f.identity;
-            }
-
             Node createNodeHier(ref LoaderNode ln)
             {
                 auto nn = new Node(ln.payload);
