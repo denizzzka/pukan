@@ -232,7 +232,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
-        if(content.skins.length)
+        if("WEIGHTS_0" in primitive.attributes)
         {
             uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(
                 primitive.attributes["JOINTS_0"].get!uint
@@ -350,7 +350,7 @@ class GlTF : DrawableByVulkan
         drawingBufferFillingRecursive(buf, trans, rootSceneNode);
     }
 
-    void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, Node node)
+    private void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, Node node)
     {
         import std.math;
 
