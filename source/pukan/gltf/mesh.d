@@ -85,8 +85,8 @@ class Mesh
 
         if(vert.weights.viewIdx < 0)
         {
-            this.vert.joints = vert.vertices; // ditto
-            this.vert.weights = this.vert.joints; // ditto
+            //~ this.vert.joints = vert.vertices; // ditto
+            //~ this.vert.weights = this.vert.joints; // ditto
         }
 
         {
@@ -188,7 +188,7 @@ class Mesh
     }
 }
 
-private void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, in BufAccess[] accessors, VkCommandBuffer cmdBuf)
+private void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, /*in*/ BufAccess[] accessors, VkCommandBuffer cmdBuf)
 in(gpuBuffs.length > 0)
 {
     const len = cast(uint) accessors.length;
@@ -199,10 +199,14 @@ in(gpuBuffs.length > 0)
     auto sizes = new VkDeviceSize[len];
     auto strides = new VkDeviceSize[len];
 
-    foreach(i, const acc; accessors)
+    foreach(i, /*const*/ acc; accessors)
     {
+        //FIXME: remove! just for testing meshes without skin
+        if(acc.viewIdx < 0) // means no skin on this mesh
+            acc.viewIdx = gpuBuffs.length - 1; // fake zeroed buffer
+
         assert(acc.viewIdx >= 0);
-        assert(acc.stride > 0);
+        //~ assert(acc.stride > 0);
 
         auto gpuBuf = gpuBuffs[acc.viewIdx];
         assert(gpuBuf !is null);

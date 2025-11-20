@@ -307,6 +307,15 @@ class GlTF : DrawableByVulkan
             }
         }
 
+        {
+            //FIXME: remove
+            // Adds fake buffer for joints and weights when skins not used
+            gpuBuffs ~= new BufferPieceOnGPU;
+            gpuBuffs[$-1].buffer = new TransferBuffer(device, 100, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        }
+
         meshes ~= node.mesh;
     }
 
