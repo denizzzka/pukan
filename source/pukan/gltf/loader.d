@@ -381,16 +381,12 @@ struct View
             count: accessor["count"].get!uint,
             min_max: min_max,
             offset: accessor["byteOffset"].opt!uint,
+            type: accessor["type"].get!string.to!Type,
             componentType: accessor["componentType"].get!ComponentType,
         );
 
-        debug enforce(buffOffset % r.componentSizeOf == 0);
-        enforce(r.offset % r.componentSizeOf == 0);
-
-        debug
-        {
-            r.type = accessor["type"].get!string.to!Type;
-        }
+        enforce(buffOffset % r.componentSizeOf == 0);
+        enforce(r.offset % r.typeSizeOf == 0);
 
         return r;
     }
@@ -434,7 +430,7 @@ struct Accessor
     uint offset;
     uint count;
     Json min_max;
-    debug Type type;
+    Type type;
     ComponentType componentType;
 
     ubyte componentSizeOf() const => .componentSizeOf(componentType);
