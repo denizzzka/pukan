@@ -245,7 +245,7 @@ import dlib.math;
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
-    //~ currDeltaTime = 11;
+    currDeltaTime = 8;
     auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.1);
 
     WorldTransformation wtb;
@@ -324,7 +324,7 @@ void createArena(T)(Scene scene, ref T node)
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
         const center = aabb.min + size/2;
-        const scale = 1.0 / size.length * 0.3;
+        const scale = 1.0 / size.length * 0.2;
 
         auto trans = Matrix4x4f.identity;
 
