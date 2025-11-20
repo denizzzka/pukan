@@ -51,7 +51,6 @@ class GlTF : DrawableByVulkan
     private GraphicsPipelineCfg* pipeline;
 
     private MeshClass[] meshes;
-    private VkDescriptorSet[] meshesDescriptorSets;
 
     package TransferBuffer jointMatricesUniformBuf;
     private VkDescriptorBufferInfo jointsUboInfo;
@@ -65,7 +64,8 @@ class GlTF : DrawableByVulkan
     {
         this.pipeline = &pipeline;
         content = cont;
-        meshesDescriptorSets = device.allocateDescriptorSets(poolAndLayout, cast(uint) content.meshes.length);
+
+        assert(content.meshes.length > 0);
 
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
@@ -145,10 +145,8 @@ class GlTF : DrawableByVulkan
         }
 
         this.rootSceneNode.traversal((node){
-            setUpEachNode(node, device);
+            setUpEachNode(node, device, poolAndLayout);
         });
-
-        assert(meshesDescriptorSets.length == 1);
     }
 
     private void recalcSkin()
@@ -206,7 +204,7 @@ class GlTF : DrawableByVulkan
             m.uploadImmediate(commandPool, commandBuffer);
     }
 
-    private void setUpEachNode(ref Node node, LogicalDevice device)
+    private void setUpEachNode(ref Node node, LogicalDevice device, ref PoolAndLayoutInfo poolAndLayout)
     {
         // Node without mesh attached
         if(node.meshIdx < 0) return;
@@ -263,7 +261,7 @@ class GlTF : DrawableByVulkan
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         if(!content.textures.length)
-            node.mesh = new JustColoredMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx], texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
+            node.mesh = new JustColoredMesh(device, mesh.name, uplVert, poolAndLayout, texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
         else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
@@ -302,7 +300,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(device, mesh.name, uplVert, meshesDescriptorSets[node.meshIdx], jointsUboInfo);
+                auto m = new TexturedMesh(device, mesh.name, uplVert, poolAndLayout, jointsUboInfo);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
@@ -349,8 +347,6 @@ class GlTF : DrawableByVulkan
 
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
-        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) meshesDescriptorSets.length, meshesDescriptorSets.ptr, 0, null);
-
         drawingBufferFillingRecursive(buf, trans, rootSceneNode);
     }
 
@@ -366,7 +362,7 @@ class GlTF : DrawableByVulkan
         {
             vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) localTrans.sizeof, cast(void*) &localTrans);
 
-            node.mesh.drawingBufferFilling(gpuBuffs, buf);
+            node.mesh.drawingBufferFilling(gpuBuffs, pipeline, buf);
         }
 
         foreach(c; node.children)
