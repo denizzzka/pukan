@@ -57,22 +57,17 @@ package mixin template DescriptorPools()
         }
     }
 
-    auto allocateDescriptorSets(ref PoolAndLayoutInfo layout, uint count)
+    VkDescriptorSet allocateDescriptorSet(ref PoolAndLayoutInfo layout)
     {
-        auto layoutsArr = new VkDescriptorSetLayout[count];
-        foreach(ref l; layoutsArr)
-            l = layout.descriptorSetLayout;
-
         VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
             sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
             descriptorPool: layout.descriptorPool,
-            descriptorSetCount: count,
-            pSetLayouts: layoutsArr.ptr,
+            descriptorSetCount: 1,
+            pSetLayouts: &layout.descriptorSetLayout,
         };
 
-        VkDescriptorSet[] ret;
-        ret.length = count;
-        vkAllocateDescriptorSets(this.device, &descriptorSetAllocateInfo, ret.ptr).vkCheck;
+        VkDescriptorSet ret;
+        vkAllocateDescriptorSets(this.device, &descriptorSetAllocateInfo, &ret).vkCheck;
 
         return ret;
     }

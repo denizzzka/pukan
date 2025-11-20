@@ -64,17 +64,18 @@ class Mesh
     string name;
     package UploadedVertices vert;
     alias this = vert;
-    /*private*/ VkDescriptorSet* descriptorSet;
+    /*private*/ VkDescriptorSet descriptorSet;
 
     private TransferBuffer uniformBuffer;
     private VkDescriptorBufferInfo uboInfo;
     private VkWriteDescriptorSet uboWriteDescriptor;
     private VkWriteDescriptorSet jointsUboWriteDescr;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, ref VkDescriptorBufferInfo jointsUboInfo)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref PoolAndLayoutInfo poolAndLayout, ref VkDescriptorBufferInfo jointsUboInfo)
     {
         this.name = name;
-        this.descriptorSet = &descriptorSet;
+        this.descriptorSet = device.allocateDescriptorSet(poolAndLayout);
+
         this.vert = vert;
 
         assert(vertices.viewIdx >= 0);
@@ -165,8 +166,10 @@ class Mesh
     {
     }
 
-    void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, VkCommandBuffer buf)
+    void drawingBufferFilling(BufferPieceOnGPU[] gpuBuffs, GraphicsPipelineCfg* pipeline, VkCommandBuffer buf)
     {
+        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &descriptorSet, 0, null);
+
         bindVertexBuffers(gpuBuffs, vert.allBuffers, buf);
 
         if(indices.accessor.count == 0)
@@ -218,11 +221,11 @@ final class JustColoredMesh : Mesh
 {
     private VkDescriptorImageInfo fakeTexture;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, VkDescriptorImageInfo fakeTexture, ref VkDescriptorBufferInfo jointsUboInfo)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref PoolAndLayoutInfo poolAndLayout, VkDescriptorImageInfo fakeTexture, ref VkDescriptorBufferInfo jointsUboInfo)
     {
         this.fakeTexture = fakeTexture;
 
-        super(device, name, vert, descriptorSet, jointsUboInfo);
+        super(device, name, vert, poolAndLayout, jointsUboInfo);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
@@ -232,7 +235,7 @@ final class JustColoredMesh : Mesh
             uboWriteDescriptor,
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: *descriptorSet,
+                dstSet: descriptorSet,
                 dstBinding: 1,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -250,9 +253,9 @@ final class TexturedMesh : Mesh
 {
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref VkDescriptorSet descriptorSet, ref VkDescriptorBufferInfo jointsUboInfo)
+    package this(LogicalDevice device, string name, UploadedVertices vert, ref PoolAndLayoutInfo poolAndLayout, ref VkDescriptorBufferInfo jointsUboInfo)
     {
-        super(device, name, vert, descriptorSet, jointsUboInfo);
+        super(device, name, vert, poolAndLayout, jointsUboInfo);
 
         ubo.material.renderType.x = 1; // is textured
     }
@@ -270,7 +273,7 @@ final class TexturedMesh : Mesh
             uboWriteDescriptor,
             VkWriteDescriptorSet(
                 sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: *descriptorSet,
+                dstSet: descriptorSet,
                 dstBinding: 1,
                 dstArrayElement: 0,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
