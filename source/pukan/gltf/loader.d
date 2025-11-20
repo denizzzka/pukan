@@ -438,6 +438,38 @@ struct Accessor
     ComponentType componentType;
 
     ubyte componentSizeOf() const => .componentSizeOf(componentType);
+    ubyte typeSizeOf() const
+    {
+        ubyte compNum;
+
+        with(Type)
+        final switch(type)
+        {
+            case SCALAR:
+                compNum = 1;
+                break;
+
+            case VEC2:
+            case MAT2:
+                compNum = 2;
+                break;
+
+            case MAT3:
+            case VEC3:
+                compNum = 3;
+                break;
+
+            case MAT4:
+            case VEC4:
+                compNum = 4;
+                break;
+
+            case undef:
+                assert(0);
+        }
+
+        return cast(ubyte) (componentSizeOf * compNum);
+    }
 }
 
 ubyte componentSizeOf(in ComponentType componentType)
@@ -530,7 +562,7 @@ struct GltfContent
 
         static if(!is(T == void))
         {
-            const stride = view.stride ? view.stride : T.sizeof;
+            const stride = view.stride ? view.stride : accessor.typeSizeOf;
             assert(stride >= T.sizeof);
         }
         else
