@@ -441,27 +441,15 @@ struct Accessor
         with(Type)
         final switch(type)
         {
-            case SCALAR:
-                compNum = 1;
-                break;
-
-            case VEC2:
-            case MAT2:
-                compNum = 2;
-                break;
-
-            case MAT3:
-            case VEC3:
-                compNum = 3;
-                break;
-
-            case MAT4:
+            case SCALAR: compNum = 1; break;
+            case VEC2: compNum = 2; break;
+            case VEC3: compNum = 3; break;
             case VEC4:
-                compNum = 4;
-                break;
+            case MAT2: compNum = 4; break;
+            case MAT3: compNum = 9; break;
+            case MAT4: compNum = 16; break;
 
-            case undef:
-                assert(0);
+            case undef: assert(0);
         }
 
         return cast(ubyte) (componentSizeOf * compNum);
