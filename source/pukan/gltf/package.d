@@ -112,7 +112,7 @@ class GlTF : DrawableByVulkan
             }
 
             this.rootSceneNode = createNodeHier(rootSceneNode);
-            this.rootSceneNode.trans = &animation.perNodeTranslations[$-1];
+            this.rootSceneNode.trans = &baseNodeTranslations[$-1];
         }
 
         // Textures:
