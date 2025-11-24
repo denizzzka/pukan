@@ -125,7 +125,7 @@ package struct AnimationSupport
 
     void setPose(const Animation* currAnimation, float time, in Matrix4x4f[] baseNodeTranslations)
     {
-        perNodeTranslations[0 .. $] = calculatePose(&animations[0], time, baseNodeTranslations);
+        perNodeTranslations[0 .. $] = calculatePose(currAnimation, time, baseNodeTranslations);
     }
 
     private Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime, in Matrix4x4f[] baseNodeTranslations)
