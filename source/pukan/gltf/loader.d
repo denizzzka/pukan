@@ -176,6 +176,8 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             Quaternionf rot;
             Vector3f scale;
 
+            assert(("matrix" in node) is null, "TODO: implemnet matrix support");
+
             {
                 auto json = "translation" in node;
                 if(json is null)
@@ -499,7 +501,8 @@ struct Skin
         assert(inverseBindMatrices.length == jointMatrices.length);
 
         foreach(i, jointIdx; nodesIndices)
-            jointMatrices[i] = inverseBindMatrices[i].inverse * perNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            //~ jointMatrices[i] = inverseBindMatrices[i].inverse * perNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            jointMatrices[i] = inverseBindMatrices[i] * perNodeTranslations[jointIdx];
 
         return jointMatrices;
     }
