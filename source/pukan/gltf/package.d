@@ -333,7 +333,10 @@ class GlTF : DrawableByVulkan
     void refreshBuffers(VkCommandBuffer buf)
     {
         if(isAnimated)
+        {
+            animation.currTime += 0.005;
             applyAnimation();
+        }
 
         //FIXME: recalc skin for each mesh
         if(content.skins.length)
@@ -347,11 +350,7 @@ class GlTF : DrawableByVulkan
 
     private void applyAnimation()
     {
-        // Update animation
-        static float time = 0;
-        time += 0.003;
-
-        animation.setPose(&animations[0], time, baseNodeTranslations[0 .. $-1]);
+        animation.setPose(&animations[0], baseNodeTranslations[0 .. $-1]);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)

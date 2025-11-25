@@ -115,6 +115,7 @@ package struct AnimationSupport
     private GltfContent* content;
     package Animation[] animations;
     package Matrix4x4f[] perNodeTranslations;
+    package float currTime = 0;
 
     package this(GltfContent* c, size_t nodesNum)
     {
@@ -123,9 +124,9 @@ package struct AnimationSupport
         animations = content.animations;
     }
 
-    void setPose(const Animation* currAnimation, float time, in Matrix4x4f[] baseNodeTranslations)
+    void setPose(const Animation* currAnimation, in Matrix4x4f[] baseNodeTranslations)
     {
-        perNodeTranslations[0 .. $] = calculatePose(currAnimation, time, baseNodeTranslations);
+        perNodeTranslations[0 .. $] = calculatePose(currAnimation, currTime, baseNodeTranslations);
     }
 
     private Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime, in Matrix4x4f[] baseNodeTranslations)
