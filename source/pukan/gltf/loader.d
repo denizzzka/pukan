@@ -386,7 +386,7 @@ struct View
         );
 
         enforce(buffOffset % r.componentSizeOf == 0);
-        enforce(r.offset % r.typeSizeOf == 0);
+        enforce(r.offset % r.componentSizeOf == 0);
 
         return r;
     }
