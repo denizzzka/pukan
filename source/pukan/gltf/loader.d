@@ -168,55 +168,9 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             foreach(child; *children)
                 childrenIdxs ~= child.get!ushort;
 
-        import dlib.math;
-
-        Matrix4x4f trans;
-        {
-            Vector3f tr;
-            Quaternionf rot;
-            Vector3f scale;
-
-            assert(("matrix" in node) is null, "TODO: implemnet matrix support");
-
-            {
-                auto json = "translation" in node;
-                if(json is null)
-                    tr = Vector3f(0, 0, 0);
-                else
-                {
-                    auto a = (*json).deserializeJson!(float[3]);
-                    tr = Vector3f(a[0], a[1], a[2]);
-                }
-            }
-
-            {
-                auto json = "rotation" in node;
-                if(json is null)
-                    rot = Quaternionf.identity;
-                else
-                {
-                    auto a = (*json).deserializeJson!(float[4]);
-                    rot = Quaternionf(Vector4f(a[0], a[1], a[2], a[3]));
-                }
-            }
-
-            {
-                auto json = "scale" in node;
-                if(json is null)
-                    scale = Vector3f(1, 1, 1);
-                else
-                {
-                    auto a = (*json).deserializeJson!(float[3]);
-                    scale = Vector3f(a[0], a[1], a[2]);
-                }
-            }
-
-            trans = tr.translationMatrix * rot.toMatrix4x4 * scale.scaleMatrix;
-        }
-
         nodes ~= Node(
             childrenNodeIndices: childrenIdxs,
-            trans: trans,
+            trans: readNodeTrans(node),
             payload: NodePayload(
                 name: node["name"].opt!string,
                 meshIdx: node["mesh"].opt!int(-1),
@@ -331,6 +285,59 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     }
 
     return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+}
+
+private Matrix4x4f readNodeTrans(in Json node)
+{
+    import dlib.math;
+
+    {
+        auto json = "matrix" in node;
+        if(json !is null)
+        {
+            auto a = (*json).deserializeJson!(float[16]);
+            return Matrix4x4f(a);
+        }
+    }
+
+    Vector3f tr;
+    Quaternionf rot;
+    Vector3f scale;
+
+    {
+        auto json = "translation" in node;
+        if(json is null)
+            tr = Vector3f(0, 0, 0);
+        else
+        {
+            auto a = (*json).deserializeJson!(float[3]);
+            tr = Vector3f(a[0], a[1], a[2]);
+        }
+    }
+
+    {
+        auto json = "rotation" in node;
+        if(json is null)
+            rot = Quaternionf.identity;
+        else
+        {
+            auto a = (*json).deserializeJson!(float[4]);
+            rot = Quaternionf(Vector4f(a[0], a[1], a[2], a[3]));
+        }
+    }
+
+    {
+        auto json = "scale" in node;
+        if(json is null)
+            scale = Vector3f(1, 1, 1);
+        else
+        {
+            auto a = (*json).deserializeJson!(float[3]);
+            scale = Vector3f(a[0], a[1], a[2]);
+        }
+    }
+
+    return tr.translationMatrix * rot.toMatrix4x4 * scale.scaleMatrix;
 }
 
 struct Buffer
