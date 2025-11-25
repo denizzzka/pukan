@@ -89,13 +89,18 @@ class GlTF : DrawableByVulkan
 
                 jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
                 assert(jointMatricesUniformBuf.length > 0);
-
-                jointsUboInfo = VkDescriptorBufferInfo(
-                    buffer: jointMatricesUniformBuf.gpuBuffer,
-                    offset: 0,
-                    range: jointMatricesUniformBuf.length,
-                );
             }
+            else
+            {
+                //FIXME: fake buffer
+                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * 10, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            }
+
+            jointsUboInfo = VkDescriptorBufferInfo(
+                buffer: jointMatricesUniformBuf.gpuBuffer,
+                offset: 0,
+                range: jointMatricesUniformBuf.length,
+            );
 
             Node createNodeHier(ref LoaderNode ln)
             {
@@ -312,8 +317,6 @@ class GlTF : DrawableByVulkan
             // Adds fake buffer for joints and weights when skins not used
             gpuBuffs ~= new BufferPieceOnGPU;
             gpuBuffs[$-1].buffer = new TransferBuffer(device, 100, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         meshes ~= node.mesh;
@@ -329,8 +332,13 @@ class GlTF : DrawableByVulkan
 
     void refreshBuffers(VkCommandBuffer buf)
     {
-        applyAnimation();
-        recalcSkin();
+        if(isAnimated)
+            applyAnimation();
+
+        //FIXME: recalc skin for each mesh
+        if(content.skins.length)
+            recalcSkin();
+
         jointMatricesUniformBuf.recordUpload(buf);
 
         foreach(e; meshes)
@@ -339,14 +347,11 @@ class GlTF : DrawableByVulkan
 
     private void applyAnimation()
     {
-        if(isAnimated)
-        {
-            // Update animation
-            static float time = 0;
-            time += 0.003;
+        // Update animation
+        static float time = 0;
+        time += 0.003;
 
-            animation.setPose(&animations[0], time, baseNodeTranslations[0 .. $-1]);
-        }
+        animation.setPose(&animations[0], time, baseNodeTranslations[0 .. $-1]);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
