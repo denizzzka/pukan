@@ -43,6 +43,8 @@ class Node : BaseNode
 class GlTF : DrawableByVulkan
 {
     private Node rootSceneNode;
+    private Matrix4x4f rootSceneNodeTrans;
+
     private GltfContent content;
     alias this = content;
 
@@ -71,14 +73,13 @@ class GlTF : DrawableByVulkan
         gpuBuffs.length = content.bufferViews.length;
 
         {
-            baseNodeTranslations.length = nodes.length + 1; // +1 is for rootSceneNode
-            baseNodeTranslations[$-1] = rootSceneNode.trans;
+            baseNodeTranslations.length = nodes.length;
 
             foreach(i, ref node; nodes)
                 baseNodeTranslations[i] = node.trans;
 
             // Vaules if object is not animated:
-            animation.perNodeTranslations[0 .. $] = baseNodeTranslations[0 .. $-1];
+            animation.perNodeTranslations[0 .. $] = baseNodeTranslations;
         }
 
         {
@@ -117,7 +118,8 @@ class GlTF : DrawableByVulkan
             }
 
             this.rootSceneNode = createNodeHier(rootSceneNode);
-            this.rootSceneNode.trans = &baseNodeTranslations[$-1];
+            this.rootSceneNodeTrans = rootSceneNode.trans;
+            this.rootSceneNode.trans = &rootSceneNodeTrans;
         }
 
         // Textures:
@@ -350,7 +352,7 @@ class GlTF : DrawableByVulkan
 
     private void applyAnimation()
     {
-        animation.setPose(&animations[0], baseNodeTranslations[0 .. $-1]);
+        animation.setPose(&animations[0], baseNodeTranslations);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
