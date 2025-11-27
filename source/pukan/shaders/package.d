@@ -57,7 +57,7 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
         VkPushConstantRange(
             stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
             offset: 0,
-            size: boneMatrixSize,
+            size: boneMatrixSize * 2, // Tr.sizeof
         )
     );
 

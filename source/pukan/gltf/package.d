@@ -355,6 +355,8 @@ class GlTF : DrawableByVulkan
         animation.setPose(&animations[0], baseNodeTranslations);
     }
 
+    //~ import std;
+
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
     {
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
@@ -362,6 +364,7 @@ class GlTF : DrawableByVulkan
 
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
 
+        //~ writeln("=========================================");
         drawingBufferFillingRecursive(buf, trans, rootSceneNode);
     }
 
@@ -369,15 +372,35 @@ class GlTF : DrawableByVulkan
     {
         import std.math;
 
+        //~ writeln(trans);
+
         assert(node.trans !is null);
 
-        auto localTrans = trans * *node.trans;
+        trans *= *node.trans;
 
         if(node.mesh)
         {
-            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) localTrans.sizeof, cast(void*) &localTrans);
+            assert(node.children.empty);
+
+            struct Tr
+            {
+                Matrix4x4f global;
+                Matrix4x4f local;
+            }
+
+            Tr tr;
+            tr.global = trans;
+            //~ tr.local = *node.trans;
+
+            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) Tr.sizeof, cast(void*) &tr);
 
             node.mesh.drawingBufferFilling(gpuBuffs, pipeline, buf);
+
+            //~ import std;
+            //~ writeln("parentTrans:");
+            //~ writeln(parentTrans);
+            //~ writeln("Cube scale node:");
+            //~ writeln(*node.trans);
         }
 
         foreach(c; node.children)

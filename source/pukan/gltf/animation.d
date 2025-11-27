@@ -127,57 +127,70 @@ package struct AnimationSupport
     void setPose(const Animation* currAnimation, in Matrix4x4f[] baseNodeTranslations)
     {
         perNodeTranslations[0 .. $] = calculatePose(currAnimation, currTime, baseNodeTranslations);
+
+        import std;
+        writeln("animation.perNodeTranslations, currTime=", currTime);
+        foreach(p; perNodeTranslations)
+            writeln(p);
     }
 
-    private Matrix4x4f[] calculatePose(const Animation* currAnimation, float currTime, in Matrix4x4f[] baseNodeTranslations)
+    private Matrix4x4f[] calculatePose(const Animation* currAnimation, in float currTime, in Matrix4x4f[] baseNodeTranslations)
     {
         Matrix4x4f[] translations = baseNodeTranslations.dup;
         assert(baseNodeTranslations.length == perNodeTranslations.length);
 
-        auto trans = Vector3f(0, 0, 0);
-        auto rot = Quaternionf.identity;
-        auto scaling = Vector3f(1, 1, 1);
+        //~ auto trans = Vector3f(0, 0, 0);
+        //~ auto rot = Quaternionf.identity;
+        //~ auto scaling = Vector3f(1, 1, 1);
 
         foreach(const scope chan; currAnimation.channels)
         {
-            float prevTime = 0.0f;
-            float nextTime = 0.0f;
-            float loopTime = 0.0f;
-
             const sampler = currAnimation.samplers[chan.samplerIdx];
             assert(sampler.interpolation == InterpolationType.LINEAR, "TODO: support all interpolation types");
+
+            float prevTime;
+            float nextTime;
+            float loopTime;
 
             const prevIdx = sampler.getSampleByTime(content, currTime, prevTime, nextTime, loopTime);
             const nextIdx = prevIdx + 1;
 
             const float interpRatio = (loopTime - prevTime) / (nextTime - prevTime);
+            //~ import std;
+            //~ writeln("loopTime = ", loopTime);
+            //~ writeln("prevTime = ", prevTime);
+            //~ writeln("interpRatio = ", interpRatio);
+
+            auto currTrans = &translations[chan.targetNode];
 
             if (chan.targetPath == TRSType.translation)
             {
                 const output = content.rangify!Vector3f(sampler.outputAcc);
                 const Vector3f prevTrans = output[prevIdx];
                 const Vector3f nextTrans = output[nextIdx];
-                trans = lerp(prevTrans, nextTrans, interpRatio);
+                *currTrans = interpLinear(prevTrans, nextTrans, interpRatio).translationMatrix;
             }
             else if (chan.targetPath == TRSType.rotation)
             {
                 const output = content.rangify!Quaternionf(sampler.outputAcc);
                 const Quaternionf prevRot = output[prevIdx];
                 const Quaternionf nextRot = output[nextIdx];
-                rot = slerp(prevRot, nextRot, interpRatio);
+                // slerp: spherical linear interpolation:
+                *currTrans = slerp(prevRot, nextRot, interpRatio).toMatrix4x4;
             }
             else if (chan.targetPath == TRSType.scale)
             {
                 const output = content.rangify!Vector3f(sampler.outputAcc);
                 const Vector3f prevScale = output[prevIdx];
                 const Vector3f nextScale = output[nextIdx];
-                scaling = lerp(prevScale, nextScale, interpRatio);
+
+                *currTrans = interpLinear(prevScale, nextScale, interpRatio).scaleMatrix;
             }
 
-            translations[chan.targetNode] =
-                trans.translationMatrix *
-                rot.toMatrix4x4 *
-                scaling.scaleMatrix;
+            //~ translations[chan.targetNode] =
+                //~ trans.translationMatrix *
+                //~ rot.toMatrix4x4 *
+                //~ scaling.scaleMatrix;
 
             //~ import std.stdio;
             //~ writeln("chan.targetNode=", chan.targetNode, " trans=\n", translations[chan.targetNode]);
