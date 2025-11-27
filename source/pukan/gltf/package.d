@@ -371,11 +371,11 @@ class GlTF : DrawableByVulkan
 
         assert(node.trans !is null);
 
-        auto localTrans = trans * *node.trans;
+        trans *= *node.trans;
 
         if(node.mesh)
         {
-            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) localTrans.sizeof, cast(void*) &localTrans);
+            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
 
             node.mesh.drawingBufferFilling(gpuBuffs, pipeline, buf);
         }
