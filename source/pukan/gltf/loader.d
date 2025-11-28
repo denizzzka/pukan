@@ -496,20 +496,39 @@ struct Primitive
 
 struct Skin
 {
-    package uint[] nodesIndices; /// joints
+    package uint[] nodesIndices; /// joints of a bones only
     //TODO: const
     private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
 
-    Matrix4x4f[] calculateJointMatrices(in GltfContent* content, ref /*TODO: in*/ Matrix4x4f[] perNodeTranslations, in ushort skinNodeIdx) const
+    Matrix4x4f[] calculateJointMatrices(in GltfContent* content, /* in */ Matrix4x4f[] baseNodeTranslations, ref /*TODO: in*/ Matrix4x4f[] perNodeTranslations, ref /*TODO: in*/ Matrix4x4f[] rootRelativeNodeTranslations, in ushort skinNodeIdx) const
     {
         Matrix4x4f[] jointMatrices;
         jointMatrices.length = nodesIndices.length;
 
         assert(inverseBindMatrices.length == jointMatrices.length);
 
+        //~ auto inverseTransform = perNodeTranslations[skinNodeIdx].inverse;
+
         foreach(i, jointIdx; nodesIndices)
-            //~ jointMatrices[i] = inverseBindMatrices[i].inverse * perNodeTranslations[jointIdx] * inverseBindMatrices[i];
-            jointMatrices[i] = inverseBindMatrices[i] * perNodeTranslations[jointIdx];
+        {
+            //~ jointMatrices[i] = inverseBindMatrices[i].inverse * baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            //~ jointMatrices[i] = inverseBindMatrices[i] * perNodeTranslations[jointIdx];
+            //~ jointMatrices[i] = inverseBindMatrices[i].inverse * perNodeTranslations[jointIdx];
+            //~ auto relativeToSkinSpace = baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            //~ auto relativeToSkinSpace = inverseBindMatrices[i].inverse * baseNodeTranslations[jointIdx];
+            //~ jointMatrices[i] = baseNodeTranslations[jointIdx] * inverseBindMatrices[i] * rootRelativeNodeTranslations[jointIdx];
+            //~ jointMatrices[i] = Matrix4x4f.identity;
+
+            // Move rest pose vertex into skin space
+            //~ auto pos = baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
+
+            // Move vertex back into model space, but with skin related to current position
+            //~ jointMatrices[i] = pos;
+
+            //~ baseNodeTranslations[jointIdx] * inverseBindMatrices[i] inverseTransform * perNodeTranslations[jointIdx] * inverseBindMatrices[i];
+
+            jointMatrices[i] = inverseBindMatrices[i].inverse * baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
+        }
 
         return jointMatrices;
     }

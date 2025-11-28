@@ -25,6 +25,7 @@ class Node : BaseNode
     alias this = payload;
 
     Matrix4x4f* trans;
+    package Matrix4x4f* transFromRoot; // used for skin calculation
     MeshClass mesh;
 
     this(NodePayload pa)
@@ -36,6 +37,33 @@ class Node : BaseNode
     {
         super.traversal((n){
             dg(cast(Node) n);
+        });
+    }
+
+    /// For correct result must be called on root node only
+    package void refreshTransFromRootValues()
+    {
+        import std.math;
+        import std;
+
+        traversal((node){
+            assert(!(*node.trans)[0].isNaN, "Uninitialized Node.trans matrix?");
+
+            // is root scene node?
+            if(node.transFromRoot is null)
+                return; // just ignore - root scene doesn't have assigned transFromRoot pointer
+
+            assert(node.parent !is null);
+            auto parentTransFromRoot = (cast(Node) node.parent).transFromRoot;
+
+            // parent is root scene node?
+            if(parentTransFromRoot is null)
+                *node.transFromRoot = *node.trans;
+            else
+            {
+                assert(!(*parentTransFromRoot)[0].isNaN);
+                *node.transFromRoot = *parentTransFromRoot * *node.trans;
+            }
         });
     }
 }
@@ -58,6 +86,8 @@ class GlTF : DrawableByVulkan
     private VkDescriptorBufferInfo jointsUboInfo;
 
     private Matrix4x4f[] baseNodeTranslations;
+    //TODO: move to Skin?
+    private Matrix4x4f[] fromRootNodeTranslations; // Used for skin calculation
     private AnimationSupport animation;
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
@@ -74,6 +104,7 @@ class GlTF : DrawableByVulkan
 
         {
             baseNodeTranslations.length = nodes.length;
+            fromRootNodeTranslations.length = nodes.length;
 
             foreach(i, ref node; nodes)
                 baseNodeTranslations[i] = node.trans;
@@ -111,6 +142,7 @@ class GlTF : DrawableByVulkan
                 {
                     auto c = createNodeHier(nodes[idx]);
                     c.trans = &animation.perNodeTranslations[idx];
+                    c.transFromRoot = &fromRootNodeTranslations[idx];
                     nn.addChildNode(c);
                 }
 
@@ -154,6 +186,13 @@ class GlTF : DrawableByVulkan
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device, poolAndLayout);
         });
+
+        // For skin support:
+        this.rootSceneNode.refreshTransFromRootValues;
+
+        //~ import std;
+        //~ writeln("fromRootNodeTranslations");
+        //~ writeln(fromRootNodeTranslations);
     }
 
     private void recalcSkin()
@@ -166,7 +205,7 @@ class GlTF : DrawableByVulkan
         //FIXME: hardcoded skin node
         const ushort skinNodeIdx = 0;
 
-        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, animation.perNodeTranslations, skinNodeIdx);
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, baseNodeTranslations, animation.perNodeTranslations, fromRootNodeTranslations, skinNodeIdx);
     }
 
     string name() const
@@ -183,7 +222,8 @@ class GlTF : DrawableByVulkan
         return null;
     }
 
-    bool isAnimated() const => animation.animations.length > 0;
+    //~ bool isAnimated() const => animation.animations.length > 0;
+    bool isAnimated() const => false;
 
     auto calcAABB() const
     {
@@ -338,6 +378,7 @@ class GlTF : DrawableByVulkan
         {
             animation.currTime += 0.005;
             applyAnimation();
+            rootSceneNode.refreshTransFromRootValues;
         }
 
         //FIXME: recalc skin for each mesh
