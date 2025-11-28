@@ -112,9 +112,11 @@ struct Animation
 
 package struct AnimationSupport
 {
+    import pukan.gltf: Trans;
+
     private GltfContent* content;
     package Animation[] animations;
-    package Matrix4x4f[] perNodeTranslations;
+    package Trans[] perNodeTranslations;
     package float currTime = 0;
 
     package this(GltfContent* c, size_t nodesNum)
@@ -124,15 +126,10 @@ package struct AnimationSupport
         animations = content.animations;
     }
 
-    void setPose(const Animation* currAnimation, in Matrix4x4f[] baseNodeTranslations)
+    void setPose(const Animation* currAnimation, in Trans[] baseNodeTranslations)
     {
-        perNodeTranslations[0 .. $] = calculatePose(currAnimation, currTime, baseNodeTranslations);
-    }
-
-    private Matrix4x4f[] calculatePose(const Animation* currAnimation, in float currTime, in Matrix4x4f[] baseNodeTranslations)
-    {
-        Matrix4x4f[] translations = baseNodeTranslations.dup;
-        assert(baseNodeTranslations.length == perNodeTranslations.length);
+        assert(perNodeTranslations.length == baseNodeTranslations.length);
+        perNodeTranslations[0..$] = baseNodeTranslations;
 
         foreach(const scope chan; currAnimation.channels)
         {
@@ -147,14 +144,14 @@ package struct AnimationSupport
             const nextIdx = prevIdx + 1;
 
             const float interpRatio = (loopTime - prevTime) / (nextTime - prevTime);
-            auto currTrans = &translations[chan.targetNode];
+            auto currTrans = &perNodeTranslations[chan.targetNode];
 
             if (chan.targetPath == TRSType.translation)
             {
                 const output = content.rangify!Vector3f(sampler.outputAcc);
                 const Vector3f prevTrans = output[prevIdx];
                 const Vector3f nextTrans = output[nextIdx];
-                *currTrans = interpLinear(prevTrans, nextTrans, interpRatio).translationMatrix;
+                currTrans.transl = lerp(prevTrans, nextTrans, interpRatio);
             }
             else if (chan.targetPath == TRSType.rotation)
             {
@@ -162,7 +159,7 @@ package struct AnimationSupport
                 const Quaternionf prevRot = output[prevIdx];
                 const Quaternionf nextRot = output[nextIdx];
                 // slerp: spherical linear interpolation:
-                *currTrans = slerp(prevRot, nextRot, interpRatio).toMatrix4x4;
+                currTrans.rot = slerp(prevRot, nextRot, interpRatio);
             }
             else if (chan.targetPath == TRSType.scale)
             {
@@ -170,10 +167,10 @@ package struct AnimationSupport
                 const Vector3f prevScale = output[prevIdx];
                 const Vector3f nextScale = output[nextIdx];
 
-                *currTrans = interpLinear(prevScale, nextScale, interpRatio).scaleMatrix;
+                currTrans.scale = lerp(prevScale, nextScale, interpRatio);
             }
+            else
+                assert(0);
         }
-
-        return translations;
     }
 }
