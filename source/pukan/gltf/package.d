@@ -87,6 +87,7 @@ class GlTF : DrawableByVulkan
 
     private Matrix4x4f[] baseNodeTranslations;
     //TODO: move to Skin?
+    private Matrix4x4f[] baseFromRootNodeTranslations; // Used for skin calculation
     private Matrix4x4f[] fromRootNodeTranslations; // Used for skin calculation
     private AnimationSupport animation;
 
@@ -189,6 +190,8 @@ class GlTF : DrawableByVulkan
 
         // For skin support:
         this.rootSceneNode.refreshTransFromRootValues;
+        baseFromRootNodeTranslations.length = fromRootNodeTranslations.length;
+        baseFromRootNodeTranslations[0..$] = fromRootNodeTranslations;
 
         //~ import std;
         //~ writeln("fromRootNodeTranslations");
@@ -205,7 +208,7 @@ class GlTF : DrawableByVulkan
         //FIXME: hardcoded skin node
         const ushort skinNodeIdx = 0;
 
-        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, baseNodeTranslations, animation.perNodeTranslations, fromRootNodeTranslations, skinNodeIdx);
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, baseFromRootNodeTranslations, animation.perNodeTranslations, fromRootNodeTranslations, skinNodeIdx);
     }
 
     string name() const
@@ -222,8 +225,8 @@ class GlTF : DrawableByVulkan
         return null;
     }
 
-    //~ bool isAnimated() const => animation.animations.length > 0;
-    bool isAnimated() const => false;
+    bool isAnimated() const => animation.animations.length > 0;
+    //~ bool isAnimated() const => false;
 
     auto calcAABB() const
     {
@@ -393,7 +396,7 @@ class GlTF : DrawableByVulkan
 
     private void applyAnimation()
     {
-        animation.setPose(&animations[0], baseNodeTranslations);
+        animation.setPose(&animations[1], baseNodeTranslations);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)

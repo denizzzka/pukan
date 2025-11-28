@@ -21,12 +21,13 @@ void main()
 {
     fragTextureCoord = vertTextureCoord;
 
-    //~ const mat4 skinMatrix =
-        //~ weight.x * jointMatrices[jointIndices.x] +
-        //~ weight.y * jointMatrices[jointIndices.y] +
-        //~ weight.z * jointMatrices[jointIndices.z] +
-        //~ weight.w * jointMatrices[jointIndices.w];
+    const mat4 skinMatrix =
+        jointMatrices[jointIndices.x] * weight.x +
+        jointMatrices[jointIndices.y] * weight.y +
+        jointMatrices[jointIndices.z] * weight.z +
+        jointMatrices[jointIndices.w] * weight.w;
 
-    //~ gl_Position = trans * skinMatrix * vec4(position, 1.0);
-    gl_Position = trans * vec4(position, 1.0);
+    gl_Position = trans * skinMatrix * vec4(position, 1.0);
+    //TODO: enable for non-skinned meshes rendering:
+    //~ gl_Position = trans * vec4(position, 1.0);
 }

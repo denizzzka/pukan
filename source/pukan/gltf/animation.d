@@ -131,8 +131,32 @@ package struct AnimationSupport
 
     private Matrix4x4f[] calculatePose(const Animation* currAnimation, in float currTime, in Matrix4x4f[] baseNodeTranslations)
     {
-        Matrix4x4f[] translations = baseNodeTranslations.dup;
         assert(baseNodeTranslations.length == perNodeTranslations.length);
+
+        import std.math.traits: isNaN;
+
+        static struct TransAccum
+        {
+            Vector3f transl;
+            Quaternionf rot;
+            Vector3f scale;
+
+            bool initialized() const => !(transl.x.isNaN && rot.x.isNaN && scale.x.isNaN);
+
+            Matrix4x4f calcMatrix() /*const*/
+            {
+                Matrix4x4f r = Matrix4x4f.identity;
+
+                if(!transl.x.isNaN) r *= transl.translationMatrix;
+                if(!rot.x.isNaN) r *= rot.toMatrix4x4;
+                if(!scale.x.isNaN) r *= scale.scaleMatrix;
+
+                return r;
+            }
+        }
+
+        TransAccum[] translations;
+        translations.length = baseNodeTranslations.length;
 
         foreach(const scope chan; currAnimation.channels)
         {
@@ -154,7 +178,7 @@ package struct AnimationSupport
                 const output = content.rangify!Vector3f(sampler.outputAcc);
                 const Vector3f prevTrans = output[prevIdx];
                 const Vector3f nextTrans = output[nextIdx];
-                *currTrans = interpLinear(prevTrans, nextTrans, interpRatio).translationMatrix;
+                currTrans.transl = interpLinear(prevTrans, nextTrans, interpRatio);
             }
             else if (chan.targetPath == TRSType.rotation)
             {
@@ -162,7 +186,7 @@ package struct AnimationSupport
                 const Quaternionf prevRot = output[prevIdx];
                 const Quaternionf nextRot = output[nextIdx];
                 // slerp: spherical linear interpolation:
-                *currTrans = slerp(prevRot, nextRot, interpRatio).toMatrix4x4;
+                currTrans.rot = slerp(prevRot, nextRot, interpRatio);
             }
             else if (chan.targetPath == TRSType.scale)
             {
@@ -170,10 +194,20 @@ package struct AnimationSupport
                 const Vector3f prevScale = output[prevIdx];
                 const Vector3f nextScale = output[nextIdx];
 
-                *currTrans = interpLinear(prevScale, nextScale, interpRatio).scaleMatrix;
+                currTrans.scale = interpLinear(prevScale, nextScale, interpRatio);
             }
+            else
+                assert(0);
         }
 
-        return translations;
+        Matrix4x4f[] ret;
+        ret.length = baseNodeTranslations.length;
+        ret[0..$] = baseNodeTranslations;
+
+        foreach(i, ref t; translations)
+            if(t.initialized)
+                ret[i] = t.calcMatrix;
+
+        return ret;
     }
 }
