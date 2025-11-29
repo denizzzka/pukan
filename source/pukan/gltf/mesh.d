@@ -217,7 +217,6 @@ in(gpuBuffs.length > 0)
         }
 
         assert(acc.viewIdx >= 0);
-        //~ assert(acc.stride > 0);
 
         auto gpuBuf = gpuBuffs[acc.viewIdx];
         assert(gpuBuf !is null);

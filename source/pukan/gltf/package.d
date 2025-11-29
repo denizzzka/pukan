@@ -268,7 +268,6 @@ class GlTF : DrawableByVulkan
     }
 
     bool isAnimated() const => animation.animations.length > 0;
-    //~ bool isAnimated() const => false;
 
     auto calcAABB() const
     {
@@ -444,7 +443,7 @@ class GlTF : DrawableByVulkan
         drawingBufferFillingRecursive(buf, trans, rootSceneNode);
     }
 
-    //TODO: not need to call this recursive - just call it in row and use fromRootNodeTranslation to get coords
+    //TODO: not need to call this recursive - just call it in row and use fromSkinRootNodeTranslations to get coords
     private void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, Node node)
     {
         import std.math;

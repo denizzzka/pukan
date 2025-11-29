@@ -245,12 +245,7 @@ import dlib.math;
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
-    //~ currDeltaTime = 14.2;
-    //~ currDeltaTime = 9.0;
-    //~ currDeltaTime = 2.35;
-    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.3);
-    //~ import std;
-    //~ writeln("currDeltaTime=", currDeltaTime);
+    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.1);
 
     WorldTransformation wtb;
 
@@ -300,13 +295,7 @@ private string[] gltfFilesSearch(string dir)
 
         auto gltfs = dirEntries(sample_dir, "*.gltf", SpanMode.depth);
         if(!gltfs.empty)
-        {
             found ~= gltfs.front;
-            continue;
-            //~ if(!gltfs.empty)
-                //~ foreach(g; gltfs)
-                    //~ found ~= g;
-        }
     }
 
     return found;
@@ -320,28 +309,10 @@ void createArena(T)(Scene scene, ref T node)
     const sectorAngle = PI*2 / found.length;
 
     const radius = 0.2;
-    //~ const radius = 0;
     const startPlace = Vector3f(0, 0, -radius);
 
     foreach(i, filename; found)
     {
-        //~ if(filename != "demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb") continue;
-        //~ if(filename != "demo/assets/gltf_samples/Fox/glTF/Fox.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb") continue;
-        import std;
-        //~ if(filename != "demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/AnimationSkin04/glTF/robot.glb") continue;
-        //~ if(filename != "demo/assets/gltf_samples/AnimationSkin04/glTF/articulatedAnimation.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/RoboArm/glTF/articulatedAnimationArm.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/AnimationSkin04/glTF/untitled.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/AnimationSkin04/glTF/Animation_Skin_01.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/AnimationSkin04/glTF/Animation_Skin_04.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/AnimationSkin04/glTF/Animation_Skin_09.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/AnimatedCube/glTF/AnimatedCube.gltf") continue;
-        //~ if(filename != "demo/assets/gltf_samples/Palka/glTF/palka.gltf") continue;
-
-        writeln(filename);
-
         auto obj = scene.gltfFactory.create(filename);
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
