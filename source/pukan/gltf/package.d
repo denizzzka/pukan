@@ -19,12 +19,41 @@ import vibe.data.json;
 
 alias LoaderNode = pukan.gltf.loader.Node;
 
+struct Trans
+{
+    Vector3f transl;
+    Quaternionf rot;
+    Vector3f scale;
+
+    static Trans identity()
+    {
+        Trans r;
+        r.transl = Vector3f(0, 0, 0);
+
+        return r;
+    }
+
+    Matrix4x4f calcMatrix() /*const*/
+    {
+        //TODO: perfomance of this calculations can be increased
+        import std.math.traits: isNaN;
+
+        Matrix4x4f r = Matrix4x4f.identity;
+
+        if(!transl.x.isNaN) r *= transl.translationMatrix;
+        if(!rot.x.isNaN) r *= rot.toMatrix4x4;
+        if(!scale.x.isNaN) r *= scale.scaleMatrix;
+
+        return r;
+    }
+}
+
 class Node : BaseNode
 {
     NodePayload payload;
     alias this = payload;
 
-    Matrix4x4f* trans;
+    Trans* trans;
     package Matrix4x4f* transFromRoot; // used for skin calculation
     MeshClass mesh;
 
@@ -47,8 +76,6 @@ class Node : BaseNode
         import std;
 
         traversal((node){
-            assert(!(*node.trans)[0].isNaN, "Uninitialized Node.trans matrix?");
-
             // is root scene node?
             if(node.transFromRoot is null)
                 return; // just ignore - root scene doesn't have assigned transFromRoot pointer
@@ -58,11 +85,11 @@ class Node : BaseNode
 
             // parent is root scene node?
             if(parentTransFromRoot is null)
-                *node.transFromRoot = *node.trans;
+                *node.transFromRoot = node.trans.calcMatrix;
             else
             {
                 assert(!(*parentTransFromRoot)[0].isNaN);
-                *node.transFromRoot = *parentTransFromRoot * *node.trans;
+                *node.transFromRoot = *parentTransFromRoot * node.trans.calcMatrix;
             }
         });
     }
@@ -71,7 +98,7 @@ class Node : BaseNode
 class GlTF : DrawableByVulkan
 {
     private Node rootSceneNode;
-    private Matrix4x4f rootSceneNodeTrans;
+    private Trans rootSceneNodeTrans;
 
     private GltfContent content;
     alias this = content;
@@ -85,7 +112,7 @@ class GlTF : DrawableByVulkan
     package TransferBuffer jointMatricesUniformBuf;
     private VkDescriptorBufferInfo jointsUboInfo;
 
-    private Matrix4x4f[] baseNodeTranslations;
+    private Trans[] baseNodeTranslations;
     //TODO: move to Skin?
     private Matrix4x4f[] baseFromRootNodeTranslations; // Used for skin calculation
     private Matrix4x4f[] fromRootNodeTranslations; // Used for skin calculation
@@ -415,7 +442,7 @@ class GlTF : DrawableByVulkan
 
         assert(node.trans !is null);
 
-        trans *= *node.trans;
+        trans *= node.trans.calcMatrix;
 
         if(node.mesh)
         {

@@ -1,7 +1,7 @@
 module pukan.gltf.loader;
 
 import dlib.math;
-import pukan.gltf: GlTF;
+import pukan.gltf: GlTF, Trans;
 import pukan.gltf.accessor;
 import pukan.gltf.animation;
 import pukan.vulkan.bindings;
@@ -185,7 +185,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         Json rootScene = scenes[ json["scene"].opt!ushort(0) ];
 
         rootSceneNode.name = rootScene["name"].opt!string;
-        rootSceneNode.trans = Matrix4x4f.identity;
+        rootSceneNode.trans = Trans.identity;
         rootSceneNode.childrenNodeIndices = rootScene["nodes"]
             .byValue.map!((e) => e.get!ushort)
             .array;
@@ -287,10 +287,12 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
 }
 
-private Matrix4x4f readNodeTrans(in Json node)
+private Trans readNodeTrans(in Json node)
 {
     import dlib.math;
 
+    //FIXME: enable this code
+    version(none)
     {
         auto json = "matrix" in node;
         if(json !is null)
@@ -300,44 +302,42 @@ private Matrix4x4f readNodeTrans(in Json node)
         }
     }
 
-    Vector3f tr;
-    Quaternionf rot;
-    Vector3f scale;
+    Trans r;
 
     {
         auto json = "translation" in node;
         if(json is null)
-            tr = Vector3f(0, 0, 0);
+            r.transl = Vector3f(0, 0, 0);
         else
         {
             auto a = (*json).deserializeJson!(float[3]);
-            tr = Vector3f(a[0], a[1], a[2]);
+            r.transl = Vector3f(a[0], a[1], a[2]);
         }
     }
 
     {
         auto json = "rotation" in node;
         if(json is null)
-            rot = Quaternionf.identity;
+            r.rot = Quaternionf.identity;
         else
         {
             auto a = (*json).deserializeJson!(float[4]);
-            rot = Quaternionf(Vector4f(a[0], a[1], a[2], a[3]));
+            r.rot = Quaternionf(Vector4f(a[0], a[1], a[2], a[3]));
         }
     }
 
     {
         auto json = "scale" in node;
         if(json is null)
-            scale = Vector3f(1, 1, 1);
+            r.scale = Vector3f(1, 1, 1);
         else
         {
             auto a = (*json).deserializeJson!(float[3]);
-            scale = Vector3f(a[0], a[1], a[2]);
+            r.scale = Vector3f(a[0], a[1], a[2]);
         }
     }
 
-    return tr.translationMatrix * rot.toMatrix4x4 * scale.scaleMatrix;
+    return r;
 }
 
 struct Buffer
@@ -500,7 +500,7 @@ struct Skin
     //TODO: const
     private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
 
-    Matrix4x4f[] calculateJointMatrices(in GltfContent* content, /* in */ Matrix4x4f[] baseNodeTranslations, ref /*TODO: in*/ Matrix4x4f[] perNodeTranslations, ref /*TODO: in*/ Matrix4x4f[] rootRelativeNodeTranslations, in ushort skinNodeIdx) const
+    Matrix4x4f[] calculateJointMatrices(in GltfContent* content, /* in */ Matrix4x4f[] baseNodeTranslations, ref /*TODO: in*/ Trans[] perNodeTranslations, ref /*TODO: in*/ Matrix4x4f[] rootRelativeNodeTranslations, in ushort skinNodeIdx) const
     {
         Matrix4x4f[] jointMatrices;
         jointMatrices.length = nodesIndices.length;
@@ -563,7 +563,7 @@ struct NodePayload
 struct Node
 {
     ushort[] childrenNodeIndices;
-    Matrix4x4f trans;
+    Trans trans;
     NodePayload payload;
     alias this = payload;
 }

@@ -112,9 +112,11 @@ struct Animation
 
 package struct AnimationSupport
 {
+    import pukan.gltf: Trans;
+
     private GltfContent* content;
     package Animation[] animations;
-    package Matrix4x4f[] perNodeTranslations;
+    package Trans[] perNodeTranslations;
     package float currTime = 0;
 
     package this(GltfContent* c, size_t nodesNum)
@@ -124,39 +126,10 @@ package struct AnimationSupport
         animations = content.animations;
     }
 
-    void setPose(const Animation* currAnimation, in Matrix4x4f[] baseNodeTranslations)
+    void setPose(const Animation* currAnimation, in Trans[] baseNodeTranslations)
     {
-        perNodeTranslations[0 .. $] = calculatePose(currAnimation, currTime, baseNodeTranslations);
-    }
-
-    private Matrix4x4f[] calculatePose(const Animation* currAnimation, in float currTime, in Matrix4x4f[] baseNodeTranslations)
-    {
-        assert(baseNodeTranslations.length == perNodeTranslations.length);
-
-        import std.math.traits: isNaN;
-
-        static struct TransAccum
-        {
-            Vector3f transl;
-            Quaternionf rot;
-            Vector3f scale;
-
-            bool initialized() const => !(transl.x.isNaN && rot.x.isNaN && scale.x.isNaN);
-
-            Matrix4x4f calcMatrix() /*const*/
-            {
-                Matrix4x4f r = Matrix4x4f.identity;
-
-                if(!transl.x.isNaN) r *= transl.translationMatrix;
-                if(!rot.x.isNaN) r *= rot.toMatrix4x4;
-                if(!scale.x.isNaN) r *= scale.scaleMatrix;
-
-                return r;
-            }
-        }
-
-        TransAccum[] translations;
-        translations.length = baseNodeTranslations.length;
+        assert(perNodeTranslations.length == baseNodeTranslations.length);
+        perNodeTranslations[0..$] = baseNodeTranslations;
 
         foreach(const scope chan; currAnimation.channels)
         {
@@ -171,14 +144,14 @@ package struct AnimationSupport
             const nextIdx = prevIdx + 1;
 
             const float interpRatio = (loopTime - prevTime) / (nextTime - prevTime);
-            auto currTrans = &translations[chan.targetNode];
+            auto currTrans = &perNodeTranslations[chan.targetNode];
 
             if (chan.targetPath == TRSType.translation)
             {
                 const output = content.rangify!Vector3f(sampler.outputAcc);
                 const Vector3f prevTrans = output[prevIdx];
                 const Vector3f nextTrans = output[nextIdx];
-                currTrans.transl = interpLinear(prevTrans, nextTrans, interpRatio);
+                currTrans.transl = lerp(prevTrans, nextTrans, interpRatio);
             }
             else if (chan.targetPath == TRSType.rotation)
             {
@@ -194,20 +167,10 @@ package struct AnimationSupport
                 const Vector3f prevScale = output[prevIdx];
                 const Vector3f nextScale = output[nextIdx];
 
-                currTrans.scale = interpLinear(prevScale, nextScale, interpRatio);
+                currTrans.scale = lerp(prevScale, nextScale, interpRatio);
             }
             else
                 assert(0);
         }
-
-        Matrix4x4f[] ret;
-        ret.length = baseNodeTranslations.length;
-        ret[0..$] = baseNodeTranslations;
-
-        foreach(i, ref t; translations)
-            if(t.initialized)
-                ret[i] = t.calcMatrix;
-
-        return ret;
     }
 }
