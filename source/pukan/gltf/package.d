@@ -227,16 +227,14 @@ class GlTF : DrawableByVulkan
             gpuBuffs ~= new BufferPieceOnGPU;
             gpuBuffs ~= new BufferPieceOnGPU;
 
-            gpuBuffs[$-2].buffer = new TransferBuffer(device, Vector4us.sizeof, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            gpuBuffs[$-1].buffer = new TransferBuffer(device, Vector4f.sizeof, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            // joints (zeroed)
+            gpuBuffs[$-2].buffer = new TransferBuffer(device, Vector4us.sizeof * nodes.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            // weights
+            gpuBuffs[$-1].buffer = new TransferBuffer(device, Vector4f.sizeof * nodes.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-            auto joints = new Vector4us[nodes.length];
             auto weights = new Vector4f[nodes.length];
-
-            joints[0..$] = Vector4us(0, 0 , 0 ,0);
             weights[0..$] = Vector4f(1, 1, 1, 1);
 
-            gpuBuffs[$-2].buffer.cpuBuf[0 .. $] = joints;
             gpuBuffs[$-1].buffer.cpuBuf[0 .. $] = weights;
         }
 
