@@ -320,10 +320,12 @@ void createArena(T)(Scene scene, ref T node)
     const sectorAngle = PI*2 / found.length;
 
     const radius = 0.2;
+    //~ const radius = 0;
     const startPlace = Vector3f(0, 0, -radius);
 
     foreach(i, filename; found)
     {
+        if(filename != "demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb") continue;
         //~ if(filename != "demo/assets/gltf_samples/Fox/glTF/Fox.gltf") continue;
         //~ if(filename != "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb") continue;
         import std;
