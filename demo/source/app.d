@@ -248,7 +248,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     //~ currDeltaTime = 14.2;
     //~ currDeltaTime = 9.0;
     //~ currDeltaTime = 2.35;
-    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.5);
+    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.3);
     //~ import std;
     //~ writeln("currDeltaTime=", currDeltaTime);
 
@@ -325,7 +325,7 @@ void createArena(T)(Scene scene, ref T node)
 
     foreach(i, filename; found)
     {
-        if(filename != "demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb") continue;
+        //~ if(filename != "demo/assets/gltf_samples/Avocado/glTF-Binary/Avocado.glb") continue;
         //~ if(filename != "demo/assets/gltf_samples/Fox/glTF/Fox.gltf") continue;
         //~ if(filename != "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb") continue;
         import std;
@@ -384,7 +384,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto n = coloredBranch.addChild(Bone());
         cubeRotator = n.payload.peek!Bone;
 
-        //~ n.addChild(cast(DrawablePrimitive) cube);
+        n.addChild(cast(DrawablePrimitive) cube);
     }
 
     auto textureBranch = primitTree.addChild(scene.texturedMeshFactory.graphicsPipelineCfg);
@@ -414,7 +414,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto texture = device.create!Texture(img, samplerInfo);
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
-        //~ textureBranch.addChild(cast(DrawablePrimitive) mesh);
+        textureBranch.addChild(cast(DrawablePrimitive) mesh);
     }
 
     return tree;
