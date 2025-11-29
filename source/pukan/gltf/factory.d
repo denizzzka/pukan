@@ -51,6 +51,12 @@ struct GltfFactory
     {
         assert(device);
 
-        return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture);
+        try
+            return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture);
+        catch(Exception e)
+        {
+            e.msg = filename~": "~e.msg;
+            throw e;
+        }
     }
 }
