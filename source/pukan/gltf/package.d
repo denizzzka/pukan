@@ -149,8 +149,13 @@ class GlTF : DrawableByVulkan
             }
             else
             {
-                //FIXME: fake buffer
-                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * 10, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                //TODO: remove this fake buffer
+                Matrix4x4f[] identityBuf;
+                identityBuf.length = nodes.length;
+                identityBuf[0..$] = Matrix4x4f.identity;
+
+                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * identityBuf.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                jointMatricesUniformBuf.cpuBuf[0 .. $] = identityBuf;
             }
 
             jointsUboInfo = VkDescriptorBufferInfo(
@@ -215,6 +220,25 @@ class GlTF : DrawableByVulkan
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device, poolAndLayout);
         });
+
+        if(content.skins.length == 0)
+        {
+            // Adds fake buffer for joints and weights when skins not used to allow skinned vertices shader work as usual
+            gpuBuffs ~= new BufferPieceOnGPU;
+            gpuBuffs ~= new BufferPieceOnGPU;
+
+            gpuBuffs[$-2].buffer = new TransferBuffer(device, Vector4us.sizeof, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            gpuBuffs[$-1].buffer = new TransferBuffer(device, Vector4f.sizeof, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            auto joints = new Vector4us[nodes.length];
+            auto weights = new Vector4f[nodes.length];
+
+            joints[0..$] = Vector4us(0, 0 , 0 ,0);
+            weights[0..$] = Vector4f(1, 1, 1, 1);
+
+            gpuBuffs[$-2].buffer.cpuBuf[0 .. $] = joints;
+            gpuBuffs[$-1].buffer.cpuBuf[0 .. $] = weights;
+        }
 
         // For skin support:
         this.rootSceneNode.refreshTransFromRootValues;
@@ -375,13 +399,6 @@ class GlTF : DrawableByVulkan
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
             }
-        }
-
-        {
-            //FIXME: remove
-            // Adds fake buffer for joints and weights when skins not used
-            gpuBuffs ~= new BufferPieceOnGPU;
-            gpuBuffs[$-1].buffer = new TransferBuffer(device, 100, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         meshes ~= node.mesh;

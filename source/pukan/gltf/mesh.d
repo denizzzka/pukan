@@ -170,7 +170,7 @@ class Mesh
     {
         vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &descriptorSet, 0, null);
 
-        bindVertexBuffers(gpuBuffs, vert.allBuffers, buf);
+        bindVertexBuffers(gpuBuffs, vert.allBuffers, buf, vertices.count);
 
         if(indices.accessor.count == 0)
         {
@@ -188,7 +188,7 @@ class Mesh
     }
 }
 
-private void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, /*in*/ BufAccess[] accessors, VkCommandBuffer cmdBuf)
+private void bindVertexBuffers(BufferPieceOnGPU[] gpuBuffs, /*in*/ BufAccess[] accessors, VkCommandBuffer cmdBuf, /*TODO: remove */ uint verticesNum)
 in(gpuBuffs.length > 0)
 {
     const len = cast(uint) accessors.length;
@@ -203,7 +203,18 @@ in(gpuBuffs.length > 0)
     {
         //FIXME: remove! just for testing meshes without skin
         if(acc.viewIdx < 0) // means no skin on this mesh
-            acc.viewIdx = gpuBuffs.length - 1; // fake zeroed buffer
+        {
+            if(i == 2) // FIXME: hardcoded joints place
+            {
+                acc.viewIdx = gpuBuffs.length - 2; // fake joints buffer
+                acc.count = verticesNum;
+            }
+            else if(i == 3) // hardcoded weights place
+            {
+                acc.viewIdx = gpuBuffs.length - 1;
+                acc.count = verticesNum;
+            }
+        }
 
         assert(acc.viewIdx >= 0);
         //~ assert(acc.stride > 0);
