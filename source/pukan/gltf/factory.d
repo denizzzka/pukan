@@ -56,6 +56,7 @@ struct GltfFactory
         catch(Exception e)
         {
             e.msg = filename~": "~e.msg;
+            //FIXME: use correct exception type
             throw e;
         }
     }
