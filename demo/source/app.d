@@ -248,7 +248,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     //~ currDeltaTime = 14.2;
     //~ currDeltaTime = 9.0;
     //~ currDeltaTime = 2.35;
-    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime /* 0.1*/);
+    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.5);
     //~ import std;
     //~ writeln("currDeltaTime=", currDeltaTime);
 
@@ -300,8 +300,13 @@ private string[] gltfFilesSearch(string dir)
 
         auto gltfs = dirEntries(sample_dir, "*.gltf", SpanMode.depth);
         if(!gltfs.empty)
-            foreach(g; gltfs)
-                found ~= g;
+        {
+            found ~= gltfs.front;
+            continue;
+            //~ if(!gltfs.empty)
+                //~ foreach(g; gltfs)
+                    //~ found ~= g;
+        }
     }
 
     return found;
@@ -314,12 +319,12 @@ void createArena(T)(Scene scene, ref T node)
     const found = gltfFilesSearch("demo/assets/gltf_samples/");
     const sectorAngle = PI*2 / found.length;
 
-    const radius = 0; //.2;
+    const radius = 0.2;
     const startPlace = Vector3f(0, 0, -radius);
 
     foreach(i, filename; found)
     {
-        if(filename != "demo/assets/gltf_samples/Fox/glTF/Fox.gltf") continue;
+        //~ if(filename != "demo/assets/gltf_samples/Fox/glTF/Fox.gltf") continue;
         //~ if(filename != "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb") continue;
         import std;
         //~ if(filename != "demo/assets/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf") continue;
