@@ -114,7 +114,6 @@ class GlTF : DrawableByVulkan
 
     private Trans[] baseNodeTranslations;
     //TODO: move to Skin?
-    private Matrix4x4f[] baseFromRootNodeTranslations; // Used for skin calculation
     private Matrix4x4f[] fromRootNodeTranslations; // Used for skin calculation
     private AnimationSupport animation;
 
@@ -217,8 +216,6 @@ class GlTF : DrawableByVulkan
 
         // For skin support:
         this.rootSceneNode.refreshTransFromRootValues;
-        baseFromRootNodeTranslations.length = fromRootNodeTranslations.length;
-        baseFromRootNodeTranslations[0..$] = fromRootNodeTranslations;
 
         //~ import std;
         //~ writeln("fromRootNodeTranslations");
@@ -232,10 +229,8 @@ class GlTF : DrawableByVulkan
 
         //FIXME: hardcoded skin is used
         const skin = content.skins[0];
-        //FIXME: hardcoded skin node
-        const ushort skinNodeIdx = 0;
 
-        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, baseFromRootNodeTranslations, animation.perNodeTranslations, fromRootNodeTranslations, skinNodeIdx);
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, animation.perNodeTranslations, fromRootNodeTranslations);
     }
 
     string possibleName() const
