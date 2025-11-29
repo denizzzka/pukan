@@ -143,6 +143,8 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         );
     }
 
+    enforce(ret.meshes.length <= 1, "FIXME: only one mesh primitive supported for now");
+
     const skins = "skins" in json;
     if(skins) foreach(ref skin; *skins)
     {
