@@ -167,7 +167,11 @@ class GlTF : DrawableByVulkan
                 {
                     auto c = createNodeHier(nodes[idx]);
                     c.trans = &animation.perNodeTranslations[idx];
-                    c.transFromRoot = &content.skins[0].fromSkinRootNodeTranslations[idx];
+
+                    //FIXME
+                    if(content.skins.length > 0)
+                        c.transFromRoot = &content.skins[0].fromSkinRootNodeTranslations[idx];
+
                     nn.addChildNode(c);
                 }
 
