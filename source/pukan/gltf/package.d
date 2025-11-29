@@ -113,8 +113,6 @@ class GlTF : DrawableByVulkan
     private VkDescriptorBufferInfo jointsUboInfo;
 
     private Trans[] baseNodeTranslations;
-    //TODO: move to Skin?
-    private Matrix4x4f[] fromRootNodeTranslations; // Used for skin calculation
     private AnimationSupport animation;
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
@@ -131,7 +129,6 @@ class GlTF : DrawableByVulkan
 
         {
             baseNodeTranslations.length = nodes.length;
-            fromRootNodeTranslations.length = nodes.length;
 
             foreach(i, ref node; nodes)
                 baseNodeTranslations[i] = node.trans;
@@ -144,7 +141,8 @@ class GlTF : DrawableByVulkan
             if(content.skins.length > 0)
             {
                 //FIXME: hardcoded skin is used
-                const skin = content.skins[0];
+                auto skin = &content.skins[0];
+                skin.fromSkinRootNodeTranslations.length = nodes.length;
 
                 jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
                 assert(jointMatricesUniformBuf.length > 0);
@@ -169,7 +167,7 @@ class GlTF : DrawableByVulkan
                 {
                     auto c = createNodeHier(nodes[idx]);
                     c.trans = &animation.perNodeTranslations[idx];
-                    c.transFromRoot = &fromRootNodeTranslations[idx];
+                    c.transFromRoot = &content.skins[0].fromSkinRootNodeTranslations[idx];
                     nn.addChildNode(c);
                 }
 
@@ -230,7 +228,7 @@ class GlTF : DrawableByVulkan
         //FIXME: hardcoded skin is used
         const skin = content.skins[0];
 
-        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(fromRootNodeTranslations);
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices();
     }
 
     string possibleName() const
