@@ -218,10 +218,6 @@ class GlTF : DrawableByVulkan
 
         // For skin support:
         this.rootSceneNode.refreshTransFromRootValues;
-
-        //~ import std;
-        //~ writeln("fromRootNodeTranslations");
-        //~ writeln(fromRootNodeTranslations);
     }
 
     private void recalcSkin()
