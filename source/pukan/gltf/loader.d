@@ -512,8 +512,13 @@ struct Skin
 
         foreach(i, jointIdx; nodesIndices)
         {
-            // Fourth row is fixed and described in the spec:
-            //assert(inverseBindMatrices[i].getRow(3) == Vector4f([0.0, 0.0, 0.0, 1.0]));
+            debug
+            {
+                // Fourth row is fixed and described in the spec, check it:
+                const row = inverseBindMatrices[i].getRow(3);
+                const diff = row - Vector4f([0.0, 0.0, 0.0, 1.0]);
+                assert(diff.length.isConsiderZero);
+            }
 
             jointMatrices[i] = fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
         }
