@@ -501,8 +501,9 @@ struct Skin
     package uint[] nodesIndices; /// skin joints
     //TODO: const
     private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
+    package Matrix4x4f[] fromSkinRootNodeTranslations; /// Nodes coords relative to root of skin
 
-    Matrix4x4f[] calculateJointMatrices(ref /*TODO: in*/ Matrix4x4f[] rootRelativeNodeTranslations) const
+    Matrix4x4f[] calculateJointMatrices() const
     {
         Matrix4x4f[] jointMatrices;
         jointMatrices.length = nodesIndices.length;
@@ -514,7 +515,7 @@ struct Skin
             // Fourth row is fixed and described in the spec:
             //assert(inverseBindMatrices[i].getRow(3) == Vector4f([0.0, 0.0, 0.0, 1.0]));
 
-            jointMatrices[i] = rootRelativeNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            jointMatrices[i] = fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
         }
 
         return jointMatrices;
