@@ -514,40 +514,7 @@ struct Skin
             // Fourth row is fixed and described in the spec:
             //assert(inverseBindMatrices[i].getRow(3) == Vector4f([0.0, 0.0, 0.0, 1.0]));
 
-            //~ jointMatrices[i] = inverseBindMatrices[i].inverse * baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
-            //~ jointMatrices[i] = inverseBindMatrices[i] * perNodeTranslations[jointIdx];
-            //~ jointMatrices[i] = inverseBindMatrices[i].inverse * perNodeTranslations[jointIdx];
-            //~ auto relativeToSkinSpace = baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
-            //~ auto relativeToSkinSpace = inverseBindMatrices[i].inverse * baseNodeTranslations[jointIdx];
-            //~ jointMatrices[i] = baseNodeTranslations[jointIdx] * inverseBindMatrices[i] * rootRelativeNodeTranslations[jointIdx];
-            //~ jointMatrices[i] = Matrix4x4f.identity;
-
-            // Move rest pose vertex into skin space
-            //~ auto pos = baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
-
-            // Move vertex back into model space, but with skin related to current position
-            //~ jointMatrices[i] = pos;
-
-            //~ baseNodeTranslations[jointIdx] * inverseBindMatrices[i] inverseTransform * perNodeTranslations[jointIdx] * inverseBindMatrices[i];
-
-            //TODO: can be calculated once during load:
-            //~ auto skinRootRelative = baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
-            //~ jointMatrices[i] = baseNodeTranslations[jointIdx] * inverseBindMatrices[i];
-            //~ auto skinRootRelative = baseNodeTranslations[jointIdx] * inverseBindMatrices[i].inverse;
-            //~ auto tmp = rootRelativeNodeTranslations[jointIdx] * inverseBindMatrices[i];
-            //~ jointMatrices[i] = perNodeTranslations[jointIdx] * inverseBindMatrices[i];
             jointMatrices[i] = rootRelativeNodeTranslations[jointIdx] * inverseBindMatrices[i];
-            //~ jointMatrices[i] = skinRootRelative * perNodeTranslations[jointIdx];
-
-
-            //~ auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 10f.degtorad);
-            //~ jointMatrices[i] = rotation.toMatrix4x4 * jointMatrices[i];
-
-            //~ import std;
-            //~ writeln("perNodeTranslations");
-            //~ writeln(perNodeTranslations);
-            //~ writeln("rootRelativeNodeTranslations");
-            //~ writeln(rootRelativeNodeTranslations);
         }
 
         return jointMatrices;
