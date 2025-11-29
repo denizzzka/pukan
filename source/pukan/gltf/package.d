@@ -238,7 +238,7 @@ class GlTF : DrawableByVulkan
         jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, baseFromRootNodeTranslations, animation.perNodeTranslations, fromRootNodeTranslations, skinNodeIdx);
     }
 
-    string name() const
+    string possibleName() const
     {
         if(rootSceneNode.name.length)
             return rootSceneNode.name;
@@ -423,7 +423,7 @@ class GlTF : DrawableByVulkan
 
     private void applyAnimation()
     {
-        animation.setPose(&animations[1], baseNodeTranslations);
+        animation.setPose(&animations[$-1], baseNodeTranslations);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
