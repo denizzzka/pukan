@@ -230,7 +230,7 @@ class GlTF : DrawableByVulkan
         //FIXME: hardcoded skin is used
         const skin = content.skins[0];
 
-        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(&content, animation.perNodeTranslations, fromRootNodeTranslations);
+        jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices(fromRootNodeTranslations);
     }
 
     string possibleName() const
