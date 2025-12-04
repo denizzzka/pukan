@@ -4,6 +4,7 @@ import pukan;
 import pukan.shaders;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import std.exception : enforce;
 
 class Scene
 {
@@ -15,7 +16,7 @@ class Scene
 
     SwapChain swapChain;
     FrameBuilder frameBuilder;
-    DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
+    DefaultRenderPass renderPass;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -33,7 +34,33 @@ class Scene
 
         device.physicalDevice.instance.useSurface(surface);
 
-        renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
+        VkSurfaceFormatKHR[] formats;
+        {
+            uint count;
+            enforce(vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice.handle, surface, &count, null) == VK_SUCCESS, "failed to query surface formats count");
+            formats.length = count;
+            enforce(vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice.handle, surface, &count, formats.ptr) == VK_SUCCESS, "failed to query surface formats");
+        }
+
+        VkFormat chosenFormat;
+        VkColorSpaceKHR chosenColorSpace;
+
+        if (formats.length == 1 && formats[0].format == VK_FORMAT_UNDEFINED) {
+            chosenFormat = VK_FORMAT_B8G8R8A8_SRGB;
+            chosenColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        } else {
+            chosenFormat = formats[0].format;
+            chosenColorSpace = formats[0].colorSpace;
+            foreach (f; formats) {
+                if (f.format == VK_FORMAT_B8G8R8A8_SRGB && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                    chosenFormat = f.format;
+                    chosenColorSpace = f.colorSpace;
+                    break;
+                }
+            }
+        }
+
+        renderPass = device.create!DefaultRenderPass(chosenFormat);
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
@@ -64,7 +91,6 @@ class Scene
 
     ~this()
     {
-        // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
         frameBuilder.destroy;
     }
@@ -127,15 +153,13 @@ class Scene
 
 import dlib.math;
 
-///
 struct WorldTransformation
 {
-    Matrix4f model; /// model to World
-    Matrix4f view; /// World to view (to camera)
-    Matrix4f proj; /// view to projection (to projective/homogeneous coordinates)
+    Matrix4f model;
+    Matrix4f view;
+    Matrix4f proj;
 }
 
-///
 struct Vertex {
     Vector3f pos;
     Vector3f color;
