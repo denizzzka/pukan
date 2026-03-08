@@ -1,6 +1,7 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"dlib": "1.4.1",
 		"gamut": "3.3.2",
 		"glfw-d": "1.1.2",
 		"intel-intrinsics": "1.12.0",
