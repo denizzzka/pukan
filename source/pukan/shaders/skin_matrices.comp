@@ -1,0 +1,39 @@
+#version 460
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0) readonly buffer TransFromRoot
+{
+    mat4 transFromRoot[];
+};
+
+layout(binding = 1) readonly buffer NodeIndices
+{
+    uint nodeIndices[];
+};
+
+layout(binding = 2) readonly buffer InvBindMatrices
+{
+    mat4 inverseBindMatrices[];
+};
+
+layout(binding = 3) writeonly buffer JointMatrices
+{
+    mat4 jointMatrices[];
+};
+
+layout(push_constant) uniform PushConsts
+{
+    mat4 skinRootInverse;
+};
+
+void main()
+{
+    const uint jointIdx = gl_GlobalInvocationID.x;
+    const uint nodeIdx = nodeIndices[jointIdx];
+
+    jointMatrices[jointIdx] =
+        skinRootInverse *
+        transFromRoot[nodeIdx] *
+        inverseBindMatrices[jointIdx];
+}

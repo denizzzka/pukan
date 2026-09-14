@@ -87,7 +87,7 @@ private struct ChunkHeader
 }
 
 ///
-package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline, Texture fakeTexture)
+package auto loadGlTF2(bool computeJointsOnGPU = true)(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline, Texture fakeTexture)
 {
     auto gltfFile = readGltfFile(filename);
     const json = gltfFile.json;
@@ -287,7 +287,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         }
     }
 
-    return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+    return new GlTF!(computeJointsOnGPU)(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
 }
 
 private Trans readNodeTrans(in Json node)
@@ -511,7 +511,7 @@ struct Skin
     package uint[] nodesIndices; /// skin joints
     package int skinRootNodeIdx = -1;
     //TODO: const
-    private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
+    package AccessRange!(Matrix4x4f, false) inverseBindMatrices;
     package Matrix4x4f[] fromSkinRootNodeTranslations; /// Nodes coords relative to root of skin
 
     Matrix4x4f[] calculateJointMatrices() const

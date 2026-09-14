@@ -7,6 +7,7 @@ import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, TexturedMesh, UploadedVertices;
+import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -95,7 +96,7 @@ class Node : BaseNode
     }
 }
 
-class GlTF : DrawableByVulkan
+class GlTF(bool computeJointsOnGPU = true) : DrawableByVulkan
 {
     private Node rootSceneNode;
     private Trans rootSceneNodeTrans;
@@ -111,6 +112,9 @@ class GlTF : DrawableByVulkan
 
     package TransferBuffer jointMatricesUniformBuf;
     private VkDescriptorBufferInfo jointsUboInfo;
+
+    static if(computeJointsOnGPU)
+        package SkinMatrices skinMatrices;
 
     private Trans[] baseNodeTranslations;
     private AnimationSupport animation;
@@ -153,6 +157,23 @@ class GlTF : DrawableByVulkan
 
                 jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
                 assert(jointMatricesUniformBuf.length > 0);
+
+                static if(computeJointsOnGPU)
+                {
+                    Matrix4x4f[] invBindArr;
+                    invBindArr.length = skin.inverseBindMatrices.length;
+                    foreach(i; 0 .. invBindArr.length)
+                        invBindArr[i] = skin.inverseBindMatrices[i];
+
+                    skinMatrices = new SkinMatrices(
+                        device,
+                        cast(uint) nodes.length,
+                        skin.nodesIndices,
+                        invBindArr,
+                        jointMatricesUniformBuf.gpuBuffer,
+                        jointMatricesUniformBuf.length,
+                    );
+                }
             }
             else
             {
@@ -295,6 +316,10 @@ class GlTF : DrawableByVulkan
             if(buf)
                 buf.uploadImmediate(commandPool, commandBuffer);
 
+        static if(computeJointsOnGPU)
+            if(skinMatrices)
+                skinMatrices.uploadStatic(commandPool, commandBuffer);
+
         foreach(ref mesh; meshes)
             mesh.updateDescriptorSetsAndUniformBuffers(device);
 
@@ -425,11 +450,31 @@ class GlTF : DrawableByVulkan
             rootSceneNode.refreshTransFromRootValues;
         }
 
-        //FIXME: recalc skin for each mesh
-        if(content.skins.length)
-            recalcSkin();
+        //FIXME: hardcoded skin is used
+        static if(computeJointsOnGPU)
+        {
+            if(content.skins.length)
+            {
+                auto skin = &content.skins[0];
 
-        jointMatricesUniformBuf.recordUpload(buf);
+                Matrix4x4f skinRootInverse = Matrix4x4f.identity;
+                if(skin.skinRootNodeIdx >= 0)
+                    skinRootInverse = skin.fromSkinRootNodeTranslations[skin.skinRootNodeIdx].inverse;
+
+                skinMatrices.setTransFromRoot(skin.fromSkinRootNodeTranslations);
+                skinMatrices.run(buf, skinRootInverse);
+            }
+            else
+                jointMatricesUniformBuf.recordUpload(buf);
+        }
+        else
+        {
+            //FIXME: recalc skin for each mesh
+            if(content.skins.length)
+                recalcSkin();
+
+            jointMatricesUniformBuf.recordUpload(buf);
+        }
 
         foreach(e; meshes)
             e.refreshBuffers(buf);

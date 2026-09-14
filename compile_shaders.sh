@@ -9,3 +9,4 @@ glslc ${TGT} -fshader-stage=frag source/pukan/shaders/colored_fragment.glsl -o c
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/textured_fragment.glsl -o compiled_shaders/textured_frag.spv
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/gltf_fragment.glsl -o compiled_shaders/gltf_fragment.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/gemm.comp -o compiled_shaders/gemm.spv
+glslc ${TGT} -fshader-stage=compute source/pukan/shaders/skin_matrices.comp -o compiled_shaders/skin_matrices.spv

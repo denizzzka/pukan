@@ -17,7 +17,7 @@ class PipelineInfoCreator : DefaultGraphicsPipelineInfoCreator!ShaderVertex
     }
 }
 
-struct GltfFactory
+struct GltfFactory(bool computeJointsOnGPU = true)
 {
     import pukan.vulkan;
     import shaders = pukan.vulkan.shaders;
@@ -52,7 +52,7 @@ struct GltfFactory
         assert(device);
 
         try
-            return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture);
+            return loadGlTF2!(computeJointsOnGPU)(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture);
         catch(Exception e)
         {
             e.msg = filename~": "~e.msg;
