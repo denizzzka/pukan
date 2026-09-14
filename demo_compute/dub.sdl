@@ -1,0 +1,7 @@
+name "demo_compute"
+description "Vulkan API D library compute demo"
+authors "Denis Feklushkin"
+copyright "Copyright © 2026, Denis Feklushkin"
+license "BSL-1.0"
+dependency "pukan" version="*"
+dflags "-preview=in"

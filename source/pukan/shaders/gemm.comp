@@ -1,0 +1,43 @@
+#version 460
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0) readonly buffer ABuffer
+{
+    float A[];
+};
+
+layout(binding = 1) readonly buffer BBuffer
+{
+    float B[];
+};
+
+layout(binding = 2) buffer CBuffer
+{
+    float C[];
+};
+
+layout(push_constant) uniform Params
+{
+    uint M;
+    uint N;
+    uint K;
+    float alpha;
+    float beta;
+} params;
+
+void main()
+{
+    const uint row = gl_GlobalInvocationID.y;
+    const uint col = gl_GlobalInvocationID.x;
+
+    if(row >= params.M || col >= params.N)
+        return;
+
+    float acc = 0.0;
+
+    for(uint k = 0; k < params.K; ++k)
+        acc += A[row * params.K + k] * B[k * params.N + col];
+
+    C[row * params.N + col] = params.alpha * acc + params.beta * C[row * params.N + col];
+}

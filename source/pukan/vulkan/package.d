@@ -3,6 +3,7 @@ module pukan.vulkan;
 //TODO: remove all these lines?
 
 public import pukan.vulkan.commands;
+public import pukan.vulkan.computation;
 public import pukan.vulkan.core;
 public import pukan.vulkan.descriptors;
 public import pukan.vulkan.frame_builder;

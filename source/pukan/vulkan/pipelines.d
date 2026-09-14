@@ -168,6 +168,24 @@ package mixin template Pipelines()
 
         return pipelines[prevLen .. $];
     }
+
+    VkPipeline[] createComputePipelines(VkComputePipelineCreateInfo[] infos)
+    out(r; r.length == infos.length)
+    {
+        size_t prevLen = pipelines.length;
+        pipelines.length += infos.length;
+
+        vkCreateComputePipelines(
+            this.device,
+            null, // pipelineCache
+            cast(uint) infos.length,
+            infos.ptr,
+            this.alloc,
+            &pipelines[prevLen]
+        ).vkCheck;
+
+        return pipelines[prevLen .. $];
+    }
 }
 
 VkPipelineLayout createPipelineLayout(LogicalDevice device, VkDescriptorSetLayout[] descriptorSetLayouts, VkPushConstantRange[] pushConstantRanges)
