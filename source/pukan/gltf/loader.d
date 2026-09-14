@@ -1,7 +1,7 @@
 module pukan.gltf.loader;
 
 import dlib.math;
-import pukan.gltf: GlTF, Trans;
+import pukan.gltf: GlTF, SkinnedGlTF, Trans;
 import pukan.gltf.accessor;
 import pukan.gltf.animation;
 import pukan.vulkan.bindings;
@@ -287,7 +287,10 @@ package auto loadGlTF2(bool computeJointsOnGPU = true)(string filename, PoolAndL
         }
     }
 
-    return new GlTF!(computeJointsOnGPU)(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+    if(ret.skins.length > 0)
+        return new SkinnedGlTF!(computeJointsOnGPU)(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+    else
+        return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
 }
 
 private Trans readNodeTrans(in Json node)
