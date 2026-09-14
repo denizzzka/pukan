@@ -164,10 +164,11 @@ void main() {
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator);
     scope(exit) tree.destroy;
 
+    GlTF[] arenaGltfs;
     {
         auto trans = Vector3f(0, 0, 0).translationMatrix;
         auto arenaNode = tree.addChild(Bone(mat: trans));
-        createArena(scene, arenaNode);
+        arenaGltfs = createArena(scene, arenaNode);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
@@ -206,6 +207,23 @@ void main() {
                 tree.drawingBufferFilling(buf, Matrix4x4f.identity);
             });
         });
+
+        static size_t verifyFrameIdx;
+        if(arenaGltfs.length && verifyFrameIdx % 25 == 0)
+        {
+            verifyFrameIdx++;
+            import pukan.gltf: SkinnedGlTF_skinJointsGPU;
+
+            foreach(a; arenaGltfs)
+            {
+                if(auto s = cast(SkinnedGlTF_skinJointsGPU) a)
+                {
+                    auto cb = frameBuilder.commandPool.allocateBuffers(1)[0];
+                    scope(exit) frameBuilder.commandPool.freeBuffers([cb]);
+                    s.debugVerifySkinJoints(device, frameBuilder.commandPool, cb);
+                }
+            }
+        }
 
         {
             import core.thread.osthread: Thread;
@@ -301,7 +319,7 @@ private string[] gltfFilesSearch(string dir)
     return found;
 }
 
-void createArena(T)(Scene scene, ref T node)
+GlTF[] createArena(T)(Scene scene, ref T node)
 {
     import std.math;
 
@@ -311,6 +329,7 @@ void createArena(T)(Scene scene, ref T node)
     const radius = 0.2;
     const startPlace = Vector3f(0, 0, -radius);
 
+    GlTF[] loaded;
     foreach(i, filename; found)
     {
         auto obj = scene.gltfFactory.create(filename);
@@ -330,7 +349,11 @@ void createArena(T)(Scene scene, ref T node)
         node
             .addChild(Bone(mat: trans))
             .addChild(obj);
+
+        loaded ~= obj;
     }
+
+    return loaded;
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)

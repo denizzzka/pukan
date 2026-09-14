@@ -572,9 +572,8 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
 
     /// Debug-only: downloads GPU-computed joint matrices and compares them against the CPU path.
     /// Must be called after submitting the command buffer that records `refreshBuffers`.
-    /// Returns the maximum absolute error between GPU and CPU paths.
     version(assert)
-    float debugVerifySkinJoints(LogicalDevice device, CommandPool commandPool, scope ref VkCommandBuffer commandBuffer)
+    void debugVerifySkinJoints(LogicalDevice device, CommandPool commandPool, scope ref VkCommandBuffer commandBuffer)
     {
         jointMatricesUniformBuf.downloadImmediate(commandPool, commandBuffer);
 
@@ -587,15 +586,11 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
         import std.algorithm: max;
 
         enum maxAllowedError = 1e-4;
-        float maxErr = 0;
         foreach(i; 0 .. gpuData.length)
         {
             const err = abs(gpuData[i] - cpuData[i]);
-            maxErr = max(maxErr, err);
             assert(err < maxAllowedError, "joint matrix error " ~ err.to!string ~ " at " ~ i.to!string);
         }
-
-        return maxErr;
     }
 }
 
