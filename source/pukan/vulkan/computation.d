@@ -4,108 +4,30 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.shaders: ShaderInfo;
 
-struct Params
+/// Base class for GPU compute kernels
+abstract class Compute
 {
-    uint M;
-    uint N;
-    uint K;
-    float alpha;
-    float beta;
-}
+    protected LogicalDevice device;
+    protected PoolAndLayoutInfo poolAndLayout;
+    protected VkDescriptorSet descriptorSet;
 
-class Gemm
-{
-    LogicalDevice device;
-    CommandPool cmdPool;
-    VkCommandBuffer cmdBuf;
+    protected VkPipelineLayout pipelineLayout;
+    protected VkPipeline pipeline;
+    protected uint pushConstantSize;
 
-    TransferBuffer bufA;
-    TransferBuffer bufB;
-    MemoryBufferMappedToCPU bufC;
+    private VkWriteDescriptorSet[] pendingWrites;
 
-    PoolAndLayoutInfo poolAndLayout;
-    VkDescriptorSet descriptorSet;
-
-    VkDescriptorBufferInfo aInfo;
-    VkDescriptorBufferInfo bInfo;
-    VkDescriptorBufferInfo cInfo;
-
-    VkPipelineLayout pipelineLayout;
-    VkPipeline pipeline;
-
-    enum ParamsSize = Params.sizeof;
-
-    this(LogicalDevice dev, uint M, uint N, uint K)
+    this(LogicalDevice dev, VkDescriptorSetLayoutBinding[] layoutBindings, ubyte[] spvBinary, VkPushConstantRange pushConstant)
     {
         device = dev;
-        _M = M;
-        _N = N;
-        _K = K;
-        cmdPool = dev.createCommandPool();
-        cmdBuf = cmdPool.allocateBuffers(1)[0];
-
-        bufA = dev.create!TransferBuffer(M*K*float.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        bufB = dev.create!TransferBuffer(K*N*float.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        bufC = dev.create!MemoryBufferMappedToCPU(M*N*float.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-
-        VkDescriptorSetLayoutBinding[] layoutBindings = [
-            VkDescriptorSetLayoutBinding(
-                binding: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: 1,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: 2,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-            ),
-        ];
 
         poolAndLayout = device.createDescriptorPool(layoutBindings, 1);
         descriptorSet = device.allocateDescriptorSet(poolAndLayout);
 
-        aInfo = VkDescriptorBufferInfo(
-            buffer: bufA.gpuBuffer,
-            offset: 0,
-            range: bufA.length,
-        );
-
-        bInfo = VkDescriptorBufferInfo(
-            buffer: bufB.gpuBuffer,
-            offset: 0,
-            range: bufB.length,
-        );
-
-        cInfo = VkDescriptorBufferInfo(
-            buffer: bufC.buf,
-            offset: 0,
-            range: bufC.cpuBuf.length,
-        );
-
-        VkWriteDescriptorSet[] descriptorWrites = [
-            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aInfo),
-            bufferWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, bInfo),
-            bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, cInfo),
-        ];
-
-        device.updateDescriptorSets(descriptorWrites);
-
-        VkPushConstantRange pushConstant = {
-            stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-            offset: 0,
-            size: ParamsSize,
-        };
+        pushConstantSize = pushConstant.size;
 
         auto shader = device.uploadShaderToGPU(
-            cast(ubyte[]) import("gemm.spv"),
+            spvBinary,
             VK_SHADER_STAGE_COMPUTE_BIT,
             layoutBindings,
             pushConstant,
@@ -129,7 +51,150 @@ class Gemm
     {
         if(pipelineLayout)
             vkDestroyPipelineLayout(device, pipelineLayout, device.alloc);
+    }
 
+    protected void bindBuffer(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorBufferInfo bufferInfo)
+    {
+        pendingWrites ~= bufferWriteDescriptor(descriptorSet, dstBinding, descriptorType, bufferInfo);
+    }
+
+    protected void bindImage(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorImageInfo imageInfo)
+    {
+        pendingWrites ~= imageWriteDescriptor(descriptorSet, dstBinding, descriptorType, imageInfo);
+    }
+
+    protected void commitDescriptorWrites()
+    {
+        device.updateDescriptorSets(pendingWrites);
+        pendingWrites.length = 0;
+    }
+
+    protected void dispatch(VkCommandBuffer cmdBuf, const(void)* pushConstants, uint groupsX, uint groupsY, uint groupsZ)
+    {
+        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+
+        vkCmdBindDescriptorSets(
+            cmdBuf,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            pipelineLayout,
+            0, // firstSet
+            1, // descriptorSetCount
+            &descriptorSet,
+            0, // dynamicOffsetCount
+            null,
+        );
+
+        if(pushConstants !is null)
+            vkCmdPushConstants(
+                cmdBuf,
+                pipelineLayout,
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                0, // offset
+                pushConstantSize,
+                pushConstants,
+            );
+
+        vkCmdDispatch(cmdBuf, groupsX, groupsY, groupsZ);
+    }
+}
+
+struct Params
+{
+    uint M;
+    uint N;
+    uint K;
+    float alpha;
+    float beta;
+}
+
+class Gemm : Compute
+{
+    CommandPool cmdPool;
+    VkCommandBuffer cmdBuf;
+
+    TransferBuffer bufA;
+    TransferBuffer bufB;
+    MemoryBufferMappedToCPU bufC;
+
+    VkDescriptorBufferInfo aInfo;
+    VkDescriptorBufferInfo bInfo;
+    VkDescriptorBufferInfo cInfo;
+
+    enum ParamsSize = Params.sizeof;
+
+    this(LogicalDevice dev, uint M, uint N, uint K)
+    {
+        VkDescriptorSetLayoutBinding[] layoutBindings = [
+            VkDescriptorSetLayoutBinding(
+                binding: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: 1,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: 2,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+            ),
+        ];
+
+        VkPushConstantRange pushConstant = {
+            stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+            offset: 0,
+            size: ParamsSize,
+        };
+
+        super(
+            dev,
+            layoutBindings,
+            cast(ubyte[]) import("gemm.spv"),
+            pushConstant,
+        );
+
+        _M = M;
+        _N = N;
+        _K = K;
+
+        cmdPool = dev.createCommandPool();
+        cmdBuf = cmdPool.allocateBuffers(1)[0];
+
+        bufA = dev.create!TransferBuffer(M*K*float.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        bufB = dev.create!TransferBuffer(K*N*float.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        bufC = dev.create!MemoryBufferMappedToCPU(M*N*float.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+        aInfo = VkDescriptorBufferInfo(
+            buffer: bufA.gpuBuffer,
+            offset: 0,
+            range: bufA.length,
+        );
+
+        bInfo = VkDescriptorBufferInfo(
+            buffer: bufB.gpuBuffer,
+            offset: 0,
+            range: bufB.length,
+        );
+
+        cInfo = VkDescriptorBufferInfo(
+            buffer: bufC.buf,
+            offset: 0,
+            range: bufC.cpuBuf.length,
+        );
+
+        bindBuffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aInfo);
+        bindBuffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, bInfo);
+        bindBuffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, cInfo);
+        commitDescriptorWrites();
+    }
+
+    ~this()
+    {
         if(cmdPool)
             destroy(cmdPool);
 
@@ -186,35 +251,12 @@ class Gemm
                 bufA.recordUpload(cmdBuf);
                 bufB.recordUpload(cmdBuf);
 
-                vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-
-                vkCmdBindDescriptorSets(
-                    cmdBuf,
-                    VK_PIPELINE_BIND_POINT_COMPUTE,
-                    pipelineLayout,
-                    0, // firstSet
-                    1, // descriptorSetCount
-                    &descriptorSet,
-                    0, // dynamicOffsetCount
-                    null,
-                );
-
                 auto params = Params(M, N, K, alpha, beta);
-                vkCmdPushConstants(
+                dispatch(
                     cmdBuf,
-                    pipelineLayout,
-                    VK_SHADER_STAGE_COMPUTE_BIT,
-                    0, // offset
-                    ParamsSize,
                     &params,
-                );
-
-                enum localSize = 16;
-
-                vkCmdDispatch(
-                    cmdBuf,
-                    (N + localSize - 1) / localSize,
-                    (M + localSize - 1) / localSize,
+                    (N + 15) / 16,
+                    (M + 15) / 16,
                     1,
                 );
             }
