@@ -176,6 +176,7 @@ package auto loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             payload: NodePayload(
                 name: node["name"].opt!string,
                 meshIdx: node["mesh"].opt!int(-1),
+                skinIdx: node["skin"].opt!int(-1),
             ),
         );
     }
@@ -293,15 +294,20 @@ private Trans readNodeTrans(in Json node)
 {
     import dlib.math;
 
-    //FIXME: enable this code
-    version(none)
+    auto matrixJson = "matrix" in node;
+    if(matrixJson !is null)
     {
-        auto json = "matrix" in node;
-        if(json !is null)
-        {
-            auto a = (*json).deserializeJson!(float[16]);
-            return Matrix4x4f(a);
-        }
+        auto mat = ((*matrixJson).deserializeJson!(float[16])).Matrix4x4f;
+
+        const s = scaling(mat);
+        const sm = scaleMatrix(Vector3f(1,1,1) / s);
+
+        Trans r;
+        r.transl = translation(mat.transposed);
+        r.rot = Quaternionf.fromMatrix(sm * mat);
+        r.scale = s;
+
+        return r;
     }
 
     Trans r;
@@ -499,6 +505,7 @@ struct Primitive
 struct Skin
 {
     package uint[] nodesIndices; /// skin joints
+    package int skinRootNodeIdx = -1;
     //TODO: const
     private AccessRange!(Matrix4x4f, false) inverseBindMatrices;
     package Matrix4x4f[] fromSkinRootNodeTranslations; /// Nodes coords relative to root of skin
@@ -510,6 +517,13 @@ struct Skin
 
         assert(inverseBindMatrices.length == jointMatrices.length);
 
+        Matrix4x4f skinRootInverse = Matrix4x4f.identity;
+        if(skinRootNodeIdx >= 0)
+        {
+            Matrix4x4f skinRootGlobal = fromSkinRootNodeTranslations[skinRootNodeIdx];
+            skinRootInverse = skinRootGlobal.inverse;
+        }
+
         foreach(i, jointIdx; nodesIndices)
         {
             debug
@@ -520,7 +534,7 @@ struct Skin
                 assert(diff.length.isConsiderZero);
             }
 
-            jointMatrices[i] = fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            jointMatrices[i] = skinRootInverse * fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
         }
 
         return jointMatrices;
@@ -531,6 +545,7 @@ struct NodePayload
 {
     string name; /// Not a unique name
     int meshIdx = -1;
+    int skinIdx = -1;
 }
 
 struct Node

@@ -144,6 +144,13 @@ class GlTF : DrawableByVulkan
                 auto skin = &content.skins[0];
                 skin.fromSkinRootNodeTranslations.length = nodes.length;
 
+                foreach(i, ref node; nodes)
+                    if(node.skinIdx == 0)
+                    {
+                        skin.skinRootNodeIdx = cast(int)i;
+                        break;
+                    }
+
                 jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
                 assert(jointMatricesUniformBuf.length > 0);
             }
