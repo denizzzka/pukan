@@ -6,14 +6,14 @@ import std.traits;
 
 class Node
 {
-    debug Node parent;
+    Node parent;
     SList!Node children;
 
     alias RT = ReturnType!(children.opSlice);
 
     RT addChildNode(Node c)
     {
-        debug c.parent = this;
+        c.parent = this;
 
         children.insert(c);
 

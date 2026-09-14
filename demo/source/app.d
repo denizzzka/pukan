@@ -208,19 +208,23 @@ void main() {
             });
         });
 
-        static size_t verifyFrameIdx;
-        if(arenaGltfs.length && verifyFrameIdx % 25 == 0)
+        version(asset)
         {
-            verifyFrameIdx++;
-            import pukan.gltf: SkinnedGlTF_skinJointsGPU;
+            static size_t verifyFrameIdx;
 
-            foreach(a; arenaGltfs)
+            if(arenaGltfs.length && verifyFrameIdx % 25 == 0)
             {
-                if(auto s = cast(SkinnedGlTF_skinJointsGPU) a)
+                verifyFrameIdx++;
+                import pukan.gltf: SkinnedGlTF_skinJointsGPU;
+
+                foreach(a; arenaGltfs)
                 {
-                    auto cb = frameBuilder.commandPool.allocateBuffers(1)[0];
-                    scope(exit) frameBuilder.commandPool.freeBuffers([cb]);
-                    s.debugVerifySkinJoints(device, frameBuilder.commandPool, cb);
+                    if(auto s = cast(SkinnedGlTF_skinJointsGPU) a)
+                    {
+                        auto cb = frameBuilder.commandPool.allocateBuffers(1)[0];
+                        scope(exit) frameBuilder.commandPool.freeBuffers([cb]);
+                        s.debugVerifySkinJoints(device, frameBuilder.commandPool, cb);
+                    }
                 }
             }
         }

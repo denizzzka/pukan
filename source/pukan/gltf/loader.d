@@ -379,11 +379,11 @@ struct View
 {
     const ubyte[] buf;
     const ubyte stride; // distance between start points of each element
-    debug const uint buffOffset;
+    const uint buffOffset;
 
     this(in ubyte[] buffer, uint length, uint offset, ubyte stride)
     {
-        debug buffOffset = offset;
+        buffOffset = offset;
         buf = buffer[offset .. offset + length];
         this.stride = stride;
     }
