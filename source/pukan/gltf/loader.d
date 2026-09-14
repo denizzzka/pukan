@@ -300,6 +300,10 @@ private Trans readNodeTrans(in Json node)
         auto mat = ((*matrixJson).deserializeJson!(float[16])).Matrix4x4f;
 
         const s = scaling(mat);
+        assert(s.x != 0);
+        assert(s.y != 0);
+        assert(s.z != 0);
+
         const sm = scaleMatrix(Vector3f(1,1,1) / s);
 
         Trans r;
