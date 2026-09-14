@@ -1,7 +1,7 @@
 module pukan.gltf.loader;
 
 import dlib.math;
-import pukan.gltf: GlTF, SkinnedGlTF, Trans;
+import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
 import pukan.gltf.accessor;
 import pukan.gltf.animation;
 import pukan.vulkan.bindings;
@@ -87,7 +87,7 @@ private struct ChunkHeader
 }
 
 ///
-package auto loadGlTF2(bool computeJointsOnGPU = true)(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline, Texture fakeTexture)
+package GlTF loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline, Texture fakeTexture, bool computeJointsOnGPU)
 {
     auto gltfFile = readGltfFile(filename);
     const json = gltfFile.json;
@@ -288,7 +288,12 @@ package auto loadGlTF2(bool computeJointsOnGPU = true)(string filename, PoolAndL
     }
 
     if(ret.skins.length > 0)
-        return new SkinnedGlTF!(computeJointsOnGPU)(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+    {
+        if(computeJointsOnGPU)
+            return new SkinnedGlTF_skinJointsGPU(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+        else
+            return new SkinnedGlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+    }
     else
         return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
 }

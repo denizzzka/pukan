@@ -17,13 +17,14 @@ class PipelineInfoCreator : DefaultGraphicsPipelineInfoCreator!ShaderVertex
     }
 }
 
-struct GltfFactory(bool computeJointsOnGPU = true)
+class GltfFactory
 {
     import pukan.vulkan;
     import shaders = pukan.vulkan.shaders;
     import pukan.vulkan.frame_builder;
 
     LogicalDevice device;
+    private immutable bool computeJointsOnGPU;
     private PoolAndLayoutInfo poolAndLayout;
     //TODO: contains part of poolAndLayout data. Deduplicate?
     private DefaultGraphicsPipelineInfoCreator!ShaderVertex pipelineInfoCreator;
@@ -31,9 +32,10 @@ struct GltfFactory(bool computeJointsOnGPU = true)
     private Texture fakeTexture; /// Stub to fill texture shader arg of non-textured meshes
 
     //TODO: remove shaderStages arg, set it implicitly
-    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
+    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass, bool computeJointsOnGPU = true)
     {
         this.device = device;
+        this.computeJointsOnGPU = computeJointsOnGPU;
 
         auto layoutBindings = shaders.createLayoutBinding(shaderStages);
         poolAndLayout = device.createDescriptorPool(layoutBindings, 20 /*FIXME*/);
@@ -52,7 +54,7 @@ struct GltfFactory(bool computeJointsOnGPU = true)
         assert(device);
 
         try
-            return loadGlTF2!(computeJointsOnGPU)(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture);
+            return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture, computeJointsOnGPU);
         catch(Exception e)
         {
             e.msg = filename~": "~e.msg;

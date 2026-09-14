@@ -23,7 +23,7 @@ class Scene
     import pukan.primitives_tree: PrimitivesFactory;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
-    GltfFactory!() gltfFactory;
+    GltfFactory gltfFactory;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
@@ -52,7 +52,7 @@ class Scene
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, texturedShaderStages, renderPass);
-        gltfFactory = GltfFactory!()(
+        gltfFactory = new GltfFactory(
             device,
             [
                 gltf_vertShader,

@@ -467,11 +467,8 @@ class GlTF : DrawableByVulkan
     }
 }
 
-class SkinnedGlTF(bool computeJointsOnGPU = true) : GlTF
+class SkinnedGlTF : GlTF
 {
-    static if(computeJointsOnGPU)
-        package SkinMatrices skinMatrices;
-
     package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
     {
         super(pipeline, poolAndLayout, device, cont, nodes, rootSceneNode, fakeTexture);
@@ -496,23 +493,6 @@ class SkinnedGlTF(bool computeJointsOnGPU = true) : GlTF
             jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
         assert(jointMatricesUniformBuf.length > 0);
-
-        static if(computeJointsOnGPU)
-        {
-            Matrix4x4f[] invBindArr;
-            invBindArr.length = skin.inverseBindMatrices.length;
-            foreach(i; 0 .. invBindArr.length)
-                invBindArr[i] = skin.inverseBindMatrices[i];
-
-            skinMatrices = new SkinMatrices(
-                device,
-                cast(uint) nodes.length,
-                skin.nodesIndices,
-                invBindArr,
-                jointMatricesUniformBuf.gpuBuffer,
-                jointMatricesUniformBuf.length,
-            );
-        }
     }
 
     protected override void setupNodeTransFromRoot(Node node, size_t idx)
@@ -523,30 +503,9 @@ class SkinnedGlTF(bool computeJointsOnGPU = true) : GlTF
 
     protected override void refreshSkinMatrices(VkCommandBuffer buf)
     {
-        static if(computeJointsOnGPU)
-        {
-            auto skin = &content.skins[0];
-
-            Matrix4x4f skinRootInverse = Matrix4x4f.identity;
-            if(skin.skinRootNodeIdx >= 0)
-                skinRootInverse = skin.fromSkinRootNodeTranslations[skin.skinRootNodeIdx].inverse;
-
-            skinMatrices.setTransFromRoot(skin.fromSkinRootNodeTranslations);
-            skinMatrices.run(buf, skinRootInverse);
-        }
-        else
-        {
-            //FIXME: recalc skin for each mesh
-            recalcSkin();
-            jointMatricesUniformBuf.recordUpload(buf);
-        }
-    }
-
-    protected override void uploadSkinMatricesStatic(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
-    {
-        static if(computeJointsOnGPU)
-            if(skinMatrices)
-                skinMatrices.uploadStatic(commandPool, commandBuffer);
+        //FIXME: recalc skin for each mesh
+        recalcSkin();
+        jointMatricesUniformBuf.recordUpload(buf);
     }
 
     private void recalcSkin()
@@ -558,6 +517,57 @@ class SkinnedGlTF(bool computeJointsOnGPU = true) : GlTF
         const skin = content.skins[0];
 
         jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices();
+    }
+}
+
+/// Uses GPU to calculate skin joints
+class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
+{
+    package SkinMatrices skinMatrices;
+
+    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
+    {
+        super(pipeline, poolAndLayout, device, cont, nodes, rootSceneNode, fakeTexture);
+    }
+
+    protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
+    {
+        super.initJointMatricesBuffer(device, nodes);
+
+        //FIXME: hardcoded skin is used
+        auto skin = &content.skins[0];
+
+        Matrix4x4f[] invBindArr;
+        invBindArr.length = skin.inverseBindMatrices.length;
+        foreach(i; 0 .. invBindArr.length)
+            invBindArr[i] = skin.inverseBindMatrices[i];
+
+        skinMatrices = new SkinMatrices(
+            device,
+            cast(uint) nodes.length,
+            skin.nodesIndices,
+            invBindArr,
+            jointMatricesUniformBuf.gpuBuffer,
+            jointMatricesUniformBuf.length,
+        );
+    }
+
+    protected override void refreshSkinMatrices(VkCommandBuffer buf)
+    {
+        auto skin = &content.skins[0];
+
+        Matrix4x4f skinRootInverse = Matrix4x4f.identity;
+        if(skin.skinRootNodeIdx >= 0)
+            skinRootInverse = skin.fromSkinRootNodeTranslations[skin.skinRootNodeIdx].inverse;
+
+        skinMatrices.setTransFromRoot(skin.fromSkinRootNodeTranslations);
+        skinMatrices.run(buf, skinRootInverse);
+    }
+
+    protected override void uploadSkinMatricesStatic(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    {
+        if(skinMatrices)
+            skinMatrices.uploadStatic(commandPool, commandBuffer);
     }
 
     /// Debug-only: downloads GPU-computed joint matrices and compares them against the CPU path.
