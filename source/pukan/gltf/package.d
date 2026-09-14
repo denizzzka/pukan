@@ -110,7 +110,10 @@ class GlTF(bool computeJointsOnGPU = true) : DrawableByVulkan
 
     private MeshClass[] meshes;
 
-    package TransferBuffer jointMatricesUniformBuf;
+    version(assert)
+        package ReadableTransferBuffer jointMatricesUniformBuf;
+    else
+        package TransferBuffer jointMatricesUniformBuf;
     private VkDescriptorBufferInfo jointsUboInfo;
 
     static if(computeJointsOnGPU)
@@ -155,7 +158,11 @@ class GlTF(bool computeJointsOnGPU = true) : DrawableByVulkan
                         break;
                     }
 
-                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                version(assert)
+                    jointMatricesUniformBuf = device.create!ReadableTransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                else
+                    jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * skin.nodesIndices.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
                 assert(jointMatricesUniformBuf.length > 0);
 
                 static if(computeJointsOnGPU)
@@ -182,7 +189,11 @@ class GlTF(bool computeJointsOnGPU = true) : DrawableByVulkan
                 identityBuf.length = nodes.length;
                 identityBuf[0..$] = Matrix4x4f.identity;
 
-                jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * identityBuf.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                version(assert)
+                    jointMatricesUniformBuf = device.create!ReadableTransferBuffer(Matrix4x4f.sizeof * identityBuf.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                else
+                    jointMatricesUniformBuf = device.create!TransferBuffer(Matrix4x4f.sizeof * identityBuf.length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
                 jointMatricesUniformBuf.cpuBuf[0 .. $] = identityBuf;
             }
 
@@ -279,6 +290,28 @@ class GlTF(bool computeJointsOnGPU = true) : DrawableByVulkan
         const skin = content.skins[0];
 
         jointMatricesUniformBuf.cpuBuf[0 .. $] = skin.calculateJointMatrices();
+    }
+
+    /// Debug-only: downloads GPU-computed joint matrices and compares them against the CPU path.
+    /// Must be called after submitting the command buffer that records `refreshBuffers`.
+    version(assert)
+    void debugVerifySkinJoints(LogicalDevice device, CommandPool commandPool, scope ref VkCommandBuffer commandBuffer)
+    {
+        if(content.skins.length == 0)
+            return;
+
+        jointMatricesUniformBuf.downloadImmediate(commandPool, commandBuffer);
+
+        auto gpuData = cast(const(float)[]) jointMatricesUniformBuf.cpuBuf;
+        auto cpuData = cast(const(float)[]) content.skins[0].calculateJointMatrices();
+
+        assert(gpuData.length == cpuData.length);
+
+        import std.math: abs;
+
+        enum maxAllowedError = 1e-4;
+        foreach(i; 0 .. gpuData.length)
+            assert(abs(gpuData[i] - cpuData[i]) < maxAllowedError);
     }
 
     string possibleName() const
