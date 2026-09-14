@@ -104,25 +104,9 @@ class Mesh
                 range: UBOContent.sizeof,
             );
 
-            uboWriteDescriptor = VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSet,
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &uboInfo,
-            );
+            uboWriteDescriptor = bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo);
 
-            jointsUboWriteDescr = VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSet,
-                dstBinding: 2,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &jointsUboInfo,
-            );
+            jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
         }
     }
 
@@ -247,15 +231,7 @@ final class JustColoredMesh : Mesh
         VkWriteDescriptorSet[] descriptorWrites = [
             jointsUboWriteDescr,
             uboWriteDescriptor,
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSet,
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &fakeTexture,
-            ),
+            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, fakeTexture),
         ];
 
         device.updateDescriptorSets(descriptorWrites);
@@ -285,15 +261,7 @@ final class TexturedMesh : Mesh
         VkWriteDescriptorSet[] descriptorWrites = [
             jointsUboWriteDescr,
             uboWriteDescriptor,
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSet,
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: textureDescrImageInfo,
-            ),
+            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, *textureDescrImageInfo),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

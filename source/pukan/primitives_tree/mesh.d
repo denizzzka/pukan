@@ -112,15 +112,7 @@ class TexturedMesh : ColoredMesh
         assert(descriptorSets.length == 1);
 
         VkWriteDescriptorSet[] descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSets[0],
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                pImageInfo: &imageInfo,
-            )
+            imageWriteDescriptor(descriptorSets[0], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageInfo),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

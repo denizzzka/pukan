@@ -83,3 +83,39 @@ struct PoolAndLayoutInfo
     VkDescriptorPool descriptorPool;
     VkDescriptorSetLayout descriptorSetLayout;
 }
+
+VkWriteDescriptorSet bufferWriteDescriptor(
+    VkDescriptorSet dstSet,
+    uint dstBinding,
+    VkDescriptorType descriptorType,
+    ref VkDescriptorBufferInfo bufferInfo,
+)
+{
+    return VkWriteDescriptorSet(
+        sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        dstSet: dstSet,
+        dstBinding: dstBinding,
+        dstArrayElement: 0,
+        descriptorType: descriptorType,
+        descriptorCount: 1,
+        pBufferInfo: &bufferInfo,
+    );
+}
+
+VkWriteDescriptorSet imageWriteDescriptor(
+    VkDescriptorSet dstSet,
+    uint dstBinding,
+    VkDescriptorType descriptorType,
+    ref VkDescriptorImageInfo imageInfo,
+)
+{
+    return VkWriteDescriptorSet(
+        sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        dstSet: dstSet,
+        dstBinding: dstBinding,
+        dstArrayElement: 0,
+        descriptorType: descriptorType,
+        descriptorCount: 1,
+        pImageInfo: &imageInfo,
+    );
+}

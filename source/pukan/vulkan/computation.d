@@ -91,33 +91,9 @@ class Gemm
         );
 
         VkWriteDescriptorSet[] descriptorWrites = [
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSet,
-                dstBinding: 0,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &aInfo,
-            ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSet,
-                dstBinding: 1,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &bInfo,
-            ),
-            VkWriteDescriptorSet(
-                sType: VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                dstSet: descriptorSet,
-                dstBinding: 2,
-                dstArrayElement: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                pBufferInfo: &cInfo,
-            ),
+            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aInfo),
+            bufferWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, bInfo),
+            bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, cInfo),
         ];
 
         device.updateDescriptorSets(descriptorWrites);
