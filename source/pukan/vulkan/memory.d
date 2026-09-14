@@ -158,6 +158,30 @@ class DeviceMemory
     }
 }
 
+/// TransferBuffer that additionally supports reading data back from GPU
+class ReadableTransferBuffer : TransferBuffer
+{
+    this(LogicalDevice device, size_t size, VkBufferUsageFlags mergeUsageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+    {
+        auto staging = device.create!MemoryBufferMappedToCPU(
+            size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        );
+
+        super(device, staging, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | mergeUsageFlags);
+    }
+
+    void recordDownload(VkCommandBuffer buf)
+    {
+        gpuBuffer.recordCopyBuffer(buf, gpuBuffer.buf, cpuBuffer.buf, cpuBuf.length);
+    }
+
+    void downloadImmediate(CommandPool commandPool, ref VkCommandBuffer buf)
+    {
+        gpuBuffer.copyBufferImmediateSubmit(commandPool, buf, gpuBuffer.buf, cpuBuffer.buf, cpuBuf.length);
+    }
+}
+
 /// Ability to transfer data into GPU
 class TransferBuffer
 {
