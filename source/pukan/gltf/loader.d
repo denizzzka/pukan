@@ -534,7 +534,12 @@ struct Skin
                 assert(diff.length.isConsiderZero);
             }
 
-            jointMatrices[i] = skinRootInverse * fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            // Speed up processing if skinRootInverse is the identity matrix
+            //TODO: It is sufficient to check this once before entering the loop
+            if(skinRootNodeIdx >= 0)
+                jointMatrices[i] = skinRootInverse * fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
+            else
+                jointMatrices[i] = fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
         }
 
         return jointMatrices;
