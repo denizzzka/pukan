@@ -99,7 +99,7 @@ class Instance
     ///
     this(VkInstance ins)
     {
-        instance = new VkT(ins, null);
+        instance = VkT(ins, null);
         log_info("Vulkan instance obtained");
     }
 

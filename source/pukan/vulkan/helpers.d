@@ -92,7 +92,7 @@ void vkCall(T...)(T a)
 }
 
 /// RAII VK object wrapper
-class VkObj(T...)
+struct VkObj(T...)
 {
     mixin PrepareSettings!T;
 
@@ -125,11 +125,21 @@ class VkObj(T...)
         allocator = alloc;
     }
 
+    @disable this(this);
+
     ~this()
     {
+        // Destructor runs once per object, so the handle isn't nulled afterwards;
+        // vkDestroyX must not be called twice for the same object.
         static if(methodsHaveThisPtr)
+        {
+            assert(vkThis !is null, "VkObj was not assigned");
             if(vkThis is null)
                 return;
+        }
+
+        if(vkObj is BaseType.init)
+            return;
 
         mixin(dtorName~"("~(methodsHaveThisPtr ? "vkThis, " : "")~"vkObj, allocator);");
     }
@@ -138,11 +148,11 @@ class VkObj(T...)
 /// Create RAII VK object
 auto create(T...)(T s)
 {
-    return new VkObj!T(s);
+    return VkObj!T(s);
 }
 
 /// Special helper to fetch values using methods like vkEnumeratePhysicalDevices
-auto getArrayFrom(alias func, uint count = 0, T...)(T obj)
+auto getArrayFrom(alias func, uint count = 0, T...)(auto ref T obj)
 {
     import std.traits;
 
