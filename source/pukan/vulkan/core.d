@@ -107,8 +107,6 @@ class Instance
     {
         if(surface)
             vkDestroySurfaceKHR(instance, surface, allocator);
-
-        destroy(instance);
     }
 
     mixin SurfaceMethods;
