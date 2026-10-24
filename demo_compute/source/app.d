@@ -43,10 +43,11 @@ void main()
     auto vk = new Instance("compute demo", 1, extension_list);
     scope(exit) destroy(vk);
 
-    auto physDevice = vk.findSuitablePhysicalDevice!appRequirements();
+    auto selected = vk.findSuitablePhysicalDevice!appRequirements();
+    auto physDevice = selected.device();
 
     const(char*)[] dev_extension_list;
-    auto device = physDevice.createLogicalDevice!appRequirements(dev_extension_list);
+    auto device = selected.createLogicalDevice(dev_extension_list);
     scope(exit) destroy(device);
 
     auto gemm = Gemm.create!appRequirements(device, M, N, K);

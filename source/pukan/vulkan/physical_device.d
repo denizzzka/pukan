@@ -148,4 +148,37 @@ class PhysicalDevice
 
         throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
     }
+
+    /// Creates logical device from a pre-prepared context
+    package LogicalDevice createLogicalDeviceFromContext(DeviceContext ctx)
+    {
+        return createLogicalDevice(ctx.enabledExtensions, ctx.enabled);
+    }
+}
+
+/// A physical device that was checked against requirements; the list is bound to the type
+struct SelectedDevice(Reqs...)
+{
+    package PhysicalDevice physicalDevice;
+    package DeviceContext context;
+    package this(PhysicalDevice pd, DeviceContext ctx)
+    {
+        physicalDevice = pd;
+        context = ctx;
+    }
+
+    /// Creates the logical device using the requirements that were used for selection
+    LogicalDevice createLogicalDevice(const(char*)[] extension_list = null)
+    {
+        auto ctx = context;
+        if(extension_list.length)
+            ctx.enabledExtensions = (ctx.enabledExtensions ~ extension_list).dup;
+        return physicalDevice.createLogicalDeviceFromContext(ctx);
+    }
+
+    /// Access to the physical device for queues/memory etc.
+    PhysicalDevice device()
+    {
+        return physicalDevice;
+    }
 }

@@ -96,7 +96,8 @@ void main() {
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
-    auto physDevice = vk.findSuitablePhysicalDevice!appRequirements();
+    auto selected = vk.findSuitablePhysicalDevice!appRequirements();
+    auto physDevice = selected.device();
     //~ debug
     //~ {
         //~ writeln("");
@@ -109,7 +110,7 @@ void main() {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
     ];
 
-    auto device = physDevice.createLogicalDevice!appRequirements(dev_extension_list);
+    auto device = selected.createLogicalDevice(dev_extension_list);
     scope(success)
     {
         import core.memory: GC;

@@ -5,9 +5,9 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
-import pukan.vulkan.physical_device: PhysicalDevice;
+import pukan.vulkan.physical_device: PhysicalDevice, SelectedDevice;
 import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
-import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, requirementsSatisfied;
+import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, requirementsSatisfied, requestRequirements;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
@@ -136,7 +136,7 @@ class Instance
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
     {
-        return findSuitablePhysicalDevice.findMemoryType(memoryTypeBitFilter, properties);
+        return selectedPhysicalDevice.findMemoryType(memoryTypeBitFilter, properties);
     }
 
     /// Must be called after logical device creation, otherwise mutex deadlock occurs
@@ -174,24 +174,21 @@ class Instance
     }
 
     ///
-    auto findSuitablePhysicalDevice(Reqs...)()
+    SelectedDevice!Reqs findSuitablePhysicalDevice(Reqs...)()
     {
-        if(selectedPhysicalDevice)
-            return selectedPhysicalDevice;
-
         auto suitable = suitablePhysicalDevices!Reqs();
 
         if(suitable.length == 0)
             throw new PukanVulkanException("no physical device satisfies the requirements");
 
-        selectedPhysicalDevice = suitable[0];
-        return selectedPhysicalDevice;
+        selectedPhysicalDevice = suitable[0].device;
+        return suitable[0];
     }
 
     /// Returns every physical device that satisfies the requirements
-    PhysicalDevice[] suitablePhysicalDevices(Reqs...)()
+    SelectedDevice!Reqs[] suitablePhysicalDevices(Reqs...)()
     {
-        PhysicalDevice[] ret;
+        SelectedDevice!Reqs[] ret;
         alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
 
         foreach(idx, dev; devices)
@@ -200,8 +197,11 @@ class Instance
             auto ctx = pd.createLogicalDeviceContext(null);
 
             string reason;
-            if(requirementsSatisfied!allRequirements(ctx, reason))
-                ret ~= pd;
+            if(!requirementsSatisfied!allRequirements(ctx, reason))
+                continue;
+
+            requestRequirements!allRequirements(ctx);
+            ret ~= SelectedDevice!Reqs(pd, ctx);
         }
 
         return ret;
@@ -210,7 +210,7 @@ class Instance
     /// Returns: family indices
     auto findSuitableQueueFamilies()
     {
-        return findSuitablePhysicalDevice.findSuitableQueueFamilies();
+        return selectedPhysicalDevice.findSuitableQueueFamilies();
     }
 
     /// Throw exception if extension is not supported
