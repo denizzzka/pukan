@@ -179,27 +179,32 @@ class Instance
         if(selectedPhysicalDevice)
             return selectedPhysicalDevice;
 
-        auto devs = devices;
+        auto suitable = suitablePhysicalDevices!Reqs();
 
-        if(devs.length == 0)
-            throw new PukanVulkanException("no Vulkan physical devices found");
+        if(suitable.length == 0)
+            throw new PukanVulkanException("no physical device satisfies the requirements");
 
+        selectedPhysicalDevice = suitable[0];
+        return selectedPhysicalDevice;
+    }
+
+    /// Returns every physical device that satisfies the requirements
+    PhysicalDevice[] suitablePhysicalDevices(Reqs...)()
+    {
+        PhysicalDevice[] ret;
         alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
 
-        foreach(idx, dev; devs)
+        foreach(idx, dev; devices)
         {
             auto pd = new PhysicalDevice(this, dev, idx);
-            auto ctx = pd.createDeviceContext(null);
+            auto ctx = pd.createLogicalDeviceContext(null);
 
             string reason;
             if(requirementsSatisfied!allRequirements(ctx, reason))
-            {
-                selectedPhysicalDevice = pd;
-                return pd;
-            }
+                ret ~= pd;
         }
 
-        throw new PukanVulkanException("no physical device satisfies the requirements");
+        return ret;
     }
 
     /// Returns: family indices

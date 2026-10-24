@@ -90,8 +90,8 @@ class PhysicalDevice
         return apprIndices;
     }
 
-    ///
-    package DeviceContext createDeviceContext(const(char*)[] extension_list)
+    /// Snapshots properties, supported features and extensions
+    DeviceContext createLogicalDeviceContext(const(char*)[] extension_list)
     {
         DeviceContext ctx;
         ctx.properties = properties;
@@ -105,7 +105,7 @@ class PhysicalDevice
     ///
     LogicalDevice createLogicalDevice(Reqs...)(const(char*)[] extension_list)
     {
-        auto ctx = createDeviceContext(extension_list);
+        auto ctx = createLogicalDeviceContext(extension_list);
         alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
 
         string reason;
@@ -114,7 +114,13 @@ class PhysicalDevice
 
         requestRequirements!allRequirements(ctx);
 
-        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled);
+        return createLogicalDevice(ctx.enabledExtensions, ctx.enabled);
+    }
+
+    /// Creates a device from values that were already checked and requested
+    LogicalDevice createLogicalDevice(const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures)
+    {
+        return new LogicalDevice(this, extension_list, enabledFeatures);
     }
 
     /**

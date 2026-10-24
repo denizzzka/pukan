@@ -22,10 +22,8 @@ class SwapChain
 
     this(LogicalDevice device, FrameBuilder fb, VkSurfaceKHR surface, RenderPass renderPass, SwapChain old)
     {
-        auto ins = device.physicalDevice.instance;
-
-        auto physDev = ins.findSuitablePhysicalDevice;
-        const capab = ins.getSurfaceCapabilities(physDev.physicalDevice, surface);
+        auto physDev = device.physicalDevice;
+        const capab = physDev.instance.getSurfaceCapabilities(physDev.physicalDevice, surface);
 
         this(device, fb, capab, renderPass, old);
     }
