@@ -5,10 +5,10 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
-import pukan.vulkan.requirements: DeviceContext, ApiVersionRequirement;
+import pukan.vulkan.requirements: DeviceContext, ApiVersionRequirement, requirementsSatisfied, requestRequirements;
 import pukan: toPrettyString;
 import std.conv: to;
-import std.meta: AliasSeq, NoDuplicates;
+import std.meta: AliasSeq;
 
 ///
 class PhysicalDevice
@@ -91,7 +91,7 @@ class PhysicalDevice
     }
 
     ///
-    LogicalDevice createLogicalDevice(Reqs...)(const(char*)[] extension_list)
+    package DeviceContext createDeviceContext(const(char*)[] extension_list)
     {
         DeviceContext ctx;
         ctx.properties = properties;
@@ -99,10 +99,20 @@ class PhysicalDevice
         ctx.supportedExtensions = extensions();
         ctx.enabledExtensions = extension_list.dup;
 
+        return ctx;
+    }
+
+    ///
+    LogicalDevice createLogicalDevice(Reqs...)(const(char*)[] extension_list)
+    {
+        auto ctx = createDeviceContext(extension_list);
         alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
 
-        static foreach(R; NoDuplicates!allRequirements)
-            R.check(ctx);
+        string reason;
+        if(!requirementsSatisfied!allRequirements(ctx, reason))
+            throw new PukanVulkanException("Vulkan requirement " ~ reason);
+
+        requestRequirements!allRequirements(ctx);
 
         return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled);
     }

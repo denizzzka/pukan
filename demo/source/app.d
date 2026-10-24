@@ -7,8 +7,11 @@ import std.conv: to;
 import std.datetime.stopwatch;
 import std.exception;
 import std.logger;
+import std.meta: AliasSeq;
 import std.stdio;
 import std.string: toStringz;
+
+alias appRequirements = AliasSeq!(Requirement!"samplerAnisotropy");
 
 enum fps = 60;
 enum width = 640;
@@ -93,7 +96,7 @@ void main() {
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
-    auto physDevice = vk.findSuitablePhysicalDevice;
+    auto physDevice = vk.findSuitablePhysicalDevice!appRequirements();
     //~ debug
     //~ {
         //~ writeln("");
@@ -106,7 +109,7 @@ void main() {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
     ];
 
-    auto device = physDevice.createLogicalDevice!(Requirement!"samplerAnisotropy")(dev_extension_list);
+    auto device = physDevice.createLogicalDevice!appRequirements(dev_extension_list);
     scope(success)
     {
         import core.memory: GC;

@@ -1,6 +1,5 @@
 module pukan.vulkan.requirements;
 
-import pukan.exceptions: PukanVulkanException;
 import pukan.vulkan.api_version: VulkanVersion, requiredApiVersionEncoded;
 import pukan.vulkan.bindings;
 import core.stdc.string: strcmp;
@@ -61,8 +60,8 @@ struct Requirement(string name, ulong minimum = 0)
     else static if(kind == Kind.extension)
         static assert(minimum == 0, "extension requirement takes no minimum: " ~ name);
 
-    /// Throws when the requirement is not met, enables features and extensions
-    static void check(ref DeviceContext ctx)
+    /// Returns false and a reason when the requirement is not met
+    static bool isSatisfied(ref DeviceContext ctx, out string reason)
     {
         static if(kind == Kind.number)
         {
@@ -72,33 +71,54 @@ struct Requirement(string name, ulong minimum = 0)
                 const value = __traits(getMember, ctx.properties.limits, name);
 
             if(value < minimum)
-                throw new PukanVulkanException("Vulkan requirement " ~ name ~ " is " ~ value.to!string ~ ", required at least " ~ minimum.to!string);
+            {
+                reason = name ~ " is " ~ value.to!string ~ ", required at least " ~ minimum.to!string;
+                return false;
+            }
         }
         else static if(kind == Kind.feature)
         {
             if(__traits(getMember, ctx.supported, name) != VK_TRUE)
-                throw new PukanVulkanException("Vulkan feature is not supported: " ~ name);
-
-            __traits(getMember, ctx.enabled, name) = VK_TRUE;
+            {
+                reason = "feature is not supported: " ~ name;
+                return false;
+            }
         }
         else static if(kind == Kind.extension)
         {
             if(!ctx.supportsExtension(name))
-                throw new PukanVulkanException("Vulkan extension is not supported: " ~ name);
-
-            ctx.enabledExtensions ~= name.ptr;
+            {
+                reason = "extension is not supported: " ~ name;
+                return false;
+            }
         }
+
+        return true;
     }
 
-    /// Throws when the requirement is not met by the instance
-    static void check(Ctx)(ref Ctx ctx) if(is(Ctx == InstanceContext))
+    /// Enables the feature or extension; numeric values have nothing to request
+    static void request(ref DeviceContext ctx)
+    {
+        static if(kind == Kind.feature)
+            __traits(getMember, ctx.enabled, name) = VK_TRUE;
+        else static if(kind == Kind.extension)
+            ctx.enabledExtensions ~= name.ptr;
+    }
+
+    /// Returns false and a reason when the requirement is not met by the instance
+    static bool isSatisfied(Ctx)(ref Ctx ctx, out string reason) if(is(Ctx == InstanceContext))
     {
         static if(kind == Kind.number && name == "apiVersion")
         {
             const required = VulkanVersion.fromUint(cast(uint) minimum);
 
             if(ctx.loaderVersion < required)
-                throw new PukanVulkanException("Vulkan requirement " ~ name ~ " is " ~ ctx.loaderVersion.toString ~ ", required at least " ~ required.toString);
+            {
+                reason = name ~ " is " ~ ctx.loaderVersion.toString ~ ", required at least " ~ required.toString;
+                return false;
+            }
+
+            return true;
         }
         else
             static assert(false, name ~ " is not an instance requirement");
@@ -122,6 +142,23 @@ template Requirements(Modules...)
 /// Baseline requirement every instance and device must satisfy
 alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersionEncoded);
 
+/// Returns true when every requirement is satisfied, otherwise fills the reason
+bool requirementsSatisfied(Reqs...)(ref DeviceContext ctx, out string reason)
+{
+    static foreach(R; NoDuplicates!Reqs)
+        if(!R.isSatisfied(ctx, reason))
+            return false;
+
+    return true;
+}
+
+/// Enables every requested feature and extension
+void requestRequirements(Reqs...)(ref DeviceContext ctx)
+{
+    static foreach(R; NoDuplicates!Reqs)
+        R.request(ctx);
+}
+
 unittest
 {
     static assert(Requirement!"samplerAnisotropy".kind == Kind.feature);
@@ -137,11 +174,10 @@ unittest
     InstanceContext instance;
     instance.loaderVersion = VulkanVersion(1, 2);
 
-    bool thrown;
-    try
-        ApiVersionRequirement.check(instance);
-    catch(PukanVulkanException)
-        thrown = true;
+    string reason;
+    assert(!ApiVersionRequirement.isSatisfied(instance, reason));
+    assert(reason.length > 0);
 
-    assert(thrown);
+    instance.loaderVersion = VulkanVersion(1, 3);
+    assert(ApiVersionRequirement.isSatisfied(instance, reason));
 }

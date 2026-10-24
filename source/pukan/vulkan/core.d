@@ -7,10 +7,11 @@ import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
 import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
-import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext;
+import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, requirementsSatisfied;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
+import std.meta: AliasSeq;
 import std.string: toStringz;
 
 ///
@@ -49,7 +50,10 @@ class Instance
         info.applicationVersion = appVer;
 
         InstanceContext ctx = { loaderVersion: loaderVersion() };
-        ApiVersionRequirement.check(ctx);
+
+        string reason;
+        if(!ApiVersionRequirement.isSatisfied(ctx, reason))
+            throw new PukanVulkanException("Vulkan requirement " ~ reason);
 
         debug extension_list ~= [
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME.ptr,
@@ -166,6 +170,12 @@ class Instance
     ///
     auto findSuitablePhysicalDevice()
     {
+        return findSuitablePhysicalDevice!()();
+    }
+
+    ///
+    auto findSuitablePhysicalDevice(Reqs...)()
+    {
         if(selectedPhysicalDevice)
             return selectedPhysicalDevice;
 
@@ -174,8 +184,22 @@ class Instance
         if(devs.length == 0)
             throw new PukanVulkanException("no Vulkan physical devices found");
 
-        selectedPhysicalDevice = new PhysicalDevice(this, devs[0], 0);
-        return selectedPhysicalDevice;
+        alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
+
+        foreach(idx, dev; devs)
+        {
+            auto pd = new PhysicalDevice(this, dev, idx);
+            auto ctx = pd.createDeviceContext(null);
+
+            string reason;
+            if(requirementsSatisfied!allRequirements(ctx, reason))
+            {
+                selectedPhysicalDevice = pd;
+                return pd;
+            }
+        }
+
+        throw new PukanVulkanException("no physical device satisfies the requirements");
     }
 
     /// Returns: family indices

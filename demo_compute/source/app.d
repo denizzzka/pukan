@@ -6,6 +6,8 @@ import std.math: abs;
 import std.random;
 import std.stdio;
 
+alias appRequirements = Requirements!(Gemm);
+
 void main()
 {
     version(linux)
@@ -41,10 +43,10 @@ void main()
     auto vk = new Instance("compute demo", 1, extension_list);
     scope(exit) destroy(vk);
 
-    auto physDevice = vk.findSuitablePhysicalDevice;
+    auto physDevice = vk.findSuitablePhysicalDevice!appRequirements();
 
     const(char*)[] dev_extension_list;
-    auto device = physDevice.createLogicalDevice!(Requirements!(Gemm))(dev_extension_list);
+    auto device = physDevice.createLogicalDevice!appRequirements(dev_extension_list);
     scope(exit) destroy(device);
 
     auto gemm = new Gemm(device, M, N, K);
