@@ -224,10 +224,17 @@ above). Both parts are merged and checked before `vkCreateInstance`.
 
 - [ ] Collect the Vulkan validation layer warnings and fix them.
 
-The debug messenger in `FlightRecorder` already prints them; group the messages
-by type (object lifetime, synchronization, descriptor usage, shader interfaces)
-and fix them one group at a time. The `fix/vulkan-warnings` branch touches debug
-messenger logging and RAII cleanup and can be merged first.
+  The debug messenger in `FlightRecorder` already prints them; group the
+  messages by type (object lifetime, synchronization, descriptor usage, shader
+  interfaces) and fix them one group at a time. The `fix/vulkan-warnings`
+  branch touches debug messenger logging and RAII cleanup and can be merged
+  first.
+
+  - [ ] `BestPractices-SpirvDeprecated_WorkgroupSize` from `demo_compute`: the
+        compute shaders use the SPIR-V `Workgroup` built-in, deprecated in
+        SPIR-V 1.6. Recompile with `--target-env=vulkan1.3` in
+        `compile_shaders.sh` so `LocalSizeId` is emitted. Affects `gemm.comp`
+        and `skin_matrices.comp`.
 
 ## Entity rendering and shaders
 
