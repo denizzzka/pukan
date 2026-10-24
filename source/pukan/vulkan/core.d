@@ -6,7 +6,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.vulkan.api_version: VulkanVersion, loaderVersion, physicalDeviceVersion;
+import pukan.vulkan.api_version: VulkanVersion, loaderVersion;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
@@ -28,6 +28,8 @@ class Instance
 
     // non-dispatcheable handles, so placing it here
     VkSurfaceKHR surface;
+
+    private PhysicalDevice selectedPhysicalDevice;
 
     /// Version requested at instance creation
     VulkanVersion apiVersion() const
@@ -172,6 +174,9 @@ class Instance
     ///
     auto findSuitablePhysicalDevice()
     {
+        if(selectedPhysicalDevice)
+            return selectedPhysicalDevice;
+
         auto devs = devices;
 
         if(devs.length == 0)
@@ -181,8 +186,13 @@ class Instance
 
         foreach(idx, dev; devs)
         {
-            if(physicalDeviceVersion(dev) >= required)
-                return new PhysicalDevice(this, dev, idx);
+            auto pd = new PhysicalDevice(this, dev, idx);
+
+            if(VulkanVersion.fromUint(pd.properties.apiVersion) >= required)
+            {
+                selectedPhysicalDevice = pd;
+                return pd;
+            }
         }
 
         throw new PukanVulkanException("no physical device supports Vulkan "~required.toString);

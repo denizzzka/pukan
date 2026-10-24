@@ -13,6 +13,8 @@ class PhysicalDevice
 {
     Instance instance;
     package VkPhysicalDevice physicalDevice;
+    /// Queried once, all property checks read this snapshot
+    immutable VkPhysicalDeviceProperties properties;
     /* TODO: "debug" */ private size_t devIdx;
 
     ///
@@ -21,6 +23,10 @@ class PhysicalDevice
         instance = inst;
         physicalDevice = dev;
         devIdx = idx;
+
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(dev, &props);
+        properties = props;
     }
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)

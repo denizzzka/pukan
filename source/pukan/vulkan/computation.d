@@ -2,6 +2,7 @@ module pukan.vulkan.computation;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.features: Limit, requireLimit;
 import pukan.vulkan.shaders: ShaderInfo;
 
 /// Base class for GPU compute kernels
@@ -124,6 +125,9 @@ class Gemm : Compute
 
     this(LogicalDevice dev, uint M, uint N, uint K)
     {
+        // gemm.comp uses a 16x16 workgroup
+        requireLimit!(Limit!("maxComputeWorkGroupInvocations", 256))(dev.physicalDevice.properties.limits);
+
         VkDescriptorSetLayoutBinding[] layoutBindings = [
             VkDescriptorSetLayoutBinding(
                 binding: 0,
