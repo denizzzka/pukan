@@ -6,7 +6,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.vulkan.api_version: VulkanVersion, loaderVersion;
+import pukan.vulkan.api_version: VulkanVersion, loaderVersion, physicalDeviceVersion;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
@@ -181,10 +181,8 @@ class Instance
 
         foreach(idx, dev; devs)
         {
-            auto pd = new PhysicalDevice(this, dev, idx);
-
-            if(pd.apiVersion >= required)
-                return pd;
+            if(physicalDeviceVersion(dev) >= required)
+                return new PhysicalDevice(this, dev, idx);
         }
 
         throw new PukanVulkanException("no physical device supports Vulkan "~required.toString);

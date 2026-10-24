@@ -63,6 +63,16 @@ VulkanVersion loaderVersion()
     return VulkanVersion.fromUint(encoded);
 }
 
+/// Version supported by the physical device
+VulkanVersion physicalDeviceVersion(VkPhysicalDevice device)
+{
+    //TODO: vkGetPhysicalDeviceProperties must not be called separately for each checked property
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(device, &props);
+
+    return VulkanVersion.fromUint(props.apiVersion);
+}
+
 unittest
 {
     static assert(VulkanVersion(1, 3) > VulkanVersion(1, 2));
