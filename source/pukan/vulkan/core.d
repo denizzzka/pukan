@@ -185,6 +185,7 @@ class Instance
         return suitable[0];
     }
 
+    // TODO: may be removed if GPU menu moves to SelectedDevice
     /// Returns every physical device that satisfies the requirements
     SelectedDevice!Reqs[] suitablePhysicalDevices(Reqs...)()
     {

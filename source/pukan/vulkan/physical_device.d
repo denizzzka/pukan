@@ -103,6 +103,7 @@ class PhysicalDevice
         return ctx;
     }
 
+    // TODO: may be removed if GPU menu moves to SelectedDevice
     ///
     LogicalDevice createLogicalDevice(Reqs...)(const(char*)[] extension_list)
     {
@@ -149,6 +150,7 @@ class PhysicalDevice
         throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
     }
 
+    // TODO: may be removed if GPU menu moves to SelectedDevice
     /// Creates logical device from a pre-prepared context
     package LogicalDevice createLogicalDeviceFromContext(DeviceContext ctx)
     {
