@@ -217,6 +217,20 @@ validation layer) are tags like device features, while the surface extensions
 come from the windowing system at runtime (the GLFW list, see the platform case
 above). Both parts are merged and checked before `vkCreateInstance`.
 
+### Device selection and creation
+
+- [ ] Return a `Selection!Reqs` value from the device search instead of a bare
+      `PhysicalDevice`. It carries the selected device, the requirement types it
+      was checked against, and the checked values (enabled features, enabled
+      extensions). `createLogicalDevice` accepts only this value, so selection
+      and creation cannot use different lists.
+
+Selection and creation take requirement lists in two independent places, and
+internal calls (`swapchain`, `findMemoryType`, `findSuitableQueueFamilies`) pass
+an empty list. The cached device can therefore be selected against a different
+list than the one used at creation, and the repeated check in
+`createLogicalDevice` catches only one direction of that mismatch.
+
 - [ ] Find more features that this system does not cover yet, beyond the list
       above.
 
