@@ -5,7 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
-import pukan.vulkan.requirements: DeviceContext, ApiVersionRequirement, requirementsSatisfied, requestRequirements;
+import pukan.vulkan.requirements: DeviceContext;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.meta: AliasSeq;
@@ -92,7 +92,7 @@ class PhysicalDevice
     }
 
     /// Snapshots properties, supported features and extensions
-    DeviceContext createLogicalDeviceContext(const(char*)[] extension_list)
+    package DeviceContext createLogicalDeviceContext(const(char*)[] extension_list)
     {
         DeviceContext ctx;
         ctx.properties = properties;
@@ -101,22 +101,6 @@ class PhysicalDevice
         ctx.enabledExtensions = extension_list.dup;
 
         return ctx;
-    }
-
-    // TODO: may be removed if GPU menu moves to SelectedDevice
-    ///
-    LogicalDevice createLogicalDevice(Reqs...)(const(char*)[] extension_list)
-    {
-        auto ctx = createLogicalDeviceContext(extension_list);
-        alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
-
-        string reason;
-        if(!requirementsSatisfied!allRequirements(ctx, reason))
-            throw new PukanVulkanException("Vulkan requirement " ~ reason);
-
-        requestRequirements!allRequirements(ctx);
-
-        return createLogicalDevice(ctx.enabledExtensions, ctx.enabled);
     }
 
     /// Creates a device from values that were already checked and requested
