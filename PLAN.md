@@ -217,6 +217,8 @@ validation layer) are tags like device features, while the surface extensions
 come from the windowing system at runtime (the GLFW list, see the platform case
 above). Both parts are merged and checked before `vkCreateInstance`.
 
+- [ ] Add an exception for the missing required features types: `FeaturesRequiredException`
+
 ### Device selection and creation
 
 Requirements are passed as a template list in two independent places: when a
