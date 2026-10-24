@@ -49,6 +49,11 @@ struct VulkanVersion
 /// Minimum Vulkan version required by the library
 enum VulkanVersion requiredApiVersion = VulkanVersion(1, 3);
 
+/// Same version in the VK_MAKE_API_VERSION encoding, known at compile time
+enum uint requiredApiVersionEncoded = requiredApiVersion.toUint();
+
+static assert(requiredApiVersionEncoded == VulkanVersion(1, 3).toUint());
+
 /// Version supported by the Vulkan loader, 1.0 if the loader predates Vulkan 1.1
 VulkanVersion loaderVersion()
 {

@@ -6,7 +6,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.vulkan.api_version: loaderVersion, requiredApiVersion;
+import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
 import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext;
 import pukan: toPrettyString;
 import std.conv: to;
@@ -18,7 +18,7 @@ class Instance
 {
     VkApplicationInfo info = {
          sType: VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
-         apiVersion: requiredApiVersion.toUint(),
+         apiVersion: requiredApiVersionEncoded,
          pEngineName: "pukan",
          engineVersion: 1,
     };

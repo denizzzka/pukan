@@ -1,7 +1,7 @@
 module pukan.vulkan.requirements;
 
 import pukan.exceptions: PukanVulkanException;
-import pukan.vulkan.api_version: VulkanVersion, requiredApiVersion;
+import pukan.vulkan.api_version: VulkanVersion, requiredApiVersionEncoded;
 import pukan.vulkan.bindings;
 import core.stdc.string: strcmp;
 import std.conv: to;
@@ -120,7 +120,7 @@ template Requirements(Modules...)
 }
 
 /// Baseline requirement every instance and device must satisfy
-alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersion.toUint());
+alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersionEncoded);
 
 unittest
 {
