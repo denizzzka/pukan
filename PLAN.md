@@ -219,17 +219,26 @@ above). Both parts are merged and checked before `vkCreateInstance`.
 
 ### Device selection and creation
 
-- [ ] Return a `Selection!Reqs` value from the device search instead of a bare
-      `PhysicalDevice`. It carries the selected device, the requirement types it
-      was checked against, and the checked values (enabled features, enabled
-      extensions). `createLogicalDevice` accepts only this value, so selection
-      and creation cannot use different lists.
+Requirements are passed as a template list in two independent places: when a
+physical device is selected and when a logical device is created. The value
+returned by selection (`PhysicalDevice`) does not carry the list it was checked
+against, so the two lists can diverge:
 
-Selection and creation take requirement lists in two independent places, and
-internal calls (`swapchain`, `findMemoryType`, `findSuitableQueueFamilies`) pass
-an empty list. The cached device can therefore be selected against a different
-list than the one used at creation, and the repeated check in
-`createLogicalDevice` catches only one direction of that mismatch.
+- the creation list can ask for something the chosen device does not support;
+  the repeated check in `createLogicalDevice` catches this direction;
+- the selection list can require more than the creation list enables, which is
+  not caught at all and shows up later as a validation error or a missing
+  capability;
+- internal calls (`swapchain`, `findMemoryType`, `findSuitableQueueFamilies`)
+  pass an empty list, so a cached selection made there can be paired with a
+  different list at creation;
+- with manual selection (a GPU menu) the user picks a device outside the
+  selection function, so nothing binds the choice to the list used for it.
+
+The same applies to the split between checking and setting: `isSatisfied` and
+`request` are separate operations, but the entry points that combine them
+(`findSuitablePhysicalDevice`, `createLogicalDevice!Reqs`) make it easy to run
+them in different places with different lists.
 
 - [ ] Find more features that this system does not cover yet, beyond the list
       above.
