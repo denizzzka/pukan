@@ -16,6 +16,7 @@ class PhysicalDevice
     Instance instance;
     package VkPhysicalDevice physicalDevice;
     /// Queried once, all property checks read this snapshot
+    // TODO: caching is not needed, query the properties at the use site
     immutable VkPhysicalDeviceProperties properties;
     /* TODO: "debug" */ private size_t devIdx;
 
