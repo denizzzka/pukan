@@ -49,7 +49,7 @@ void main()
     auto device = physDevice.createLogicalDevice!appRequirements(dev_extension_list);
     scope(exit) destroy(device);
 
-    auto gemm = new Gemm(device, M, N, K);
+    auto gemm = Gemm.create!appRequirements(device, M, N, K);
     scope(exit) destroy(gemm);
 
     gemm.setA(A);

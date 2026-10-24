@@ -2,7 +2,7 @@ module pukan.vulkan.computation;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.requirements: Requirement;
+import pukan.vulkan.requirements: Requirement, contains;
 import pukan.vulkan.shaders: ShaderInfo;
 import std.meta: AliasSeq;
 
@@ -126,7 +126,17 @@ class Gemm : Compute
 
     enum ParamsSize = Params.sizeof;
 
-    this(LogicalDevice dev, uint M, uint N, uint K)
+    /// Creates the kernel and checks its requirements are part of the manifest
+    static Gemm create(Manifest...)(LogicalDevice dev, uint M, uint N, uint K)
+    {
+        // Optional guard, illustrative only: the requirement is declared above, this catches a forgotten manifest entry
+        static foreach(R; requirements)
+            static assert(contains!(R, Manifest), "Gemm requirement is missing from the manifest: " ~ R.requirementName);
+
+        return new Gemm(dev, M, N, K);
+    }
+
+    private this(LogicalDevice dev, uint M, uint N, uint K)
     {
         VkDescriptorSetLayoutBinding[] layoutBindings = [
             VkDescriptorSetLayoutBinding(

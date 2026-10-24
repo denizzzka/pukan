@@ -55,6 +55,9 @@ struct Requirement(string name, ulong minimum = 0)
 {
     private enum kind = requirementKind!name;
 
+    /// Name used in diagnostics
+    enum string requirementName = name;
+
     static if(kind == Kind.feature)
         static assert(minimum == 0, "feature requirement takes no minimum: " ~ name);
     else static if(kind == Kind.extension)
@@ -125,6 +128,17 @@ struct Requirement(string name, ulong minimum = 0)
     }
 }
 
+/// True when T is present in the list
+template contains(T, List...)
+{
+    static if(List.length == 0)
+        enum contains = false;
+    else static if(is(List[0] == T))
+        enum contains = true;
+    else
+        enum contains = contains!(T, List[1 .. $]);
+}
+
 private template moduleRequirements(M)
 {
     static if(__traits(hasMember, M, "requirements"))
@@ -170,6 +184,9 @@ unittest
     static struct A { alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
     static struct B { alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
     static assert(Requirements!(A, B).length == 1);
+
+    static assert(contains!(int, int, float));
+    static assert(!contains!(double, int, float));
 
     InstanceContext instance;
     instance.loaderVersion = VulkanVersion(1, 2);
