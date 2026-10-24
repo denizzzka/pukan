@@ -2,7 +2,9 @@ module pukan.vulkan.shaders;
 
 package mixin template Shaders()
 {
+    import pukan.exceptions: PukanVulkanException;
     import std.container.slist;
+    import std.exception: enforce;
     private SList!ShaderInfo loadedShaders;
 
     ref ShaderInfo uploadShaderToGPU(

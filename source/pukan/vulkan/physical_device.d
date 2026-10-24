@@ -5,8 +5,10 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
+import pukan.vulkan.requirements: DeviceContext;
 import pukan: toPrettyString;
 import std.conv: to;
+import std.meta: NoDuplicates;
 
 ///
 class PhysicalDevice
@@ -89,9 +91,18 @@ class PhysicalDevice
     }
 
     ///
-    LogicalDevice createLogicalDevice(const(char*)[] extension_list)
+    LogicalDevice createLogicalDevice(Reqs...)(const(char*)[] extension_list)
     {
-        return new LogicalDevice(this, extension_list);
+        DeviceContext ctx;
+        ctx.properties = properties;
+        vkGetPhysicalDeviceFeatures(physicalDevice, &ctx.supported);
+        ctx.supportedExtensions = extensions();
+        ctx.enabledExtensions = extension_list.dup;
+
+        static foreach(R; NoDuplicates!Reqs)
+            R.check(ctx);
+
+        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled);
     }
 
     /**

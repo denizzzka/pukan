@@ -17,4 +17,4 @@ public import pukan.vulkan.shaders;
 public import pukan.vulkan.swapchain;
 public import pukan.vulkan.textures;
 public import pukan.vulkan.api_version;
-public import pukan.vulkan.features;
+public import pukan.vulkan.requirements;

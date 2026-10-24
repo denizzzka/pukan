@@ -1,5 +1,6 @@
 import pukan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.requirements: Requirements;
 import std.algorithm: max;
 import std.math: abs;
 import std.random;
@@ -43,7 +44,7 @@ void main()
     auto physDevice = vk.findSuitablePhysicalDevice;
 
     const(char*)[] dev_extension_list;
-    auto device = physDevice.createLogicalDevice(dev_extension_list);
+    auto device = physDevice.createLogicalDevice!(Requirements!(Gemm))(dev_extension_list);
     scope(exit) destroy(device);
 
     auto gemm = new Gemm(device, M, N, K);

@@ -3,7 +3,6 @@ module pukan.vulkan.logical_device;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.exceptions;
 import log = std.logger;
 import std.exception: enforce;
 import std.string: toStringz;
@@ -16,12 +15,9 @@ class LogicalDevice
 
     const uint familyIdx;
 
-    package this(PhysicalDevice pd, const(char*)[] extension_list)
+    package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures)
     {
         physicalDevice = pd;
-
-        VkPhysicalDeviceFeatures supportedFeatures;
-        vkGetPhysicalDeviceFeatures(pd.physicalDevice, &supportedFeatures);
 
         const fqIdxs = pd.findSuitableQueueFamilies();
         enforce(fqIdxs.length > 0);
@@ -36,12 +32,6 @@ class LogicalDevice
             pQueuePriorities: &queuePriority,
         };
 
-        //TODO: exclude hardcoded features, take them from the requirement system
-        enforce!PukanVulkanException(supportedFeatures.samplerAnisotropy == true);
-        VkPhysicalDeviceFeatures deviceFeatures = {
-            samplerAnisotropy: VK_TRUE,
-        };
-
         //~ VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeatures = {
             //~ sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT,
             //~ shaderObject: VK_TRUE,
@@ -51,7 +41,7 @@ class LogicalDevice
             sType: VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             queueCreateInfoCount: 1,
             pQueueCreateInfos: &queueCreateInfo,
-            pEnabledFeatures: &deviceFeatures,
+            pEnabledFeatures: &enabledFeatures,
             ppEnabledExtensionNames: extension_list.ptr,
             enabledExtensionCount: cast(uint) extension_list.length,
             //~ pNext: &shaderObjectFeatures,

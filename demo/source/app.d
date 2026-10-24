@@ -1,6 +1,7 @@
 import pukan;
 import pukan.scene_tree;
 import pukan.vulkan.bindings;
+import pukan.vulkan.requirements: Requirement;
 import glfw3.api;
 import std.conv: to;
 import std.datetime.stopwatch;
@@ -105,7 +106,7 @@ void main() {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
     ];
 
-    auto device =  physDevice.createLogicalDevice(dev_extension_list);
+    auto device = physDevice.createLogicalDevice!(Requirement!"samplerAnisotropy")(dev_extension_list);
     scope(success)
     {
         import core.memory: GC;
