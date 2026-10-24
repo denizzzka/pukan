@@ -17,16 +17,42 @@ Scope: anything requested at device creation time because a driver or GPU may
 not provide it: `VkPhysicalDeviceFeatures` members, structures chained through
 `VkPhysicalDeviceFeatures2`, device extensions, and version-gated features.
 
-Current state: `LogicalDevice.this` takes a device extension list and hardcodes
-`samplerAnisotropy`; `Instance.this` takes an instance extension list;
-`PhysicalDevice` can already enumerate extensions and features.
+Current state: requirements are declared as `Requirement` tags and flow through
+`Requirements!`; `Instance` checks the loader version, device creation checks the
+device version and applies the enabled features and extensions. The remaining
+gaps are the unchecked items below.
+
+### Done
+
+- [x] `Requirement!(name, minimum)` with compile-time kind inference: `VK_` prefix
+      is an extension, a `VkBool32` field of `VkPhysicalDeviceFeatures` is a
+      feature, a `uint` field of the properties or limits is a number.
+- [x] `Requirements!(Modules...)` unions subsystem `requirements` and removes
+      duplicates.
+- [x] Checking and enabling are separate: `requirementsSatisfied` only reads,
+      `requestRequirements` fills `enabled` and `enabledExtensions`.
+- [x] Bulk contexts `InstanceContext` and `DeviceContext`, so checks run once, at
+      instance and device creation.
+- [x] Vulkan API version as a requirement (`ApiVersionRequirement`, baseline 1.3)
+      with loader and device checks.
+- [x] Device selection filters physical devices by requirements; `PhysicalDevice`
+      and `Instance` cache the properties and the selection.
+- [x] `PukanVulkanException` and `PukanVulkanExceptionWithCode`; throws in
+      `pukan.vulkan` are migrated to them.
+- [x] Manual flow for a GPU menu: `createLogicalDeviceContext`,
+      `requirementsSatisfied`, `requestRequirements` and the primitive
+      `createLogicalDevice`.
+- [x] Compute declares `maxComputeWorkGroupInvocations`; the hardcoded
+      `samplerAnisotropy` is gone.
+- [x] `contains` and `Gemm.create!Manifest` catch a manifest that misses the
+      kernel requirement (illustrative).
 
 ### Already used in the code
 
 Enabled today, with the intended classification:
 
-- `samplerAnisotropy`: hardcoded and enforced in `logical_device.d`, marked with
-  a TODO. Must become a requirement declared by the texture/sampler code.
+- `samplerAnisotropy`: declared by the application manifest
+  (`demo/source/app.d`); the hardcoded version in `logical_device.d` is removed.
 - `VK_KHR_swapchain`: required by the demo, device extension.
 - `VK_KHR_surface` plus the platform surface extension from GLFW
   (`VK_KHR_xcb_surface`, `VK_KHR_wayland_surface`, `VK_KHR_win32_surface`):
@@ -49,8 +75,9 @@ Used but never enabled:
 
 Version dependencies:
 
-- The instance requests Vulkan 1.3.0 (`core.d`), but
-  `findSuitablePhysicalDevice` takes device 0 without checking its version.
+- The instance requests Vulkan 1.3.0 (`core.d`), and
+  `findSuitablePhysicalDevice` checks the device version against the same
+  baseline.
 - `vkGetPhysicalDeviceProperties2` needs Vulkan 1.1.
 - Shaders are compiled with `--target-env=vulkan1.2` (SPIR-V 1.5) although the
   GLSL is `#version 460`.
@@ -64,11 +91,14 @@ Two separate concerns:
 
 - **Enabling** is decided before `vkCreateDevice` and cannot be changed later.
 - **Checking availability** may be repeated freely. `vkGetPhysicalDeviceFeatures`
-  fills the whole struct in one call, so checking many features costs one call
-  and there is nothing worth caching; a cache would only add storage. What
-  matters is that the check happens before the first use.
+  fills the whole struct in one call, so checking many features costs one call;
+  the properties are cached on `PhysicalDevice` for limits. What matters is that
+  the check happens before the first use.
 
 ### Features as compile-time tags
+
+The implemented tag is the unified `Requirement` (see "Done"); the separate
+`Feature` and `Extension` sketches below are the original design.
 
 A feature tag is generated from its name, so there is no struct to declare per
 feature:
@@ -186,11 +216,9 @@ Two ways to request a feature:
 - **Optional**: enabled if available, skipped otherwise. The device records what
   actually got enabled.
 
-- [ ] Add the Vulkan-specific exception types: `PukanVulkanException` deriving
+- [x] Add the Vulkan-specific exception types: `PukanVulkanException` deriving
       from `PukanException`, and `PukanVulkanExceptionWithCode` holding a
-      `VkResult`. Neither exists today; `PukanExceptionWithCode` is the closest
-      and only fits where a `VkResult` is already available, while a missing
-      feature has none. Existing throws in `pukan.vulkan` move to the new types.
+      `VkResult`. Existing throws in `pukan.vulkan` are migrated to them.
 
 An entity that can work both ways asks the device when it is created, and the
 application organizes the fallback itself:
@@ -241,6 +269,10 @@ The same applies to the split between checking and setting: `isSatisfied` and
 `request` are separate operations, but the entry points that combine them
 (`findSuitablePhysicalDevice`, `createLogicalDevice!Reqs`) make it easy to run
 them in different places with different lists.
+
+Selection now filters by requirements and caches the properties, and creation
+re-checks its list, but the two lists are still independent: the mismatch is
+open.
 
 - [ ] Find more features that this system does not cover yet, beyond the list
       above.
