@@ -40,7 +40,7 @@ class PhysicalDevice
                 return i;
         }
 
-        throw new PukanException("failed to find suitable memory type");
+        throw new PukanVulkanException("failed to find suitable memory type");
     }
 
     void printDevice()
@@ -116,6 +116,6 @@ class PhysicalDevice
                 return;
         }
 
-        throw new PukanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
+        throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
     }
 }

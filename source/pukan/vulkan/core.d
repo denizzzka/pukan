@@ -6,7 +6,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.vulkan.api_version: VulkanVersion;
+import pukan.vulkan.api_version: VulkanVersion, loaderVersion;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
@@ -29,6 +29,12 @@ class Instance
     // non-dispatcheable handles, so placing it here
     VkSurfaceKHR surface;
 
+    /// Version requested at instance creation
+    VulkanVersion apiVersion() const
+    {
+        return VulkanVersion.fromUint(info.apiVersion);
+    }
+
     static void log_info(A...)(A s)
     {
         debug
@@ -44,6 +50,12 @@ class Instance
     {
         info.pApplicationName = appName.toStringz;
         info.applicationVersion = appVer;
+
+        const requested = apiVersion;
+        const loader = loaderVersion();
+
+        if(loader < requested)
+            throw new PukanVulkanException("Vulkan loader "~loader.toString~" is lower than the required "~requested.toString);
 
         debug extension_list ~= [
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME.ptr,
@@ -160,13 +172,22 @@ class Instance
     ///
     auto findSuitablePhysicalDevice()
     {
-        if(devices.length > 0)
+        auto devs = devices;
+
+        if(devs.length == 0)
+            throw new PukanVulkanException("no Vulkan physical devices found");
+
+        auto required = apiVersion;
+
+        foreach(idx, dev; devs)
         {
-            const idx = 0;
-            return new PhysicalDevice(this, devices[idx], idx);
+            auto pd = new PhysicalDevice(this, dev, idx);
+
+            if(pd.apiVersion >= required)
+                return pd;
         }
 
-        throw new PukanException("appropriate device not found");
+        throw new PukanVulkanException("no physical device supports Vulkan "~required.toString);
     }
 
     /// Returns: family indices
@@ -186,7 +207,7 @@ class Instance
                 return;
         }
 
-        throw new PukanException("Extension "~extensionName.to!string~" is not supported by Vulkan instance", file, line);
+        throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan instance", file, line);
     }
 }
 

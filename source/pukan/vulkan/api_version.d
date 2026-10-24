@@ -1,6 +1,6 @@
 module pukan.vulkan.api_version;
 
-import pukan.exceptions: PukanExceptionWithCode;
+import pukan.exceptions: PukanVulkanExceptionWithCode;
 import pukan.vulkan.bindings;
 
 /// Vulkan API version, ordered by major, minor and patch
@@ -58,7 +58,7 @@ VulkanVersion loaderVersion()
     const ret = proc(&encoded);
 
     if(ret != VK_SUCCESS)
-        throw new PukanExceptionWithCode(ret, "failed to query the Vulkan loader version");
+        throw new PukanVulkanExceptionWithCode(ret, "failed to query the Vulkan loader version");
 
     return VulkanVersion.fromUint(encoded);
 }

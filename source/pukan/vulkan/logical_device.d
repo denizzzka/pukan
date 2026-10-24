@@ -37,7 +37,7 @@ class LogicalDevice
         };
 
         //TODO: exclude hardcoded features, take them from the requirement system
-        enforce!PukanException(supportedFeatures.samplerAnisotropy == true);
+        enforce!PukanVulkanException(supportedFeatures.samplerAnisotropy == true);
         VkPhysicalDeviceFeatures deviceFeatures = {
             samplerAnisotropy: VK_TRUE,
         };

@@ -42,7 +42,7 @@ package mixin template Shaders()
 
         auto code = cast(ubyte[]) read(filename);
 
-        enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
+        enforce!PukanVulkanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
         return uploadShaderToGPU(code, stage, layoutBindings, pushConstant);
     }

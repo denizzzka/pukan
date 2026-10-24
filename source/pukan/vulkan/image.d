@@ -18,7 +18,7 @@ package mixin template Images()
     }
 }
 
-import pukan.exceptions: PukanException;
+import pukan.exceptions: PukanVulkanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
@@ -78,7 +78,7 @@ class ImageMemory : DeviceMemory
             destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
         else
-            throw new PukanException("unsupported layout transition!");
+            throw new PukanVulkanException("unsupported layout transition!");
 
         vkCmdPipelineBarrier(
             buf,
@@ -140,7 +140,7 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool
         default:
             import std.conv;
             import std.exception;
-            enforce!PukanException(false, "Unsupported pixel format: "~pixelFormat.to!string);
+            enforce!PukanVulkanException(false, "Unsupported pixel format: "~pixelFormat.to!string);
             break;
     }
 
