@@ -79,7 +79,7 @@ void main() {
             writeln(i.to!string);
     }
 
-    auto vk = new Instance(name, makeApiVersion(1,2,3,4), extension_list);
+    auto vk = new Instance(name, 1, extension_list);
     scope(exit) destroy(vk);
 
     //~ debug

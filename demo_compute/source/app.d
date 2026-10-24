@@ -37,7 +37,7 @@ void main()
                 cpuC[i * N + j] += A[i * K + k] * B[k * N + j];
 
     const(char*)[] extension_list;
-    auto vk = new Instance("compute demo", makeApiVersion(0, 1, 3, 0), extension_list);
+    auto vk = new Instance("compute demo", 1, extension_list);
     scope(exit) destroy(vk);
 
     auto physDevice = vk.findSuitablePhysicalDevice;

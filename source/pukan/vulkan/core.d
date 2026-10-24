@@ -6,25 +6,20 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
+import pukan.vulkan.api_version: VulkanVersion;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
 import std.string: toStringz;
-
-/// VK_MAKE_API_VERSION macros
-uint makeApiVersion(uint variant, uint major, uint minor, uint patch)
-{
-    return ((((uint)(variant)) << 29U) | (((uint)(major)) << 22U) | (((uint)(minor)) << 12U) | ((uint)(patch)));
-}
 
 ///
 class Instance
 {
     VkApplicationInfo info = {
          sType: VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
-         apiVersion: makeApiVersion(0, 1, 3, 0),
+         apiVersion: VulkanVersion(1, 3).toUint(),
          pEngineName: "pukan",
-         engineVersion: makeApiVersion(0, 0, 0, 1),
+         engineVersion: 1,
     };
 
     alias VkT = VkObj!(VkInstanceCreateInfo*, VkAllocationCallbacks*);

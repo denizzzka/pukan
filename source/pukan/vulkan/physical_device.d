@@ -5,6 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
+import pukan.vulkan.api_version: VulkanVersion;
 import pukan: toPrettyString;
 import std.conv: to;
 
@@ -13,6 +14,7 @@ class PhysicalDevice
 {
     Instance instance;
     package VkPhysicalDevice physicalDevice;
+    immutable VulkanVersion apiVersion;
     /* TODO: "debug" */ private size_t devIdx;
 
     ///
@@ -21,6 +23,10 @@ class PhysicalDevice
         instance = inst;
         physicalDevice = dev;
         devIdx = idx;
+
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(dev, &props);
+        apiVersion = VulkanVersion.fromUint(props.apiVersion);
     }
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
