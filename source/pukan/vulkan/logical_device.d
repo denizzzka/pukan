@@ -36,6 +36,7 @@ class LogicalDevice
             pQueuePriorities: &queuePriority,
         };
 
+        //TODO: exclude hardcoded features, take them from the requirement system
         enforce!PukanException(supportedFeatures.samplerAnisotropy == true);
         VkPhysicalDeviceFeatures deviceFeatures = {
             samplerAnisotropy: VK_TRUE,
