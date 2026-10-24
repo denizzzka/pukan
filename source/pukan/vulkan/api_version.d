@@ -46,6 +46,9 @@ struct VulkanVersion
     }
 }
 
+/// Minimum Vulkan version required by the library
+enum VulkanVersion requiredApiVersion = VulkanVersion(1, 3);
+
 /// Version supported by the Vulkan loader, 1.0 if the loader predates Vulkan 1.1
 VulkanVersion loaderVersion()
 {

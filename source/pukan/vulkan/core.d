@@ -6,7 +6,8 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.vulkan.api_version: VulkanVersion, loaderVersion;
+import pukan.vulkan.api_version: loaderVersion, requiredApiVersion;
+import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
@@ -17,7 +18,7 @@ class Instance
 {
     VkApplicationInfo info = {
          sType: VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO,
-         apiVersion: VulkanVersion(1, 3).toUint(),
+         apiVersion: requiredApiVersion.toUint(),
          pEngineName: "pukan",
          engineVersion: 1,
     };
@@ -30,12 +31,6 @@ class Instance
     VkSurfaceKHR surface;
 
     private PhysicalDevice selectedPhysicalDevice;
-
-    /// Version requested at instance creation
-    VulkanVersion apiVersion() const
-    {
-        return VulkanVersion.fromUint(info.apiVersion);
-    }
 
     static void log_info(A...)(A s)
     {
@@ -53,11 +48,8 @@ class Instance
         info.pApplicationName = appName.toStringz;
         info.applicationVersion = appVer;
 
-        const requested = apiVersion;
-        const loader = loaderVersion();
-
-        if(loader < requested)
-            throw new PukanVulkanException("Vulkan loader "~loader.toString~" is lower than the required "~requested.toString);
+        InstanceContext ctx = { loaderVersion: loaderVersion() };
+        ApiVersionRequirement.check(ctx);
 
         debug extension_list ~= [
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME.ptr,
@@ -182,20 +174,8 @@ class Instance
         if(devs.length == 0)
             throw new PukanVulkanException("no Vulkan physical devices found");
 
-        auto required = apiVersion;
-
-        foreach(idx, dev; devs)
-        {
-            auto pd = new PhysicalDevice(this, dev, idx);
-
-            if(VulkanVersion.fromUint(pd.properties.apiVersion) >= required)
-            {
-                selectedPhysicalDevice = pd;
-                return pd;
-            }
-        }
-
-        throw new PukanVulkanException("no physical device supports Vulkan "~required.toString);
+        selectedPhysicalDevice = new PhysicalDevice(this, devs[0], 0);
+        return selectedPhysicalDevice;
     }
 
     /// Returns: family indices

@@ -1,7 +1,7 @@
 module pukan.vulkan.requirements;
 
 import pukan.exceptions: PukanVulkanException;
-import pukan.vulkan.api_version: VulkanVersion;
+import pukan.vulkan.api_version: VulkanVersion, requiredApiVersion;
 import pukan.vulkan.bindings;
 import core.stdc.string: strcmp;
 import std.conv: to;
@@ -45,6 +45,12 @@ struct DeviceContext
     }
 }
 
+/// Instance snapshot the requirements are checked against
+struct InstanceContext
+{
+    VulkanVersion loaderVersion;
+}
+
 /// Device requirement: a numeric property, a feature or an extension
 struct Requirement(string name, ulong minimum = 0)
 {
@@ -83,6 +89,20 @@ struct Requirement(string name, ulong minimum = 0)
             ctx.enabledExtensions ~= name.ptr;
         }
     }
+
+    /// Throws when the requirement is not met by the instance
+    static void check(Ctx)(ref Ctx ctx) if(is(Ctx == InstanceContext))
+    {
+        static if(kind == Kind.number && name == "apiVersion")
+        {
+            const required = VulkanVersion.fromUint(cast(uint) minimum);
+
+            if(ctx.loaderVersion < required)
+                throw new PukanVulkanException("Vulkan requirement " ~ name ~ " is " ~ ctx.loaderVersion.toString ~ ", required at least " ~ required.toString);
+        }
+        else
+            static assert(false, name ~ " is not an instance requirement");
+    }
 }
 
 private template moduleRequirements(M)
@@ -99,6 +119,9 @@ template Requirements(Modules...)
     alias Requirements = NoDuplicates!(staticMap!(moduleRequirements, Modules));
 }
 
+/// Baseline requirement every instance and device must satisfy
+alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersion.toUint());
+
 unittest
 {
     static assert(Requirement!"samplerAnisotropy".kind == Kind.feature);
@@ -110,4 +133,15 @@ unittest
     static struct A { alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
     static struct B { alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
     static assert(Requirements!(A, B).length == 1);
+
+    InstanceContext instance;
+    instance.loaderVersion = VulkanVersion(1, 2);
+
+    bool thrown;
+    try
+        ApiVersionRequirement.check(instance);
+    catch(PukanVulkanException)
+        thrown = true;
+
+    assert(thrown);
 }
