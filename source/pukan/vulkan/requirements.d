@@ -8,6 +8,13 @@ import std.meta: AliasSeq, NoDuplicates, staticMap;
 
 private enum Kind { number, feature, extension }
 
+/// Declare optional requirements for an entity
+template getOptionalRequirements(Reqs...)
+{
+    private import std.meta: AliasSeq;
+    alias getOptionalRequirements = AliasSeq!Reqs;
+}
+
 private template requirementKind(string name)
 {
     static if(name.length > 3 && name[0 .. 3] == "VK_")
@@ -42,18 +49,46 @@ struct DeviceContext
 
         return false;
     }
+
+    bool hasEnabledExtension(string name) const
+    {
+        import core.stdc.string: strcmp;
+
+        foreach(e; enabledExtensions)
+            if(strcmp(e, name.ptr) == 0)
+                return true;
+
+        return false;
+    }
 }
 
 /// Instance snapshot the requirements are checked against
 struct InstanceContext
 {
     VulkanVersion loaderVersion;
+    const(char)*[] enabledExtensions;
+
+    bool hasEnabledExtension(string name) const
+    {
+        import core.stdc.string: strcmp;
+
+        foreach(e; enabledExtensions)
+            if(strcmp(e, name.ptr) == 0)
+                return true;
+
+        return false;
+    }
 }
 
 /// Device requirement: a numeric property, a feature or an extension
 struct Requirement(string name, ulong minimum = 0)
 {
-    private enum kind = requirementKind!name;
+    package enum kind = requirementKind!name;
+
+    /// True when this is a device/instance extension
+    enum bool isExtension = kind == Kind.extension;
+    /// True when this is a VkBool32 feature
+    enum bool isFeature = kind == Kind.feature;
 
     /// Name used in diagnostics
     enum string requirementName = name;
@@ -108,6 +143,71 @@ struct Requirement(string name, ulong minimum = 0)
             ctx.enabledExtensions ~= name.ptr;
     }
 
+    /// Returns false and a reason when the requirement is not enabled
+    static bool isEnabled(ref const DeviceContext ctx, out string reason)
+    {
+        static if(kind == Kind.number)
+        {
+            static if(__traits(hasMember, VkPhysicalDeviceProperties, name))
+                const value = __traits(getMember, ctx.properties, name);
+            else
+                const value = __traits(getMember, ctx.properties.limits, name);
+
+            if(value < minimum)
+            {
+                reason = name ~ " is " ~ value.to!string ~ ", required at least " ~ minimum.to!string;
+                return false;
+            }
+        }
+        else static if(kind == Kind.feature)
+        {
+            if(__traits(getMember, ctx.enabled, name) != VK_TRUE)
+            {
+                reason = "feature is not enabled: " ~ name;
+                return false;
+            }
+        }
+        else static if(kind == Kind.extension)
+        {
+            if(!ctx.hasEnabledExtension(name))
+            {
+                reason = "extension is not enabled: " ~ name;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// Returns false and a reason when the requirement is not enabled by the instance
+    static bool isEnabled(Ctx)(ref const Ctx ctx, out string reason) if(is(Ctx == InstanceContext))
+    {
+        static if(kind == Kind.number && name == "apiVersion")
+        {
+            const required = VulkanVersion.fromUint(cast(uint) minimum);
+
+            if(ctx.loaderVersion < required)
+            {
+                reason = name ~ " is " ~ ctx.loaderVersion.toString ~ ", required at least " ~ required.toString;
+                return false;
+            }
+
+            return true;
+        }
+        else static if(kind == Kind.extension)
+        {
+            if(!ctx.hasEnabledExtension(name))
+            {
+                reason = "extension is not enabled: " ~ name;
+                return false;
+            }
+
+            return true;
+        }
+        else
+            static assert(false, name ~ " is not an instance requirement");
+    }
+
     /// Returns false and a reason when the requirement is not met by the instance
     static bool isSatisfied(Ctx)(ref Ctx ctx, out string reason) if(is(Ctx == InstanceContext))
     {
@@ -153,6 +253,20 @@ template Requirements(Modules...)
     alias Requirements = NoDuplicates!(staticMap!(moduleRequirements, Modules));
 }
 
+private template moduleOptionalRequirements(M)
+{
+    static if(__traits(hasMember, M, "optionalRequirements"))
+        alias moduleOptionalRequirements = M.optionalRequirements;
+    else
+        alias moduleOptionalRequirements = AliasSeq!();
+}
+
+/// Union of optional requirements declared by the given entities/modules, without duplicates
+template OptionalRequirementsOf(Modules...)
+{
+    alias OptionalRequirementsOf = NoDuplicates!(staticMap!(moduleOptionalRequirements, Modules));
+}
+
 /// Baseline requirement every instance and device must satisfy
 alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersionEncoded);
 
@@ -171,6 +285,71 @@ void requestRequirements(Reqs...)(ref DeviceContext ctx)
 {
     static foreach(R; NoDuplicates!Reqs)
         R.request(ctx);
+}
+
+/// Enables optional features and extensions if they are supported, otherwise skips them
+void requestOptionalRequirements(Reqs...)(ref DeviceContext ctx)
+{
+    static foreach(R; NoDuplicates!Reqs)
+    {
+        string reason;
+        if(R.isSatisfied(ctx, reason))
+            R.request(ctx);
+    }
+}
+
+/// Returns true when every requirement is enabled, otherwise fills the reason
+bool requirementsEnabled(Reqs...)(ref const DeviceContext ctx, out string reason)
+{
+    static foreach(R; NoDuplicates!Reqs)
+        if(!R.isEnabled(ctx, reason))
+            return false;
+
+    return true;
+}
+
+/// Returns true when every requirement is enabled by the instance, otherwise fills the reason
+bool requirementsEnabled(Reqs...)(ref const InstanceContext ctx, out string reason)
+{
+    static foreach(R; NoDuplicates!Reqs)
+        if(!R.isEnabled(ctx, reason))
+            return false;
+
+    return true;
+}
+
+/// Throws RequirementsNotMetException if any requirement is not enabled
+void requireEnabled(Reqs...)(ref const DeviceContext ctx, string entity, string file = __FILE__, size_t line = __LINE__)
+{
+    import pukan.exceptions: RequirementsNotMetException;
+
+    string[] missing;
+    static foreach(R; NoDuplicates!Reqs)
+    {
+        string reason;
+        if(!R.isEnabled(ctx, reason))
+            missing ~= reason;
+    }
+
+    if(missing.length)
+        throw new RequirementsNotMetException(entity, missing, file, line);
+}
+
+/// Throws RequirementsNotMetException if any requirement is not enabled
+void requireEnabled(Reqs...)(ref const InstanceContext ctx, string entity, string file = __FILE__, size_t line = __LINE__)
+{
+    import pukan.exceptions: RequirementsNotMetException;
+
+    string[] missing;
+    static foreach(R; NoDuplicates!Reqs)
+    {
+        string reason;
+        if(!R.isEnabled(ctx, reason))
+            missing ~= reason;
+    }
+
+    if(missing.length)
+        throw new RequirementsNotMetException(entity, missing, file, line);
 }
 
 unittest

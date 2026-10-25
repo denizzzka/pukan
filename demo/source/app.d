@@ -1,7 +1,9 @@
 import pukan;
 import pukan.scene_tree;
 import pukan.vulkan.bindings;
+import pukan.vulkan.core: FlightRecorder;
 import pukan.vulkan.requirements: Requirement;
+import pukan.exceptions: RequirementsNotMetException;
 import glfw3.api;
 import std.conv: to;
 import std.datetime.stopwatch;
@@ -12,6 +14,8 @@ import std.stdio;
 import std.string: toStringz;
 
 alias appRequirements = AliasSeq!(Requirement!"samplerAnisotropy");
+debug alias DebugEntities = FlightRecorder!Instance;
+else alias DebugEntities = AliasSeq!();
 
 enum fps = 60;
 enum width = 640;
@@ -83,7 +87,7 @@ void main() {
             writeln(i.to!string);
     }
 
-    auto vk = new Instance(name, 1, extension_list);
+    auto vk = Instance.createWith!DebugEntities(name, 1, extension_list);
     scope(exit) destroy(vk);
 
     //~ debug
@@ -119,8 +123,15 @@ void main() {
         destroy(device);
     }
 
-    debug auto dbg = vk.attachFlightRecorder(device);
-    debug scope(exit) destroy(dbg);
+    debug FlightRecorder!Instance dbg;
+    debug
+    {
+        try
+            dbg = vk.attachFlightRecorder(device);
+        catch(RequirementsNotMetException e)
+            writeln("Debug messenger disabled: ", e.msg);
+    }
+    debug scope(exit) if(dbg) destroy(dbg);
 
     static import glfw3.internal;
 

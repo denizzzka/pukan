@@ -7,7 +7,8 @@ import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice, SelectedDevice;
 import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
-import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, requirementsSatisfied, requestRequirements;
+import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, OptionalRequirementsOf, getOptionalRequirements, Requirement, requirementsSatisfied, requestRequirements, requireEnabled;
+import pukan.vulkan.bindings: VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.exception: enforce;
@@ -33,6 +34,9 @@ class Instance
 
     private PhysicalDevice selectedPhysicalDevice;
 
+    /// Enabled instance extensions (for optional requirement checks)
+    const(char)*[] enabledExtensions;
+
     static void log_info(A...)(A s)
     {
         debug
@@ -49,16 +53,11 @@ class Instance
         info.pApplicationName = appName.toStringz;
         info.applicationVersion = appVer;
 
-        InstanceContext ctx = { loaderVersion: loaderVersion() };
+        InstanceContext ctxCheck = { loaderVersion: loaderVersion() };
 
         string reason;
-        if(!ApiVersionRequirement.isSatisfied(ctx, reason))
+        if(!ApiVersionRequirement.isSatisfied(ctxCheck, reason))
             throw new PukanVulkanException("Vulkan requirement " ~ reason);
-
-        debug extension_list ~= [
-            VK_EXT_DEBUG_UTILS_EXTENSION_NAME.ptr,
-            //~ VK_EXT_LAYER_SETTINGS_EXTENSION_NAME.ptr, //no effect
-        ];
 
         const(char*)[] validation_layers;
         debug validation_layers ~= [
@@ -97,6 +96,8 @@ class Instance
         };
 
         instance = create(&createInfo, allocator);
+
+        enabledExtensions = extension_list.dup;
 
         log_info("Vulkan instance created");
     }
@@ -143,6 +144,10 @@ class Instance
     debug scope attachFlightRecorder(in LogicalDevice ld)
     {
         assert(ld.physicalDevice.instance == this, "Wrong LogicalDevice provided");
+
+        auto ctx = instanceContext();
+        import pukan.vulkan.requirements: requireEnabled;
+        requireEnabled!(FlightRecorder!Instance.optionalRequirements)(ctx, "FlightRecorder");
 
         auto d = new FlightRecorder!Instance(this);
 
@@ -214,6 +219,23 @@ class Instance
         return selectedPhysicalDevice.findSuitableQueueFamilies();
     }
 
+    /// Instance requirements context for optional checks
+    InstanceContext instanceContext() const
+    {
+        InstanceContext ctx;
+        ctx.loaderVersion = loaderVersion();
+        ctx.enabledExtensions = enabledExtensions.dup;
+        return ctx;
+    }
+
+    /// Throws RequirementsNotMetException if any requirement is not enabled
+    void requireEnabled(Reqs...)(string entity, string file = __FILE__, size_t line = __LINE__)
+    {
+        import pukan.vulkan.requirements: requireEnabled;
+        auto ctx = instanceContext();
+        requireEnabled!Reqs(ctx, entity, file, line);
+    }
+
     /// Throw exception if extension is not supported
     void checkExtensionSupportedEx(in char* extensionName, string file = __FILE__, size_t line = __LINE__)
     {
@@ -227,10 +249,61 @@ class Instance
 
         throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan instance", file, line);
     }
+
+    /// Create an instance with optional requirements enabled if available
+    static Instance createWith(Modules...)(string appName, uint appVer, const(char*)[] extension_list)
+    {
+        import std.algorithm: canFind;
+        import std.meta: AliasSeq;
+        import core.stdc.string: strcmp;
+
+        alias optional = OptionalRequirementsOf!Modules;
+        const(char)*[] merged = extension_list.dup;
+
+        VkExtensionProperties[] supported = getArrayFrom!vkEnumerateInstanceExtensionProperties(null);
+
+        static foreach(R; optional)
+        {
+            static if(R.isExtension)
+            {
+                bool ok = false;
+                foreach(e; supported)
+                    if(strcmp(&e.extensionName[0], R.requirementName.ptr) == 0)
+                    {
+                        ok = true;
+                        break;
+                    }
+
+                if(ok)
+                {
+                    bool already = false;
+                    foreach(x; merged)
+                        if(x && strcmp(x, R.requirementName.ptr) == 0)
+                        {
+                            already = true;
+                            break;
+                        }
+
+                    if(!already)
+                        merged ~= R.requirementName.ptr;
+                }
+            }
+            else
+            {
+                static assert(false, "Instance optional requirement must be an extension or apiVersion: " ~ R.requirementName);
+            }
+        }
+
+        return new Instance(appName, appVer, merged);
+    }
 }
 
 class FlightRecorder(TBackend)
 {
+    static alias optionalRequirements = getOptionalRequirements!(
+        Requirement!(VK_EXT_DEBUG_UTILS_EXTENSION_NAME),
+    );
+
     TBackend backend;
 
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
