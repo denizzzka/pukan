@@ -9,6 +9,8 @@ constraint is marked in "Mesh rendering merge".
 
 ## Feature requirements
 
+- [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be used independently of the rest of `pukan`. Keep module names unchanged.
+
 - [ ] Build a Vulkan feature requirement system: every feature that Vulkan
       requires to be declared before first use is requested once, automatically,
       when application code uses a part that needs it.
