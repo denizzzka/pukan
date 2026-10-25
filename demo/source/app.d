@@ -123,15 +123,8 @@ void main() {
         destroy(device);
     }
 
-    debug FlightRecorder!Instance dbg;
-    debug
-    {
-        try
-            dbg = vk.attachFlightRecorder(device);
-        catch(RequirementsNotMetException e)
-            writeln("Debug messenger disabled: ", e.msg);
-    }
-    debug scope(exit) if(dbg) destroy(dbg);
+    debug auto dbg = vk.attachFlightRecorder(device);
+    debug scope(exit) destroy(dbg);
 
     static import glfw3.internal;
 
