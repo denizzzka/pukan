@@ -78,9 +78,10 @@ Enabled today, with the intended classification:
 
 Not declared as a requirement yet:
 
-- `VK_EXT_vertex_input_dynamic_state`: the below-1.3 fallback for dynamic
-  vertex input. Its structure is in the chain registry, but no requirement uses
-  it because the code runs on core 1.3.
+- `VK_EXT_vertex_input_dynamic_state`: needed only below 1.3; on the 1.3
+  baseline `VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE` and
+  `vkCmdBindVertexBuffers2` are core. Its structure stays in the registry for a
+  lower baseline.
 - `vkCmdBindVertexBuffers2`: core 1.3, covered by `ApiVersionFor`.
 
 Version dependencies:
@@ -345,8 +346,8 @@ requirements, which is currently unused.
         `SwapChain` and not declared or checked.
   - [ ] Depth format `VK_FORMAT_D24_UNORM_S8_UINT` and the image formats in
         `image.d` are not checked against device support.
-  - [ ] `VK_EXT_vertex_input_dynamic_state`: the below-1.3 fallback; its
-        structure is in the registry but no requirement uses it.
+  - [x] `VK_EXT_vertex_input_dynamic_state`: covered by core 1.3; the structure
+        stays in the registry for a below-1.3 baseline.
 
 ## Warnings
 
