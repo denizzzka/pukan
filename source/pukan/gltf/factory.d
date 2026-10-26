@@ -24,7 +24,7 @@ class GltfFactory
     import pukan.vulkan.frame_builder;
     import pukan.gltf.skin_matrices: SkinMatrices;
 
-    private alias requirements = Requirements!(SkinMatrices);
+    private alias requirements = SkinMatrices.requirements;
 
     LogicalDevice device;
     private immutable bool computeJointsOnGPU;
