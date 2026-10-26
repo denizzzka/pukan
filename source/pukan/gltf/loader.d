@@ -204,7 +204,7 @@ package GlTF loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     {
         const viewIdxPtr = "bufferView" in img;
 
-        import pukan.misc: loadImageFromFile, loadImageFromMemory;
+        import pukan.misc: loadImageFromMemory;
         import std.traits: ReturnType;
 
         ReturnType!loadImageFromMemory extFormatImg;
@@ -214,17 +214,14 @@ package GlTF loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
         {
             const mime = "mimeType" in img;
             enforce(mime);
-            enforce(
-                mime.get!string == "image/jpeg" || mime.get!string == "image/png",
-                "Unsupported image type: "~(*mime).to!string
-            );
+            enforceImageMime(mime.get!string);
 
             const View view = ret.bufferViews[viewIdxPtr.get!ushort];
 
             extFormatImg = loadImageFromMemory(view.buf, format);
         }
         else
-            extFormatImg = loadImageFromFile(build_path(dir, img["uri"].get!string), format);
+            extFormatImg = loadImageFromUri(dir, img["uri"].get!string, format);
 
         ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg, format);
     }
@@ -630,23 +627,85 @@ private string build_path(string dir, string filename) => dir ~ std.path.dirSepa
 private Buffer readBufUri(string dir, in Json fileDescr)
 {
     import std.algorithm.searching: startsWith;
-    import std.base64;
 
     const len = fileDescr["byteLength"].get!ulong;
     const uri = fileDescr["uri"].get!string;
 
-    immutable magic = "data:application/gltf-buffer;base64,";
     Buffer ret;
 
-    if(!uri.startsWith(magic))
+    if(!uri.startsWith("data:"))
         ret.buf = cast(ubyte[]) std.file.read(build_path(dir, uri));
     else
-    {
-        const based = uri[magic.length .. $];
-        ret.buf = Base64.decode(based);
-    }
+        ret.buf = parseDataUri(uri).payload;
 
     enforce(ret.buf.length == len);
 
     return ret;
+}
+
+private struct DataUri
+{
+    string mimeType;
+    ubyte[] payload;
+}
+
+private DataUri parseDataUri(string uri)
+{
+    import std.algorithm.searching: countUntil, startsWith;
+    import std.base64: Base64;
+
+    enum prefix = "data:";
+    enforce(uri.startsWith(prefix), "not a data URI");
+
+    const comma = uri.countUntil(',');
+    enforce(comma >= 0, "malformed data URI");
+
+    const header = uri[prefix.length .. comma];
+    const paramsEnd = header.countUntil(';');
+    enforce(paramsEnd > 0, "data URI has no MIME type");
+    enforce(header[paramsEnd .. $] == ";base64", "data URI must be base64-encoded");
+
+    return DataUri(header[0 .. paramsEnd], Base64.decode(uri[comma + 1 .. $]));
+}
+
+private void enforceImageMime(string mime)
+{
+    enforce(
+        mime == "image/jpeg" || mime == "image/png",
+        "Unsupported image type: "~mime
+    );
+}
+
+private auto loadImageFromUri(string dir, string uri, out VkFormat format)
+{
+    import pukan.misc: loadImageFromFile, loadImageFromMemory;
+    import std.algorithm.searching: startsWith;
+
+    if(!uri.startsWith("data:"))
+        return loadImageFromFile(build_path(dir, uri), format);
+
+    const data = parseDataUri(uri);
+    enforceImageMime(data.mimeType);
+
+    return loadImageFromMemory(data.payload, format);
+}
+
+unittest
+{
+    import std.exception: assertThrown;
+    import vibe.data.json: Json;
+
+    VkFormat format;
+    loadImageFromUri("",
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+        format);
+    assert(format == VK_FORMAT_R8G8B8A8_SRGB);
+
+    assertThrown(loadImageFromUri("", "data:image/png,raw", format));
+    assertThrown(loadImageFromUri("", "data:image/gif;base64,R0lGODlh", format));
+
+    auto bufDescr = Json.emptyObject;
+    bufDescr["uri"] = "data:application/octet-stream;base64,AAEC";
+    bufDescr["byteLength"] = 3;
+    assert(readBufUri("", bufDescr).buf == [ubyte(0), 1, 2]);
 }
