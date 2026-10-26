@@ -749,7 +749,7 @@ template RequirementsFor(Backend, Modules...)
 /// Names of the extension requirements in Reqs
 template extensionNames(Reqs...)
 {
-    private enum string[] collect()
+    private string[] collect()
     {
         string[] names;
 
