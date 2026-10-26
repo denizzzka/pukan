@@ -88,6 +88,7 @@ struct InstanceContext
 }
 
 /// Device requirement: a numeric property, a feature or an extension
+/// Features and extensions have no minimum, so it only matters for numbers
 // TODO: take the name from a symbol and reject string literals with static assert
 struct Requirement(string name, ulong minimum = 0)
 {
