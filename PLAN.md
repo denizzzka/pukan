@@ -313,3 +313,71 @@ Because the goal is vague here, the questions below decide the scope:
 - Should the 2D overlay be a separate pass after the 3D pass, or a subpass of
   the same render pass?
 - Are pipelines created at scene setup or on first use?
+
+## Data layout and throughput
+
+Thesis: the remaining speed is in reducing the entropy of the data that moves
+through the pipeline, not in macros and not in rewriting CPU loops as compute
+shaders. Fewer bytes on the bus and in the caches mean fewer misses and fewer
+stalled stages; every item below is a way of sending less, or sending it in a
+more predictable order.
+
+Each item earns its place only with numbers: VRAM occupied, bytes per instance
+uploaded per frame, cache misses, frame time on a fixed scene. The baseline
+comes before any of them, and the quantization item is the only near-term one;
+it touches the vertex layout that the pipeline work rewrites anyway. The rest
+are long-term spikes, each judged against the plain version it replaces.
+
+- [ ] Record a baseline on a fixed scene: VRAM, per-frame upload bytes, frame
+      time, and the entity update time used against the archetype target.
+
+- **Quantized static geometry**
+  - [ ] Optional extreme quantization for static batches: store positions and
+        rotations in as few as 2 bits per component when the drawable is authored
+        on a local grid, and decode in the vertex shader. Saves VRAM and removes
+        the vertex stage's memory bottleneck; the precision budget is per batch,
+        and the unquantized layout stays the default.
+
+- **Motors instead of matrices**
+  - [ ] Upload instance transforms as motors (dual quaternions, 8 floats)
+        instead of `mat4` (16 floats) in the transform SSBO, which halves the
+        traffic for the dynamic path.
+  - [ ] Interpolate skinned animation in motor space instead of blending
+        matrices, which removes the shear and scale artifacts of linear matrix
+        blending.
+  - [ ] Measure both against the matrix path on the same scene before making
+        motors the only path.
+  - Octonions are non-associative, so a chain of transforms has no well-defined
+    result; they stay out unless a concrete use turns up.
+
+- **Archetype storage instead of classic ECS**
+  - [ ] Replace the classic ECS with archetype storage: one contiguous SoA
+        block per archetype over flat memory, walked linearly, with no virtual
+        calls.
+  - [ ] Target 1,000,000 entities updated in 6 ms in one thread on the FX-9590,
+        the figure already observed there, then find the ceiling.
+  - The A-infinity and Grothendieck-sheaf framing describes this layout rather
+    than prescribing one: a section of a sheaf over flat memory is an
+    archetype, and the gluing is the archetype table. What pays off is the
+    contiguity and the absent dispatch, so build that and keep the vocabulary
+    for the write-up.
+
+- **Adelic storage**
+  - [ ] Spike: split one logical array into layers by access frequency and
+        locality instead of keeping it contiguous, so the hot part stays in
+        cache and the cold part is uploaded once.
+  - [ ] Acceptance: no allocation in the frame loop and a zero-copy upload path
+        to the GPU, measured against a plain SoA array. If the layered version
+        does not beat SoA on the fixed scene, drop it.
+  - The p-adic metric names the tiering rule; the gain, if any, comes from the
+    tiering and from the upload that does not copy.
+
+- **Closed-form shading instead of loops**
+  - [ ] Remove ray marching from the absorption path: evaluate the integral in
+        closed form, as a sum of modes, instead of stepping through a 3D
+        texture, targeting 15 ALU instructions where 64 steps were needed.
+  - [ ] Treat a loop or a branch in a fragment shader as a defect that has to be
+        justified; a closed form exists more often than it looks.
+  - The holonomic D-module formalism is where such a closed form comes from;
+    the shader only needs the result. This item waits until there is a
+    volumetric or absorptive effect in the scene to measure it on.
