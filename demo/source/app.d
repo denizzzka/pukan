@@ -86,6 +86,7 @@ void main(string[] args) {
     const windowWidth = stereo ? width * 2 : width;
     auto window = glfwCreateWindow(windowWidth, height, name.toStringz, null, null);
     enforce(window, "Cannot create a window");
+    glfwSetScrollCallback(window, &onScroll);
 
     //~ glfwSetWindowUserPointer(demo.window, demo);
     //~ glfwSetWindowRefreshCallback(demo.window, &demo_refresh_callback);
@@ -308,8 +309,24 @@ enum cameraFovY = 45.0f;
 enum cameraNear = 0.1f;
 enum cameraFar = 10.0f;
 enum stereoEyeSeparation = 0.06f;
-enum cameraDistance = 1.2f;
+enum initialCameraDistance = 1.2f;
+enum minCameraDistance = 0.6f;
+enum maxCameraDistance = 2.5f;
 enum sceneDepth = 1.0f;
+
+float cameraDistance = initialCameraDistance;
+
+extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
+{
+    auto distance = cameraDistance - cast(float) yoffset * 0.1f;
+
+    if(distance < minCameraDistance)
+        distance = minCameraDistance;
+    if(distance > maxCameraDistance)
+        distance = maxCameraDistance;
+
+    cameraDistance = distance;
+}
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
