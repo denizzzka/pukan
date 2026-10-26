@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Backward Compatibility
+
+- Backward compatibility is not a concern: rename, remove and restructure APIs freely.
+
 ## Comments Policy
 
 - The project language is English.
