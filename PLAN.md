@@ -252,6 +252,14 @@ Ideas:
   module. Key by SPIR-V binary plus stage, return the existing `ShaderInfo`.
 - Keep `Scene` passive: it holds drawables and factories, not shader lists.
 
+## Primitive rendering
+
+Needed soon.
+
+- [ ] 3D lines with a thickness in pixels, for debug output.
+- [ ] Cylinders: surface quality, length, radius, color.
+- [ ] Spheres: surface quality, radius, color.
+
 ## Mesh rendering merge
 
 - [ ] Unify `Mesh` rendering paths after the steps above are validated.
