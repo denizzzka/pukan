@@ -36,6 +36,8 @@ class SwapChain
 
     this(LogicalDevice device, FrameBuilder fb, VkSurfaceCapabilitiesKHR capabilities, RenderPass renderPass, SwapChain old)
     {
+        import pukan.exceptions: PukanVulkanException;
+        import std.algorithm: any, canFind;
         import std.conv: to;
 
         auto cap = capabilities;
@@ -43,6 +45,16 @@ class SwapChain
         enforce(cap.currentExtent.width != uint.max, "unsupported, see VkSurfaceCapabilitiesKHR(3) Manual Page");
         enforce(cap.minImageCount > 0);
         enforce(cap.maxImageCount == 0 || cap.maxImageCount >= 3, "maxImageCount: "~cap.maxImageCount.to!string);
+
+        auto surface = device.physicalDevice.instance.surface;
+        const formats = getArrayFrom!vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice.physicalDevice, surface);
+        const presentModes = getArrayFrom!vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice.physicalDevice, surface);
+
+        enforce(formats.any!(f => f.format == renderPass.imageFormat &&
+                f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
+            new PukanVulkanException("surface does not support the swapchain color format"));
+        enforce(presentModes.canFind(VK_PRESENT_MODE_FIFO_KHR),
+            new PukanVulkanException("surface does not support FIFO present mode"));
 
         VkSwapchainCreateInfoKHR cinf = {
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,

@@ -342,8 +342,8 @@ requirements, which is currently unused.
         `vkCmdBindVertexBuffers2`: core 1.3, covered by `ApiVersionFor`.
   - [x] Queue families: `Requirement!(VkQueueFamilyProperties.queueFlags, ...)`
         checked at selection; the family is chosen by `QueueFlagsFor` at creation.
-  - [ ] Swapchain surface: format, color space and present mode are chosen by
-        `SwapChain` and not declared or checked.
+  - [x] Swapchain surface: `SwapChain` checks the color format, color space and
+        present mode against `vkGetPhysicalDeviceSurface*` before creation.
   - [x] Depth and sampled formats: `FormatRequirement` checks optimal tiling
         features at selection; `FrameBuilder` declares the depth format and
         `GltfFactory` the sampled texture format.
