@@ -9,6 +9,11 @@ constraint is marked in "Mesh rendering merge".
 - [ ] Set up CI on GitHub: build the library and both demos and run them with
       the validation layers enabled.
 
+## glTF loading
+
+- [ ] Teach `pukan.gltf.loader` to handle `data:image/...;base64` image URIs.
+      Buffer data URIs are already supported.
+
 ## VkObj coverage
 
 Needs thinking first.
