@@ -76,9 +76,6 @@ technique/pipeline machinery is proven would hide its defects.
 - [ ] OSD: debug text and small overlays (FPS, counters, flags).
 - [ ] Menu: prefer a ready-made solution (dimgui, bindbc-imgui, GTK, ...) and
       evaluate how it integrates with the existing frame loop.
-- [ ] 2D graphics under 3D: a background layer drawn before the scene.
-      Evaluate whether it can be done cheaply: one fullscreen quad pass with
-      depth write disabled, then the 3D pass on top.
 
 Questions:
 
