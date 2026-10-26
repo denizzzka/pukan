@@ -12,7 +12,7 @@ import std.meta: AliasSeq;
 import std.stdio;
 import std.string: toStringz;
 
-alias appRequirements = SwapChain.requirements;
+alias appRequirements = Requirements!(SwapChain);
 debug alias DebugEntities = FlightRecorder;
 else alias DebugEntities = AliasSeq!();
 
