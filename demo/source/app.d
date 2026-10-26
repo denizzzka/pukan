@@ -404,7 +404,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
             samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
             samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
             samplerInfo.anisotropyEnable = VK_TRUE;
-            samplerInfo.maxAnisotropy = 16; //TODO: use vkGetPhysicalDeviceProperties (at least)
+            samplerInfo.maxAnisotropy = requiredAnisotropy;
             samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
             samplerInfo.unnormalizedCoordinates = VK_FALSE;
             samplerInfo.compareEnable = VK_FALSE;
