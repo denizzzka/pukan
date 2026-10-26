@@ -87,6 +87,9 @@ void main(string[] args) {
     auto window = glfwCreateWindow(windowWidth, height, name.toStringz, null, null);
     enforce(window, "Cannot create a window");
     glfwSetScrollCallback(window, &onScroll);
+    glfwSetMouseButtonCallback(window, &onMouseButton);
+    glfwSetCursorPosCallback(window, &onCursorPos);
+    glfwGetCursorPos(window, &cursorX, &cursorY);
 
     //~ glfwSetWindowUserPointer(demo.window, demo);
     //~ glfwSetWindowRefreshCallback(demo.window, &demo_refresh_callback);
@@ -193,9 +196,17 @@ void main(string[] args) {
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
+        frameTime = glfwGetTime();
         glfwPollEvents();
 
         const curr = sw.peek.total!"msecs" * 0.001;
+
+        static float prevCurr = 0.0f;
+        const dt = curr - prevCurr;
+        prevCurr = curr;
+
+        if(!sceneDragging && frameTime - lastInteractionTime > autoResumeDelay)
+            sceneYaw += autoRotationSpeed * dt;
 
         WorldTransformation wtb;
         updateWorldTransformations(wtb, curr, scene.swapChain.imageExtent, tree, cubeRotator);
@@ -328,13 +339,62 @@ extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
     cameraDistance = distance;
 }
 
+enum autoRotationSpeed = 90f.degtorad * 0.1f;
+enum autoResumeDelay = 10.0;
+enum manualRotationSensitivity = 0.006f;
+enum maxScenePitch = 80f.degtorad;
+
+double frameTime;
+double lastInteractionTime = -1e9;
+double cursorX;
+double cursorY;
+bool sceneDragging;
+float sceneYaw = 0.0f;
+float scenePitch = 0.0f;
+
+extern(C) void onMouseButton(GLFWwindow*, int button, int action, int) nothrow @nogc
+{
+    if(button != GLFW_MOUSE_BUTTON_LEFT)
+        return;
+
+    if(action == GLFW_PRESS)
+    {
+        sceneDragging = true;
+        lastInteractionTime = frameTime;
+    }
+    else if(action == GLFW_RELEASE)
+    {
+        sceneDragging = false;
+        lastInteractionTime = frameTime;
+    }
+}
+
+extern(C) void onCursorPos(GLFWwindow*, double xpos, double ypos) nothrow @nogc
+{
+    const dx = xpos - cursorX;
+    const dy = ypos - cursorY;
+    cursorX = xpos;
+    cursorY = ypos;
+
+    if(!sceneDragging)
+        return;
+
+    sceneYaw += cast(float) dx * manualRotationSensitivity;
+    scenePitch += cast(float) dy * manualRotationSensitivity;
+
+    if(scenePitch > maxScenePitch)
+        scenePitch = maxScenePitch;
+    if(scenePitch < -maxScenePitch)
+        scenePitch = -maxScenePitch;
+
+    lastInteractionTime = frameTime;
+}
+
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
-    auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.1);
-
     WorldTransformation wtb;
 
-    wtb.model = rotation.toMatrix4x4;
+    wtb.model = rotationMatrix!float(Axis.y, sceneYaw) * rotationMatrix!float(Axis.x, scenePitch);
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
         Vector3f(0, -0.2f, -cameraDistance), // camera position
