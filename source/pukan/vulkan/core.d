@@ -31,7 +31,7 @@ private bool hasExtension(List)(List list, string name)
 /// Validation layer settings, declared by debug instances
 struct LayerSettings
 {
-    alias requirements = AliasSeq!(Requirement!(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME));
+    private alias requirements = AliasSeq!(Requirement!(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME));
 }
 
 ///
@@ -309,7 +309,7 @@ class Instance
 
 class FlightRecorder(TBackend)
 {
-    static alias optionalRequirements = getOptionalRequirements!(
+    private static alias optionalRequirements = getOptionalRequirements!(
         Requirement!(VK_EXT_DEBUG_UTILS_EXTENSION_NAME),
     );
 

@@ -111,7 +111,7 @@ struct Params
 
 class Gemm : Compute
 {
-    alias requirements = AliasSeq!(Requirement!("maxComputeWorkGroupInvocations", 256));
+    private alias requirements = AliasSeq!(Requirement!("maxComputeWorkGroupInvocations", 256));
 
     CommandPool cmdPool;
     VkCommandBuffer cmdBuf;

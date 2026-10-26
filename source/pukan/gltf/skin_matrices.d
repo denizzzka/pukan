@@ -11,7 +11,7 @@ import std.meta: AliasSeq;
 /// jointMatrices[i] = skinRootInverse * transFromRoot[nodeIndices[i]] * inverseBindMatrices[i]
 class SkinMatrices : Compute
 {
-    alias requirements = AliasSeq!(Requirement!("maxComputeWorkGroupInvocations", 64));
+    private alias requirements = AliasSeq!(Requirement!("maxComputeWorkGroupInvocations", 64));
 
     TransferBuffer transFromRootBuf; /// per-node transform relative to skin root, updated per frame
     TransferBuffer nodeIndicesBuf; /// joint index -> node index, static

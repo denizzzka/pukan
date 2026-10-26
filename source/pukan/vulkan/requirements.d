@@ -249,7 +249,7 @@ template contains(T, List...)
 private template moduleRequirements(M)
 {
     static if(__traits(hasMember, M, "requirements"))
-        alias moduleRequirements = M.requirements;
+        alias moduleRequirements = __traits(getMember, M, "requirements");
     else
         alias moduleRequirements = AliasSeq!();
 }
@@ -263,7 +263,7 @@ template Requirements(Modules...)
 private template moduleOptionalRequirements(M)
 {
     static if(__traits(hasMember, M, "optionalRequirements"))
-        alias moduleOptionalRequirements = M.optionalRequirements;
+        alias moduleOptionalRequirements = __traits(getMember, M, "optionalRequirements");
     else
         alias moduleOptionalRequirements = AliasSeq!();
 }
@@ -305,7 +305,7 @@ template OptionalRequirementsFor(Backend, Modules...)
 private template moduleResolvedRequirements(Backend, alias M)
 {
     static if(__traits(hasMember, resolveEntity!(M, Backend), "requirements"))
-        alias moduleResolvedRequirements = resolveEntity!(M, Backend).requirements;
+        alias moduleResolvedRequirements = __traits(getMember, resolveEntity!(M, Backend), "requirements");
     else
         alias moduleResolvedRequirements = AliasSeq!();
 }
@@ -414,8 +414,8 @@ unittest
     static assert(Requirement!("apiVersion", VulkanVersion(1, 3).toUint()).kind == Kind.number);
     static assert(!__traits(compiles, Requirement!"notARequirement"));
 
-    static struct A { alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
-    static struct B { alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
+    static struct A { private alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
+    static struct B { private alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
     static assert(Requirements!(A, B).length == 1);
 
     static assert(contains!(int, int, float));

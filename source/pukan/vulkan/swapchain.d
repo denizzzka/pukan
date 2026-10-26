@@ -8,7 +8,7 @@ import std.meta: AliasSeq;
 
 class SwapChain
 {
-    static alias requirements = AliasSeq!(
+    private static alias requirements = AliasSeq!(
         Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME),
     );
 

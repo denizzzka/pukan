@@ -13,7 +13,7 @@ enum requiredAnisotropy = 16;
 
 class Texture
 {
-    static alias optionalRequirements = getOptionalRequirements!(
+    private static alias optionalRequirements = getOptionalRequirements!(
         Requirement!"samplerAnisotropy",
         Requirement!("maxSamplerAnisotropy", requiredAnisotropy),
     );
