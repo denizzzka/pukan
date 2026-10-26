@@ -15,7 +15,7 @@ class PipelineInfoCreator : DefaultGraphicsPipelineInfoCreator!ShaderVertex
         rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         dynamicStates ~= VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE;
 
-        super(dev, descriptorSetLayouts, shads, renderPass);
+        super(dev, descriptorSetLayouts, shads, renderPass, 1);
     }
 }
 

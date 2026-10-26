@@ -45,22 +45,54 @@ class DefaultRenderPass : RenderPass
             depthAttachment,
         ];
 
-        VkSubpassDescription subpass = {
-            pipelineBindPoint: VK_PIPELINE_BIND_POINT_GRAPHICS,
-            colorAttachmentCount: 1,
-            pColorAttachments: &colorAttachmentRef,
-            pDepthStencilAttachment: &depthAttachmentRef,
-        };
+        VkSubpassDescription[] subpasses = [
+            {
+                pipelineBindPoint: VK_PIPELINE_BIND_POINT_GRAPHICS,
+                colorAttachmentCount: 1,
+                pColorAttachments: &colorAttachmentRef,
+            },
+            {
+                pipelineBindPoint: VK_PIPELINE_BIND_POINT_GRAPHICS,
+                colorAttachmentCount: 1,
+                pColorAttachments: &colorAttachmentRef,
+                pDepthStencilAttachment: &depthAttachmentRef,
+            },
+        ];
 
-        VkSubpassDependency dependency = defaultSubpassDependency;
+        VkSubpassDependency[] dependencies = [
+            {
+                srcSubpass: VK_SUBPASS_EXTERNAL,
+                dstSubpass: 0,
+                srcStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                srcAccessMask: 0,
+                dstStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                dstAccessMask: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            },
+            {
+                srcSubpass: 0,
+                dstSubpass: 1,
+                srcStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                srcAccessMask: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                dstStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                dstAccessMask: VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            },
+            {
+                srcSubpass: VK_SUBPASS_EXTERNAL,
+                dstSubpass: 1,
+                srcStageMask: VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                srcAccessMask: 0,
+                dstStageMask: VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                dstAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            },
+        ];
 
         VkRenderPassCreateInfo renderPassInfo = {
             attachmentCount: cast(uint) attachments.length,
             pAttachments: attachments.ptr,
-            subpassCount: 1,
-            pSubpasses: &subpass,
-            dependencyCount: 1,
-            pDependencies: &dependency,
+            subpassCount: cast(uint) subpasses.length,
+            pSubpasses: subpasses.ptr,
+            dependencyCount: cast(uint) dependencies.length,
+            pDependencies: dependencies.ptr,
         };
 
         vkCall(device, &renderPassInfo, device.alloc, &vkRenderPass);
@@ -90,15 +122,6 @@ class DefaultRenderPass : RenderPass
         stencilStoreOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
         initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
         finalLayout: VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    };
-
-    enum VkSubpassDependency defaultSubpassDependency = {
-        srcSubpass: VK_SUBPASS_EXTERNAL,
-        dstSubpass: 0,
-        srcStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        srcAccessMask: 0,
-        dstStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        dstAccessMask: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     };
 
     static struct CommonData
@@ -135,7 +158,11 @@ class DefaultRenderPass : RenderPass
         );
     }
 
-    void recordCommandBuffer(VkCommandBuffer commandBuffer,  void delegate(ref VkCommandBuffer) fillBufferDg)
+    void recordCommandBuffer(
+        VkCommandBuffer commandBuffer,
+        void delegate(ref VkCommandBuffer) draw2D,
+        void delegate(ref VkCommandBuffer) draw3D,
+    )
     {
         VkRenderPassBeginInfo renderPassInfo;
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -162,7 +189,11 @@ class DefaultRenderPass : RenderPass
 
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        fillBufferDg(commandBuffer);
+        draw2D(commandBuffer);
+
+        vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+
+        draw3D(commandBuffer);
 
         vkCmdEndRenderPass(commandBuffer);
     }

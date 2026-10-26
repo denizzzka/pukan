@@ -192,7 +192,7 @@ void main() {
 
             tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
 
-            scene.renderPass.recordCommandBuffer(cb, (buf){
+            scene.recordCommandBuffer(cb, (buf){
                 tree.drawingBufferFilling(buf, Matrix4x4f.identity);
             });
         });

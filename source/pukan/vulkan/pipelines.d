@@ -11,7 +11,13 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
     VkPipelineShaderStageCreateInfo[] shaderStages;
     VkPushConstantRange[] pushConstantRanges;
 
-    this(LogicalDevice dev, VkDescriptorSetLayout[] descriptorSetLayouts, ShaderInfo[] shads, RenderPass renderPass)
+    this(
+        LogicalDevice dev,
+        VkDescriptorSetLayout[] descriptorSetLayouts,
+        ShaderInfo[] shads,
+        RenderPass renderPass,
+        uint subpass = 0,
+    )
     {
         device = dev;
 
@@ -31,7 +37,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
         initVertexInputStateCreateInfo();
         initViewportState();
 
-        fillPipelineInfo(renderPass);
+        fillPipelineInfo(renderPass, subpass);
     }
 
     ~this()
@@ -115,7 +121,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
 
     VkGraphicsPipelineCreateInfo pipelineCreateInfo;
 
-    void fillPipelineInfo(ref RenderPass renderPass)
+    void fillPipelineInfo(ref RenderPass renderPass, uint subpass)
     {
         import pukan.vulkan.defaults: colorBlending, inputAssembly, multisampling;
 
@@ -134,7 +140,7 @@ class DefaultGraphicsPipelineInfoCreator(Vertex)
             pDynamicState: &dynamicStateInfo,
             layout: pipelineLayout,
             renderPass: renderPass.vkRenderPass,
-            subpass: 0,
+            subpass: subpass,
             basePipelineHandle: null, // Optional
             basePipelineIndex: -1, // Optional
         );

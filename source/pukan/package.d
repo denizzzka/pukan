@@ -1,5 +1,6 @@
 module pukan;
 
+public import pukan.background;
 public import pukan.gltf;
 public import pukan.misc;
 public import pukan.primitives_tree;

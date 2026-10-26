@@ -8,5 +8,7 @@ glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/gltf_vertices.glsl -o co
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/colored_fragment.glsl -o compiled_shaders/colored_frag.spv
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/textured_fragment.glsl -o compiled_shaders/textured_frag.spv
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/gltf_fragment.glsl -o compiled_shaders/gltf_fragment.spv
+glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/checkerboard.vert -o compiled_shaders/checkerboard_vert.spv
+glslc ${TGT} -fshader-stage=frag source/pukan/shaders/checkerboard.frag -o compiled_shaders/checkerboard_frag.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/gemm.comp -o compiled_shaders/gemm.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/skin_matrices.comp -o compiled_shaders/skin_matrices.spv

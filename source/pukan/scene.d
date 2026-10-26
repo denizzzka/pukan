@@ -16,6 +16,7 @@ class Scene
     SwapChain swapChain;
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
+    Checkerboard background;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -34,6 +35,7 @@ class Scene
         device.physicalDevice.instance.useSurface(surface);
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
+        background = new Checkerboard(device, renderPass);
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
@@ -64,9 +66,20 @@ class Scene
 
     ~this()
     {
+        background.destroy;
+
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
         frameBuilder.destroy;
+    }
+
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, void delegate(ref VkCommandBuffer) drawScene)
+    {
+        renderPass.recordCommandBuffer(
+            commandBuffer,
+            (ref VkCommandBuffer buf) { background.draw(buf); },
+            drawScene,
+        );
     }
 
     void recreateSwapChain()
