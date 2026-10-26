@@ -73,15 +73,15 @@ class PhysicalDevice
     }
 
     // TODO: empty args list?!
-    /// Returns: family indices
-    auto findSuitableQueueFamilies()
+    /// Returns: family indices satisfying the required flags
+    auto findSuitableQueueFamilies(VkQueueFlags required = VK_QUEUE_GRAPHICS_BIT)
     {
         auto qFamilyProps = getArrayFrom!vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice);
         size_t[] apprIndices;
 
         foreach(i, qfp; qFamilyProps)
         {
-            if (qfp.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            if((qfp.queueFlags & required) == required)
                apprIndices ~= i;
         }
 
@@ -92,6 +92,7 @@ class PhysicalDevice
     package bool createLogicalDeviceContext(Reqs...)(const(char)*[] extension_list, out DeviceContext ctx, out string reason)
     {
         ctx.properties = properties;
+        ctx.queueFamilies = getArrayFrom!vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice);
         ctx.supportedExtensions = extensions();
         ctx.enabledExtensions = extension_list.dup;
 
@@ -116,7 +117,7 @@ class PhysicalDevice
         FeatureChain chain;
         fillFeatureChain!Reqs(chain);
 
-        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled, ctx.enabledChainMask, chain);
+        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled, ctx.enabledChainMask, chain, QueueFlagsFor!Reqs);
     }
 }
 

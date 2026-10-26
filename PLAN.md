@@ -340,8 +340,8 @@ requirements, which is currently unused.
         checked when a sampler enables anisotropy.
   - [x] `VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE` and
         `vkCmdBindVertexBuffers2`: core 1.3, covered by `ApiVersionFor`.
-  - [ ] Graphics queue: `findSuitableQueueFamilies` filters
-        `VK_QUEUE_GRAPHICS_BIT` without a declared requirement.
+  - [x] Queue families: `Requirement!(VkQueueFamilyProperties.queueFlags, ...)`
+        checked at selection; the family is chosen by `QueueFlagsFor` at creation.
   - [ ] Swapchain surface: format, color space and present mode are chosen by
         `SwapChain` and not declared or checked.
   - [ ] Depth format `VK_FORMAT_D24_UNORM_S8_UINT` and the image formats in

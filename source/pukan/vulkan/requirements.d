@@ -7,7 +7,7 @@ import std.conv: to;
 import std.meta: AliasSeq, NoDuplicates, staticIndexOf, staticMap;
 import std.typecons: Tuple;
 
-private enum Kind { number, feature, chainFeature, extension }
+private enum Kind { number, feature, chainFeature, extension, queue }
 
 private template isNumberType(T)
 {
@@ -211,6 +211,9 @@ private template requirementKind(string name)
         enum requirementKind = Kind.feature;
     else static if(structsWithField!(name, featureStructs).length > 0)
         enum requirementKind = Kind.chainFeature;
+    else static if(__traits(hasMember, VkQueueFamilyProperties, name) &&
+        is(typeof(__traits(getMember, VkQueueFamilyProperties, name)) == VkQueueFlags))
+        enum requirementKind = Kind.queue;
     else static if(__traits(hasMember, VkPhysicalDeviceProperties, name) &&
         isNumberType!(typeof(__traits(getMember, VkPhysicalDeviceProperties, name))))
         enum requirementKind = Kind.number;
@@ -228,6 +231,8 @@ struct DeviceContext
     VkPhysicalDeviceFeatures supported;
     VkPhysicalDeviceFeatures enabled;
     ChainMask enabledChainMask;
+    VkQueueFamilyProperties[] queueFamilies;
+    VkQueueFlags selectedQueueFlags;
     VkExtensionProperties[] supportedExtensions;
     const(char)*[] enabledExtensions;
     version(assert)
@@ -312,6 +317,8 @@ private struct RequirementImpl(string name, ulong minimum)
 
     /// Name used in diagnostics
     enum string requirementName = name;
+    /// Minimum value or flags the requirement asks for
+    package enum ulong requirementMinimum = minimum;
 
     static if(kind == Kind.feature)
         static assert(minimum == 0, "feature requirement takes no minimum: " ~ name);
@@ -319,6 +326,8 @@ private struct RequirementImpl(string name, ulong minimum)
         static assert(minimum == 0, "feature requirement takes no minimum: " ~ name);
     else static if(kind == Kind.extension)
         static assert(minimum == 0, "extension requirement takes no minimum: " ~ name);
+    else static if(kind == Kind.queue)
+        static assert(minimum != 0, "queue requirement needs flags: " ~ name);
 
     /// Returns false and a reason when the requirement is not met
     static bool isSatisfied(Ctx)(ref Ctx ctx, out string reason) if(is(Ctx == DeviceContext))
@@ -346,6 +355,17 @@ private struct RequirementImpl(string name, ulong minimum)
         }
         else static if(kind == Kind.chainFeature)
             static assert(false, "chain features are checked during the device query: " ~ name);
+        else static if(kind == Kind.queue)
+        {
+            const required = cast(VkQueueFlags) minimum;
+
+            foreach(f; ctx.queueFamilies)
+                if((f.queueFlags & required) == required)
+                    return true;
+
+            reason = "no queue family with flags " ~ required.to!string;
+            return false;
+        }
         else static if(kind == Kind.extension)
         {
             if(!ctx.supportsExtension(name))
@@ -373,7 +393,7 @@ private struct RequirementImpl(string name, ulong minimum)
         }
     }
 
-    /// Records the chain feature in the mask; numeric values have nothing to request
+    /// Records the chain feature in the mask; numbers and queue flags have nothing to request
     static void request(ref DeviceContext ctx)
     {
         static if(kind == Kind.feature)
@@ -417,6 +437,16 @@ private struct RequirementImpl(string name, ulong minimum)
             if(!ctx.enabledChainMask.isSet(chainBitIndex!name))
             {
                 reason = "feature is not enabled: " ~ name;
+                return false;
+            }
+        }
+        else static if(kind == Kind.queue)
+        {
+            const required = cast(VkQueueFlags) minimum;
+
+            if((ctx.selectedQueueFlags & required) != required)
+            {
+                reason = "queue flags are not enabled: " ~ required.to!string;
                 return false;
             }
         }
@@ -719,6 +749,23 @@ template ApiVersionFor(Reqs...)
         : requiredApiVersion;
 }
 
+/// Queue flags the requirements need
+template QueueFlagsFor(Reqs...)
+{
+    private VkQueueFlags collect()
+    {
+        VkQueueFlags ret;
+
+        static foreach(R; Reqs)
+            static if(R.kind == Kind.queue)
+                ret |= cast(VkQueueFlags) R.requirementMinimum;
+
+        return ret;
+    }
+
+    enum QueueFlagsFor = collect();
+}
+
 /// Returns true when every requirement is satisfied, otherwise fills the reason
 bool requirementsSatisfied(Reqs...)(ref DeviceContext ctx, out string reason)
 {
@@ -885,6 +932,24 @@ unittest
     swapchain.request(chainCtx);
     swapchain.request(chainCtx);
     assert(chainCtx.enabledExtensions.length == 1);
+
+    alias graphicsQueue = Requirement!(VkQueueFamilyProperties.queueFlags, VK_QUEUE_GRAPHICS_BIT);
+    static assert(graphicsQueue.kind == Kind.queue);
+    static assert(QueueFlagsFor!graphicsQueue == VK_QUEUE_GRAPHICS_BIT);
+
+    DeviceContext queueCtx;
+    queueCtx.queueFamilies = [
+        VkQueueFamilyProperties(queueFlags: 0),
+        VkQueueFamilyProperties(queueFlags: VK_QUEUE_GRAPHICS_BIT),
+    ];
+    assert(requirementsSatisfied!graphicsQueue(queueCtx, reason));
+    assert(!requirementsEnabled!graphicsQueue(queueCtx, reason));
+
+    queueCtx.selectedQueueFlags = VK_QUEUE_GRAPHICS_BIT;
+    assert(requirementsEnabled!graphicsQueue(queueCtx, reason));
+
+    DeviceContext noQueue;
+    assert(!requirementsSatisfied!graphicsQueue(noQueue, reason));
 
     static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }

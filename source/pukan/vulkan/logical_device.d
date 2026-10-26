@@ -18,14 +18,16 @@ class LogicalDevice
 
     private VkPhysicalDeviceFeatures enabledFeatures;
     private ChainMask enabledChainMask;
+    private VkQueueFlags selectedQueueFlags;
     private const(char)*[] enabledExtensions;
 
     package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures,
-        ChainMask enabledChainMask, FeatureChain chain)
+        ChainMask enabledChainMask, FeatureChain chain, VkQueueFlags requiredQueueFlags)
     {
         physicalDevice = pd;
+        selectedQueueFlags = requiredQueueFlags;
 
-        const fqIdxs = pd.findSuitableQueueFamilies();
+        const fqIdxs = pd.findSuitableQueueFamilies(requiredQueueFlags);
         enforce(fqIdxs.length > 0);
         familyIdx = cast(uint) fqIdxs[0];
 
@@ -93,6 +95,7 @@ class LogicalDevice
         ctx.properties = physicalDevice.properties;
         ctx.enabled = enabledFeatures;
         ctx.enabledChainMask = enabledChainMask;
+        ctx.selectedQueueFlags = selectedQueueFlags;
         ctx.enabledExtensions = enabledExtensions.dup;
         return ctx;
     }

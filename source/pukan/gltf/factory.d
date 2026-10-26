@@ -2,6 +2,8 @@ module pukan.gltf.factory;
 
 import pukan.gltf;
 import pukan.vulkan;
+import pukan.vulkan.bindings;
+import std.meta: AliasSeq;
 
 class PipelineInfoCreator : DefaultGraphicsPipelineInfoCreator!ShaderVertex
 {
@@ -24,7 +26,10 @@ class GltfFactory
     import pukan.vulkan.frame_builder;
     import pukan.gltf.skin_matrices: SkinMatrices;
 
-    private alias requirements = SkinMatrices.requirements;
+    private alias requirements = AliasSeq!(
+        SkinMatrices.requirements,
+        Requirement!(VkQueueFamilyProperties.queueFlags, VK_QUEUE_GRAPHICS_BIT),
+    );
 
     LogicalDevice device;
     private immutable bool computeJointsOnGPU;
