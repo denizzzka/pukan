@@ -7,6 +7,8 @@ constraint is marked in "Mesh rendering merge".
 - [ ] Deal with warnings
 - [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
       used independently of the rest of `pukan`. Keep module names unchanged.
+- [ ] Set up CI on GitHub: build the library and both demos and run them with
+      the validation layers enabled.
 
 ## VkObj coverage
 
