@@ -13,7 +13,10 @@ import std.meta: AliasSeq;
 import std.stdio;
 import std.string: toStringz;
 
-alias appRequirements = AliasSeq!(Requirement!"samplerAnisotropy");
+alias appRequirements = AliasSeq!(
+    Requirement!"samplerAnisotropy",
+    SwapChain.requirements,
+);
 debug alias DebugEntities = FlightRecorder;
 else alias DebugEntities = AliasSeq!();
 
@@ -110,11 +113,7 @@ void main() {
             //~ s.extensionName.to!string.writeln;
     //~ }
 
-    const(char*)[] dev_extension_list = [
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
-    ];
-
-    auto device = selected.createLogicalDevice(dev_extension_list);
+    auto device = selected.createLogicalDevice();
     scope(success)
     {
         import core.memory: GC;

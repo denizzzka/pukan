@@ -2,10 +2,16 @@ module pukan.vulkan.swapchain;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.requirements: Requirement;
 import std.exception: enforce;
+import std.meta: AliasSeq;
 
 class SwapChain
 {
+    static alias requirements = AliasSeq!(
+        Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME),
+    );
+
     LogicalDevice device;
     VkSwapchainKHR swapchain;
     private SwapChain oldSwapChain;
