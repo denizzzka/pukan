@@ -314,6 +314,24 @@ template OptionalRequirementsFor(Backend, Modules...)
     alias OptionalRequirementsFor = NoDuplicates!(staticMap!(moduleOptional, Modules));
 }
 
+/// Optional requirements minus everything Required covers
+template OptionalRequirementsWithout(Required...)
+{
+    /// Optional requirements not covered by Required
+    template Of(Optional...)
+    {
+        private template keep(R)
+        {
+            static if(contains!(R, Required))
+                alias keep = AliasSeq!();
+            else
+                alias keep = AliasSeq!(R);
+        }
+
+        alias Of = staticMap!(keep, NoDuplicates!Optional);
+    }
+}
+
 private template moduleResolvedRequirements(Backend, alias M)
 {
     static if(__traits(hasMember, resolveEntity!(M, Backend), "requirements"))
@@ -448,6 +466,17 @@ unittest
     static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static assert(Requirements!(A, B).length == 1);
+
+    static struct Opt
+    {
+        private alias optionalRequirements = AliasSeq!(
+            Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy),
+            Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME),
+        );
+    }
+    static assert(OptionalRequirementsWithout!(Requirements!A).Of!(OptionalRequirementsOf!Opt).length == 1);
+    static assert(is(OptionalRequirementsWithout!(Requirements!A).Of!(OptionalRequirementsOf!Opt)[0] ==
+        Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME)));
 
     static assert(contains!(int, int, float));
     static assert(!contains!(double, int, float));

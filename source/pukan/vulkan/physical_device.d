@@ -5,7 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
-import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, requestOptionalRequirements;
+import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, OptionalRequirementsWithout, requestOptionalRequirements;
 import pukan: toPrettyString;
 import std.meta: AliasSeq;
 
@@ -134,7 +134,7 @@ struct SelectedDevice(Reqs...)
     LogicalDevice createLogicalDevice(Modules...)()
     {
         auto ctx = context;
-        alias optional = OptionalRequirementsFor!(LogicalDevice, Modules);
+        alias optional = OptionalRequirementsWithout!Reqs.Of!(OptionalRequirementsFor!(LogicalDevice, Modules));
         requestOptionalRequirements!optional(ctx);
         return physicalDevice.createLogicalDeviceFromContext(ctx);
     }
