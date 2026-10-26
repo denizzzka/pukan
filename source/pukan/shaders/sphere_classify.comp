@@ -12,7 +12,7 @@ layout(push_constant) uniform Push {
     float maxEdge;
     float minEdge;
     uint sphereCount;
-    uint colorCount;
+    uint groupCount;
     uint levelCount;
     uint maxLevel;
 } pc;

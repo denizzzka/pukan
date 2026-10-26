@@ -6,6 +6,14 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirement;
 import std.meta: AliasSeq;
+import std.typecons: BitFlags;
+
+enum SphereGroupFlag: uint
+{
+    normals = 1u << 0,
+}
+
+alias SphereGroupFlags = BitFlags!SphereGroupFlag;
 
 struct SphereVertex
 {
@@ -46,11 +54,17 @@ struct SphereVertex
     }
 }
 
+struct SphereGroup
+{
+    Vector3f color;
+    SphereGroupFlags flags;
+}
+
 struct SphereInstance
 {
     Vector3f center;
     float radius;
-    uint colorIndex;
+    uint groupIndex;
 }
 
 struct SphereLod
@@ -77,7 +91,7 @@ private struct ClassifyPush
     float maxEdge;
     float minEdge;
     uint sphereCount;
-    uint colorCount;
+    uint groupCount;
     uint levelCount;
     uint maxLevel;
 }
@@ -276,7 +290,7 @@ class SphereRenderer : DrawablePrimitive
     private LogicalDevice device;
     private SphereLod lod;
     private uint instanceCount;
-    private uint colorCount;
+    private uint groupCount;
     private uint levelCount;
     private uint bucketCount;
 
@@ -383,21 +397,21 @@ class SphereRenderer : DrawablePrimitive
             destroy(paletteBuffer);
     }
 
-    void setInstances(SphereInstance[] instances, Vector3f[] palette)
+    void setInstances(SphereInstance[] instances, SphereGroup[] groups)
     in(instances.length > 0)
-    in(palette.length > 0 && palette.length <= paletteSize)
+    in(groups.length > 0 && groups.length <= paletteSize)
     {
         import core.stdc.string: memset;
 
         assert(!uploaded);
-        assert(palette.length * levelCount <= frameBuckets);
+        assert(groups.length * levelCount <= frameBuckets);
 
         instanceCount = cast(uint) instances.length;
-        colorCount = cast(uint) palette.length;
-        bucketCount = colorCount * levelCount;
+        groupCount = cast(uint) groups.length;
+        bucketCount = groupCount * levelCount;
 
         foreach(ref instance; instances)
-            assert(instance.colorIndex < colorCount);
+            assert(instance.groupIndex < groupCount);
 
         sourceCenters = device.create!TransferBuffer(
             instances.length * Vector4f.sizeof,
@@ -431,7 +445,7 @@ class SphereRenderer : DrawablePrimitive
             foreach(i, ref instance; instances)
             {
                 centers[i] = Vector4f(instance.center.x, instance.center.y, instance.center.z, instance.radius);
-                colors[i] = instance.colorIndex;
+                colors[i] = instance.groupIndex;
             }
         }
 
@@ -440,12 +454,12 @@ class SphereRenderer : DrawablePrimitive
         {
             memset(commands.cpuBuf.ptr, 0, commands.cpuBuf.length);
             auto indirect = cast(VkDrawIndexedIndirectCommand[]) commands.cpuBuf;
-            foreach(color; 0 .. colorCount)
+            foreach(group; 0 .. groupCount)
             {
                 foreach(level; 0 .. levelCount)
                 {
                     const lvl = generator.level(level);
-                    indirect[color * levelCount + level] = VkDrawIndexedIndirectCommand(
+                    indirect[group * levelCount + level] = VkDrawIndexedIndirectCommand(
                         indexCount: lvl.indexCount,
                         instanceCount: 0,
                         firstIndex: lvl.indexOffset,
@@ -458,10 +472,10 @@ class SphereRenderer : DrawablePrimitive
 
         {
             auto paletteData = cast(Vector4f[]) paletteBuffer.cpuBuf;
-            foreach(i, ref color; palette)
-                paletteData[i] = Vector4f(color.x, color.y, color.z, 1.0f);
-            foreach(i; palette.length .. paletteSize)
-                paletteData[i] = Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+            foreach(i, ref group; groups)
+                paletteData[i] = Vector4f(group.color.x, group.color.y, group.color.z, cast(float) cast(uint) group.flags);
+            foreach(i; groups.length .. paletteSize)
+                paletteData[i] = Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
         }
 
         {
@@ -587,7 +601,7 @@ class SphereRenderer : DrawablePrimitive
             maxEdge: lod.maxEdgePx,
             minEdge: lod.maxEdgePx * 0.5f,
             sphereCount: instanceCount,
-            colorCount: colorCount,
+            groupCount: groupCount,
             levelCount: levelCount,
             maxLevel: lod.maxLevel,
         );

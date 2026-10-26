@@ -6,6 +6,16 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirement;
 import std.meta: AliasSeq;
+import std.typecons: BitFlags;
+
+enum CylinderGroupFlag: uint
+{
+    normals = 1u << 0,
+    firstCap = 1u << 1,
+    secondCap = 1u << 2,
+}
+
+alias CylinderGroupFlags = BitFlags!CylinderGroupFlag;
 
 struct CylinderInstance
 {
@@ -18,7 +28,7 @@ struct CylinderInstance
 struct CylinderGroup
 {
     Vector3f color;
-    uint capMask = 0b11;
+    CylinderGroupFlags flags = CylinderGroupFlags(CylinderGroupFlag.firstCap, CylinderGroupFlag.secondCap);
 }
 
 struct CylinderLod
@@ -511,7 +521,7 @@ class CylinderRenderer : DrawablePrimitive
 
             foreach(group; 0 .. groupCount)
             {
-                const mask = groups[group].capMask;
+                const flags = groups[group].flags;
 
                 foreach(level; 0 .. levelCount)
                 {
@@ -526,14 +536,14 @@ class CylinderRenderer : DrawablePrimitive
                         firstInstance: 0,
                     );
                     indirect[base + 1u] = VkDrawIndexedIndirectCommand(
-                        indexCount: (mask & 1u) ? lvl.capIndices : 0,
+                        indexCount: flags.firstCap ? lvl.capIndices : 0,
                         instanceCount: 0,
                         firstIndex: lvl.indexOffset + lvl.sideIndices,
                         vertexOffset: lvl.vertexOffset,
                         firstInstance: 0,
                     );
                     indirect[base + 2u] = VkDrawIndexedIndirectCommand(
-                        indexCount: (mask & 2u) ? lvl.capIndices : 0,
+                        indexCount: flags.secondCap ? lvl.capIndices : 0,
                         instanceCount: 0,
                         firstIndex: lvl.indexOffset + lvl.sideIndices + lvl.capIndices,
                         vertexOffset: lvl.vertexOffset,
@@ -546,9 +556,9 @@ class CylinderRenderer : DrawablePrimitive
         {
             auto palette = cast(Vector4f[]) paletteBuffer.cpuBuf;
             foreach(i, ref group; groups)
-                palette[i] = Vector4f(group.color.x, group.color.y, group.color.z, 1.0f);
+                palette[i] = Vector4f(group.color.x, group.color.y, group.color.z, cast(float) cast(uint) group.flags);
             foreach(i; groups.length .. paletteSize)
-                palette[i] = Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+                palette[i] = Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
         }
 
         {

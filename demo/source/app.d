@@ -1,7 +1,7 @@
 import pukan;
 import pukan.scene_tree;
-import pukan.primitives_tree.cylinder: CylinderGroup, CylinderInstance, CylinderRenderer;
-import pukan.primitives_tree.sphere: SphereInstance, SphereRenderer;
+import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
+import pukan.primitives_tree.sphere: SphereGroup, SphereGroupFlag, SphereGroupFlags, SphereInstance, SphereRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
@@ -528,6 +528,7 @@ private struct SphereSpec
     float xStep;
     float yStep;
     float y0;
+    SphereGroupFlags flags;
 }
 
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
@@ -591,15 +592,18 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         const specs = [
             SphereSpec(Vector3f(0.3f, 1.0f, 0.4f), 20, 4, 0.018f, 0.040f, 0.045f, 0.26f),
             SphereSpec(Vector3f(0.4f, 0.6f, 1.0f), 8, 3, 0.030f, 0.090f, 0.060f, 0.46f),
-            SphereSpec(Vector3f(1.0f, 0.5f, 0.4f), 5, 1, 0.080f, 0.140f, 0.000f, 0.66f),
+            SphereSpec(
+                Vector3f(1.0f, 0.5f, 0.4f), 5, 1, 0.080f, 0.140f, 0.000f, 0.66f,
+                SphereGroupFlags(SphereGroupFlag.normals),
+            ),
         ];
 
         SphereInstance[] instances;
-        Vector3f[] palette;
+        SphereGroup[] groups;
 
-        foreach(colorIndex, spec; specs)
+        foreach(groupIndex, spec; specs)
         {
-            palette ~= spec.color;
+            groups ~= SphereGroup(spec.color, spec.flags);
 
             foreach(row; 0 .. spec.rows)
             {
@@ -607,12 +611,12 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
                 {
                     const x = (cast(float) col - cast(float)(spec.cols - 1) * 0.5f) * spec.xStep;
                     const y = spec.y0 + cast(float) row * spec.yStep;
-                    instances ~= SphereInstance(Vector3f(x, y, 0), spec.radius, cast(uint) colorIndex);
+                    instances ~= SphereInstance(Vector3f(x, y, 0), spec.radius, cast(uint) groupIndex);
                 }
             }
         }
 
-        scene.sphereRenderer.setInstances(instances, palette);
+        scene.sphereRenderer.setInstances(instances, groups);
         spheresBranch.addChild(cast(DrawablePrimitive) scene.sphereRenderer);
     }
 
@@ -625,9 +629,18 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         import std.math: PI, cos, sin;
 
         CylinderGroup[] groups = [
-            CylinderGroup(Vector3f(0.3f, 1.0f, 0.4f), 0b11),
-            CylinderGroup(Vector3f(0.4f, 0.6f, 1.0f), 0b01),
-            CylinderGroup(Vector3f(1.0f, 0.5f, 0.4f), 0b00),
+            CylinderGroup(
+                Vector3f(0.3f, 1.0f, 0.4f),
+                CylinderGroupFlags(CylinderGroupFlag.firstCap, CylinderGroupFlag.secondCap),
+            ),
+            CylinderGroup(
+                Vector3f(0.4f, 0.6f, 1.0f),
+                CylinderGroupFlags(CylinderGroupFlag.firstCap),
+            ),
+            CylinderGroup(
+                Vector3f(1.0f, 0.5f, 0.4f),
+                CylinderGroupFlags(CylinderGroupFlag.normals),
+            ),
         ];
 
         CylinderInstance[] instances;
