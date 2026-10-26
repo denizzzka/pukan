@@ -15,6 +15,9 @@ alias ST = VkStructureType;
 
 alias sType_list = AliasSeq!(
     Entry!(VkInstanceCreateInfo,        VkInstance,         ST.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO),
+    Entry!(VkSemaphoreCreateInfo,       VkSemaphore,        ST.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO),
+    Entry!(VkFenceCreateInfo,           VkFence,            ST.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO),
+    Entry!(VkCommandPoolCreateInfo,     VkCommandPool,      ST.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO),
     Entry!(VkRenderPassCreateInfo,      VkRenderPass,       ST.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO),
     Entry!(VkPipelineLayoutCreateInfo,  VkPipelineLayout,   ST.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO),
     Entry!(VkBufferCreateInfo,          VkBuffer,           ST.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO), //FIXME: remove

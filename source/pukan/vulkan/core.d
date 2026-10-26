@@ -43,12 +43,12 @@ class Instance
          engineVersion: 1,
     };
 
-    alias VkT = VkObj!(VkInstanceCreateInfo*, VkAllocationCallbacks*);
-    VkT instance;
+    alias InstanceObj = VkObj!VkInstance;
+    InstanceObj instance;
     VkAllocationCallbacks* allocator = null;
 
     // non-dispatcheable handles, so placing it here
-    VkSurfaceKHR surface;
+    VkObj!VkSurfaceKHR surface;
 
     private PhysicalDevice selectedPhysicalDevice;
 
@@ -122,7 +122,7 @@ class Instance
                 createInfo.pNext = &layersSettings;
         }
 
-        instance = create(&createInfo, allocator);
+        instance = InstanceObj(allocator, createInfo);
 
         enabledExtensions = extension_list.dup;
 
@@ -132,21 +132,16 @@ class Instance
     ///
     this(VkInstance ins)
     {
-        instance = VkT(ins, null);
+        instance = InstanceObj(ins, null);
         log_info("Vulkan instance obtained");
-    }
-
-    ~this()
-    {
-        if(surface)
-            vkDestroySurfaceKHR(instance, surface, allocator);
     }
 
     mixin SurfaceMethods;
 
     void useSurface(VkSurfaceKHR s) @live
     {
-        surface = s;
+        destroy(surface);
+        surface = VkObj!VkSurfaceKHR(s, instance, allocator);
     }
 
     void printAllAvailableLayers()

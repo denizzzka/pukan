@@ -14,7 +14,7 @@ class CommandPool
 {
     LogicalDevice device;
 
-    VkCommandPool commandPool;
+    VkObj!VkCommandPool commandPool;
 
     enum VkCommandPoolCreateInfo defaultPoolCreateInfo = {
         sType: VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -42,13 +42,7 @@ class CommandPool
         auto cinf = defaultPoolCreateInfo;
         cinf.queueFamilyIndex = queueFamilyIndex;
 
-        vkCreateCommandPool(device.device, &cinf, device.alloc, &commandPool).vkCheck;
-    }
-
-    ~this()
-    {
-        if(commandPool)
-            vkDestroyCommandPool(device.device, commandPool, device.alloc);
+        commandPool = VkObj!VkCommandPool(device.device, device.alloc, cinf);
     }
 
     VkCommandBuffer[] allocateBuffers(uint count)
@@ -93,9 +87,9 @@ class CommandPool
         auto fence = device.createFence;
         scope(exit) destroy(fence);
 
-        vkResetFences(device, 1, &fence.fence).vkCheck;
+        vkResetFences(device, 1, &fence.fence.handle).vkCheck;
         vkQueueSubmit(device.getQueue(), 1, &submitInfo, fence).vkCheck;
-        vkWaitForFences(device.device, 1, &fence.fence, VK_TRUE, uint.max).vkCheck;
+        vkWaitForFences(device.device, 1, &fence.fence.handle, VK_TRUE, uint.max).vkCheck;
     }
 }
 

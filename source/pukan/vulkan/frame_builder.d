@@ -126,8 +126,8 @@ class SyncFramesInFlight
         imageAvailable = fb.device.create!Semaphore;
         renderFinished = fb.device.create!Semaphore;
 
-        imageAvailableSemaphores = [imageAvailable.semaphore];
-        renderFinishedSemaphores = [renderFinished.semaphore];
+        imageAvailableSemaphores = [imageAvailable.semaphore.handle];
+        renderFinishedSemaphores = [renderFinished.semaphore.handle];
     }
 }
 

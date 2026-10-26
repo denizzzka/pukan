@@ -189,7 +189,7 @@ class Semaphore
 {
     ubyte[70000] FIXME_druntime_issue_REMOVE_ME;
     LogicalDevice device;
-    VkSemaphore semaphore;
+    VkObj!VkSemaphore semaphore;
     alias this = semaphore;
 
     this(LogicalDevice dev)
@@ -200,13 +200,7 @@ class Semaphore
             sType: VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
 
-        vkCreateSemaphore(device.device, &cinf, device.alloc, &semaphore).vkCheck;
-    }
-
-    ~this()
-    {
-        if(semaphore)
-            vkDestroySemaphore(device.device, semaphore, device.alloc);
+        semaphore = VkObj!VkSemaphore(device.device, device.alloc, cinf);
     }
 }
 
@@ -214,7 +208,7 @@ class Fence
 {
     //~ ubyte[70000] FIXME_druntime_issue_REMOVE_ME;
     LogicalDevice device;
-    VkFence fence;
+    VkObj!VkFence fence;
     alias this = fence;
 
     this(LogicalDevice dev)
@@ -226,22 +220,16 @@ class Fence
             flags: VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        vkCreateFence(device.device, &cinf, device.alloc, &fence).vkCheck;
-    }
-
-    ~this()
-    {
-        if(fence)
-            vkDestroyFence(device.device, fence, device.alloc);
+        fence = VkObj!VkFence(device.device, device.alloc, cinf);
     }
 
     void wait()
     {
-        vkWaitForFences(device, 1, &fence, VK_TRUE, uint.max).vkCheck;
+        vkWaitForFences(device, 1, &fence.handle, VK_TRUE, uint.max).vkCheck;
     }
 
     void reset()
     {
-        vkResetFences(device, 1, &fence).vkCheck;
+        vkResetFences(device, 1, &fence.handle).vkCheck;
     }
 }

@@ -46,7 +46,7 @@ class SwapChain
         enforce(cap.minImageCount > 0);
         enforce(cap.maxImageCount == 0 || cap.maxImageCount >= 3, "maxImageCount: "~cap.maxImageCount.to!string);
 
-        auto surface = device.physicalDevice.instance.surface;
+        auto surface = device.physicalDevice.instance.surface.handle;
         const formats = getArrayFrom!vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice.physicalDevice, surface);
         const presentModes = getArrayFrom!vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice.physicalDevice, surface);
 
@@ -58,7 +58,7 @@ class SwapChain
 
         VkSwapchainCreateInfoKHR cinf = {
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            surface: device.physicalDevice.instance.surface,
+            surface: device.physicalDevice.instance.surface.handle,
             imageFormat: renderPass.imageFormat,
             imageColorSpace: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
             imageExtent: capabilities.currentExtent,
