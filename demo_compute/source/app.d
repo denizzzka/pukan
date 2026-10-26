@@ -50,7 +50,7 @@ void main()
     auto device = selected.createLogicalDevice(dev_extension_list);
     scope(exit) destroy(device);
 
-    auto gemm = Gemm.create!appRequirements(device, M, N, K);
+    auto gemm = Gemm.create(device, M, N, K);
     scope(exit) destroy(gemm);
 
     gemm.setA(A);

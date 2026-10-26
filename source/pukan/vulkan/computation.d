@@ -2,7 +2,7 @@ module pukan.vulkan.computation;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.requirements: Requirement, contains;
+import pukan.vulkan.requirements: Requirement;
 import pukan.vulkan.shaders: ShaderInfo;
 import std.meta: AliasSeq;
 
@@ -126,12 +126,10 @@ class Gemm : Compute
 
     enum ParamsSize = Params.sizeof;
 
-    /// Creates the kernel and checks its requirements are part of the manifest
-    static Gemm create(Manifest...)(LogicalDevice dev, uint M, uint N, uint K)
+    /// Verifies the requirements, then creates the kernel
+    static Gemm create(LogicalDevice dev, uint M, uint N, uint K)
     {
-        // Optional guard, illustrative only: the requirement is declared above, this catches a forgotten manifest entry
-        static foreach(R; requirements)
-            static assert(contains!(R, Manifest), "Gemm requirement is missing from the manifest: " ~ R.requirementName);
+        dev.ensureEnabled!requirements("Gemm");
 
         return new Gemm(dev, M, N, K);
     }
