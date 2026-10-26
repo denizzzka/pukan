@@ -282,8 +282,8 @@ struct InstanceContext
     }
 }
 
-/// Device requirement: a numeric property, a feature (base or chained) or an extension
-/// Features and extensions have no minimum, so it only matters for numbers
+/// Device requirement: a number, a feature (base or chained), queue flags or an extension
+/// Numbers and queue flags take a value; features and extensions take none
 template Requirement(alias source, ulong minimum = 0)
 {
     /// Field symbols take their own name, string constants their value
