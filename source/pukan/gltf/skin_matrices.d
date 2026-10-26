@@ -11,7 +11,10 @@ import std.meta: AliasSeq;
 /// jointMatrices[i] = skinRootInverse * transFromRoot[nodeIndices[i]] * inverseBindMatrices[i]
 class SkinMatrices : Compute
 {
-    package alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 64));
+    package alias requirements = AliasSeq!(
+        Requirement!(VkPhysicalDeviceVulkan13Features.maintenance4),
+        Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 64),
+    );
 
     TransferBuffer transFromRootBuf; /// per-node transform relative to skin root, updated per frame
     TransferBuffer nodeIndicesBuf; /// joint index -> node index, static
@@ -25,6 +28,7 @@ class SkinMatrices : Compute
     uint jointsCount;
 
     enum PushConstantSize = Matrix4x4f.sizeof;
+    enum workgroupSize = 64;
 
     this(
         LogicalDevice dev,
@@ -80,11 +84,23 @@ class SkinMatrices : Compute
             size: PushConstantSize,
         };
 
+        uint[1] workgroupSizes = [workgroupSize];
+        VkSpecializationMapEntry[1] mapEntries = [
+            VkSpecializationMapEntry(constantID: 0, offset: 0, size: uint.sizeof),
+        ];
+        VkSpecializationInfo specialization = {
+            mapEntryCount: cast(uint) mapEntries.length,
+            pMapEntries: mapEntries.ptr,
+            dataSize: workgroupSizes.sizeof,
+            pData: cast(const void*) workgroupSizes.ptr,
+        };
+
         super(
             dev,
             layoutBindings,
             cast(ubyte[]) import("skin_matrices.spv"),
             pushConstant,
+            &specialization,
         );
 
         transFromRootInfo = VkDescriptorBufferInfo(
@@ -173,7 +189,7 @@ class SkinMatrices : Compute
         dispatch(
             cmdBuf,
             &skinRootInverse,
-            (jointsCount + 63) / 64,
+            (jointsCount + workgroupSize - 1) / workgroupSize,
             1,
             1,
         );

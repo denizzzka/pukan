@@ -19,7 +19,13 @@ abstract class Compute
 
     private VkWriteDescriptorSet[] pendingWrites;
 
-    this(LogicalDevice dev, VkDescriptorSetLayoutBinding[] layoutBindings, ubyte[] spvBinary, VkPushConstantRange pushConstant)
+    this(
+        LogicalDevice dev,
+        VkDescriptorSetLayoutBinding[] layoutBindings,
+        ubyte[] spvBinary,
+        VkPushConstantRange pushConstant,
+        VkSpecializationInfo* specialization = null,
+    )
     {
         device = dev;
 
@@ -38,9 +44,12 @@ abstract class Compute
         pipelineLayout = createPipelineLayout(device, [poolAndLayout.descriptorSetLayout], [pushConstant]);
         scope(failure) destroy(pipelineLayout);
 
+        auto stage = shader.createShaderStageInfo;
+        stage.pSpecializationInfo = specialization;
+
         auto pipelineCreateInfo = VkComputePipelineCreateInfo(
             sType: VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            stage: shader.createShaderStageInfo,
+            stage: stage,
             layout: pipelineLayout,
             basePipelineHandle: null,
             basePipelineIndex: -1,
@@ -112,6 +121,7 @@ struct Params
 class Gemm : Compute
 {
     private alias requirements = AliasSeq!(
+        Requirement!(VkPhysicalDeviceVulkan13Features.maintenance4),
         Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256),
         Requirement!(VkQueueFamilyProperties.queueFlags, VK_QUEUE_COMPUTE_BIT),
     );
@@ -128,6 +138,8 @@ class Gemm : Compute
     VkDescriptorBufferInfo cInfo;
 
     enum ParamsSize = Params.sizeof;
+    enum workgroupSizeX = 16;
+    enum workgroupSizeY = 16;
 
     /// Verifies the requirements, then creates the kernel
     static Gemm create(LogicalDevice dev, uint M, uint N, uint K)
@@ -166,11 +178,24 @@ class Gemm : Compute
             size: ParamsSize,
         };
 
+        uint[2] workgroupSizes = [workgroupSizeX, workgroupSizeY];
+        VkSpecializationMapEntry[2] mapEntries = [
+            VkSpecializationMapEntry(constantID: 0, offset: 0, size: uint.sizeof),
+            VkSpecializationMapEntry(constantID: 1, offset: uint.sizeof, size: uint.sizeof),
+        ];
+        VkSpecializationInfo specialization = {
+            mapEntryCount: cast(uint) mapEntries.length,
+            pMapEntries: mapEntries.ptr,
+            dataSize: workgroupSizes.sizeof,
+            pData: cast(const void*) workgroupSizes.ptr,
+        };
+
         super(
             dev,
             layoutBindings,
             cast(ubyte[]) import("gemm.spv"),
             pushConstant,
+            &specialization,
         );
 
         _M = M;
@@ -270,8 +295,8 @@ class Gemm : Compute
                 dispatch(
                     cmdBuf,
                     &params,
-                    (N + 15) / 16,
-                    (M + 15) / 16,
+                    (N + workgroupSizeX - 1) / workgroupSizeX,
+                    (M + workgroupSizeY - 1) / workgroupSizeY,
                     1,
                 );
             }
