@@ -7,7 +7,6 @@ import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
 import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, requestOptionalRequirements;
 import pukan: toPrettyString;
-import std.conv: to;
 import std.meta: AliasSeq;
 
 ///
@@ -18,14 +17,12 @@ class PhysicalDevice
     /// Queried once, all property checks read this snapshot
     // TODO: caching is not needed, query the properties at the use site
     immutable VkPhysicalDeviceProperties properties;
-    /* TODO: "debug" */ private size_t devIdx;
 
     ///
-    this(Instance inst, VkPhysicalDevice dev, size_t idx)
+    this(Instance inst, VkPhysicalDevice dev)
     {
         instance = inst;
         physicalDevice = dev;
-        devIdx = idx;
 
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(dev, &props);
@@ -112,20 +109,6 @@ class PhysicalDevice
     VkExtensionProperties[] extensions(const(char*) layerName = null)
     {
         return getArrayFrom!vkEnumerateDeviceExtensionProperties(physicalDevice, layerName);
-    }
-
-    /// Throw exception if extension is not supported
-    void checkExtensionSupportedEx(in char* extensionName, string file = __FILE__, size_t line = __LINE__)
-    {
-        import core.stdc.string: strcmp;
-
-        foreach(e; extensions)
-        {
-            if(strcmp(&e.extensionName[0], extensionName) == 0)
-                return;
-        }
-
-        throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
     }
 
     // TODO: may be removed if GPU menu moves to SelectedDevice

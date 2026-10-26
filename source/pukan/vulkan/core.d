@@ -196,9 +196,9 @@ class Instance
         SelectedDevice!Reqs[] ret;
         alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
 
-        foreach(idx, dev; devices)
+        foreach(dev; devices)
         {
-            auto pd = new PhysicalDevice(this, dev, idx);
+            auto pd = new PhysicalDevice(this, dev);
             auto ctx = pd.createLogicalDeviceContext(null);
 
             string reason;
@@ -232,20 +232,6 @@ class Instance
     {
         auto ctx = instanceContext();
         requireEnabled!Reqs(ctx, entity, file, line);
-    }
-
-    /// Throw exception if extension is not supported
-    void checkExtensionSupportedEx(in char* extensionName, string file = __FILE__, size_t line = __LINE__)
-    {
-        import core.stdc.string: strcmp;
-
-        foreach(e; extensions)
-        {
-            if(strcmp(&e.extensionName[0], extensionName) == 0)
-                return;
-        }
-
-        throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan instance", file, line);
     }
 
     /// Create an instance with optional requirements enabled if available
