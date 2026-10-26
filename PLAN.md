@@ -4,7 +4,7 @@ Checkboxes track progress: `[ ]` is open, `[x]` is done. Items can be done in an
 order; the order below is only a suggested grouping. The one real ordering
 constraint is marked in "Mesh rendering merge".
 
-- [ ] Deal with warnings
+- [x] Deal with warnings
 - [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
       used independently of the rest of `pukan`. Keep module names unchanged.
 - [ ] Set up CI on GitHub: build the library and both demos and run them with
@@ -23,18 +23,20 @@ Needs thinking first.
 
 ## Warnings
 
-- [ ] Collect the Vulkan validation layer warnings and fix them.
+- [x] Collect the Vulkan validation layer warnings and fix them.
 
-  The debug messenger in `FlightRecorder` already prints them; group the
-  messages by type (object lifetime, synchronization, descriptor usage, shader
-  interfaces) and fix them one group at a time. The `fix/vulkan-warnings`
-  branch touches debug messenger logging and RAII cleanup and can be merged
-  first.
+  Two groups appeared: shader interfaces (the deprecated SPIR-V `Workgroup`
+  built-in) and best practices (`VK_EXT_debug_utils` in a debug build). Compute
+  shaders now emit `LocalSizeId`, and the debug-utils message is muted. The
+  `fix/vulkan-warnings` branch's debug messenger logging change is ported; its
+  RAII changes were not needed.
 
-  - [ ] `BestPractices-SpirvDeprecated_WorkgroupSize` from `demo_compute`: the
-        compute shaders use the SPIR-V `Workgroup` built-in, deprecated in
-        SPIR-V 1.6. Recompile with `--target-env=vulkan1.3` in
-        `compile_shaders.sh` so `LocalSizeId` is emitted. Affects `gemm.comp`
+  The build still prints `ldc.intrinsics.LLVM_version` deprecations from
+  mir-core. They are upstream.
+
+  - [x] `BestPractices-SpirvDeprecated_WorkgroupSize` from `demo_compute`:
+        fixed by targeting Vulkan 1.3 and setting the workgroup size through
+        specialization constants, which emits `LocalSizeId`. Affects `gemm.comp`
         and `skin_matrices.comp`.
 
 ## Entity rendering and shaders
