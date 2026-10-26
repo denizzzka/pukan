@@ -57,34 +57,31 @@ gaps are the unchecked items below.
       `createLogicalDeviceFromContext!Reqs`. A second request call asserts.
 - [x] Compute declares `maxComputeWorkGroupInvocations`; the hardcoded
       `samplerAnisotropy` is gone.
-- [x] `contains` and `Gemm.create!Manifest` catch a manifest that misses the
-      kernel requirement (illustrative).
+- [x] `contains` keeps a manifest consistent with what a subsystem needs;
+      `Gemm.create` checks its requirement through `dev.ensureEnabled`.
 
 ### Already used in the code
 
 Enabled today, with the intended classification:
 
-- `samplerAnisotropy`: declared by the application manifest
-  (`demo/source/app.d`); the hardcoded version in `logical_device.d` is removed.
-- `VK_KHR_swapchain`: required by the demo, device extension.
-- `VK_KHR_surface` plus the platform surface extension from GLFW
-  (`VK_KHR_xcb_surface`, `VK_KHR_wayland_surface`, `VK_KHR_win32_surface`):
-  optional for the library, required by the window code. The window setup throws
-  when a needed extension is unavailable.
-- `VK_EXT_debug_utils` and `VK_LAYER_KHRONOS_validation`: optional, debug only.
-  The debug setup throws when it asks for them and they are not available.
+- `samplerAnisotropy` and `maxSamplerAnisotropy`: declared by
+  `Texture.optionalRequirements` and checked when a sampler enables anisotropy.
+- `VK_KHR_swapchain`: required by the demo manifest, device extension.
+- `VK_KHR_surface`: required by `WindowSurface`; the platform extensions
+  (`xlib`, `xcb`, `wayland`, `win32`, `metal`, `macos`) are its optional
+  requirements, so the supported one is enabled without taking the GLFW list.
+- `VK_EXT_debug_utils`: optional, debug only.
+- `VK_EXT_layer_settings`: required by `LayerSettings`, debug only; the pNext
+  structure is attached only when the extension is enabled.
+- `VK_LAYER_KHRONOS_validation`: enabled by `Instance` in debug builds; layers
+  are outside the requirement system.
 
-Used but never enabled:
+Not declared as a requirement yet:
 
-- `VK_EXT_vertex_input_dynamic_state`: `VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE`
-  in `gltf/factory.d`. The extension and its `vertexInputDynamicState` feature
-  are not requested anywhere.
-- `VK_EXT_layer_settings`: `VkLayerSettingsCreateInfoEXT` is put into
-  `VkInstanceCreateInfo.pNext` in `core.d`, even in release builds, while the
-  extension name is commented out.
-- `vkCmdBindVertexBuffers2` in `gltf/mesh.d` is core 1.3, or
-  `VK_EXT_extended_dynamic_state` below 1.3; the physical device API version is
-  never checked.
+- `VK_EXT_vertex_input_dynamic_state`: the below-1.3 fallback for dynamic
+  vertex input. Its structure is in the chain registry, but no requirement uses
+  it because the code runs on core 1.3.
+- `vkCmdBindVertexBuffers2`: core 1.3, covered by `ApiVersionFor`.
 
 Version dependencies:
 
@@ -103,10 +100,11 @@ pipelines, `VK_FORMAT_D24_UNORM_S8_UINT`, `VK_FORMAT_B8G8R8A8_SRGB`,
 Two separate concerns:
 
 - **Enabling** is decided before `vkCreateDevice` and cannot be changed later.
-- **Checking availability** may be repeated freely. `vkGetPhysicalDeviceFeatures`
-  fills the whole struct in one call, so checking many features costs one call;
-  the properties are cached on `PhysicalDevice` for limits. What matters is that
-  the check happens before the first use.
+- **Checking availability** may be repeated freely.
+  `vkGetPhysicalDeviceFeatures2` fills the base struct and the chained
+  structures in one call, so checking many features costs one call; the
+  properties are cached on `PhysicalDevice` for limits. What matters is that the
+  check happens before the first use.
 
 ### Features as compile-time tags
 
@@ -238,6 +236,10 @@ otherwise it needs `VK_KHR_get_physical_device_properties2` (an instance
 extension). The code already hardcodes `apiVersion = 1.3.0` in `Instance`, which
 is a real requirement, so it belongs in the same system as the features.
 
+The implemented form is `RequirementsVersion!Reqs` for the maximum the
+requirements imply and `ApiVersionFor!Reqs` for the larger of that and the
+library baseline; the `ApiVersion!(1, 3)` sketch below is the original design.
+
 - Compile time: `ApiVersion!(1, 3)` is a value in the requirement set, the union
   takes the maximum, and `static assert`s keep the set consistent with what the
   modules use. The baseline is 1.3.0 today, the same value `Instance` hardcodes.
@@ -282,6 +284,10 @@ Two ways to request a feature:
 - **Optional**: enabled if available, skipped otherwise. The device records what
   actually got enabled.
 
+The implemented form is `requirements` / `optionalRequirements` with `Requirement`
+tags, `OptionalRequirementsWithout` for the overlap and `ensureEnabled` after
+creation; the `FeatureSet` and `has!X` sketch below is the original design.
+
 - [x] Add the Vulkan-specific exception types: `PukanVulkanException` deriving
       from `PukanException`, and `PukanVulkanExceptionWithCode` holding a
       `VkResult`. Existing throws in `pukan.vulkan` are migrated to them.
@@ -306,39 +312,26 @@ calls, no extra storage. A subsystem that needs a feature unconditionally still
 asserts `has!X` (or `static assert`s it in the template variant), which catches
 a missing entry in `AppFeatures` rather than a missing driver capability.
 
-Instance-level requirements are a hybrid: statically known ones (debug utils,
-validation layer) are tags like device features, while the surface extensions
-come from the windowing system at runtime (the GLFW list, see the platform case
-above). Both parts are merged and checked before `vkCreateInstance`.
+Instance-level requirements are declared like device features: `FlightRecorder`
+and `LayerSettings` are debug entities, `WindowSurface` owns `VK_KHR_surface` and
+the platform surface extensions. `Instance.createWith` merges them, enables the
+supported optional ones and attaches the layer settings structure only when its
+extension is enabled.
 
 - [x] Add an exception for the missing required features types: `RequirementsNotMetException`
 
 ### Device selection and creation
 
-Requirements are passed as a template list in two independent places: when a
-physical device is selected and when a logical device is created. The value
-returned by selection (`PhysicalDevice`) does not carry the list it was checked
-against, so the two lists can diverge:
+Requirements are passed as a template list when a physical device is selected
+and when a logical device is created. The value returned by selection is
+`SelectedDevice!Reqs`, so the list is part of the type: creation enables exactly
+that list, plus the optional requirements of the modules passed to
+`createLogicalDevice`, and chain features are built from the same list.
 
-- the creation list can ask for something the chosen device does not support;
-  the repeated check in `createLogicalDevice` catches this direction;
-- the selection list can require more than the creation list enables, which is
-  not caught at all and shows up later as a validation error or a missing
-  capability;
-- internal calls (`swapchain`, `findMemoryType`, `findSuitableQueueFamilies`)
-  pass an empty list, so a cached selection made there can be paired with a
-  different list at creation;
-- with manual selection (a GPU menu) the user picks a device outside the
-  selection function, so nothing binds the choice to the list used for it.
-
-The same applies to the split between checking and setting: `isSatisfied` and
-`request` are separate operations, but the entry points that combine them
-(`findSuitablePhysicalDevice`, `createLogicalDevice!Reqs`) make it easy to run
-them in different places with different lists.
-
-Selection now filters by requirements and caches the properties, and creation
-re-checks its list, but the two lists are still independent: the mismatch is
-open.
+A mismatch is still possible through the package-level manual flow
+(`createLogicalDeviceContext!Reqs`, then `createLogicalDeviceFromContext!Reqs`
+with a different list) and through `findSuitablePhysicalDevice()` without
+requirements, which is currently unused.
 
 - [ ] Walk the code for every hardcoded capability, feature, extension or format
       and move it into the requirement system. Found so far:
