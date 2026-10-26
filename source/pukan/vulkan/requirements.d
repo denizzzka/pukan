@@ -230,6 +230,12 @@ struct DeviceContext
     ChainMask enabledChainMask;
     VkExtensionProperties[] supportedExtensions;
     const(char)*[] enabledExtensions;
+    version(assert)
+    {
+        /// Guards against running a request step twice
+        private bool requiredRequested;
+        private bool optionalRequested;
+    }
 
     bool supportsExtension(string name) const
     {
@@ -728,6 +734,12 @@ bool requirementsSatisfied(Reqs...)(ref DeviceContext ctx, out string reason)
 /// Enables every requested feature and extension
 void requestRequirements(Reqs...)(ref DeviceContext ctx)
 {
+    version(assert)
+    {
+        assert(!ctx.requiredRequested, "requestRequirements was already called");
+        ctx.requiredRequested = true;
+    }
+
     static foreach(R; NoDuplicates!Reqs)
         R.request(ctx);
 }
@@ -735,6 +747,12 @@ void requestRequirements(Reqs...)(ref DeviceContext ctx)
 /// Enables optional features and extensions if they are supported, otherwise skips them
 void requestOptionalRequirements(Reqs...)(ref DeviceContext ctx)
 {
+    version(assert)
+    {
+        assert(!ctx.optionalRequested, "requestOptionalRequirements was already called");
+        ctx.optionalRequested = true;
+    }
+
     static foreach(R; NoDuplicates!Reqs)
     {{
         // The enabled chain is linked from required requirements only, before device creation
@@ -896,6 +914,7 @@ unittest
     assert(ApiVersionRequirement.isSatisfied(instance, reason));
 
     import std.exception: assertThrown;
+    import core.exception: AssertError;
     import pukan.exceptions: RequirementsNotMetException;
 
     DeviceContext device;
@@ -913,4 +932,27 @@ unittest
     DeviceContext disabled;
     assertThrown!RequirementsNotMetException(
         requireEnabled!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy))(disabled, "test"));
+
+    version(assert)
+    {
+        DeviceContext requested;
+        requestRequirements!swapchain(requested);
+
+        bool rejected;
+        try
+            requestRequirements!swapchain(requested);
+        catch(AssertError)
+            rejected = true;
+        assert(rejected, "second requestRequirements was not rejected");
+
+        DeviceContext requestedOptional;
+        requestOptionalRequirements!swapchain(requestedOptional);
+
+        rejected = false;
+        try
+            requestOptionalRequirements!swapchain(requestedOptional);
+        catch(AssertError)
+            rejected = true;
+        assert(rejected, "second requestOptionalRequirements was not rejected");
+    }
 }

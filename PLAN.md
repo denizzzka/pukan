@@ -52,9 +52,9 @@ gaps are the unchecked items below.
       and `Instance` cache the properties and the selection.
 - [x] `PukanVulkanException` and `PukanVulkanExceptionWithCode`; throws in
       `pukan.vulkan` are migrated to them.
-- [x] Manual flow for a GPU menu: `createLogicalDeviceContext`,
-      `requirementsSatisfied`, `requestRequirements` and the primitive
-      `createLogicalDevice`.
+- [x] Manual flow for a GPU menu (package-level): `createLogicalDeviceContext!Reqs`,
+      `requirementsSatisfied`, `requestRequirements` and
+      `createLogicalDeviceFromContext!Reqs`. A second request call asserts.
 - [x] Compute declares `maxComputeWorkGroupInvocations`; the hardcoded
       `samplerAnisotropy` is gone.
 - [x] `contains` and `Gemm.create!Manifest` catch a manifest that misses the
