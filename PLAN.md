@@ -48,8 +48,6 @@ Ideas:
 Needed soon.
 
 - [ ] 3D lines with a thickness in pixels, for debug output.
-- [ ] Cylinders: surface quality, length, radius, color.
-- [ ] Spheres: surface quality, radius, color.
 
 ## Geometric algebra: PGA and CGA
 
