@@ -271,6 +271,7 @@ class Instance
 
         alias required = RequirementsFor!(Instance, Modules);
         alias optional = OptionalRequirementsWithout!required.Of!(OptionalRequirementsFor!(Instance, Modules));
+        // The caller list is runtime data, so requirements are merged without duplicates
         const(char)*[] merged = extension_list.dup;
 
         VkExtensionProperties[] supported = getArrayFrom!vkEnumerateInstanceExtensionProperties(null);
@@ -279,7 +280,8 @@ class Instance
         {{
             static if(R.isExtension)
             {
-                merged ~= R.requirementName.ptr;
+                if(!hasExtension(merged, R.requirementName))
+                    merged ~= R.requirementName.ptr;
             }
             else
             {
@@ -299,7 +301,7 @@ class Instance
                         break;
                     }
 
-                if(ok)
+                if(ok && !hasExtension(merged, R.requirementName))
                     merged ~= R.requirementName.ptr;
             }
             else

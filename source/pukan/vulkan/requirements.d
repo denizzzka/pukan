@@ -375,7 +375,11 @@ private struct RequirementImpl(string name, ulong minimum)
         else static if(kind == Kind.chainFeature)
             ctx.enabledChainMask.set(chainBitIndex!name);
         else static if(kind == Kind.extension)
-            ctx.enabledExtensions ~= name.ptr;
+        {
+            // Required and optional are requested in separate calls, so skip a name already enabled
+            if(!ctx.hasEnabledExtension(name))
+                ctx.enabledExtensions ~= name.ptr;
+        }
     }
 
     /// Returns false and a reason when the requirement is not enabled
@@ -858,6 +862,11 @@ unittest
     FeatureChain supported;
     supported[chainIndex!VkPhysicalDeviceVulkan13Features].dynamicRendering = VK_TRUE;
     assert(dynamicRendering.isSupportedBy(supported, reason));
+
+    alias swapchain = Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    swapchain.request(chainCtx);
+    swapchain.request(chainCtx);
+    assert(chainCtx.enabledExtensions.length == 1);
 
     static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
