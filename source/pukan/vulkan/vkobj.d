@@ -135,6 +135,28 @@ struct VkObj(Handle)
         }
     }
 
+    ref VkObj opAssign(VkObj rhs)
+    {
+        destroy(this);
+
+        handle = rhs.handle;
+        allocator = rhs.allocator;
+
+        static if(Info.destroyParent == VkParentKind.instance)
+            parentInstance = rhs.parentInstance;
+        else static if(Info.destroyParent == VkParentKind.device)
+            parentDevice = rhs.parentDevice;
+
+        rhs.handle = Handle.init;
+        rhs.allocator = null;
+        static if(Info.destroyParent == VkParentKind.instance)
+            rhs.parentInstance = VkInstance.init;
+        else static if(Info.destroyParent == VkParentKind.device)
+            rhs.parentDevice = VkDevice.init;
+
+        return this;
+    }
+
     @disable this(this);
 
     ~this()

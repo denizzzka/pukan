@@ -140,7 +140,6 @@ class Instance
 
     void useSurface(VkSurfaceKHR s) @live
     {
-        destroy(surface);
         surface = VkObj!VkSurfaceKHR(s, instance, allocator);
     }
 
