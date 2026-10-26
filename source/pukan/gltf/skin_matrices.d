@@ -4,14 +4,14 @@ import dlib.math;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.computation: Compute;
-import pukan.vulkan.requirements: RequirementOf;
+import pukan.vulkan.requirements: Requirement;
 import std.meta: AliasSeq;
 
 /// GPU kernel that calculates skin joint matrices:
 /// jointMatrices[i] = skinRootInverse * transFromRoot[nodeIndices[i]] * inverseBindMatrices[i]
 class SkinMatrices : Compute
 {
-    package alias requirements = AliasSeq!(RequirementOf!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 64));
+    package alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 64));
 
     TransferBuffer transFromRootBuf; /// per-node transform relative to skin root, updated per frame
     TransferBuffer nodeIndicesBuf; /// joint index -> node index, static

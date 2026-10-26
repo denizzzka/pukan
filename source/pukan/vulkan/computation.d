@@ -2,7 +2,7 @@ module pukan.vulkan.computation;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.requirements: RequirementOf;
+import pukan.vulkan.requirements: Requirement;
 import pukan.vulkan.shaders: ShaderInfo;
 import std.meta: AliasSeq;
 
@@ -111,7 +111,7 @@ struct Params
 
 class Gemm : Compute
 {
-    private alias requirements = AliasSeq!(RequirementOf!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256));
+    private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256));
 
     CommandPool cmdPool;
     VkCommandBuffer cmdBuf;

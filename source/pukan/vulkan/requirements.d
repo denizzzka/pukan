@@ -89,8 +89,18 @@ struct InstanceContext
 
 /// Device requirement: a numeric property, a feature or an extension
 /// Features and extensions have no minimum, so it only matters for numbers
-// TODO: take the name from a symbol and reject string literals with static assert
-struct Requirement(string name, ulong minimum = 0)
+template Requirement(alias source, ulong minimum = 0)
+{
+    /// Field symbols take their own name, string constants their value
+    static if(is(typeof(source) == string))
+        private enum string name = source;
+    else
+        private enum string name = __traits(identifier, source);
+
+    alias Requirement = RequirementImpl!(name, minimum);
+}
+
+private struct RequirementImpl(string name, ulong minimum)
 {
     package enum kind = requirementKind!name;
 
@@ -237,12 +247,6 @@ struct Requirement(string name, ulong minimum = 0)
     }
 }
 
-/// Requirement for a Vulkan struct field, named after the field symbol
-template RequirementOf(alias field, ulong minimum = 0)
-{
-    alias RequirementOf = Requirement!(__traits(identifier, field), minimum);
-}
-
 /// True when T is present in the list
 template contains(T, List...)
 {
@@ -347,7 +351,7 @@ template extensionNames(Reqs...)
 }
 
 /// Baseline requirement every instance and device must satisfy
-alias ApiVersionRequirement = RequirementOf!(VkPhysicalDeviceProperties.apiVersion, requiredApiVersionEncoded);
+alias ApiVersionRequirement = Requirement!(VkPhysicalDeviceProperties.apiVersion, requiredApiVersionEncoded);
 
 /// Returns true when every requirement is satisfied, otherwise fills the reason
 bool requirementsSatisfied(Reqs...)(ref DeviceContext ctx, out string reason)
@@ -433,16 +437,16 @@ void requireEnabled(Reqs...)(ref const InstanceContext ctx, string entity, strin
 
 unittest
 {
-    static assert(Requirement!"samplerAnisotropy".kind == Kind.feature);
-    static assert(Requirement!("maxComputeWorkGroupInvocations", 256).kind == Kind.number);
+    static assert(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy).kind == Kind.feature);
+    static assert(Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256).kind == Kind.number);
     static assert(Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME).kind == Kind.extension);
-    static assert(Requirement!("apiVersion", VulkanVersion(1, 3).toUint()).kind == Kind.number);
-    static assert(is(RequirementOf!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256) ==
-        Requirement!("maxComputeWorkGroupInvocations", 256)));
-    static assert(!__traits(compiles, Requirement!"notARequirement"));
+    static assert(Requirement!(VkPhysicalDeviceProperties.apiVersion, VulkanVersion(1, 3).toUint()).kind == Kind.number);
+    static assert(Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256).requirementName ==
+        "maxComputeWorkGroupInvocations");
+    static assert(!__traits(compiles, Requirement!VkPhysicalDeviceLimits));
 
-    static struct A { private alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
-    static struct B { private alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }
+    static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
+    static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static assert(Requirements!(A, B).length == 1);
 
     static assert(contains!(int, int, float));
@@ -462,18 +466,18 @@ unittest
     import pukan.exceptions: RequirementsNotMetException;
 
     DeviceContext device;
-    assert(!requirementsEnabled!(Requirement!"samplerAnisotropy")(device, reason));
+    assert(!requirementsEnabled!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy))(device, reason));
 
     device.enabled.samplerAnisotropy = VK_TRUE;
-    assert(requirementsEnabled!(Requirement!"samplerAnisotropy")(device, reason));
+    assert(requirementsEnabled!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy))(device, reason));
 
     device.properties.limits.maxSamplerAnisotropy = 8;
-    assert(!requirementsEnabled!(Requirement!("maxSamplerAnisotropy", 16))(device, reason));
+    assert(!requirementsEnabled!(Requirement!(VkPhysicalDeviceLimits.maxSamplerAnisotropy, 16))(device, reason));
 
     device.properties.limits.maxSamplerAnisotropy = 16;
-    assert(requirementsEnabled!(Requirement!("maxSamplerAnisotropy", 16))(device, reason));
+    assert(requirementsEnabled!(Requirement!(VkPhysicalDeviceLimits.maxSamplerAnisotropy, 16))(device, reason));
 
     DeviceContext disabled;
     assertThrown!RequirementsNotMetException(
-        requireEnabled!(Requirement!"samplerAnisotropy")(disabled, "test"));
+        requireEnabled!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy))(disabled, "test"));
 }
