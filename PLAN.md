@@ -22,9 +22,9 @@ Needs thinking first.
 
 - [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be used independently of the rest of `pukan`. Keep module names unchanged.
 
-- [ ] Build a Vulkan feature requirement system: every feature that Vulkan
-      requires to be declared before first use is requested once, automatically,
-      when application code uses a part that needs it.
+- [x] Build a Vulkan feature requirement system: every feature that Vulkan
+      requires to be declared before first use is declared by the entity that
+      uses it, enabled once at creation and checked before use.
 
 Scope: anything requested at device creation time because a driver or GPU may
 not provide it: `VkPhysicalDeviceFeatures` members, structures chained through
@@ -340,8 +340,20 @@ Selection now filters by requirements and caches the properties, and creation
 re-checks its list, but the two lists are still independent: the mismatch is
 open.
 
-- [ ] Find more features that this system does not cover yet, beyond the list
-      above.
+- [ ] Walk the code for every hardcoded capability, feature, extension or format
+      and move it into the requirement system. Found so far:
+  - [x] `samplerAnisotropy` and `maxSamplerAnisotropy`: declared by `Texture` and
+        checked when a sampler enables anisotropy.
+  - [x] `VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE` and
+        `vkCmdBindVertexBuffers2`: core 1.3, covered by `ApiVersionFor`.
+  - [ ] Graphics queue: `findSuitableQueueFamilies` filters
+        `VK_QUEUE_GRAPHICS_BIT` without a declared requirement.
+  - [ ] Swapchain surface: format, color space and present mode are chosen by
+        `SwapChain` and not declared or checked.
+  - [ ] Depth format `VK_FORMAT_D24_UNORM_S8_UINT` and the image formats in
+        `image.d` are not checked against device support.
+  - [ ] `VK_EXT_vertex_input_dynamic_state`: the below-1.3 fallback; its
+        structure is in the registry but no requirement uses it.
 
 ## Warnings
 
