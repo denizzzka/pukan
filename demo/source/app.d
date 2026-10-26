@@ -4,7 +4,6 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
 import glfw3.api;
-import std.conv: to;
 import std.datetime.stopwatch;
 import std.exception;
 import std.logger;
@@ -15,6 +14,32 @@ import std.string: toStringz;
 alias appRequirements = Requirements!(SwapChain, GltfFactory);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
 else alias DebugEntities = AliasSeq!();
+
+alias appEntities = AliasSeq!(DebugEntities, WindowSurface);
+
+/// GLFW extensions that the given app entities do not already declare
+const(char)*[] glfwExtraExtensions(Modules...)()
+{
+    import std.algorithm: canFind;
+    import std.conv: to;
+
+    uint count;
+    const char** required = glfwGetRequiredInstanceExtensions(&count);
+    if(required is null)
+        return null;
+
+    enum declared = extensionNames!(
+        RequirementsFor!(Instance, Modules),
+        OptionalRequirementsFor!(Instance, Modules),
+    );
+
+    const(char)*[] ret;
+    foreach(name; required[0 .. count])
+        if(!declared.canFind(name.to!string))
+            ret ~= name;
+
+    return ret;
+}
 
 enum fps = 60;
 enum width = 640;
@@ -46,47 +71,7 @@ void main() {
     //~ glfwSetFramebufferSizeCallback(demo.window, &demo_resize_callback);
     //~ glfwSetKeyCallback(demo.window, &demo_key_callback);
 
-    // Print needed extensions
-    uint ext_count;
-    const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
-    const(char*)[] extension_list = extensions[0 .. ext_count];
-
-    version(none)
-    {
-        // Additional "heuristic": someday we'll refuse to give up on glfw
-
-        extension_list ~= VK_KHR_SURFACE_EXTENSION_NAME.ptr;
-        const(char)* surfaceName;
-
-        version(Windows)
-        {
-            surfaceName = VK_KHR_WIN32_SURFACE_EXTENSION_NAME.ptr;
-        }
-        else //version(Posix)
-        {
-            import std.process: environment;
-
-            const st = environment.get("XDG_SESSION_TYPE");
-
-            if(st == "x11")
-                surfaceName = VK_KHR_XCB_SURFACE_EXTENSION_NAME.ptr;
-            else if(st == "wayland")
-                surfaceName = VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME.ptr;
-            else
-                assert(false, "Surface not supported");
-        }
-
-        extension_list ~= surfaceName;
-    }
-
-    debug
-    {
-        writeln("Needed extensions:");
-        foreach(i; extension_list)
-            writeln(i.to!string);
-    }
-
-    auto vk = Instance.createWith!DebugEntities(name, 1, extension_list);
+    auto vk = Instance.createWith!appEntities(name, 1, glfwExtraExtensions!appEntities());
     scope(exit) destroy(vk);
 
     //~ debug

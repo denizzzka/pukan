@@ -273,8 +273,7 @@ class Instance
         {{
             static if(R.isExtension)
             {
-                if(!hasExtension(merged, R.requirementName))
-                    merged ~= R.requirementName.ptr;
+                merged ~= R.requirementName.ptr;
             }
             else
             {
@@ -294,7 +293,7 @@ class Instance
                         break;
                     }
 
-                if(ok && !hasExtension(merged, R.requirementName))
+                if(ok)
                     merged ~= R.requirementName.ptr;
             }
             else

@@ -321,6 +321,23 @@ template RequirementsFor(Backend, Modules...)
     alias RequirementsFor = NoDuplicates!(staticMap!(moduleRequired, Modules));
 }
 
+/// Names of the extension requirements in Reqs
+template extensionNames(Reqs...)
+{
+    private enum string[] collect()
+    {
+        string[] names;
+
+        static foreach(R; NoDuplicates!Reqs)
+            static if(R.isExtension)
+                names ~= R.requirementName;
+
+        return names;
+    }
+
+    enum string[] extensionNames = collect();
+}
+
 /// Baseline requirement every instance and device must satisfy
 alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersionEncoded);
 
