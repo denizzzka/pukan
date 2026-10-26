@@ -46,8 +46,7 @@ void main()
     auto selected = vk.findSuitablePhysicalDevice!appRequirements();
     auto physDevice = selected.device();
 
-    const(char*)[] dev_extension_list;
-    auto device = selected.createLogicalDevice(dev_extension_list);
+    auto device = selected.createLogicalDevice();
     scope(exit) destroy(device);
 
     auto gemm = Gemm.create(device, M, N, K);

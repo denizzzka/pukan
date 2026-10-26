@@ -103,12 +103,6 @@ class PhysicalDevice
         return ctx;
     }
 
-    /// Creates a device from values that were already checked and requested
-    LogicalDevice createLogicalDevice(const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures)
-    {
-        return new LogicalDevice(this, extension_list, enabledFeatures);
-    }
-
     /**
         When layerName parameter is null, only extensions provided by the
         Vulkan implementation or by implicitly enabled layers are returned.
@@ -138,7 +132,7 @@ class PhysicalDevice
     /// Creates logical device from a pre-prepared context
     package LogicalDevice createLogicalDeviceFromContext(DeviceContext ctx)
     {
-        return createLogicalDevice(ctx.enabledExtensions, ctx.enabled);
+        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled);
     }
 }
 
@@ -154,13 +148,11 @@ struct SelectedDevice(Reqs...)
     }
 
     /// Creates the logical device using the requirements that were used for selection
-    LogicalDevice createLogicalDevice(Modules...)(const(char*)[] extension_list = null)
+    LogicalDevice createLogicalDevice(Modules...)()
     {
         auto ctx = context;
         alias optional = OptionalRequirementsFor!(LogicalDevice, Modules);
         requestOptionalRequirements!optional(ctx);
-        if(extension_list.length)
-            ctx.enabledExtensions = (ctx.enabledExtensions ~ extension_list).dup;
         return physicalDevice.createLogicalDeviceFromContext(ctx);
     }
 
