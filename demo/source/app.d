@@ -231,21 +231,21 @@ void main() {
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
             static Duration prevTime;
-            const curr = sw.peek;
+            const now = sw.peek;
 
-            if(prevTime.split!"seconds" != curr.split!"seconds")
+            if(prevTime.split!"seconds" != now.split!"seconds")
             {
                 static size_t prevSecondFrameNum;
                 fps = frameNum - prevSecondFrameNum;
                 prevSecondFrameNum = frameNum;
             }
 
-            auto remaining = frameDuration - (curr - prevTime);
+            auto remaining = frameDuration - (now - prevTime);
 
             //~ if(!remaining.isNegative)
                 //~ Thread.sleep(remaining);
 
-            prevTime = curr;
+            prevTime = now;
         }
     }
 
