@@ -1,6 +1,7 @@
 module pukan.scene;
 
 import pukan;
+import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.shaders;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -25,6 +26,7 @@ class Scene
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
     GltfFactory gltfFactory;
+    SphereRenderer sphereRenderer;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
@@ -59,6 +61,14 @@ class Scene
             [
                 gltf_vertShader,
                 gltf_fragShader,
+            ],
+            renderPass,
+        );
+        sphereRenderer = new SphereRenderer(
+            device,
+            [
+                sphereVertShader,
+                sphereFragShader,
             ],
             renderPass,
         );

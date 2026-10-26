@@ -1,5 +1,6 @@
 import pukan;
 import pukan.scene_tree;
+import pukan.primitives_tree.sphere: SphereInstance, SphereRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
@@ -11,7 +12,7 @@ import std.meta: AliasSeq;
 import std.stdio;
 import std.string: toStringz;
 
-alias appRequirements = Requirements!(SwapChain, GltfFactory, FrameBuilder);
+alias appRequirements = Requirements!(SwapChain, GltfFactory, FrameBuilder, SphereRenderer);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
 else alias DebugEntities = AliasSeq!();
 
@@ -199,6 +200,18 @@ void main(string[] args) {
         updateWorldTransformations(wtb, curr, scene.swapChain.imageExtent, tree, cubeRotator);
         const transl = wtb.proj * wtb.view * wtb.model;
 
+        const sphereViewModel = wtb.view * wtb.model * Vector3f(0, 0, sceneDepth).translationMatrix;
+        const aspect = cast(float) scene.swapChain.imageExtent.width / scene.swapChain.imageExtent.height;
+
+        scene.sphereRenderer.setCamera(
+            sphereViewModel,
+            cameraFovY,
+            aspect,
+            scene.swapChain.imageExtent.height,
+            cameraNear,
+            cameraFar,
+        );
+
         if(!stereo)
             tree.root.payload = Bone(transl);
 
@@ -212,6 +225,8 @@ void main(string[] args) {
             }
 
             auto cb = frame.commandBuffer;
+
+            scene.sphereRenderer.prepare(cb);
 
             tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
 
@@ -293,6 +308,8 @@ enum cameraFovY = 45.0f;
 enum cameraNear = 0.1f;
 enum cameraFar = 10.0f;
 enum stereoEyeSeparation = 0.06f;
+enum cameraDistance = 1.2f;
+enum sceneDepth = 1.0f;
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
@@ -303,7 +320,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.model = rotation.toMatrix4x4;
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(0, -0.2, -0.8), // camera position
+        Vector3f(0, -0.2f, -cameraDistance), // camera position
         Vector3f(0, 0, 0), // point at which the camera is looking
         Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
     );
@@ -320,7 +337,7 @@ WorldTransformation[2] calculateStereoWTB(in VkExtent2D eyeExtent, float currDel
 {
     auto base = calculateWTB(eyeExtent, currDeltaTime);
     const views = makeStereoViews(
-        Vector3f(0, -0.2, -0.8),
+        Vector3f(0, -0.2f, -cameraDistance),
         Vector3f(0, 0, 0),
         Vector3f(0, 1, 0),
         cameraFovY,
@@ -413,6 +430,17 @@ GlTF[] createArena(T)(Scene scene, ref T node)
     return loaded;
 }
 
+private struct SphereSpec
+{
+    Vector3f color;
+    uint cols;
+    uint rows;
+    float radius;
+    float xStep;
+    float yStep;
+    float y0;
+}
+
 auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
 {
     auto tree = new SceneTree;
@@ -420,7 +448,7 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
     auto primitTree = new PrimitivesTree;
 
     {
-        auto trans = Vector3f(0, 0, 1).translationMatrix;
+        auto trans = Vector3f(0, 0, sceneDepth).translationMatrix;
         tree
             .addChild(Bone(mat: trans))
             .addChild(primitTree);
@@ -466,6 +494,37 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
         textureBranch.addChild(cast(DrawablePrimitive) mesh);
+    }
+
+    auto spheresBranch = primitTree.addChild(scene.sphereRenderer.pipelineCfg);
+
+    {
+        const specs = [
+            SphereSpec(Vector3f(0.3f, 1.0f, 0.4f), 20, 4, 0.018f, 0.040f, 0.045f, 0.26f),
+            SphereSpec(Vector3f(0.4f, 0.6f, 1.0f), 8, 3, 0.030f, 0.090f, 0.060f, 0.46f),
+            SphereSpec(Vector3f(1.0f, 0.5f, 0.4f), 5, 1, 0.080f, 0.140f, 0.000f, 0.66f),
+        ];
+
+        SphereInstance[] instances;
+        Vector3f[] palette;
+
+        foreach(colorIndex, spec; specs)
+        {
+            palette ~= spec.color;
+
+            foreach(row; 0 .. spec.rows)
+            {
+                foreach(col; 0 .. spec.cols)
+                {
+                    const x = (cast(float) col - cast(float)(spec.cols - 1) * 0.5f) * spec.xStep;
+                    const y = spec.y0 + cast(float) row * spec.yStep;
+                    instances ~= SphereInstance(Vector3f(x, y, 0), spec.radius, cast(uint) colorIndex);
+                }
+            }
+        }
+
+        scene.sphereRenderer.setInstances(instances, palette);
+        spheresBranch.addChild(cast(DrawablePrimitive) scene.sphereRenderer);
     }
 
     return tree;

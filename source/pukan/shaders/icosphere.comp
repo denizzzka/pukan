@@ -1,0 +1,106 @@
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(push_constant) uniform Push {
+    uint level;
+    uint vertexOffset;
+    uint indexOffset;
+} pc;
+
+layout(std430, binding = 0) writeonly buffer Positions { float positions[]; };
+layout(std430, binding = 1) writeonly buffer Indices { uint indices[]; };
+
+const float phi = 1.618033988749895;
+
+const vec3 baseVertices[12] = vec3[12](
+    vec3(-1.0,  phi,  0.0), vec3( 1.0,  phi,  0.0),
+    vec3(-1.0, -phi,  0.0), vec3( 1.0, -phi,  0.0),
+    vec3( 0.0, -1.0,  phi), vec3( 0.0,  1.0,  phi),
+    vec3( 0.0, -1.0, -phi), vec3( 0.0,  1.0, -phi),
+    vec3( phi,  0.0, -1.0), vec3( phi,  0.0,  1.0),
+    vec3(-phi,  0.0, -1.0), vec3(-phi,  0.0,  1.0)
+);
+
+const ivec3 baseFaces[20] = ivec3[20](
+    ivec3( 0, 11,  5), ivec3( 0,  5,  1), ivec3( 0,  1,  7), ivec3( 0,  7, 10), ivec3( 0, 10, 11),
+    ivec3( 1,  5,  9), ivec3( 5, 11,  4), ivec3(11, 10,  2), ivec3(10,  7,  6), ivec3( 7,  1,  8),
+    ivec3( 3,  9,  4), ivec3( 3,  4,  2), ivec3( 3,  2,  6), ivec3( 3,  6,  8), ivec3( 3,  8,  9),
+    ivec3( 4,  9,  5), ivec3( 2,  4, 11), ivec3( 6,  2, 10), ivec3( 8,  6,  7), ivec3( 9,  8,  1)
+);
+
+vec3 pointOnFace(uint face, uint row, uint col, uint n)
+{
+    const ivec3 f = baseFaces[face];
+    const vec3 a = normalize(baseVertices[f.x]);
+    const vec3 b = normalize(baseVertices[f.y]);
+    const vec3 c = normalize(baseVertices[f.z]);
+
+    return normalize((float(n - row) * a + float(row - col) * b + float(col) * c) / float(n));
+}
+
+void main()
+{
+    const uint n = 1u << pc.level;
+    const uint tid = gl_GlobalInvocationID.x;
+    if(tid >= 60u * n * n)
+        return;
+
+    const uint triangle = tid / 3u;
+    const uint corner = tid % 3u;
+    const uint face = triangle / (n * n);
+    const uint local = triangle % (n * n);
+
+    const uint upCount = n * (n + 1u) / 2u;
+    const bool isUp = local < upCount;
+    const uint t = isUp ? local : local - upCount;
+
+    uint row = 0u;
+    uint col = 0u;
+    uint cum = 0u;
+    if(isUp)
+    {
+        for(row = 0u; row < n; ++row)
+        {
+            if(t < cum + row + 1u)
+            {
+                col = t - cum;
+                break;
+            }
+            cum += row + 1u;
+        }
+    }
+    else
+    {
+        for(row = 1u; row < n; ++row)
+        {
+            if(t < cum + row)
+            {
+                col = t - cum;
+                break;
+            }
+            cum += row;
+        }
+    }
+
+    uint r;
+    uint c;
+    if(isUp)
+    {
+        if(corner == 0u)      { r = row;      c = col; }
+        else if(corner == 1u) { r = row + 1u; c = col; }
+        else                  { r = row + 1u; c = col + 1u; }
+    }
+    else
+    {
+        if(corner == 0u)      { r = row;      c = col; }
+        else if(corner == 1u) { r = row + 1u; c = col + 1u; }
+        else                  { r = row;      c = col + 1u; }
+    }
+
+    const vec3 p = pointOnFace(face, r, c, n);
+    positions[3u * (pc.vertexOffset + tid) + 0u] = p.x;
+    positions[3u * (pc.vertexOffset + tid) + 1u] = p.y;
+    positions[3u * (pc.vertexOffset + tid) + 2u] = p.z;
+    indices[pc.indexOffset + tid] = tid;
+}

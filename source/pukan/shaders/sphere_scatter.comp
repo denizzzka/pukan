@@ -1,0 +1,32 @@
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(push_constant) uniform Push {
+    uint sphereCount;
+} pc;
+
+layout(std430, binding = 0) readonly buffer Centers { vec4 centers[]; };
+layout(std430, binding = 1) readonly buffer SourceColors { uint sourceColors[]; };
+layout(std430, binding = 2) readonly buffer SphereBuckets { int sphereBuckets[]; };
+layout(std430, binding = 3) readonly buffer Offsets { uint offsets[]; };
+layout(std430, binding = 4) buffer Cursors { uint cursors[]; };
+layout(std430, binding = 5) writeonly buffer BucketCenters { vec4 bucketCenters[]; };
+layout(std430, binding = 6) writeonly buffer BucketColors { uint bucketColors[]; };
+
+void main()
+{
+    const uint tid = gl_GlobalInvocationID.x;
+    if(tid >= pc.sphereCount)
+        return;
+
+    const int bucket = sphereBuckets[tid];
+    if(bucket < 0)
+        return;
+
+    const uint slot = atomicAdd(cursors[bucket], 1u);
+    const uint dst = offsets[bucket] + slot;
+
+    bucketCenters[dst] = centers[tid];
+    bucketColors[dst] = sourceColors[tid];
+}

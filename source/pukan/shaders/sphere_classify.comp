@@ -1,0 +1,88 @@
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(push_constant) uniform Push {
+    mat4 viewModel;
+    float tanX;
+    float tanY;
+    float focal;
+    float nearPlane;
+    float farPlane;
+    float maxEdge;
+    float minEdge;
+    uint sphereCount;
+    uint colorCount;
+    uint levelCount;
+    uint maxLevel;
+} pc;
+
+layout(std430, binding = 0) readonly buffer Centers { vec4 centers[]; };
+layout(std430, binding = 1) readonly buffer SourceColors { uint sourceColors[]; };
+layout(std430, binding = 2) buffer Levels { uint levels[]; };
+layout(std430, binding = 3) buffer SphereBuckets { int sphereBuckets[]; };
+layout(std430, binding = 4) buffer Counts { uint counts[]; };
+
+shared uint histogram[64];
+
+void main()
+{
+    const uint local = gl_LocalInvocationIndex;
+    histogram[local] = 0u;
+    barrier();
+
+    const uint tid = gl_GlobalInvocationID.x;
+    if(tid < pc.sphereCount)
+    {
+        const vec4 sphere = centers[tid];
+        const float radius = sphere.w;
+
+        const vec4 view = pc.viewModel * vec4(sphere.xyz, 1.0);
+        const float depth = abs(view.z);
+        const float pixelRadius = depth > 0.001 ? radius * pc.focal / depth : 0.0;
+
+        uint level = levels[tid];
+        float edge = pixelRadius * 1.0516 / float(1u << level);
+
+        if(edge > pc.maxEdge)
+        {
+            while(level < pc.maxLevel && edge > pc.maxEdge)
+            {
+                ++level;
+                edge *= 0.5;
+            }
+        }
+        else if(edge < pc.minEdge)
+        {
+            while(level > 0u && edge < pc.minEdge)
+            {
+                --level;
+                edge *= 2.0;
+            }
+        }
+        levels[tid] = level;
+
+        const bool culled =
+            depth + radius < pc.nearPlane ||
+            depth - radius > pc.farPlane ||
+            abs(view.x) - radius > pc.tanX * depth ||
+            abs(view.y) - radius > pc.tanY * depth;
+
+        if(culled)
+        {
+            sphereBuckets[tid] = -1;
+        }
+        else
+        {
+            const uint bucket = sourceColors[tid] * pc.levelCount + level;
+            sphereBuckets[tid] = int(bucket);
+            atomicAdd(histogram[bucket], 1u);
+        }
+    }
+
+    barrier();
+
+    const uint value = histogram[local];
+    if(value != 0u)
+        atomicAdd(counts[local], value);
+}

@@ -1,5 +1,6 @@
 module pukan.shaders;
 
+import dlib.math: Matrix4x4f;
 import pukan.vulkan.bindings;
 import pukan.vulkan.logical_device;
 import pukan.vulkan.shaders;
@@ -10,6 +11,9 @@ ShaderInfo texturedFragShader;
 
 ShaderInfo gltf_vertShader;
 ShaderInfo gltf_fragShader;
+
+ShaderInfo sphereVertShader;
+ShaderInfo sphereFragShader;
 
 void initShaders(size_t boneMatrixSize)(LogicalDevice device)
 {
@@ -78,5 +82,22 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
         ],
+    );
+
+    sphereVertShader = device.uploadShaderToGPU(
+        cast(ubyte[]) import("sphere_vert.spv"),
+        VK_SHADER_STAGE_VERTEX_BIT,
+        null,
+        VkPushConstantRange(
+            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            offset: 0,
+            size: Matrix4x4f.sizeof,
+        )
+    );
+
+    sphereFragShader = device.uploadShaderToGPU(
+        cast(ubyte[]) import("sphere_frag.spv"),
+        VK_SHADER_STAGE_FRAGMENT_BIT,
+        null
     );
 }
