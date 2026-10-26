@@ -235,6 +235,12 @@ struct Requirement(string name, ulong minimum = 0)
     }
 }
 
+/// Requirement for a Vulkan struct field, named after the field symbol
+template RequirementOf(alias field, ulong minimum = 0)
+{
+    alias RequirementOf = Requirement!(__traits(identifier, field), minimum);
+}
+
 /// True when T is present in the list
 template contains(T, List...)
 {
@@ -339,7 +345,7 @@ template extensionNames(Reqs...)
 }
 
 /// Baseline requirement every instance and device must satisfy
-alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersionEncoded);
+alias ApiVersionRequirement = RequirementOf!(VkPhysicalDeviceProperties.apiVersion, requiredApiVersionEncoded);
 
 /// Returns true when every requirement is satisfied, otherwise fills the reason
 bool requirementsSatisfied(Reqs...)(ref DeviceContext ctx, out string reason)
@@ -429,6 +435,8 @@ unittest
     static assert(Requirement!("maxComputeWorkGroupInvocations", 256).kind == Kind.number);
     static assert(Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME).kind == Kind.extension);
     static assert(Requirement!("apiVersion", VulkanVersion(1, 3).toUint()).kind == Kind.number);
+    static assert(is(RequirementOf!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256) ==
+        Requirement!("maxComputeWorkGroupInvocations", 256)));
     static assert(!__traits(compiles, Requirement!"notARequirement"));
 
     static struct A { private alias requirements = AliasSeq!(Requirement!"samplerAnisotropy"); }

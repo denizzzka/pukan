@@ -4,7 +4,7 @@ import pukan.exceptions;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
-import pukan.vulkan.requirements: Requirement, getOptionalRequirements;
+import pukan.vulkan.requirements: RequirementOf, getOptionalRequirements;
 import std.conv: to;
 import std.exception: enforce;
 
@@ -14,8 +14,8 @@ enum requiredAnisotropy = 16;
 class Texture
 {
     private static alias optionalRequirements = getOptionalRequirements!(
-        Requirement!"samplerAnisotropy",
-        Requirement!("maxSamplerAnisotropy", requiredAnisotropy),
+        RequirementOf!(VkPhysicalDeviceFeatures.samplerAnisotropy),
+        RequirementOf!(VkPhysicalDeviceLimits.maxSamplerAnisotropy, requiredAnisotropy),
     );
 
     LogicalDevice device;
