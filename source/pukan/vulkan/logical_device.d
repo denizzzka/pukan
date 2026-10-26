@@ -3,6 +3,7 @@ module pukan.vulkan.logical_device;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.physical_device: PhysicalDevice;
+import pukan.vulkan.requirements: DeviceContext, FeatureChain, clearFeatureChain, linkDeviceFeatures, requireEnabled;
 import log = std.logger;
 import std.exception: enforce;
 import std.string: toStringz;
@@ -16,9 +17,10 @@ class LogicalDevice
     const uint familyIdx;
 
     private VkPhysicalDeviceFeatures enabledFeatures;
+    private FeatureChain enabledChain;
     private const(char)*[] enabledExtensions;
 
-    package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures)
+    package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures, FeatureChain enabledChain)
     {
         physicalDevice = pd;
 
@@ -35,6 +37,13 @@ class LogicalDevice
             pQueuePriorities: &queuePriority,
         };
 
+        FeatureChain chain = enabledChain;
+        VkPhysicalDeviceFeatures2 features2 = {
+            sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+            features: enabledFeatures,
+        };
+        linkDeviceFeatures(chain, features2);
+
         //~ VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeatures = {
             //~ sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT,
             //~ shaderObject: VK_TRUE,
@@ -44,10 +53,10 @@ class LogicalDevice
             sType: VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             queueCreateInfoCount: 1,
             pQueueCreateInfos: &queueCreateInfo,
-            pEnabledFeatures: &enabledFeatures,
+            pNext: &features2,
+            // pEnabledFeatures must stay null while VkPhysicalDeviceFeatures2 is in pNext
             ppEnabledExtensionNames: extension_list.ptr,
             enabledExtensionCount: cast(uint) extension_list.length,
-            //~ pNext: &shaderObjectFeatures,
         };
 
         debug
@@ -72,17 +81,19 @@ class LogicalDevice
         }
 
         vkCreateDevice(pd.physicalDevice, &createInfo, alloc, &device).vkCheck;
+        clearFeatureChain(chain);
         this.enabledFeatures = enabledFeatures;
+        this.enabledChain = chain;
         this.enabledExtensions = extension_list.dup;
     }
 
     /// Device requirements context for optional checks
-    import pukan.vulkan.requirements: DeviceContext, requireEnabled;
-    DeviceContext deviceContext() const
+    DeviceContext deviceContext()
     {
         DeviceContext ctx;
         ctx.properties = physicalDevice.properties;
         ctx.enabled = enabledFeatures;
+        ctx.enabledChain = enabledChain;
         ctx.enabledExtensions = enabledExtensions.dup;
         return ctx;
     }

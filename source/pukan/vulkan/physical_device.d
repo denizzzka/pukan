@@ -5,7 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
-import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, OptionalRequirementsWithout, requestOptionalRequirements;
+import pukan.vulkan.requirements;
 import pukan: toPrettyString;
 import std.meta: AliasSeq;
 
@@ -89,13 +89,13 @@ class PhysicalDevice
     }
 
     /// Snapshots properties, supported features and extensions
-    package DeviceContext createLogicalDeviceContext(const(char*)[] extension_list)
+    package DeviceContext createLogicalDeviceContext(Reqs...)(const(char)*[] extension_list)
     {
         DeviceContext ctx;
         ctx.properties = properties;
-        vkGetPhysicalDeviceFeatures(physicalDevice, &ctx.supported);
         ctx.supportedExtensions = extensions();
         ctx.enabledExtensions = extension_list.dup;
+        queryDeviceFeatures!Reqs(physicalDevice, ctx);
 
         return ctx;
     }
@@ -115,7 +115,7 @@ class PhysicalDevice
     /// Creates logical device from a pre-prepared context
     package LogicalDevice createLogicalDeviceFromContext(DeviceContext ctx)
     {
-        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled);
+        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled, ctx.enabledChain);
     }
 }
 

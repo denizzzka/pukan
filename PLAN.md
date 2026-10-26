@@ -89,8 +89,8 @@ Used but never enabled:
 Version dependencies:
 
 - The instance requests Vulkan 1.3.0 (`core.d`), and
-  `findSuitablePhysicalDevice` checks the device version against the same
-  baseline.
+  `findSuitablePhysicalDevice` checks the device version against the higher of
+  that baseline and the version the requirements imply (`ApiVersionFor`).
 - `vkGetPhysicalDeviceProperties2` needs Vulkan 1.1.
 - Shaders are compiled with `--target-env=vulkan1.2` (SPIR-V 1.5) although the
   GLSL is `#version 460`.
@@ -180,27 +180,52 @@ known before the device exists, so there is no ordering problem to solve.
 
 ### Features from pNext structs
 
-`requirementKind` recognises only members of `VkPhysicalDeviceFeatures`, so a
-feature from the `VkPhysicalDeviceFeatures2` chain cannot be declared at all:
-`dynamicRendering`, `timelineSemaphore`, `descriptorIndexing`,
-`vertexInputDynamicState` and the like fall through to
-`"unknown Vulkan requirement"`. The first real consumer is
-`VK_EXT_vertex_input_dynamic_state` in `gltf/factory.d`: its
-`vertexInputDynamicState` feature is used but never requested.
+`Requirement` takes a field symbol of a structure chained through
+`VkPhysicalDeviceFeatures2`. The owning structure is resolved from a compile-time
+registry, most preferred first: `VkPhysicalDeviceVulkan11Features`,
+`...12...`, `...13...`, then the extension structures.
 
-- [ ] Resolve the owning struct at compile time from a fixed list:
-      `VkPhysicalDeviceVulkan11Features`, `...12...`, `...13...`, then the
-      extension feature structs the library knows about. A name that is missing
-      or matches more than one struct is a `static assert` naming the
-      candidates, so a typo stays a compile error.
-- [ ] Check through `vkGetPhysicalDeviceFeatures2` over a pNext chain built from
-      the resolved structs, once per physical device; keep the bulk
-      `vkGetPhysicalDeviceFeatures` read for the base struct.
-- [ ] Enable by setting the resolved field and chaining the same struct into
-      `VkDeviceCreateInfo.pNext`. A requirement must not be able to set a field
-      in a struct that device creation does not link.
-- [ ] Keep `Requirement` a single tag: the field symbol selects the struct, so
+- [x] Resolve the owning structure at compile time from the registry; a name that
+      is missing or present in more than one structure is a `static assert`
+      naming the candidates, so a typo stays a compile error.
+- [x] Check through `vkGetPhysicalDeviceFeatures2` over a pNext chain built from
+      the structures the requirement set references, once per physical device;
+      the base `VkPhysicalDeviceFeatures` come from the same call.
+- [x] Enable by setting the resolved field and chaining the same structure into
+      `VkDeviceCreateInfo.pNext`, with `pEnabledFeatures` left null. A
+      requirement cannot set a field in a structure that device creation does not
+      link.
+- [x] Keep `Requirement` a single tag: the field symbol selects the structure, so
       an entity does not name `VkPhysicalDeviceVulkan12Features` by hand.
+
+Version selection: each structure contributes the version that introduced it and
+the union takes the maximum, so a manifest raises the minimum instead of every
+caller remembering it:
+
+```d
+alias Needs12 = Requirement!(VkPhysicalDeviceVulkan12Features.timelineSemaphore);
+alias Needs13 = Requirement!(VkPhysicalDeviceVulkan13Features.synchronization2);
+
+static assert(RequirementsVersion!Needs12 == VulkanVersion(1, 2));
+static assert(RequirementsVersion!(Needs12, Needs13) == VulkanVersion(1, 3));
+static assert(ApiVersionFor!Needs12 == requiredApiVersion); // baseline 1.3 wins
+```
+
+`VkPhysicalDeviceVulkan11Features` and `...12...` need 1.2, `...13...` needs 1.3,
+`VkPhysicalDeviceVulkan14Features` needs 1.4 and stays out while the baseline is
+1.3. `RequirementsVersion` ignores the baseline, `ApiVersionFor` takes the larger
+of the two, and device selection checks the latter.
+
+Extension structures are explicit: the requirement set must name the device
+extension that provides the structure, and `Requirements`/`RequirementsFor`
+reject a set that forgets it. Chain features are not optional yet: the enabled
+chain is linked from required requirements before device creation, so
+`getOptionalRequirements` and `requestOptionalRequirements` reject them.
+
+Not a consumer yet: `VK_EXT_vertex_input_dynamic_state` in `gltf/factory.d` is
+not needed on the current baseline, because
+`VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE` and `vkCmdBindVertexBuffers2` are
+core 1.3. Its structure stays in the registry for a below-1.3 build.
 
 ### Vulkan version as a requirement
 

@@ -7,7 +7,7 @@ import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice, SelectedDevice;
 import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
-import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, OptionalRequirementsFor, OptionalRequirementsWithout, getOptionalRequirements, Requirement, requirementsSatisfied, requestRequirements, requireEnabled;
+import pukan.vulkan.requirements;
 import pukan.vulkan.bindings: VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 import pukan: toPrettyString;
 import std.conv: to;
@@ -218,12 +218,15 @@ class Instance
     SelectedDevice!Reqs[] suitablePhysicalDevices(Reqs...)()
     {
         SelectedDevice!Reqs[] ret;
-        alias allRequirements = AliasSeq!(ApiVersionRequirement, Reqs);
+        alias allRequirements = AliasSeq!(
+            Requirement!(VkPhysicalDeviceProperties.apiVersion, ApiVersionFor!Reqs.toUint()),
+            Reqs,
+        );
 
         foreach(dev; devices)
         {
             auto pd = new PhysicalDevice(this, dev);
-            auto ctx = pd.createLogicalDeviceContext(null);
+            auto ctx = pd.createLogicalDeviceContext!Reqs(null);
 
             string reason;
             if(!requirementsSatisfied!allRequirements(ctx, reason))

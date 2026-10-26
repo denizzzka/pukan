@@ -1,12 +1,13 @@
 module pukan.vulkan.requirements;
 
-import pukan.vulkan.api_version: VulkanVersion, requiredApiVersionEncoded;
+import pukan.vulkan.api_version: VulkanVersion, requiredApiVersion, requiredApiVersionEncoded;
 import pukan.vulkan.bindings;
 import core.stdc.string: strcmp;
 import std.conv: to;
-import std.meta: AliasSeq, NoDuplicates, staticMap;
+import std.meta: AliasSeq, NoDuplicates, staticIndexOf, staticMap;
+import std.typecons: Tuple;
 
-private enum Kind { number, feature, extension }
+private enum Kind { number, feature, chainFeature, extension }
 
 private template isNumberType(T)
 {
@@ -18,8 +19,110 @@ private template isNumberType(T)
 /// Declare optional requirements for an entity
 template getOptionalRequirements(Reqs...)
 {
+    static foreach(R; Reqs)
+        // The enabled chain is linked from required requirements only, before device creation
+        static assert(R.kind != Kind.chainFeature,
+            "optional chain feature is not supported: " ~ R.requirementName);
+
     private import std.meta: AliasSeq;
     alias getOptionalRequirements = AliasSeq!Reqs;
+}
+
+/// Feature structures chained through VkPhysicalDeviceFeatures2, most preferred first
+private alias featureStructs = AliasSeq!(
+    VkPhysicalDeviceVulkan11Features,
+    VkPhysicalDeviceVulkan12Features,
+    VkPhysicalDeviceVulkan13Features,
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT,
+);
+
+/// Storage for every known feature structure
+alias FeatureChain = Tuple!featureStructs;
+
+/// Version that introduced the structure, 1.0 for extension-only ones
+private template featureStructVersion(T)
+{
+    static if(is(T == VkPhysicalDeviceVulkan11Features) || is(T == VkPhysicalDeviceVulkan12Features))
+        enum featureStructVersion = VulkanVersion(1, 2);
+    else static if(is(T == VkPhysicalDeviceVulkan13Features))
+        enum featureStructVersion = VulkanVersion(1, 3);
+    else
+        enum featureStructVersion = VulkanVersion(1, 0);
+}
+
+/// Device extension that enables the structure, empty for core ones
+private template featureStructExtension(T)
+{
+    static if(is(T == VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT))
+        enum featureStructExtension = "VK_EXT_vertex_input_dynamic_state";
+    else
+        enum featureStructExtension = "";
+}
+
+private template featureStructSType(T)
+{
+    static if(is(T == VkPhysicalDeviceVulkan11Features))
+        enum featureStructSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    else static if(is(T == VkPhysicalDeviceVulkan12Features))
+        enum featureStructSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    else static if(is(T == VkPhysicalDeviceVulkan13Features))
+        enum featureStructSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    else static if(is(T == VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT))
+        enum featureStructSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
+    else
+        static assert(false, "unknown feature structure: " ~ T.stringof);
+}
+
+private template isFeatureStructField(T, string name)
+{
+    enum isFeatureStructField = __traits(hasMember, T, name) &&
+        is(typeof(__traits(getMember, T, name)) == VkBool32);
+}
+
+/// Structures holding the given field, in registry order
+private template structsWithField(string name, Structs...)
+{
+    static if(Structs.length == 0)
+        alias structsWithField = AliasSeq!();
+    else static if(isFeatureStructField!(Structs[0], name))
+        alias structsWithField = AliasSeq!(Structs[0], structsWithField!(name, Structs[1 .. $]));
+    else
+        alias structsWithField = structsWithField!(name, Structs[1 .. $]);
+}
+
+/// Structure that owns the given chain feature field
+private template OwnerOf(string name)
+{
+    alias candidates = structsWithField!(name, featureStructs);
+
+    static assert(candidates.length > 0, "unknown Vulkan chain feature: " ~ name);
+    static assert(candidates.length == 1, "ambiguous Vulkan chain feature: " ~ name);
+
+    alias OwnerOf = candidates[0];
+}
+
+/// Position of the structure in the registry
+private template chainIndex(T)
+{
+    enum chainIndex = staticIndexOf!(T, featureStructs);
+}
+
+private template requirementOwner(R)
+{
+    static if(__traits(hasMember, R, "owner"))
+        alias requirementOwner = R.owner;
+    else
+        alias requirementOwner = void;
+}
+
+private template structReferenced(T, Reqs...)
+{
+    static if(Reqs.length == 0)
+        enum structReferenced = false;
+    else static if(is(requirementOwner!(Reqs[0]) == T))
+        enum structReferenced = true;
+    else
+        enum structReferenced = structReferenced!(T, Reqs[1 .. $]);
 }
 
 private template requirementKind(string name)
@@ -29,6 +132,8 @@ private template requirementKind(string name)
     else static if(__traits(hasMember, VkPhysicalDeviceFeatures, name) &&
         is(typeof(__traits(getMember, VkPhysicalDeviceFeatures, name)) == VkBool32))
         enum requirementKind = Kind.feature;
+    else static if(structsWithField!(name, featureStructs).length > 0)
+        enum requirementKind = Kind.chainFeature;
     else static if(__traits(hasMember, VkPhysicalDeviceProperties, name) &&
         isNumberType!(typeof(__traits(getMember, VkPhysicalDeviceProperties, name))))
         enum requirementKind = Kind.number;
@@ -45,6 +150,8 @@ struct DeviceContext
     VkPhysicalDeviceProperties properties;
     VkPhysicalDeviceFeatures supported;
     VkPhysicalDeviceFeatures enabled;
+    FeatureChain supportedChain;
+    FeatureChain enabledChain;
     VkExtensionProperties[] supportedExtensions;
     const(char)*[] enabledExtensions;
 
@@ -87,7 +194,7 @@ struct InstanceContext
     }
 }
 
-/// Device requirement: a numeric property, a feature or an extension
+/// Device requirement: a numeric property, a feature (base or chained) or an extension
 /// Features and extensions have no minimum, so it only matters for numbers
 template Requirement(alias source, ulong minimum = 0)
 {
@@ -106,13 +213,27 @@ private struct RequirementImpl(string name, ulong minimum)
 
     /// True when this is a device/instance extension
     enum bool isExtension = kind == Kind.extension;
-    /// True when this is a VkBool32 feature
+    /// True when this is a VkBool32 feature of VkPhysicalDeviceFeatures
     enum bool isFeature = kind == Kind.feature;
+    /// True when this is a VkBool32 feature of a chained structure
+    enum bool isChainFeature = kind == Kind.chainFeature;
+
+    /// Structure that owns the chained feature
+    static if(kind == Kind.chainFeature)
+        alias owner = OwnerOf!name;
+
+    /// Vulkan version that introduced the chained structure, if any
+    static if(kind == Kind.chainFeature)
+        package enum VulkanVersion requiredVersion = featureStructVersion!owner;
+    else
+        package enum VulkanVersion requiredVersion = VulkanVersion(1, 0);
 
     /// Name used in diagnostics
     enum string requirementName = name;
 
     static if(kind == Kind.feature)
+        static assert(minimum == 0, "feature requirement takes no minimum: " ~ name);
+    else static if(kind == Kind.chainFeature)
         static assert(minimum == 0, "feature requirement takes no minimum: " ~ name);
     else static if(kind == Kind.extension)
         static assert(minimum == 0, "extension requirement takes no minimum: " ~ name);
@@ -141,6 +262,14 @@ private struct RequirementImpl(string name, ulong minimum)
                 return false;
             }
         }
+        else static if(kind == Kind.chainFeature)
+        {
+            if(__traits(getMember, ctx.supportedChain[chainIndex!owner], name) != VK_TRUE)
+            {
+                reason = "feature is not supported: " ~ name;
+                return false;
+            }
+        }
         else static if(kind == Kind.extension)
         {
             if(!ctx.supportsExtension(name))
@@ -158,6 +287,12 @@ private struct RequirementImpl(string name, ulong minimum)
     {
         static if(kind == Kind.feature)
             __traits(getMember, ctx.enabled, name) = VK_TRUE;
+        else static if(kind == Kind.chainFeature)
+        {
+            auto ref slot = ctx.enabledChain[chainIndex!owner];
+            slot.sType = featureStructSType!owner;
+            __traits(getMember, slot, name) = VK_TRUE;
+        }
         else static if(kind == Kind.extension)
             ctx.enabledExtensions ~= name.ptr;
     }
@@ -181,6 +316,14 @@ private struct RequirementImpl(string name, ulong minimum)
         else static if(kind == Kind.feature)
         {
             if(__traits(getMember, ctx.enabled, name) != VK_TRUE)
+            {
+                reason = "feature is not enabled: " ~ name;
+                return false;
+            }
+        }
+        else static if(kind == Kind.chainFeature)
+        {
+            if(__traits(getMember, ctx.enabledChain[chainIndex!owner], name) != VK_TRUE)
             {
                 reason = "feature is not enabled: " ~ name;
                 return false;
@@ -247,6 +390,57 @@ private struct RequirementImpl(string name, ulong minimum)
     }
 }
 
+/// Queries the features referenced by Reqs into ctx
+void queryDeviceFeatures(Reqs...)(VkPhysicalDevice device, ref DeviceContext ctx)
+{
+    VkPhysicalDeviceFeatures2 head = {
+        sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+    };
+    FeatureChain chain;
+
+    static foreach(i, T; featureStructs)
+    {{
+        static if(structReferenced!(T, Reqs))
+        {
+            chain[i].sType = featureStructSType!T;
+            chain[i].pNext = head.pNext;
+            head.pNext = &chain[i];
+        }
+    }}
+
+    vkGetPhysicalDeviceFeatures2(device, &head);
+    ctx.supported = head.features;
+
+    static foreach(i, T; featureStructs)
+    {
+        ctx.supportedChain[i] = chain[i];
+        ctx.supportedChain[i].pNext = null;
+    }
+}
+
+/// Links the requested chain features into head; call clearFeatureChain after creation
+void linkDeviceFeatures(ref FeatureChain chain, ref VkPhysicalDeviceFeatures2 head)
+{
+    head.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    head.pNext = null;
+
+    static foreach(i; 0 .. featureStructs.length)
+    {
+        if(cast(int) chain[i].sType != 0)
+        {
+            chain[i].pNext = head.pNext;
+            head.pNext = &chain[i];
+        }
+    }
+}
+
+/// Drops the pNext links so the stored values stay valid
+void clearFeatureChain(ref FeatureChain chain)
+{
+    static foreach(i; 0 .. featureStructs.length)
+        chain[i].pNext = null;
+}
+
 /// True when T is present in the list
 template contains(T, List...)
 {
@@ -266,10 +460,37 @@ private template moduleRequirements(M)
         alias moduleRequirements = AliasSeq!();
 }
 
+/// Device extension that provides the chained structure of R, empty if core
+private template chainExtension(R)
+{
+    static if(__traits(hasMember, R, "owner"))
+        enum chainExtension = featureStructExtension!(R.owner);
+    else
+        enum chainExtension = "";
+}
+
+/// True when every chain feature is declared together with its device extension
+private template chainExtensionsDeclared(Reqs...)
+{
+    static if(Reqs.length == 0)
+        enum chainExtensionsDeclared = true;
+    else static if(chainExtension!(Reqs[0]).length > 0)
+        enum chainExtensionsDeclared =
+            contains!(Requirement!(chainExtension!(Reqs[0])), Reqs) &&
+            chainExtensionsDeclared!(Reqs[1 .. $]);
+    else
+        enum chainExtensionsDeclared = chainExtensionsDeclared!(Reqs[1 .. $]);
+}
+
 /// Union of the requirements declared by the given subsystems, without duplicates
 template Requirements(Modules...)
 {
-    alias Requirements = NoDuplicates!(staticMap!(moduleRequirements, Modules));
+    private alias reqs = NoDuplicates!(staticMap!(moduleRequirements, Modules));
+
+    static assert(chainExtensionsDeclared!reqs,
+        "a chain feature requires its device extension in the same requirement set");
+
+    alias Requirements = reqs;
 }
 
 private template moduleOptionalRequirements(M)
@@ -348,7 +569,12 @@ template RequirementsFor(Backend, Modules...)
         alias moduleRequired = moduleResolvedRequirements!(Backend, M);
     }
 
-    alias RequirementsFor = NoDuplicates!(staticMap!(moduleRequired, Modules));
+    private alias reqs = NoDuplicates!(staticMap!(moduleRequired, Modules));
+
+    static assert(chainExtensionsDeclared!reqs,
+        "a chain feature requires its device extension in the same requirement set");
+
+    alias RequirementsFor = reqs;
 }
 
 /// Names of the extension requirements in Reqs
@@ -370,6 +596,31 @@ template extensionNames(Reqs...)
 
 /// Baseline requirement every instance and device must satisfy
 alias ApiVersionRequirement = Requirement!(VkPhysicalDeviceProperties.apiVersion, requiredApiVersionEncoded);
+
+/// Highest Vulkan version the requirements imply, ignoring the library baseline
+template RequirementsVersion(Reqs...)
+{
+    private VulkanVersion maxVersion()
+    {
+        VulkanVersion ret = VulkanVersion(1, 0);
+
+        static foreach(R; Reqs)
+            if(R.requiredVersion > ret)
+                ret = R.requiredVersion;
+
+        return ret;
+    }
+
+    enum RequirementsVersion = maxVersion();
+}
+
+/// Vulkan version the requirements need, never below the library baseline
+template ApiVersionFor(Reqs...)
+{
+    enum ApiVersionFor = RequirementsVersion!Reqs > requiredApiVersion
+        ? RequirementsVersion!Reqs
+        : requiredApiVersion;
+}
 
 /// Returns true when every requirement is satisfied, otherwise fills the reason
 bool requirementsSatisfied(Reqs...)(ref DeviceContext ctx, out string reason)
@@ -393,6 +644,9 @@ void requestOptionalRequirements(Reqs...)(ref DeviceContext ctx)
 {
     static foreach(R; NoDuplicates!Reqs)
     {{
+        // The enabled chain is linked from required requirements only, before device creation
+        static assert(!R.isChainFeature, "optional chain feature is not supported: " ~ R.requirementName);
+
         string reason;
         if(R.isSatisfied(ctx, reason))
             R.request(ctx);
@@ -455,6 +709,8 @@ void requireEnabled(Reqs...)(ref const InstanceContext ctx, string entity, strin
 
 unittest
 {
+    string reason;
+
     static assert(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy).kind == Kind.feature);
     static assert(Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256).kind == Kind.number);
     static assert(Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME).kind == Kind.extension);
@@ -462,6 +718,52 @@ unittest
     static assert(Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 256).requirementName ==
         "maxComputeWorkGroupInvocations");
     static assert(!__traits(compiles, Requirement!VkPhysicalDeviceLimits));
+
+    static assert(Requirement!(VkPhysicalDeviceVulkan13Features.dynamicRendering).kind == Kind.chainFeature);
+    static assert(is(Requirement!(VkPhysicalDeviceVulkan13Features.dynamicRendering).owner ==
+        VkPhysicalDeviceVulkan13Features));
+    static assert(Requirement!(VkPhysicalDeviceVulkan13Features.dynamicRendering).requiredVersion == VulkanVersion(1, 3));
+    static assert(Requirement!(VkPhysicalDeviceVulkan11Features.storageBuffer16BitAccess).requiredVersion ==
+        VulkanVersion(1, 2));
+    static assert(RequirementsVersion!() == VulkanVersion(1, 0));
+    static assert(RequirementsVersion!(
+        Requirement!(VkPhysicalDeviceVulkan11Features.storageBuffer16BitAccess),
+        Requirement!(VkPhysicalDeviceVulkan13Features.synchronization2),
+    ) == VulkanVersion(1, 3));
+    static assert(ApiVersionFor!(Requirement!(VkPhysicalDeviceVulkan11Features.storageBuffer16BitAccess)) ==
+        requiredApiVersion);
+
+    static struct ChainOnly
+    {
+        private alias requirements = AliasSeq!(
+            Requirement!(VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT.vertexInputDynamicState));
+    }
+    static struct ChainWithExtension
+    {
+        private alias requirements = AliasSeq!(
+            Requirement!(VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT.vertexInputDynamicState),
+            Requirement!(VK_EXT_vertex_input_dynamic_state));
+    }
+    static assert(!__traits(compiles, Requirements!ChainOnly));
+    static assert(__traits(compiles, Requirements!ChainWithExtension));
+    static assert(!__traits(compiles, getOptionalRequirements!(
+        Requirement!(VkPhysicalDeviceVulkan13Features.dynamicRendering))));
+
+    DeviceContext chainCtx;
+    alias dynamicRendering = Requirement!(VkPhysicalDeviceVulkan13Features.dynamicRendering);
+    dynamicRendering.request(chainCtx);
+    assert(chainCtx.enabledChain[chainIndex!VkPhysicalDeviceVulkan13Features].sType ==
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES);
+    assert(requirementsEnabled!dynamicRendering(chainCtx, reason));
+
+    VkPhysicalDeviceFeatures2 head;
+    linkDeviceFeatures(chainCtx.enabledChain, head);
+    assert(head.pNext is &chainCtx.enabledChain[chainIndex!VkPhysicalDeviceVulkan13Features]);
+    clearFeatureChain(chainCtx.enabledChain);
+    assert(chainCtx.enabledChain[chainIndex!VkPhysicalDeviceVulkan13Features].pNext is null);
+
+    chainCtx.supportedChain[chainIndex!VkPhysicalDeviceVulkan13Features].dynamicRendering = VK_TRUE;
+    assert(dynamicRendering.isSatisfied(chainCtx, reason));
 
     static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
@@ -484,7 +786,6 @@ unittest
     InstanceContext instance;
     instance.loaderVersion = VulkanVersion(1, 2);
 
-    string reason;
     assert(!ApiVersionRequirement.isSatisfied(instance, reason));
     assert(reason.length > 0);
 
