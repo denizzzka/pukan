@@ -88,6 +88,7 @@ struct InstanceContext
 }
 
 /// Device requirement: a numeric property, a feature or an extension
+// TODO: take the name from a symbol and reject string literals with static assert
 struct Requirement(string name, ulong minimum = 0)
 {
     package enum kind = requirementKind!name;
