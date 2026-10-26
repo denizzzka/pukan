@@ -178,6 +178,30 @@ Start with (2), move to (1) if the assert proves too weak in practice.
 Two-phase init is not needed once the union is compile-time: the full set is
 known before the device exists, so there is no ordering problem to solve.
 
+### Features from pNext structs
+
+`requirementKind` recognises only members of `VkPhysicalDeviceFeatures`, so a
+feature from the `VkPhysicalDeviceFeatures2` chain cannot be declared at all:
+`dynamicRendering`, `timelineSemaphore`, `descriptorIndexing`,
+`vertexInputDynamicState` and the like fall through to
+`"unknown Vulkan requirement"`. The first real consumer is
+`VK_EXT_vertex_input_dynamic_state` in `gltf/factory.d`: its
+`vertexInputDynamicState` feature is used but never requested.
+
+- [ ] Resolve the owning struct at compile time from a fixed list:
+      `VkPhysicalDeviceVulkan11Features`, `...12...`, `...13...`, then the
+      extension feature structs the library knows about. A name that is missing
+      or matches more than one struct is a `static assert` naming the
+      candidates, so a typo stays a compile error.
+- [ ] Check through `vkGetPhysicalDeviceFeatures2` over a pNext chain built from
+      the resolved structs, once per physical device; keep the bulk
+      `vkGetPhysicalDeviceFeatures` read for the base struct.
+- [ ] Enable by setting the resolved field and chaining the same struct into
+      `VkDeviceCreateInfo.pNext`. A requirement must not be able to set a field
+      in a struct that device creation does not link.
+- [ ] Keep `Requirement` a single tag: the field symbol selects the struct, so
+      an entity does not name `VkPhysicalDeviceVulkan12Features` by hand.
+
 ### Vulkan version as a requirement
 
 `vkGetPhysicalDeviceFeatures2` is itself version-gated: it is core in 1.1,
