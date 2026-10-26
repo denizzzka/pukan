@@ -91,6 +91,7 @@ class PhysicalDevice
     /// Snapshots properties, supported features and extensions
     package bool createLogicalDeviceContext(Reqs...)(const(char)*[] extension_list, out DeviceContext ctx, out string reason)
     {
+        ctx.device = physicalDevice;
         ctx.properties = properties;
         ctx.queueFamilies = getArrayFrom!vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice);
         ctx.supportedExtensions = extensions();

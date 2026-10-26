@@ -21,7 +21,7 @@ template getOptionalRequirements(Reqs...)
 {
     static foreach(R; Reqs)
         // The enabled chain is linked from required requirements only, before device creation
-        static assert(R.kind != Kind.chainFeature,
+        static assert(!R.isChainFeature,
             "optional chain feature is not supported: " ~ R.requirementName);
 
     private import std.meta: AliasSeq;
@@ -227,6 +227,7 @@ private template requirementKind(string name)
 /// Device snapshot the requirements are checked against
 struct DeviceContext
 {
+    VkPhysicalDevice device;
     VkPhysicalDeviceProperties properties;
     VkPhysicalDeviceFeatures supported;
     VkPhysicalDeviceFeatures enabled;
@@ -568,6 +569,47 @@ void linkDeviceFeatures(ref FeatureChain chain, ref VkPhysicalDeviceFeatures2 he
     }
 }
 
+/// Requirement for a format with the given optimal tiling features
+struct FormatRequirement(VkFormat format, VkFormatFeatureFlags features)
+{
+    enum string requirementName = format.stringof ~ " " ~ features.stringof;
+    enum bool isExtension = false;
+    enum bool isFeature = false;
+    enum bool isChainFeature = false;
+    package enum VulkanVersion requiredVersion = VulkanVersion(1, 0);
+
+    /// Returns false and a reason when the format lacks the features
+    static bool isSatisfied(Ctx)(ref Ctx ctx, out string reason) if(is(Ctx == DeviceContext))
+    {
+        return checkFormat(ctx.device, reason);
+    }
+
+    /// Formats are checked, not enabled at device creation
+    static void request(ref DeviceContext ctx)
+    {
+    }
+
+    /// Returns false and a reason when the format lacks the features
+    static bool isEnabled(ref const DeviceContext ctx, out string reason)
+    {
+        return checkFormat(cast(VkPhysicalDevice) ctx.device, reason);
+    }
+
+    private static bool checkFormat(VkPhysicalDevice device, out string reason)
+    {
+        VkFormatProperties properties;
+        vkGetPhysicalDeviceFormatProperties(device, format, &properties);
+
+        if((properties.optimalTilingFeatures & features) != features)
+        {
+            reason = "format lacks features: " ~ requirementName;
+            return false;
+        }
+
+        return true;
+    }
+}
+
 /// True when T is present in the list
 template contains(T, List...)
 {
@@ -757,7 +799,7 @@ template QueueFlagsFor(Reqs...)
         VkQueueFlags ret;
 
         static foreach(R; Reqs)
-            static if(R.kind == Kind.queue)
+            static if(__traits(hasMember, R, "kind") && R.kind == Kind.queue)
                 ret |= cast(VkQueueFlags) R.requirementMinimum;
 
         return ret;
@@ -950,6 +992,12 @@ unittest
 
     DeviceContext noQueue;
     assert(!requirementsSatisfied!graphicsQueue(noQueue, reason));
+
+    alias depth = FormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT,
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    static assert(!depth.isExtension && !depth.isFeature && !depth.isChainFeature);
+    static assert(RequirementsVersion!depth == VulkanVersion(1, 0));
+    static assert(QueueFlagsFor!depth == 0);
 
     static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }

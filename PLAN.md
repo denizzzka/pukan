@@ -344,8 +344,9 @@ requirements, which is currently unused.
         checked at selection; the family is chosen by `QueueFlagsFor` at creation.
   - [ ] Swapchain surface: format, color space and present mode are chosen by
         `SwapChain` and not declared or checked.
-  - [ ] Depth format `VK_FORMAT_D24_UNORM_S8_UINT` and the image formats in
-        `image.d` are not checked against device support.
+  - [x] Depth and sampled formats: `FormatRequirement` checks optimal tiling
+        features at selection; `FrameBuilder` declares the depth format and
+        `GltfFactory` the sampled texture format.
   - [x] `VK_EXT_vertex_input_dynamic_state`: covered by core 1.3; the structure
         stays in the registry for a below-1.3 baseline.
 

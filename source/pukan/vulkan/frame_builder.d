@@ -5,10 +5,15 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;
+import std.meta: AliasSeq;
 
 // This class should gradually become shared thread-safe
 class FrameBuilder
 {
+    private alias requirements = AliasSeq!(
+        FormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT),
+    );
+
     LogicalDevice device;
     private Queue graphicsQueue;
     /* TODO:private */ CommandPool commandPool;
