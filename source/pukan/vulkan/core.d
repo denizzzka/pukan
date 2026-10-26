@@ -85,8 +85,12 @@ class Instance
 
         debug const value = VK_TRUE;
 
+        // Best practices flags debug utils as debug-only, which this build is
+        debug const(char)*[] mutedMessages = ["BestPractices-specialuse-extension"];
+
         debug auto settings = [
             VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "validate_best_practices", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
+            VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, mutedMessages.ptr),
             //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "validate_best_practices_nvidia", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
             //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "validate_sync", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
             //~ VkLayerSettingEXT("VK_LAYER_KHRONOS_validation", "gpuav_enable", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &value),
