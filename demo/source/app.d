@@ -45,7 +45,26 @@ enum fps = 60;
 enum width = 640;
 enum height = 640;
 
-void main() {
+void main(string[] args) {
+    import std.getopt: defaultGetoptPrinter, getopt;
+
+    bool stereo;
+    bool crossEyed;
+    auto getoptResult = getopt(
+        args,
+        "stereo", "render side-by-side stereo", &stereo,
+        "cross-eyed", "swap stereo halves for cross-eyed viewing", &crossEyed,
+    );
+
+    if(getoptResult.helpWanted)
+    {
+        defaultGetoptPrinter("pukan3D demo", getoptResult.options);
+        return;
+    }
+
+    if(crossEyed)
+        stereo = true;
+
     version(linux)
     version(DigitalMars)
     {
@@ -63,7 +82,8 @@ void main() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     //~ glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    auto window = glfwCreateWindow(width, height, name.toStringz, null, null);
+    const windowWidth = stereo ? width * 2 : width;
+    auto window = glfwCreateWindow(windowWidth, height, name.toStringz, null, null);
     enforce(window, "Cannot create a window");
 
     //~ glfwSetWindowUserPointer(demo.window, demo);
@@ -173,11 +193,14 @@ void main() {
     {
         glfwPollEvents();
 
+        const curr = sw.peek.total!"msecs" * 0.001;
+
         WorldTransformation wtb;
-        updateWorldTransformations(wtb, sw, scene.swapChain.imageExtent, tree, cubeRotator);
+        updateWorldTransformations(wtb, curr, scene.swapChain.imageExtent, tree, cubeRotator);
         const transl = wtb.proj * wtb.view * wtb.model;
 
-        tree.root.payload = Bone(transl);
+        if(!stereo)
+            tree.root.payload = Bone(transl);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
 
@@ -192,9 +215,21 @@ void main() {
 
             tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
 
-            scene.recordCommandBuffer(cb, (buf){
-                tree.drawingBufferFilling(buf, Matrix4x4f.identity);
-            });
+            if(stereo)
+            {
+                scene.recordStereoCommandBuffer(cb, (buf, eye, eyeExtent) {
+                    const view = crossEyed ? 1 - eye : eye;
+                    auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
+                    tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
+                    tree.drawingBufferFilling(buf, Matrix4x4f.identity);
+                });
+            }
+            else
+            {
+                scene.recordCommandBuffer(cb, (buf){
+                    tree.drawingBufferFilling(buf, Matrix4x4f.identity);
+                });
+            }
         });
 
         version(asset)
@@ -254,6 +289,11 @@ void main() {
 
 import dlib.math;
 
+enum cameraFovY = 45.0f;
+enum cameraNear = 0.1f;
+enum cameraFar = 10.0f;
+enum stereoEyeSeparation = 0.06f;
+
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
 {
     auto rotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * currDeltaTime * 0.1);
@@ -268,18 +308,42 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
         Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
     );
     wtb.proj = perspectiveMatrix(
-        45.0f /* FOV */,
+        cameraFovY,
         cast(float) imageExtent.width / imageExtent.height,
-        0.1f /* zNear */, 10.0f /* zFar */
+        cameraNear, cameraFar,
     );
 
     return wtb;
 }
 
-void updateWorldTransformations(out WorldTransformation wtb, ref StopWatch sw, in VkExtent2D imageExtent, SceneTree tree, Bone* cubeRotator)
+WorldTransformation[2] calculateStereoWTB(in VkExtent2D eyeExtent, float currDeltaTime)
 {
-    const curr = sw.peek.total!"msecs" * 0.001;
+    auto base = calculateWTB(eyeExtent, currDeltaTime);
+    const views = makeStereoViews(
+        Vector3f(0, -0.2, -0.8),
+        Vector3f(0, 0, 0),
+        Vector3f(0, 1, 0),
+        cameraFovY,
+        eyeExtent,
+        cameraNear,
+        cameraFar,
+        stereoEyeSeparation,
+    );
 
+    WorldTransformation[2] ret;
+
+    foreach(i; 0 .. 2)
+    {
+        ret[i] = base;
+        ret[i].view = views[i].view;
+        ret[i].proj = views[i].proj;
+    }
+
+    return ret;
+}
+
+void updateWorldTransformations(out WorldTransformation wtb, float curr, in VkExtent2D imageExtent, SceneTree tree, Bone* cubeRotator)
+{
     wtb = calculateWTB(imageExtent, curr);
 
     auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
