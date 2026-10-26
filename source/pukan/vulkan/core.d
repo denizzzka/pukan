@@ -7,7 +7,7 @@ import pukan.vulkan.helpers;
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice, SelectedDevice;
 import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
-import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, OptionalRequirementsOf, getOptionalRequirements, Requirement, requirementsSatisfied, requestRequirements, requireEnabled;
+import pukan.vulkan.requirements: ApiVersionRequirement, InstanceContext, OptionalRequirementsFor, getOptionalRequirements, Requirement, requirementsSatisfied, requestRequirements, requireEnabled;
 import pukan.vulkan.bindings: VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 import pukan: toPrettyString;
 import std.conv: to;
@@ -257,7 +257,7 @@ class Instance
         import std.meta: AliasSeq;
         import core.stdc.string: strcmp;
 
-        alias optional = OptionalRequirementsOf!Modules;
+        alias optional = OptionalRequirementsFor!(Instance, Modules);
         const(char)*[] merged = extension_list.dup;
 
         VkExtensionProperties[] supported = getArrayFrom!vkEnumerateInstanceExtensionProperties(null);

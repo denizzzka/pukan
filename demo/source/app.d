@@ -14,7 +14,7 @@ import std.stdio;
 import std.string: toStringz;
 
 alias appRequirements = AliasSeq!(Requirement!"samplerAnisotropy");
-debug alias DebugEntities = FlightRecorder!Instance;
+debug alias DebugEntities = FlightRecorder;
 else alias DebugEntities = AliasSeq!();
 
 enum fps = 60;

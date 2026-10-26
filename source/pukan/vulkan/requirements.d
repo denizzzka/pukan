@@ -267,6 +267,34 @@ template OptionalRequirementsOf(Modules...)
     alias OptionalRequirementsOf = NoDuplicates!(staticMap!(moduleOptionalRequirements, Modules));
 }
 
+/// Instantiates an entity template with Backend; plain types are kept as is
+private template resolveEntity(alias M, Backend)
+{
+    static if(__traits(compiles, M!Backend))
+        alias resolveEntity = M!Backend;
+    else static if(__traits(isTemplate, M))
+        static assert(false, "cannot instantiate this entity template with " ~ Backend.stringof);
+    else
+        alias resolveEntity = M;
+}
+
+private template moduleResolvedOptionalRequirements(Backend, alias M)
+{
+    alias moduleResolvedOptionalRequirements =
+        moduleOptionalRequirements!(resolveEntity!(M, Backend));
+}
+
+/// Union of optional requirements of entities resolved against Backend, without duplicates
+template OptionalRequirementsFor(Backend, Modules...)
+{
+    private template moduleOptional(alias M)
+    {
+        alias moduleOptional = moduleResolvedOptionalRequirements!(Backend, M);
+    }
+
+    alias OptionalRequirementsFor = NoDuplicates!(staticMap!(moduleOptional, Modules));
+}
+
 /// Baseline requirement every instance and device must satisfy
 alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersionEncoded);
 

@@ -5,7 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
-import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsOf, requestOptionalRequirements, requireEnabled;
+import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, requestOptionalRequirements, requireEnabled;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.meta: AliasSeq;
@@ -157,7 +157,7 @@ struct SelectedDevice(Reqs...)
     LogicalDevice createLogicalDevice(Modules...)(const(char*)[] extension_list = null)
     {
         auto ctx = context;
-        alias optional = OptionalRequirementsOf!Modules;
+        alias optional = OptionalRequirementsFor!(LogicalDevice, Modules);
         requestOptionalRequirements!optional(ctx);
         if(extension_list.length)
             ctx.enabledExtensions = (ctx.enabledExtensions ~ extension_list).dup;
