@@ -15,6 +15,25 @@ import std.exception: enforce;
 import std.meta: AliasSeq;
 import std.string: toStringz;
 
+debug enum validationLayerName = "VK_LAYER_KHRONOS_validation";
+
+private bool hasExtension(List)(List list, string name)
+{
+    import core.stdc.string: strcmp;
+
+    foreach(e; list)
+        if(e && strcmp(e, name.ptr) == 0)
+            return true;
+
+    return false;
+}
+
+/// Validation layer settings, declared by debug instances
+struct LayerSettings
+{
+    alias requirements = AliasSeq!(Requirement!(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME));
+}
+
 ///
 class Instance
 {
@@ -61,7 +80,7 @@ class Instance
 
         const(char*)[] validation_layers;
         debug validation_layers ~= [
-            "VK_LAYER_KHRONOS_validation", //TODO: sType member isn't needed if this validation disabled
+            validationLayerName, //TODO: sType member isn't needed if this validation disabled
         ];
 
         debug const value = VK_TRUE;
@@ -92,8 +111,13 @@ class Instance
             enabledExtensionCount: cast(uint) extension_list.length,
             ppEnabledLayerNames: validation_layers.ptr,
             enabledLayerCount: cast(uint) validation_layers.length,
-            pNext: &layersSettings,
         };
+
+        debug
+        {
+            if(hasExtension(extension_list, VK_EXT_LAYER_SETTINGS_EXTENSION_NAME))
+                createInfo.pNext = &layersSettings;
+        }
 
         instance = create(&createInfo, allocator);
 
@@ -237,17 +261,29 @@ class Instance
     /// Create an instance with optional requirements enabled if available
     static Instance createWith(Modules...)(string appName, uint appVer, const(char*)[] extension_list)
     {
-        import std.algorithm: canFind;
-        import std.meta: AliasSeq;
         import core.stdc.string: strcmp;
 
+        alias required = RequirementsFor!(Instance, Modules);
         alias optional = OptionalRequirementsFor!(Instance, Modules);
         const(char)*[] merged = extension_list.dup;
 
         VkExtensionProperties[] supported = getArrayFrom!vkEnumerateInstanceExtensionProperties(null);
 
+        static foreach(R; required)
+        {{
+            static if(R.isExtension)
+            {
+                if(!hasExtension(merged, R.requirementName))
+                    merged ~= R.requirementName.ptr;
+            }
+            else
+            {
+                static assert(false, "Instance required requirement must be an extension: " ~ R.requirementName);
+            }
+        }}
+
         static foreach(R; optional)
-        {
+        {{
             static if(R.isExtension)
             {
                 bool ok = false;
@@ -258,25 +294,14 @@ class Instance
                         break;
                     }
 
-                if(ok)
-                {
-                    bool already = false;
-                    foreach(x; merged)
-                        if(x && strcmp(x, R.requirementName.ptr) == 0)
-                        {
-                            already = true;
-                            break;
-                        }
-
-                    if(!already)
-                        merged ~= R.requirementName.ptr;
-                }
+                if(ok && !hasExtension(merged, R.requirementName))
+                    merged ~= R.requirementName.ptr;
             }
             else
             {
                 static assert(false, "Instance optional requirement must be an extension or apiVersion: " ~ R.requirementName);
             }
-        }
+        }}
 
         return new Instance(appName, appVer, merged);
     }

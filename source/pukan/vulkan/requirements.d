@@ -302,6 +302,25 @@ template OptionalRequirementsFor(Backend, Modules...)
     alias OptionalRequirementsFor = NoDuplicates!(staticMap!(moduleOptional, Modules));
 }
 
+private template moduleResolvedRequirements(Backend, alias M)
+{
+    static if(__traits(hasMember, resolveEntity!(M, Backend), "requirements"))
+        alias moduleResolvedRequirements = resolveEntity!(M, Backend).requirements;
+    else
+        alias moduleResolvedRequirements = AliasSeq!();
+}
+
+/// Union of required requirements of entities resolved against Backend, without duplicates
+template RequirementsFor(Backend, Modules...)
+{
+    private template moduleRequired(alias M)
+    {
+        alias moduleRequired = moduleResolvedRequirements!(Backend, M);
+    }
+
+    alias RequirementsFor = NoDuplicates!(staticMap!(moduleRequired, Modules));
+}
+
 /// Baseline requirement every instance and device must satisfy
 alias ApiVersionRequirement = Requirement!("apiVersion", requiredApiVersionEncoded);
 

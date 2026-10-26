@@ -3,8 +3,12 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirements;
 import std.algorithm: max;
 import std.math: abs;
+import std.meta: AliasSeq;
 import std.random;
 import std.stdio;
+
+debug alias DebugEntities = LayerSettings;
+else alias DebugEntities = AliasSeq!();
 
 alias appRequirements = Requirements!(Gemm);
 
@@ -40,7 +44,7 @@ void main()
                 cpuC[i * N + j] += A[i * K + k] * B[k * N + j];
 
     const(char*)[] extension_list;
-    auto vk = new Instance("compute demo", 1, extension_list);
+    auto vk = Instance.createWith!DebugEntities("compute demo", 1, extension_list);
     scope(exit) destroy(vk);
 
     auto selected = vk.findSuitablePhysicalDevice!appRequirements();

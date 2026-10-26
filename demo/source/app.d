@@ -1,7 +1,7 @@
 import pukan;
 import pukan.scene_tree;
 import pukan.vulkan.bindings;
-import pukan.vulkan.core: FlightRecorder;
+import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
 import glfw3.api;
 import std.conv: to;
@@ -13,7 +13,7 @@ import std.stdio;
 import std.string: toStringz;
 
 alias appRequirements = Requirements!(SwapChain, GltfFactory);
-debug alias DebugEntities = FlightRecorder;
+debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
 else alias DebugEntities = AliasSeq!();
 
 enum fps = 60;
