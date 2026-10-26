@@ -146,7 +146,6 @@ class Instance
         assert(ld.physicalDevice.instance == this, "Wrong LogicalDevice provided");
 
         auto ctx = instanceContext();
-        import pukan.vulkan.requirements: requireEnabled;
         requireEnabled!(FlightRecorder!Instance.optionalRequirements)(ctx, "FlightRecorder");
 
         auto d = new FlightRecorder!Instance(this);
@@ -229,9 +228,8 @@ class Instance
     }
 
     /// Throws RequirementsNotMetException if any requirement is not enabled
-    void requireEnabled(Reqs...)(string entity, string file = __FILE__, size_t line = __LINE__)
+    void ensureEnabled(Reqs...)(string entity, string file = __FILE__, size_t line = __LINE__)
     {
-        import pukan.vulkan.requirements: requireEnabled;
         auto ctx = instanceContext();
         requireEnabled!Reqs(ctx, entity, file, line);
     }

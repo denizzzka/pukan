@@ -88,7 +88,7 @@ class LogicalDevice
     }
 
     /// Throws RequirementsNotMetException if any requirement is not enabled
-    void requireEnabled(Reqs...)(string entity, string file = __FILE__, size_t line = __LINE__)
+    void ensureEnabled(Reqs...)(string entity, string file = __FILE__, size_t line = __LINE__)
     {
         auto ctx = deviceContext();
         requireEnabled!Reqs(ctx, entity, file, line);

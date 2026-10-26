@@ -2,8 +2,7 @@ import pukan;
 import pukan.scene_tree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder;
-import pukan.vulkan.requirements: Requirement;
-import pukan.exceptions: RequirementsNotMetException;
+import pukan.vulkan.textures: Texture;
 import glfw3.api;
 import std.conv: to;
 import std.datetime.stopwatch;
@@ -13,10 +12,7 @@ import std.meta: AliasSeq;
 import std.stdio;
 import std.string: toStringz;
 
-alias appRequirements = AliasSeq!(
-    Requirement!"samplerAnisotropy",
-    SwapChain.requirements,
-);
+alias appRequirements = SwapChain.requirements;
 debug alias DebugEntities = FlightRecorder;
 else alias DebugEntities = AliasSeq!();
 
@@ -113,7 +109,7 @@ void main() {
             //~ s.extensionName.to!string.writeln;
     //~ }
 
-    auto device = selected.createLogicalDevice();
+    auto device = selected.createLogicalDevice!(Texture)();
     scope(success)
     {
         import core.memory: GC;

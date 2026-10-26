@@ -8,6 +8,13 @@ import std.meta: AliasSeq, NoDuplicates, staticMap;
 
 private enum Kind { number, feature, extension }
 
+private template isNumberType(T)
+{
+    enum isNumberType =
+        is(T == uint) || is(T == int) || is(T == ulong) || is(T == long) ||
+        is(T == float) || is(T == double);
+}
+
 /// Declare optional requirements for an entity
 template getOptionalRequirements(Reqs...)
 {
@@ -23,10 +30,10 @@ private template requirementKind(string name)
         is(typeof(__traits(getMember, VkPhysicalDeviceFeatures, name)) == VkBool32))
         enum requirementKind = Kind.feature;
     else static if(__traits(hasMember, VkPhysicalDeviceProperties, name) &&
-        is(typeof(__traits(getMember, VkPhysicalDeviceProperties, name)) == uint))
+        isNumberType!(typeof(__traits(getMember, VkPhysicalDeviceProperties, name))))
         enum requirementKind = Kind.number;
     else static if(__traits(hasMember, VkPhysicalDeviceLimits, name) &&
-        is(typeof(__traits(getMember, VkPhysicalDeviceLimits, name)) == uint))
+        isNumberType!(typeof(__traits(getMember, VkPhysicalDeviceLimits, name))))
         enum requirementKind = Kind.number;
     else
         static assert(false, "unknown Vulkan requirement: " ~ name);
@@ -319,11 +326,11 @@ void requestRequirements(Reqs...)(ref DeviceContext ctx)
 void requestOptionalRequirements(Reqs...)(ref DeviceContext ctx)
 {
     static foreach(R; NoDuplicates!Reqs)
-    {
+    {{
         string reason;
         if(R.isSatisfied(ctx, reason))
             R.request(ctx);
-    }
+    }}
 }
 
 /// Returns true when every requirement is enabled, otherwise fills the reason
@@ -353,11 +360,11 @@ void requireEnabled(Reqs...)(ref const DeviceContext ctx, string entity, string 
 
     string[] missing;
     static foreach(R; NoDuplicates!Reqs)
-    {
+    {{
         string reason;
         if(!R.isEnabled(ctx, reason))
             missing ~= reason;
-    }
+    }}
 
     if(missing.length)
         throw new RequirementsNotMetException(entity, missing, file, line);
@@ -370,11 +377,11 @@ void requireEnabled(Reqs...)(ref const InstanceContext ctx, string entity, strin
 
     string[] missing;
     static foreach(R; NoDuplicates!Reqs)
-    {
+    {{
         string reason;
         if(!R.isEnabled(ctx, reason))
             missing ~= reason;
-    }
+    }}
 
     if(missing.length)
         throw new RequirementsNotMetException(entity, missing, file, line);
@@ -404,4 +411,23 @@ unittest
 
     instance.loaderVersion = VulkanVersion(1, 3);
     assert(ApiVersionRequirement.isSatisfied(instance, reason));
+
+    import std.exception: assertThrown;
+    import pukan.exceptions: RequirementsNotMetException;
+
+    DeviceContext device;
+    assert(!requirementsEnabled!(Requirement!"samplerAnisotropy")(device, reason));
+
+    device.enabled.samplerAnisotropy = VK_TRUE;
+    assert(requirementsEnabled!(Requirement!"samplerAnisotropy")(device, reason));
+
+    device.properties.limits.maxSamplerAnisotropy = 8;
+    assert(!requirementsEnabled!(Requirement!("maxSamplerAnisotropy", 16))(device, reason));
+
+    device.properties.limits.maxSamplerAnisotropy = 16;
+    assert(requirementsEnabled!(Requirement!("maxSamplerAnisotropy", 16))(device, reason));
+
+    DeviceContext disabled;
+    assertThrown!RequirementsNotMetException(
+        requireEnabled!(Requirement!"samplerAnisotropy")(disabled, "test"));
 }

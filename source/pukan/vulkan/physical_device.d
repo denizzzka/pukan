@@ -5,7 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
-import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, requestOptionalRequirements, requireEnabled;
+import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, requestOptionalRequirements;
 import pukan: toPrettyString;
 import std.conv: to;
 import std.meta: AliasSeq;
