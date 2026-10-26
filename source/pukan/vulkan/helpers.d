@@ -1,6 +1,6 @@
 module pukan.vulkan.helpers;
 
-import pukan.exceptions: PukanExceptionWithCode;
+import pukan.exceptions: PukanVulkanExceptionWithCode;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 public import pukan.vulkan.stype_list: ResultType, getCreateInfoStructureType;
@@ -9,7 +9,7 @@ import std.traits: PointerTarget;
 auto vkCheck(VkResult ret, string err_descr = __FUNCTION__, string file = __FILE__, size_t line = __LINE__)
 {
     if(ret != VkResult.VK_SUCCESS)
-        throw new PukanExceptionWithCode(ret, err_descr, file, line);
+        throw new PukanVulkanExceptionWithCode(ret, err_descr, file, line);
 
     return ret;
 }

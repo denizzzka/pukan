@@ -1,13 +1,20 @@
 import pukan;
 import pukan.scene_tree;
 import pukan.vulkan.bindings;
+import pukan.vulkan.core: FlightRecorder;
+import pukan.vulkan.textures: Texture;
 import glfw3.api;
 import std.conv: to;
 import std.datetime.stopwatch;
 import std.exception;
 import std.logger;
+import std.meta: AliasSeq;
 import std.stdio;
 import std.string: toStringz;
+
+alias appRequirements = SwapChain.requirements;
+debug alias DebugEntities = FlightRecorder;
+else alias DebugEntities = AliasSeq!();
 
 enum fps = 60;
 enum width = 640;
@@ -79,7 +86,7 @@ void main() {
             writeln(i.to!string);
     }
 
-    auto vk = new Instance(name, makeApiVersion(1,2,3,4), extension_list);
+    auto vk = Instance.createWith!DebugEntities(name, 1, extension_list);
     scope(exit) destroy(vk);
 
     //~ debug
@@ -92,7 +99,8 @@ void main() {
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
-    auto physDevice = vk.findSuitablePhysicalDevice;
+    auto selected = vk.findSuitablePhysicalDevice!appRequirements();
+    auto physDevice = selected.device();
     //~ debug
     //~ {
         //~ writeln("");
@@ -101,11 +109,7 @@ void main() {
             //~ s.extensionName.to!string.writeln;
     //~ }
 
-    const(char*)[] dev_extension_list = [
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME.ptr,
-    ];
-
-    auto device =  physDevice.createLogicalDevice(dev_extension_list);
+    auto device = selected.createLogicalDevice!(Texture)();
     scope(success)
     {
         import core.memory: GC;

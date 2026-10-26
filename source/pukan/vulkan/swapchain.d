@@ -2,10 +2,16 @@ module pukan.vulkan.swapchain;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.requirements: Requirement;
 import std.exception: enforce;
+import std.meta: AliasSeq;
 
 class SwapChain
 {
+    static alias requirements = AliasSeq!(
+        Requirement!(VK_KHR_SWAPCHAIN_EXTENSION_NAME),
+    );
+
     LogicalDevice device;
     VkSwapchainKHR swapchain;
     private SwapChain oldSwapChain;
@@ -22,10 +28,8 @@ class SwapChain
 
     this(LogicalDevice device, FrameBuilder fb, VkSurfaceKHR surface, RenderPass renderPass, SwapChain old)
     {
-        auto ins = device.physicalDevice.instance;
-
-        auto physDev = ins.findSuitablePhysicalDevice;
-        const capab = ins.getSurfaceCapabilities(physDev.physicalDevice, surface);
+        auto physDev = device.physicalDevice;
+        const capab = physDev.instance.getSurfaceCapabilities(physDev.physicalDevice, surface);
 
         this(device, fb, capab, renderPass, old);
     }

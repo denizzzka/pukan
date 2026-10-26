@@ -2,7 +2,9 @@ module pukan.vulkan.shaders;
 
 package mixin template Shaders()
 {
+    import pukan.exceptions: PukanVulkanException;
     import std.container.slist;
+    import std.exception: enforce;
     private SList!ShaderInfo loadedShaders;
 
     ref ShaderInfo uploadShaderToGPU(
@@ -42,7 +44,7 @@ package mixin template Shaders()
 
         auto code = cast(ubyte[]) read(filename);
 
-        enforce!PukanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
+        enforce!PukanVulkanException(code.length % 4 == 0, "SPIR-V code size must be a multiple of 4");
 
         return uploadShaderToGPU(code, stage, layoutBindings, pushConstant);
     }

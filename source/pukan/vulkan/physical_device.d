@@ -5,14 +5,19 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
+import pukan.vulkan.requirements: DeviceContext, OptionalRequirementsFor, requestOptionalRequirements;
 import pukan: toPrettyString;
 import std.conv: to;
+import std.meta: AliasSeq;
 
 ///
 class PhysicalDevice
 {
     Instance instance;
     package VkPhysicalDevice physicalDevice;
+    /// Queried once, all property checks read this snapshot
+    // TODO: caching is not needed, query the properties at the use site
+    immutable VkPhysicalDeviceProperties properties;
     /* TODO: "debug" */ private size_t devIdx;
 
     ///
@@ -21,6 +26,10 @@ class PhysicalDevice
         instance = inst;
         physicalDevice = dev;
         devIdx = idx;
+
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(dev, &props);
+        properties = props;
     }
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
@@ -34,7 +43,7 @@ class PhysicalDevice
                 return i;
         }
 
-        throw new PukanException("failed to find suitable memory type");
+        throw new PukanVulkanException("failed to find suitable memory type");
     }
 
     void printDevice()
@@ -82,10 +91,22 @@ class PhysicalDevice
         return apprIndices;
     }
 
-    ///
-    LogicalDevice createLogicalDevice(const(char*)[] extension_list)
+    /// Snapshots properties, supported features and extensions
+    package DeviceContext createLogicalDeviceContext(const(char*)[] extension_list)
     {
-        return new LogicalDevice(this, extension_list);
+        DeviceContext ctx;
+        ctx.properties = properties;
+        vkGetPhysicalDeviceFeatures(physicalDevice, &ctx.supported);
+        ctx.supportedExtensions = extensions();
+        ctx.enabledExtensions = extension_list.dup;
+
+        return ctx;
+    }
+
+    /// Creates a device from values that were already checked and requested
+    LogicalDevice createLogicalDevice(const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures)
+    {
+        return new LogicalDevice(this, extension_list, enabledFeatures);
     }
 
     /**
@@ -110,6 +131,42 @@ class PhysicalDevice
                 return;
         }
 
-        throw new PukanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
+        throw new PukanVulkanException("Extension "~extensionName.to!string~" is not supported by Vulkan physical device "~devIdx.to!string, file, line);
+    }
+
+    // TODO: may be removed if GPU menu moves to SelectedDevice
+    /// Creates logical device from a pre-prepared context
+    package LogicalDevice createLogicalDeviceFromContext(DeviceContext ctx)
+    {
+        return createLogicalDevice(ctx.enabledExtensions, ctx.enabled);
+    }
+}
+
+/// A physical device that was checked against requirements; the list is bound to the type
+struct SelectedDevice(Reqs...)
+{
+    package PhysicalDevice physicalDevice;
+    package DeviceContext context;
+    package this(PhysicalDevice pd, DeviceContext ctx)
+    {
+        physicalDevice = pd;
+        context = ctx;
+    }
+
+    /// Creates the logical device using the requirements that were used for selection
+    LogicalDevice createLogicalDevice(Modules...)(const(char*)[] extension_list = null)
+    {
+        auto ctx = context;
+        alias optional = OptionalRequirementsFor!(LogicalDevice, Modules);
+        requestOptionalRequirements!optional(ctx);
+        if(extension_list.length)
+            ctx.enabledExtensions = (ctx.enabledExtensions ~ extension_list).dup;
+        return physicalDevice.createLogicalDeviceFromContext(ctx);
+    }
+
+    /// Access to the physical device for queues/memory etc.
+    PhysicalDevice device()
+    {
+        return physicalDevice;
     }
 }

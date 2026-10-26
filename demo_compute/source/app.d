@@ -1,9 +1,12 @@
 import pukan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.requirements: Requirements;
 import std.algorithm: max;
 import std.math: abs;
 import std.random;
 import std.stdio;
+
+alias appRequirements = Requirements!(Gemm);
 
 void main()
 {
@@ -37,16 +40,17 @@ void main()
                 cpuC[i * N + j] += A[i * K + k] * B[k * N + j];
 
     const(char*)[] extension_list;
-    auto vk = new Instance("compute demo", makeApiVersion(0, 1, 3, 0), extension_list);
+    auto vk = new Instance("compute demo", 1, extension_list);
     scope(exit) destroy(vk);
 
-    auto physDevice = vk.findSuitablePhysicalDevice;
+    auto selected = vk.findSuitablePhysicalDevice!appRequirements();
+    auto physDevice = selected.device();
 
     const(char*)[] dev_extension_list;
-    auto device = physDevice.createLogicalDevice(dev_extension_list);
+    auto device = selected.createLogicalDevice(dev_extension_list);
     scope(exit) destroy(device);
 
-    auto gemm = new Gemm(device, M, N, K);
+    auto gemm = Gemm.create!appRequirements(device, M, N, K);
     scope(exit) destroy(gemm);
 
     gemm.setA(A);

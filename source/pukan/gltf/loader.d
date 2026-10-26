@@ -242,7 +242,7 @@ package GlTF loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
             addressModeV: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
             addressModeW: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
             anisotropyEnable: VK_TRUE,
-            maxAnisotropy: 16, //TODO: use vkGetPhysicalDeviceProperties (at least)
+            maxAnisotropy: requiredAnisotropy,
             borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
             unnormalizedCoordinates: VK_FALSE,
             compareEnable: VK_FALSE,
