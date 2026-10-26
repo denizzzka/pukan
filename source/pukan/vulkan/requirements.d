@@ -107,6 +107,83 @@ private template chainIndex(T)
     enum chainIndex = staticIndexOf!(T, featureStructs);
 }
 
+/// Count of the VkBool32 fields of the structure
+private template featureFieldCount(T)
+{
+    enum featureFieldCount = countFeatureFields!(T, __traits(allMembers, T));
+}
+
+private template countFeatureFields(T, Members...)
+{
+    static if(Members.length == 0)
+        enum countFeatureFields = 0;
+    else static if(isFeatureStructField!(T, Members[0]))
+        enum countFeatureFields = 1 + countFeatureFields!(T, Members[1 .. $]);
+    else
+        enum countFeatureFields = countFeatureFields!(T, Members[1 .. $]);
+}
+
+private template fieldsBefore(T, Structs...)
+{
+    static if(Structs.length == 0)
+        enum fieldsBefore = 0;
+    else static if(is(Structs[0] == T))
+        enum fieldsBefore = 0;
+    else
+        enum fieldsBefore = featureFieldCount!(Structs[0]) + fieldsBefore!(T, Structs[1 .. $]);
+}
+
+private template fieldIndexIn(T, string name, Members...)
+{
+    static if(Members.length == 0)
+        enum fieldIndexIn = 0;
+    else static if(Members[0] == name)
+        enum fieldIndexIn = 0;
+    else static if(isFeatureStructField!(T, Members[0]))
+        enum fieldIndexIn = 1 + fieldIndexIn!(T, name, Members[1 .. $]);
+    else
+        enum fieldIndexIn = fieldIndexIn!(T, name, Members[1 .. $]);
+}
+
+private template totalFeatureFields(Structs...)
+{
+    static if(Structs.length == 0)
+        enum totalFeatureFields = 0;
+    else
+        enum totalFeatureFields = featureFieldCount!(Structs[0]) + totalFeatureFields!(Structs[1 .. $]);
+}
+
+/// Bit of the given chain feature in ChainMask
+/// The registry order flattens to one index, so a requirement keeps a stable bit
+private template chainBitIndex(string name)
+{
+    alias owner = OwnerOf!name;
+
+    enum chainBitIndex = fieldsBefore!(owner, featureStructs) +
+        fieldIndexIn!(owner, name, __traits(allMembers, owner));
+}
+
+static assert(totalFeatureFields!featureStructs <= 128, "ChainMask covers 128 chain features");
+
+/// Bits of the chain features enabled for a device
+/// The flat field index splits into a word (bit / 64) and an offset (bit % 64)
+struct ChainMask
+{
+    private ulong[2] words;
+
+    /// True when the bit is set
+    bool isSet(size_t bit) const
+    {
+        return (words[bit / 64] & (1UL << (bit % 64))) != 0;
+    }
+
+    /// Sets the bit
+    void set(size_t bit)
+    {
+        words[bit / 64] |= 1UL << (bit % 64);
+    }
+}
+
 private template requirementOwner(R)
 {
     static if(__traits(hasMember, R, "owner"))
@@ -150,8 +227,7 @@ struct DeviceContext
     VkPhysicalDeviceProperties properties;
     VkPhysicalDeviceFeatures supported;
     VkPhysicalDeviceFeatures enabled;
-    FeatureChain supportedChain;
-    FeatureChain enabledChain;
+    ChainMask enabledChainMask;
     VkExtensionProperties[] supportedExtensions;
     const(char)*[] enabledExtensions;
 
@@ -239,7 +315,7 @@ private struct RequirementImpl(string name, ulong minimum)
         static assert(minimum == 0, "extension requirement takes no minimum: " ~ name);
 
     /// Returns false and a reason when the requirement is not met
-    static bool isSatisfied(ref DeviceContext ctx, out string reason)
+    static bool isSatisfied(Ctx)(ref Ctx ctx, out string reason) if(is(Ctx == DeviceContext))
     {
         static if(kind == Kind.number)
         {
@@ -263,13 +339,7 @@ private struct RequirementImpl(string name, ulong minimum)
             }
         }
         else static if(kind == Kind.chainFeature)
-        {
-            if(__traits(getMember, ctx.supportedChain[chainIndex!owner], name) != VK_TRUE)
-            {
-                reason = "feature is not supported: " ~ name;
-                return false;
-            }
-        }
+            static assert(false, "chain features are checked during the device query: " ~ name);
         else static if(kind == Kind.extension)
         {
             if(!ctx.supportsExtension(name))
@@ -282,17 +352,28 @@ private struct RequirementImpl(string name, ulong minimum)
         return true;
     }
 
-    /// Enables the feature or extension; numeric values have nothing to request
+    static if(kind == Kind.chainFeature)
+    {
+        /// Returns false and a reason when the chain feature is not supported
+        static bool isSupportedBy(ref const FeatureChain chain, out string reason)
+        {
+            if(__traits(getMember, chain[chainIndex!owner], name) != VK_TRUE)
+            {
+                reason = "feature is not supported: " ~ name;
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    /// Records the chain feature in the mask; numeric values have nothing to request
     static void request(ref DeviceContext ctx)
     {
         static if(kind == Kind.feature)
             __traits(getMember, ctx.enabled, name) = VK_TRUE;
         else static if(kind == Kind.chainFeature)
-        {
-            auto ref slot = ctx.enabledChain[chainIndex!owner];
-            slot.sType = featureStructSType!owner;
-            __traits(getMember, slot, name) = VK_TRUE;
-        }
+            ctx.enabledChainMask.set(chainBitIndex!name);
         else static if(kind == Kind.extension)
             ctx.enabledExtensions ~= name.ptr;
     }
@@ -323,7 +404,7 @@ private struct RequirementImpl(string name, ulong minimum)
         }
         else static if(kind == Kind.chainFeature)
         {
-            if(__traits(getMember, ctx.enabledChain[chainIndex!owner], name) != VK_TRUE)
+            if(!ctx.enabledChainMask.isSet(chainBitIndex!name))
             {
                 reason = "feature is not enabled: " ~ name;
                 return false;
@@ -390,8 +471,8 @@ private struct RequirementImpl(string name, ulong minimum)
     }
 }
 
-/// Queries the features referenced by Reqs into ctx
-void queryDeviceFeatures(Reqs...)(VkPhysicalDevice device, ref DeviceContext ctx)
+/// Queries the features referenced by Reqs, keeping the chain values on the stack only
+bool queryDeviceFeatures(Reqs...)(VkPhysicalDevice device, ref DeviceContext ctx, out string reason)
 {
     VkPhysicalDeviceFeatures2 head = {
         sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -411,14 +492,27 @@ void queryDeviceFeatures(Reqs...)(VkPhysicalDevice device, ref DeviceContext ctx
     vkGetPhysicalDeviceFeatures2(device, &head);
     ctx.supported = head.features;
 
-    static foreach(i, T; featureStructs)
-    {
-        ctx.supportedChain[i] = chain[i];
-        ctx.supportedChain[i].pNext = null;
-    }
+    static foreach(R; Reqs)
+        static if(R.isChainFeature)
+            if(!R.isSupportedBy(chain, reason))
+                return false;
+
+    return true;
 }
 
-/// Links the requested chain features into head; call clearFeatureChain after creation
+/// Fills the chain with the features required by Reqs
+void fillFeatureChain(Reqs...)(ref FeatureChain chain)
+{
+    static foreach(R; Reqs)
+        static if(R.isChainFeature)
+        {
+            auto ref slot = chain[chainIndex!(R.owner)];
+            slot.sType = featureStructSType!(R.owner);
+            __traits(getMember, slot, R.requirementName) = VK_TRUE;
+        }
+}
+
+/// Links the requested chain features into head
 void linkDeviceFeatures(ref FeatureChain chain, ref VkPhysicalDeviceFeatures2 head)
 {
     head.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -432,13 +526,6 @@ void linkDeviceFeatures(ref FeatureChain chain, ref VkPhysicalDeviceFeatures2 he
             head.pNext = &chain[i];
         }
     }
-}
-
-/// Drops the pNext links so the stored values stay valid
-void clearFeatureChain(ref FeatureChain chain)
-{
-    static foreach(i; 0 .. featureStructs.length)
-        chain[i].pNext = null;
 }
 
 /// True when T is present in the list
@@ -626,8 +713,10 @@ template ApiVersionFor(Reqs...)
 bool requirementsSatisfied(Reqs...)(ref DeviceContext ctx, out string reason)
 {
     static foreach(R; NoDuplicates!Reqs)
-        if(!R.isSatisfied(ctx, reason))
-            return false;
+        // Chain features have no stored snapshot; queryDeviceFeatures checks them
+        static if(!R.isChainFeature)
+            if(!R.isSatisfied(ctx, reason))
+                return false;
 
     return true;
 }
@@ -751,19 +840,24 @@ unittest
 
     DeviceContext chainCtx;
     alias dynamicRendering = Requirement!(VkPhysicalDeviceVulkan13Features.dynamicRendering);
+    assert(!requirementsEnabled!dynamicRendering(chainCtx, reason));
     dynamicRendering.request(chainCtx);
-    assert(chainCtx.enabledChain[chainIndex!VkPhysicalDeviceVulkan13Features].sType ==
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES);
+    assert(chainCtx.enabledChainMask.isSet(chainBitIndex!"dynamicRendering"));
     assert(requirementsEnabled!dynamicRendering(chainCtx, reason));
 
-    VkPhysicalDeviceFeatures2 head;
-    linkDeviceFeatures(chainCtx.enabledChain, head);
-    assert(head.pNext is &chainCtx.enabledChain[chainIndex!VkPhysicalDeviceVulkan13Features]);
-    clearFeatureChain(chainCtx.enabledChain);
-    assert(chainCtx.enabledChain[chainIndex!VkPhysicalDeviceVulkan13Features].pNext is null);
+    FeatureChain chain;
+    fillFeatureChain!dynamicRendering(chain);
+    assert(chain[chainIndex!VkPhysicalDeviceVulkan13Features].sType ==
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES);
+    assert(chain[chainIndex!VkPhysicalDeviceVulkan13Features].dynamicRendering == VK_TRUE);
 
-    chainCtx.supportedChain[chainIndex!VkPhysicalDeviceVulkan13Features].dynamicRendering = VK_TRUE;
-    assert(dynamicRendering.isSatisfied(chainCtx, reason));
+    VkPhysicalDeviceFeatures2 head;
+    linkDeviceFeatures(chain, head);
+    assert(head.pNext is &chain[chainIndex!VkPhysicalDeviceVulkan13Features]);
+
+    FeatureChain supported;
+    supported[chainIndex!VkPhysicalDeviceVulkan13Features].dynamicRendering = VK_TRUE;
+    assert(dynamicRendering.isSupportedBy(supported, reason));
 
     static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }

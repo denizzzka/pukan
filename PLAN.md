@@ -222,6 +222,10 @@ reject a set that forgets it. Chain features are not optional yet: the enabled
 chain is linked from required requirements before device creation, so
 `getOptionalRequirements` and `requestOptionalRequirements` reject them.
 
+Nothing from the structures stays in memory: `vkGetPhysicalDeviceFeatures2` and
+the pNext chain live on the stack during selection and creation, and the device
+keeps only a 16-byte bitmask of enabled chain features for `ensureEnabled`.
+
 Not a consumer yet: `VK_EXT_vertex_input_dynamic_state` in `gltf/factory.d` is
 not needed on the current baseline, because
 `VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE` and `vkCmdBindVertexBuffers2` are

@@ -226,9 +226,12 @@ class Instance
         foreach(dev; devices)
         {
             auto pd = new PhysicalDevice(this, dev);
-            auto ctx = pd.createLogicalDeviceContext!Reqs(null);
-
+            DeviceContext ctx;
             string reason;
+
+            if(!pd.createLogicalDeviceContext!Reqs(null, ctx, reason))
+                continue;
+
             if(!requirementsSatisfied!allRequirements(ctx, reason))
                 continue;
 

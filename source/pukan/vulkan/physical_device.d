@@ -89,15 +89,13 @@ class PhysicalDevice
     }
 
     /// Snapshots properties, supported features and extensions
-    package DeviceContext createLogicalDeviceContext(Reqs...)(const(char)*[] extension_list)
+    package bool createLogicalDeviceContext(Reqs...)(const(char)*[] extension_list, out DeviceContext ctx, out string reason)
     {
-        DeviceContext ctx;
         ctx.properties = properties;
         ctx.supportedExtensions = extensions();
         ctx.enabledExtensions = extension_list.dup;
-        queryDeviceFeatures!Reqs(physicalDevice, ctx);
 
-        return ctx;
+        return queryDeviceFeatures!Reqs(physicalDevice, ctx, reason);
     }
 
     /**
@@ -113,9 +111,12 @@ class PhysicalDevice
 
     // TODO: may be removed if GPU menu moves to SelectedDevice
     /// Creates logical device from a pre-prepared context
-    package LogicalDevice createLogicalDeviceFromContext(DeviceContext ctx)
+    package LogicalDevice createLogicalDeviceFromContext(Reqs...)(DeviceContext ctx)
     {
-        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled, ctx.enabledChain);
+        FeatureChain chain;
+        fillFeatureChain!Reqs(chain);
+
+        return new LogicalDevice(this, ctx.enabledExtensions, ctx.enabled, ctx.enabledChainMask, chain);
     }
 }
 
@@ -136,7 +137,7 @@ struct SelectedDevice(Reqs...)
         auto ctx = context;
         alias optional = OptionalRequirementsWithout!Reqs.Of!(OptionalRequirementsFor!(LogicalDevice, Modules));
         requestOptionalRequirements!optional(ctx);
-        return physicalDevice.createLogicalDeviceFromContext(ctx);
+        return physicalDevice.createLogicalDeviceFromContext!Reqs(ctx);
     }
 
     /// Access to the physical device for queues/memory etc.

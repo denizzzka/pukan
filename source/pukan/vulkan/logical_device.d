@@ -3,7 +3,7 @@ module pukan.vulkan.logical_device;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.vulkan.requirements: DeviceContext, FeatureChain, clearFeatureChain, linkDeviceFeatures, requireEnabled;
+import pukan.vulkan.requirements: ChainMask, DeviceContext, FeatureChain, linkDeviceFeatures, requireEnabled;
 import log = std.logger;
 import std.exception: enforce;
 import std.string: toStringz;
@@ -17,10 +17,11 @@ class LogicalDevice
     const uint familyIdx;
 
     private VkPhysicalDeviceFeatures enabledFeatures;
-    private FeatureChain enabledChain;
+    private ChainMask enabledChainMask;
     private const(char)*[] enabledExtensions;
 
-    package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures, FeatureChain enabledChain)
+    package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures,
+        ChainMask enabledChainMask, FeatureChain chain)
     {
         physicalDevice = pd;
 
@@ -37,7 +38,6 @@ class LogicalDevice
             pQueuePriorities: &queuePriority,
         };
 
-        FeatureChain chain = enabledChain;
         VkPhysicalDeviceFeatures2 features2 = {
             sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
             features: enabledFeatures,
@@ -81,9 +81,8 @@ class LogicalDevice
         }
 
         vkCreateDevice(pd.physicalDevice, &createInfo, alloc, &device).vkCheck;
-        clearFeatureChain(chain);
         this.enabledFeatures = enabledFeatures;
-        this.enabledChain = chain;
+        this.enabledChainMask = enabledChainMask;
         this.enabledExtensions = extension_list.dup;
     }
 
@@ -93,7 +92,7 @@ class LogicalDevice
         DeviceContext ctx;
         ctx.properties = physicalDevice.properties;
         ctx.enabled = enabledFeatures;
-        ctx.enabledChain = enabledChain;
+        ctx.enabledChainMask = enabledChainMask;
         ctx.enabledExtensions = enabledExtensions.dup;
         return ctx;
     }
