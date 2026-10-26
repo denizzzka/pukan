@@ -10,7 +10,6 @@ import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
 import pukan.vulkan.requirements;
 import pukan.vulkan.bindings: VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 import pukan: toPrettyString;
-import std.conv: to;
 import std.exception: enforce;
 import std.meta: AliasSeq;
 import std.string: toStringz;
@@ -357,10 +356,10 @@ class FlightRecorder(TBackend)
         void* pUserData
     ) //FIXME: nothrow
     {
-        //TODO: move out from renderer package
-        import std.stdio: writeln;
+        // GC must not be used here: called during instance destruction
+        import core.stdc.stdio: fprintf, stderr;
 
-        writeln("Severity: ", messageSeverity, ", type: ", messageType, ", ", pCallbackData.pMessage.to!string);
+        fprintf(stderr, "Severity: %u, type: %u, %s\n", messageSeverity, messageType, pCallbackData.pMessage);
 
         if(messageSeverity == VkDebugUtilsMessageSeverityFlagBitsEXT.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {
