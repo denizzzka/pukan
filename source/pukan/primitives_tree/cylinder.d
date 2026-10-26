@@ -420,6 +420,8 @@ class CylinderRenderer : DrawablePrimitive
             renderPass,
             1,
         );
+        // The instance basis is left-handed, so its winding is reversed.
+        pipelineInfoCreator.rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         pipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
         pipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineInfoCreator.pipelineCreateInfo])[0];
 
