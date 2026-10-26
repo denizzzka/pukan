@@ -271,6 +271,16 @@ Needed soon.
 - [ ] Cylinders: surface quality, length, radius, color.
 - [ ] Spheres: surface quality, radius, color.
 
+## Geometric algebra: PGA and CGA
+
+- [ ] Spike: evaluate adding PGA (Projective Geometric Algebra) and CGA
+      (Conformal Geometric Algebra).
+
+A seed entry: its presence should be taken into account when the other engine
+components are designed and developed. PGA suits graphics better, but CGA is
+sometimes needed: fractals, spheres, complex smooth surfaces (signed distance
+fields).
+
 ## Mesh rendering merge
 
 - [ ] Unify `Mesh` rendering paths after the steps above are validated.
