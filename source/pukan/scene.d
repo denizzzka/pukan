@@ -1,6 +1,7 @@
 module pukan.scene;
 
 import pukan;
+import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.shaders;
 import pukan.vulkan;
@@ -27,6 +28,7 @@ class Scene
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
     GltfFactory gltfFactory;
     SphereRenderer sphereRenderer;
+    CylinderRenderer cylinderRenderer;
 
     this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
     {
@@ -69,6 +71,14 @@ class Scene
             [
                 sphereVertShader,
                 sphereFragShader,
+            ],
+            renderPass,
+        );
+        cylinderRenderer = new CylinderRenderer(
+            device,
+            [
+                cylinderVertShader,
+                cylinderFragShader,
             ],
             renderPass,
         );

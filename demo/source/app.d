@@ -1,5 +1,6 @@
 import pukan;
 import pukan.scene_tree;
+import pukan.primitives_tree.cylinder: CylinderGroup, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereInstance, SphereRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
@@ -12,7 +13,7 @@ import std.meta: AliasSeq;
 import std.stdio;
 import std.string: toStringz;
 
-alias appRequirements = Requirements!(SwapChain, GltfFactory, FrameBuilder, SphereRenderer);
+alias appRequirements = Requirements!(SwapChain, GltfFactory, FrameBuilder, SphereRenderer, CylinderRenderer);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
 else alias DebugEntities = AliasSeq!();
 
@@ -223,6 +224,16 @@ void main(string[] args) {
             cameraNear,
             cameraFar,
         );
+        const cylinderViewModel = wtb.view * wtb.model;
+
+        scene.cylinderRenderer.setCamera(
+            cylinderViewModel,
+            cameraFovY,
+            aspect,
+            scene.swapChain.imageExtent.height,
+            cameraNear,
+            cameraFar,
+        );
 
         if(!stereo)
             tree.root.payload = Bone(transl);
@@ -239,6 +250,7 @@ void main(string[] args) {
             auto cb = frame.commandBuffer;
 
             scene.sphereRenderer.prepare(cb);
+            scene.cylinderRenderer.prepare(cb);
 
             tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
 
@@ -320,7 +332,7 @@ enum cameraFovY = 45.0f;
 enum cameraNear = 0.1f;
 enum cameraFar = 10.0f;
 enum stereoEyeSeparation = 0.06f;
-enum initialCameraDistance = 1.2f;
+enum initialCameraDistance = 2.2f;
 enum minCameraDistance = 0.6f;
 enum maxCameraDistance = 2.5f;
 enum sceneDepth = 1.0f;
@@ -602,6 +614,55 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
         scene.sphereRenderer.setInstances(instances, palette);
         spheresBranch.addChild(cast(DrawablePrimitive) scene.sphereRenderer);
+    }
+
+    auto cylinderPrimitives = new PrimitivesTree;
+    tree.addChild(cylinderPrimitives);
+
+    auto cylindersBranch = cylinderPrimitives.addChild(scene.cylinderRenderer.pipelineCfg);
+
+    {
+        import std.math: PI, cos, sin;
+
+        CylinderGroup[] groups = [
+            CylinderGroup(Vector3f(0.3f, 1.0f, 0.4f), 0b11),
+            CylinderGroup(Vector3f(0.4f, 0.6f, 1.0f), 0b01),
+            CylinderGroup(Vector3f(1.0f, 0.5f, 0.4f), 0b00),
+        ];
+
+        CylinderInstance[] instances;
+
+        const sampleCount = gltfFilesSearch("demo/assets/gltf_samples/").length;
+        const sectorAngle = 2.0f * PI / sampleCount;
+
+        foreach(i; 0 .. sampleCount)
+        {
+            const angle = sectorAngle * cast(float) i;
+            const cx = -0.2f * sin(angle);
+            const cz = -0.2f * cos(angle);
+
+            instances ~= CylinderInstance(
+                Vector3f(cx, -0.58f, cz - 0.06f),
+                Vector3f(cx, -0.58f, cz + 0.06f),
+                0.010f,
+                0,
+            );
+            instances ~= CylinderInstance(
+                Vector3f(cx - 0.02f, -0.72f, cz - 0.02f),
+                Vector3f(cx + 0.02f, -0.72f, cz + 0.02f),
+                0.015f,
+                1,
+            );
+            instances ~= CylinderInstance(
+                Vector3f(cx, -0.92f, cz),
+                Vector3f(cx, -0.80f, cz),
+                0.020f,
+                2,
+            );
+        }
+
+        scene.cylinderRenderer.setInstances(instances, groups);
+        cylindersBranch.addChild(cast(DrawablePrimitive) scene.cylinderRenderer);
     }
 
     return tree;

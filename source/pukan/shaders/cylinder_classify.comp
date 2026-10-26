@@ -1,0 +1,99 @@
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(push_constant) uniform Push {
+    mat4 viewModel;
+    float tanX;
+    float tanY;
+    float focal;
+    float nearPlane;
+    float farPlane;
+    float maxEdge;
+    float minEdge;
+    uint cylinderCount;
+    uint groupCount;
+    uint levelCount;
+    uint maxLevel;
+} pc;
+
+layout(std430, binding = 0) readonly buffer SourceA { vec4 sourceA[]; };
+layout(std430, binding = 1) readonly buffer SourceB { vec4 sourceB[]; };
+layout(std430, binding = 2) buffer Levels { uint levels[]; };
+layout(std430, binding = 3) buffer Buckets { int buckets[]; };
+layout(std430, binding = 4) buffer Counts { uint counts[]; };
+
+shared uint histogram[64];
+
+const float tau = 6.283185307179586;
+
+void main()
+{
+    const uint local = gl_LocalInvocationIndex;
+    histogram[local] = 0u;
+    barrier();
+
+    const uint tid = gl_GlobalInvocationID.x;
+    if(tid < pc.cylinderCount)
+    {
+        const vec4 a = sourceA[tid];
+        const vec4 b = sourceB[tid];
+        const vec3 p0 = a.xyz;
+        const vec3 p1 = b.xyz;
+        const float radius = a.w;
+        const uint group = uint(b.w);
+
+        const vec3 axis = p1 - p0;
+        const float halfLength = 0.5 * length(axis);
+        const float bound = sqrt(halfLength * halfLength + radius * radius);
+        const vec3 center = 0.5 * (p0 + p1);
+
+        const vec4 view = pc.viewModel * vec4(center, 1.0);
+        const float depth = abs(view.z);
+        const float screenRadius = depth > 0.001 ? radius * pc.focal / depth : 0.0;
+
+        uint level = levels[tid];
+        float edge = tau * screenRadius / float(8u << level);
+
+        if(edge > pc.maxEdge)
+        {
+            while(level < pc.maxLevel && edge > pc.maxEdge)
+            {
+                ++level;
+                edge *= 0.5;
+            }
+        }
+        else if(edge < pc.minEdge)
+        {
+            while(level > 0u && edge < pc.minEdge)
+            {
+                --level;
+                edge *= 2.0;
+            }
+        }
+        levels[tid] = level;
+
+        const bool culled =
+            depth + bound < pc.nearPlane ||
+            depth - bound > pc.farPlane ||
+            abs(view.x) - bound > pc.tanX * depth ||
+            abs(view.y) - bound > pc.tanY * depth;
+
+        if(culled)
+        {
+            buckets[tid] = -1;
+        }
+        else
+        {
+            const uint bucket = group * pc.levelCount + level;
+            buckets[tid] = int(bucket);
+            atomicAdd(histogram[bucket], 1u);
+        }
+    }
+
+    barrier();
+
+    const uint value = histogram[local];
+    if(value != 0u)
+        atomicAdd(counts[local], value);
+}

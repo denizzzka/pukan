@@ -15,6 +15,9 @@ ShaderInfo gltf_fragShader;
 ShaderInfo sphereVertShader;
 ShaderInfo sphereFragShader;
 
+ShaderInfo cylinderVertShader;
+ShaderInfo cylinderFragShader;
+
 void initShaders(size_t boneMatrixSize)(LogicalDevice device)
 {
     vertShader = device.uploadShaderToGPU(
@@ -97,6 +100,23 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
 
     sphereFragShader = device.uploadShaderToGPU(
         cast(ubyte[]) import("sphere_frag.spv"),
+        VK_SHADER_STAGE_FRAGMENT_BIT,
+        null
+    );
+
+    cylinderVertShader = device.uploadShaderToGPU(
+        cast(ubyte[]) import("cylinder_vert.spv"),
+        VK_SHADER_STAGE_VERTEX_BIT,
+        null,
+        VkPushConstantRange(
+            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            offset: 0,
+            size: Matrix4x4f.sizeof,
+        )
+    );
+
+    cylinderFragShader = device.uploadShaderToGPU(
+        cast(ubyte[]) import("cylinder_frag.spv"),
         VK_SHADER_STAGE_FRAGMENT_BIT,
         null
     );

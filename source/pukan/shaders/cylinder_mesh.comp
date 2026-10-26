@@ -1,0 +1,130 @@
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(push_constant) uniform Push {
+    uint level;
+    uint vertexOffset;
+    uint indexOffset;
+} pc;
+
+layout(std430, binding = 0) writeonly buffer Vertices { float vertices[]; };
+layout(std430, binding = 1) writeonly buffer Indices { uint indices[]; };
+
+const float tau = 6.283185307179586;
+
+void main()
+{
+    const uint segments = 8u << pc.level;
+    const uint vertexCount = 4u * segments + 2u;
+    const uint indexCount = 12u * segments;
+    const uint tid = gl_GlobalInvocationID.x;
+
+    if(tid >= max(vertexCount, indexCount))
+        return;
+
+    if(tid < vertexCount)
+    {
+        vec3 position;
+        vec3 normal;
+
+        if(tid < 2u * segments)
+        {
+            const uint ring = tid / segments;
+            const uint i = tid % segments;
+            const float angle = tau * float(i) / float(segments);
+            position = vec3(cos(angle), float(ring), sin(angle));
+            normal = vec3(cos(angle), 0.0, sin(angle));
+        }
+        else if(tid < 3u * segments + 1u)
+        {
+            const uint t = tid - 2u * segments;
+            if(t == 0u)
+            {
+                position = vec3(0.0, 0.0, 0.0);
+                normal = vec3(0.0, -1.0, 0.0);
+            }
+            else
+            {
+                const uint i = t - 1u;
+                const float angle = tau * float(i) / float(segments);
+                position = vec3(cos(angle), 0.0, sin(angle));
+                normal = vec3(0.0, -1.0, 0.0);
+            }
+        }
+        else
+        {
+            const uint t = tid - (3u * segments + 1u);
+            if(t == 0u)
+            {
+                position = vec3(0.0, 1.0, 0.0);
+                normal = vec3(0.0, 1.0, 0.0);
+            }
+            else
+            {
+                const uint i = t - 1u;
+                const float angle = tau * float(i) / float(segments);
+                position = vec3(cos(angle), 1.0, sin(angle));
+                normal = vec3(0.0, 1.0, 0.0);
+            }
+        }
+
+        const uint base = 6u * (pc.vertexOffset + tid);
+        vertices[base + 0u] = position.x;
+        vertices[base + 1u] = position.y;
+        vertices[base + 2u] = position.z;
+        vertices[base + 3u] = normal.x;
+        vertices[base + 4u] = normal.y;
+        vertices[base + 5u] = normal.z;
+    }
+
+    if(tid < indexCount)
+    {
+        uint value;
+
+        if(tid < 6u * segments)
+        {
+            const uint segment = tid / 6u;
+            const uint corner = tid % 6u;
+            const uint bottom = segment;
+            const uint bottomNext = (segment + 1u) % segments;
+            const uint top = segments + segment;
+            const uint topNext = segments + (segment + 1u) % segments;
+
+            if(corner == 0u)      value = bottom;
+            else if(corner == 1u) value = top;
+            else if(corner == 2u) value = bottomNext;
+            else if(corner == 3u) value = top;
+            else if(corner == 4u) value = topNext;
+            else                  value = bottomNext;
+        }
+        else if(tid < 9u * segments)
+        {
+            const uint t = tid - 6u * segments;
+            const uint segment = t / 3u;
+            const uint corner = t % 3u;
+            const uint center = 2u * segments;
+            const uint rim = 2u * segments + 1u + segment;
+            const uint rimNext = 2u * segments + 1u + (segment + 1u) % segments;
+
+            if(corner == 0u)      value = center;
+            else if(corner == 1u) value = rim;
+            else                  value = rimNext;
+        }
+        else
+        {
+            const uint t = tid - 9u * segments;
+            const uint segment = t / 3u;
+            const uint corner = t % 3u;
+            const uint center = 3u * segments + 1u;
+            const uint rim = 3u * segments + 2u + segment;
+            const uint rimNext = 3u * segments + 2u + (segment + 1u) % segments;
+
+            if(corner == 0u)      value = center;
+            else if(corner == 1u) value = rimNext;
+            else                  value = rim;
+        }
+
+        indices[pc.indexOffset + tid] = value;
+    }
+}

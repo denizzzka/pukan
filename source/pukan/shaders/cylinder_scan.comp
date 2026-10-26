@@ -1,0 +1,33 @@
+#version 460
+
+layout(local_size_x = 1) in;
+
+layout(std430, binding = 0) readonly buffer Counts { uint counts[]; };
+layout(std430, binding = 1) buffer Offsets { uint offsets[]; };
+layout(std430, binding = 2) buffer Cursors { uint cursors[]; };
+layout(std430, binding = 3) buffer Commands { uint commands[]; };
+
+const uint parts = 3u;
+
+void main()
+{
+    uint running = 0u;
+
+    for(uint bucket = 0u; bucket < 64u; ++bucket)
+    {
+        const uint count = counts[bucket];
+        offsets[bucket] = running;
+        cursors[bucket] = 0u;
+        running += count;
+
+        for(uint part = 0u; part < parts; ++part)
+        {
+            const uint command = (bucket * parts + part) * 5u;
+            if(commands[command + 0u] != 0u)
+            {
+                commands[command + 1u] = count;
+                commands[command + 4u] = offsets[bucket];
+            }
+        }
+    }
+}
