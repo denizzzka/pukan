@@ -334,8 +334,8 @@ A mismatch is still possible through the package-level manual flow
 with a different list) and through `findSuitablePhysicalDevice()` without
 requirements, which is currently unused.
 
-- [ ] Walk the code for every hardcoded capability, feature, extension or format
-      and move it into the requirement system. Found so far:
+- [x] Walk the code for every hardcoded capability, feature, extension or
+      format and move it into the requirement system. Found:
   - [x] `samplerAnisotropy` and `maxSamplerAnisotropy`: declared by `Texture` and
         checked when a sampler enables anisotropy.
   - [x] `VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE` and
