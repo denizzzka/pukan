@@ -77,13 +77,10 @@ stalled stages; every item below is a way of sending less, or sending it in a
 more predictable order.
 
 Each item earns its place only with numbers: VRAM occupied, bytes per instance
-uploaded per frame, cache misses, frame time on a fixed scene. The baseline
-comes before any of them, and the quantization item is the only near-term one;
-it touches the vertex layout that the mesh merge now owns. The rest are
-long-term spikes, each judged against the plain version it replaces.
-
-- [ ] Record a baseline on a fixed scene: VRAM, per-frame upload bytes, frame
-      time, and the entity update time used against the archetype target.
+uploaded per frame, cache misses, frame time on a fixed scene. The baseline is
+recorded in `bench/baseline.md`, and the quantization item is the only
+near-term one; it touches the vertex layout that the mesh merge now owns. The
+rest are long-term spikes, each judged against the plain version it replaces.
 
 - **Quantized static geometry**
   - [ ] Optional extreme quantization for static batches: store positions and
