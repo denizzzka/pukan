@@ -10,14 +10,25 @@ order; the order below is only a suggested grouping.
 
 ## VkObj coverage
 
-Needs thinking first.
+Audit result: `VkObj` owns standalone handles (`VkInstance`, `VkSurfaceKHR`,
+`VkSemaphore`, `VkFence`, `VkCommandPool`). The rest already have owners:
+`Memory`, `Images`, `Shaders`, `DescriptorPools` and `Pipelines` mixins, or
+their containing objects. `Texture` owns only its view and sampler; the image
+belongs to `Images`. Extending `VkObj` to every Vulkan handle is not worth it:
+it cannot express parents, extension destroy functions, batch frees,
+non-owned handles or destruction order. `VkInfoNames`, `vkCall` and
+`SimpleSList` already cover generic create/destroy naming and array storage;
+the missing part is ownership, not reflection.
 
-- [ ] Extend `VkObj` to all Vulkan objects automatically: locate the argument
-      holding the created or destroyed handle by its type rather than by its
-      position in the argument list, and call the matching destructor on
-      destruction.
-- [ ] Cover handles that come as a static or dynamic array.
-- [ ] Check whether such or similar functionality already exists in the code.
+- [ ] Add `VkObj` specializations only for new standalone handles with a known
+      parent. Keep bulk and order-sensitive resources in their mixins.
+- [ ] Fix `SimpleSList.detach`: `dispose` currently leaves the element in the
+      list. Only then add an owned-handle array helper with a destroy delegate
+      if a batch owner needs it. Do not use `VkObj[]` for batch handles.
+- [ ] Remove `VkParentKind.physicalDevice` or implement the matching parent
+      field and constructor; it is unused today.
+- [ ] Register `Compute` pipeline layouts in `Pipelines` and remove its manual
+      destructor, so layouts outlive pipelines.
 
 ## Geometric algebra: PGA and CGA
 
