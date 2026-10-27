@@ -7,6 +7,8 @@ glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/mesh_vertices.glsl -o co
 glslc ${TGT} -DSKINNED -fshader-stage=vertex source/pukan/shaders/mesh_vertices.glsl -o compiled_shaders/mesh_skinned_vert.spv
 
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/mesh_fragment.glsl -o compiled_shaders/mesh_frag.spv
+glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/line.vert -o compiled_shaders/line_vert.spv
+glslc ${TGT} -fshader-stage=frag source/pukan/shaders/line.frag -o compiled_shaders/line_frag.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/sphere.vert -o compiled_shaders/sphere_vert.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/sphere.frag -o compiled_shaders/sphere_frag.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/icosphere.comp -o compiled_shaders/icosphere.spv

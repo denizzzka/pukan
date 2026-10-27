@@ -224,7 +224,7 @@ when a scene with many identical instances appears.
 
 Needed soon.
 
-- [ ] 3D lines with a thickness in pixels, for debug output.
+- [x] 3D lines with a thickness in pixels, for debug output.
 
 ## Geometric algebra: PGA and CGA
 

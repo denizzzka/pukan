@@ -2,6 +2,7 @@ module pukan.primitives_tree;
 
 import pukan;
 public import pukan.primitives_tree.factory: PrimitivesFactory;
+public import pukan.primitives_tree.lines: LineInstance, LineRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: DrawableByVulkan;

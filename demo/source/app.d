@@ -176,7 +176,8 @@ void main(string[] args) {
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
     Bone* cubeRotator;
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator);
+    LineRenderer lineRenderer;
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator, lineRenderer);
     scope(exit) tree.destroy;
 
     GlTF[] arenaGltfs;
@@ -234,6 +235,8 @@ void main(string[] args) {
             cameraNear,
             cameraFar,
         );
+
+        lineRenderer.setViewport(scene.swapChain.imageExtent);
 
         if(!stereo)
             tree.root.payload = Bone(transl);
@@ -531,7 +534,7 @@ private struct SphereSpec
     SphereGroupFlags flags;
 }
 
-auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator)
+auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator, out LineRenderer lineRenderer)
 {
     auto tree = new SceneTree;
 
@@ -676,6 +679,25 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
         scene.cylinderRenderer.setInstances(instances, groups);
         cylindersBranch.addChild(cast(DrawablePrimitive) scene.cylinderRenderer);
+    }
+
+    {
+        lineRenderer = new LineRenderer(
+            device,
+            scene.pipelineFactory,
+            scene.renderPass,
+            scene.swapChain.imageExtent,
+        );
+
+        lineRenderer.setLines([
+            LineInstance(Vector4f(-0.55f, -0.55f, -0.1f, 2), Vector4f(0.55f, -0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
+            LineInstance(Vector4f(-0.55f, 0.55f, -0.1f, 2), Vector4f(0.55f, 0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
+            LineInstance(Vector4f(-0.55f, -0.55f, -0.1f, 2), Vector4f(-0.55f, 0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
+            LineInstance(Vector4f(0.55f, -0.55f, -0.1f, 2), Vector4f(0.55f, 0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
+        ]);
+
+        auto linesBranch = primitTree.addChild(lineRenderer.pipelineCfg);
+        linesBranch.addChild(cast(DrawablePrimitive) lineRenderer);
     }
 
     return tree;
