@@ -513,6 +513,7 @@ private string[] benchSampleNames = [
     "Avocado",
     "BarramundiFish",
     "BoxTexturedNonPowerOfTwo",
+    "CesiumMilkTruck",
     "Fox",
     "MandarinOrange",
     "Palka",
