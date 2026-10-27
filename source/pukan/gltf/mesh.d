@@ -94,32 +94,60 @@ class GltfMesh : Mesh
 
         if(!vert.aabb.min.x.isNaN)
         {
-            if(box.min.x.isNaN)
-            {
-                box.min = vert.aabb.min;
-                box.max = vert.aabb.max;
-            }
-            else
-            {
-                expandAABB(box, vert.aabb.min);
-                expandAABB(box, vert.aabb.max);
-            }
+            debug assert(isSameAabb(vert.aabb, scannedAabb(gpuBuffs)),
+                "glTF accessor bounds differ from the vertex data");
 
+            mergeAabb(box, vert.aabb);
             return;
         }
 
+        mergeAabb(box, scannedAabb(gpuBuffs));
+    }
+
+    private Boxf scannedAabb(in BufferPieceOnGPU[] gpuBuffs) const
+    {
         auto range = AccessRange!(Vector3f, false)(gpuBuffs[vert.vertices.viewIdx].buffer.cpuBuf, vert.vertices);
 
-        if(box.min.x.isNaN)
-        {
-            box.min = range.front;
-            box.max = box.min;
+        Boxf box;
+        box.min = range.front;
+        box.max = box.min;
 
-            range.popFront;
-        }
+        range.popFront;
 
         foreach(e; range)
             expandAABB(box, e);
+
+        return box;
+    }
+
+    private static void mergeAabb(ref Boxf box, in Boxf other)
+    {
+        import std.math: isNaN;
+
+        if(box.min.x.isNaN)
+        {
+            box.min = other.min;
+            box.max = other.max;
+            return;
+        }
+
+        expandAABB(box, other.min);
+        expandAABB(box, other.max);
+    }
+
+    private static bool isSameAabb(in Boxf a, in Boxf b)
+    {
+        import std.math: isClose;
+
+        enum tolerance = 1e-5f;
+
+        return
+            isClose(a.min.x, b.min.x, tolerance, tolerance) &&
+            isClose(a.min.y, b.min.y, tolerance, tolerance) &&
+            isClose(a.min.z, b.min.z, tolerance, tolerance) &&
+            isClose(a.max.x, b.max.x, tolerance, tolerance) &&
+            isClose(a.max.y, b.max.y, tolerance, tolerance) &&
+            isClose(a.max.z, b.max.z, tolerance, tolerance);
     }
 
     private ref UBOContent ubo()
