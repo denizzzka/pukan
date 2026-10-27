@@ -3,7 +3,6 @@ module pukan.scene;
 import pukan;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
-import pukan.shaders;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
@@ -40,54 +39,19 @@ class Scene
         device.physicalDevice.instance.useSurface(surface);
 
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
-        background = new Checkerboard(device, renderPass);
+
+        pipelineFactory = new PipelineFactory(device);
+
+        background = new Checkerboard(device, pipelineFactory, renderPass);
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
 
-        initShaders!(Bone.mat.sizeof)(device);
-
-        pipelineFactory = new PipelineFactory(device);
-
-        auto coloredShaderStages = [
-            vertShader,
-            coloredFragShader,
-        ];
-
-        auto texturedShaderStages = [
-            vertShader,
-            texturedFragShader,
-        ];
-
-        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, coloredShaderStages, renderPass);
-        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, texturedShaderStages, renderPass);
-        gltfFactory = new GltfFactory(
-            device,
-            pipelineFactory,
-            [
-                gltf_vertShader,
-                gltf_fragShader,
-            ],
-            renderPass,
-        );
-        sphereRenderer = new SphereRenderer(
-            device,
-            pipelineFactory,
-            [
-                sphereVertShader,
-                sphereFragShader,
-            ],
-            renderPass,
-        );
-        cylinderRenderer = new CylinderRenderer(
-            device,
-            pipelineFactory,
-            [
-                cylinderVertShader,
-                cylinderFragShader,
-            ],
-            renderPass,
-        );
+        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, renderPass);
+        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, renderPass);
+        gltfFactory = new GltfFactory(device, pipelineFactory, renderPass);
+        sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass);
+        cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass);
     }
 
     ~this()

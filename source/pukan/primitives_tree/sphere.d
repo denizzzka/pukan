@@ -321,7 +321,6 @@ class SphereRenderer : DrawablePrimitive
     this(
         LogicalDevice device,
         PipelineFactory pipelines,
-        ShaderInfo[] shaderStages,
         RenderPass renderPass,
         SphereLod lod = SphereLod(),
     )
@@ -332,7 +331,7 @@ class SphereRenderer : DrawablePrimitive
 
         const technique = pipelines.declare(RenderTechnique(
             name: "spheres",
-            stages: shaderStages,
+            stages: shaderStages(device),
             vertexBindings: SphereVertex.getBindingDescriptions,
             vertexAttributes: SphereVertex.getAttributeDescriptions,
         ), 1);
@@ -348,6 +347,40 @@ class SphereRenderer : DrawablePrimitive
         pipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
         generator = new IcosphereGenerator(device, lod.maxLevel);
+    }
+
+    private static ShaderInfo[] shaderStages(LogicalDevice device)
+    {
+        return [
+            device.uploadShaderToGPU(
+                cast(ubyte[]) import("sphere_vert.spv"),
+                VK_SHADER_STAGE_VERTEX_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: 0,
+                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 1,
+                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    ),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+            ),
+            device.uploadShaderToGPU(
+                cast(ubyte[]) import("sphere_frag.spv"),
+                VK_SHADER_STAGE_FRAGMENT_BIT,
+                null,
+            ),
+        ];
     }
 
     ~this()

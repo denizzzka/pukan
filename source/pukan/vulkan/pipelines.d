@@ -1,151 +1,9 @@
 module pukan.vulkan.pipelines;
 
+import pukan.exceptions: PukanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
-
-class DefaultGraphicsPipelineInfoCreator(Vertex)
-{
-    LogicalDevice device;
-    VkPipelineLayout pipelineLayout;
-    VkPipelineShaderStageCreateInfo[] shaderStages;
-    VkPushConstantRange[] pushConstantRanges;
-
-    this(
-        LogicalDevice dev,
-        VkDescriptorSetLayout[] descriptorSetLayouts,
-        ShaderInfo[] shads,
-        RenderPass renderPass,
-        uint subpass = 0,
-    )
-    {
-        device = dev;
-
-        foreach(ref s; shads)
-        {
-            shaderStages ~= s.createShaderStageInfo;
-
-            if(s.pushConstantRange.stageFlags)
-                pushConstantRanges ~= s.pushConstantRange;
-        }
-
-        pipelineLayout = createPipelineLayout(device, descriptorSetLayouts, pushConstantRanges); //TODO: move out from this class?
-        scope(failure) destroy(pipelineLayout);
-
-        initDepthStencil();
-        initDynamicStates();
-        initVertexInputStateCreateInfo();
-        initViewportState();
-
-        fillPipelineInfo(renderPass, subpass);
-    }
-
-    ~this()
-    {
-        if(pipelineLayout)
-            vkDestroyPipelineLayout(device, pipelineLayout, device.alloc);
-    }
-
-    VkPipelineDepthStencilStateCreateInfo depthStencil;
-
-    void initDepthStencil()
-    {
-        depthStencil = VkPipelineDepthStencilStateCreateInfo(
-            sType: VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-            depthTestEnable: VK_TRUE,
-            depthWriteEnable: VK_TRUE,
-            depthCompareOp: VK_COMPARE_OP_LESS,
-            depthBoundsTestEnable: VK_FALSE,
-            stencilTestEnable: VK_FALSE,
-        );
-    }
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo;
-
-    auto initVertexInputStateCreateInfo()
-    {
-        static bindingDescriptions = Vertex.getBindingDescriptions;
-        static attributeDescriptions = Vertex.getAttributeDescriptions;
-
-        vertexInputInfo = VkPipelineVertexInputStateCreateInfo(
-            sType: VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-            vertexBindingDescriptionCount: cast(uint) bindingDescriptions.length,
-            pVertexBindingDescriptions: bindingDescriptions.ptr,
-            vertexAttributeDescriptionCount: cast(uint) attributeDescriptions.length,
-            pVertexAttributeDescriptions: attributeDescriptions.ptr,
-        );
-    }
-
-    VkDynamicState[] dynamicStates = [
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-    ];
-
-    VkPipelineDynamicStateCreateInfo dynamicStateInfo;
-
-    void initDynamicStates()
-    {
-        dynamicStateInfo = VkPipelineDynamicStateCreateInfo(
-            sType: VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            dynamicStateCount: cast(uint) dynamicStates.length,
-            pDynamicStates: dynamicStates.ptr,
-        );
-    }
-
-    VkPipelineViewportStateCreateInfo viewportState;
-
-    void initViewportState()
-    {
-        viewportState = VkPipelineViewportStateCreateInfo(
-            sType: VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-            viewportCount: 1,
-            pViewports: null, // If the viewport state is dynamic, this member is ignored
-            scissorCount: 1,
-            pScissors: null, // If the scissor state is dynamic, this member is ignored
-        );
-    }
-
-    VkPipelineRasterizationStateCreateInfo rasterizerInfo = {
-        sType: VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        rasterizerDiscardEnable: VK_FALSE,
-        depthClampEnable: VK_FALSE,
-        polygonMode: VK_POLYGON_MODE_FILL,
-        lineWidth: 1.0f,
-        cullMode: VK_CULL_MODE_BACK_BIT,
-        frontFace: VK_FRONT_FACE_CLOCKWISE,
-        depthBiasEnable: VK_FALSE,
-        depthBiasConstantFactor: 0.0f, // Optional
-        depthBiasClamp: 0.0f, // Optional
-        depthBiasSlopeFactor: 0.0f, // Optional
-    };
-
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo;
-
-    void fillPipelineInfo(ref RenderPass renderPass, uint subpass)
-    {
-        import pukan.vulkan.defaults: colorBlending, inputAssembly, multisampling;
-
-        pipelineCreateInfo = VkGraphicsPipelineCreateInfo(
-            sType: VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            stageCount: cast(uint) shaderStages.length,
-            pStages: shaderStages.ptr,
-            pVertexInputState: &vertexInputInfo,
-            pInputAssemblyState: &inputAssembly,
-            pViewportState: &viewportState,
-            pRasterizationState: &rasterizerInfo,
-            pMultisampleState: &multisampling,
-            pDepthStencilState: &depthStencil,
-
-            pColorBlendState: &colorBlending,
-            pDynamicState: &dynamicStateInfo,
-            layout: pipelineLayout,
-            renderPass: renderPass.vkRenderPass,
-            subpass: subpass,
-            basePipelineHandle: null, // Optional
-            basePipelineIndex: -1, // Optional
-        );
-    }
-}
 
 package mixin template Pipelines()
 {
@@ -344,8 +202,6 @@ final class PipelineFactory
     private struct Technique
     {
         RenderTechnique description;
-        ShaderInfo[] stages;
-        VkDescriptorSetLayout setLayout;
         VkPipelineLayout pipelineLayout;
         DescriptorAllocator allocator;
     }
@@ -370,19 +226,18 @@ final class PipelineFactory
     {
         Technique entry;
         entry.description = technique;
-        entry.stages = technique.stages;
 
         auto bindings = createLayoutBinding(technique.stages);
+        auto setLayout = device.createDescriptorSetLayout(bindings);
 
-        entry.setLayout = device.createDescriptorSetLayout(bindings);
         entry.pipelineLayout = createPipelineLayout(
             device,
-            [entry.setLayout],
+            [setLayout],
             pushConstantRanges(technique.stages),
         );
         device.registerPipelineLayout(entry.pipelineLayout);
 
-        entry.allocator = new DescriptorAllocator(device, entry.setLayout, bindings, setsPerPool);
+        entry.allocator = new DescriptorAllocator(device, setLayout, bindings, setsPerPool);
 
         techniques ~= entry;
 
@@ -396,7 +251,13 @@ final class PipelineFactory
         if(auto found = key in cache)
             return *found;
 
-        cache[key] = createPipeline(id, renderPass, subpass);
+        try
+            cache[key] = createPipeline(id, renderPass, subpass);
+        catch(PukanException e)
+        {
+            e.msg = "technique " ~ techniqueName(id) ~ ": " ~ e.msg;
+            throw e;
+        }
 
         return cache[key];
     }
@@ -434,7 +295,7 @@ final class PipelineFactory
         const state = technique.description.state;
 
         VkPipelineShaderStageCreateInfo[] stages;
-        foreach(ref stage; technique.stages)
+        foreach(ref stage; technique.description.stages)
             stages ~= stage.createShaderStageInfo;
 
         VkDynamicState[] dynamicStates = [

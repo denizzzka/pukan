@@ -207,7 +207,7 @@ struct SkinnedMeshTechnique
       changing the image.
 - [x] Add `DescriptorAllocator`; grow pools; move per-mesh material UBOs into one
       buffer with offsets.
-- [ ] Remove `PrimitivesFactory` and `GltfFactory` as pipeline owners; make
+- [x] Remove `PrimitivesFactory` and `GltfFactory` as pipeline owners; make
       `Scene` passive.
 - [ ] Merge the mesh paths using static and skinned techniques.
 - [ ] Consider instancing and batching, including a palette offset for skinned

@@ -1,5 +1,6 @@
 module pukan.gltf.factory;
 
+import dlib.math: Matrix4x4f;
 import pukan.gltf;
 import pukan.gltf.mesh: MaterialBuffer;
 import pukan.vulkan;
@@ -28,7 +29,6 @@ class GltfFactory
     this(
         LogicalDevice device,
         PipelineFactory pipelines,
-        ShaderInfo[] shaderStages,
         RenderPass renderPass,
         bool computeJointsOnGPU = true,
     )
@@ -38,7 +38,7 @@ class GltfFactory
 
         const technique = pipelines.declare(RenderTechnique(
             name: "glTF",
-            stages: shaderStages,
+            stages: shaderStages(device),
             vertexBindings: ShaderVertex.getBindingDescriptions,
             vertexAttributes: ShaderVertex.getAttributeDescriptions,
             state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
@@ -56,6 +56,47 @@ class GltfFactory
     {
         if(materialBuffer)
             destroy(materialBuffer);
+    }
+
+    private static ShaderInfo[] shaderStages(LogicalDevice device)
+    {
+        return [
+            device.uploadShaderToGPU(
+                cast(ubyte[]) import("gltf_vertices.spv"),
+                VK_SHADER_STAGE_VERTEX_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: 2,
+                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    ),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+            ),
+            device.uploadShaderToGPU(
+                cast(ubyte[]) import("gltf_fragment.spv"),
+                VK_SHADER_STAGE_FRAGMENT_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: 0,
+                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 1,
+                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                ],
+            ),
+        ];
     }
 
     auto create(string filename)

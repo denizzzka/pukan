@@ -6,7 +6,6 @@ public import pukan.gltf.loader: ComponentType;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import std.conv: to;
 
 static struct Material
 {
