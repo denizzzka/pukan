@@ -108,7 +108,7 @@ class Node : BaseNode
 
     Trans* trans;
     package Matrix4x4f* transFromRoot; // used for skin calculation
-    MeshClass mesh;
+    MeshClass[] meshes;
 
     this(NodePayload pa)
     {
@@ -380,10 +380,21 @@ class GlTF : DrawableByVulkan
         if(node.meshIdx < 0) return;
 
         const mesh = &content.meshes[node.meshIdx];
-        assert(mesh.primitives.length == 1, "FIXME: only one mesh primitive supported for now");
 
-        const primitive = &mesh.primitives[0];
+        foreach(primitive; mesh.primitives)
+        {
+            auto m = createPrimitiveMesh(device, *mesh, primitive);
+            node.meshes ~= m;
+            meshes ~= m;
+        }
+    }
 
+    private MeshClass createPrimitiveMesh(
+        LogicalDevice device,
+        in Mesh mesh,
+        in Primitive primitive,
+    )
+    {
         UploadedVertices uplVert;
 
         {
@@ -556,8 +567,7 @@ class GlTF : DrawableByVulkan
         );
 
         m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals);
-        node.mesh = m;
-        meshes ~= node.mesh;
+        return m;
     }
 
     private static Matrix4x4f skinMatrix(
@@ -653,8 +663,8 @@ class GlTF : DrawableByVulkan
 
         trans *= node.trans.calcMatrix;
 
-        if(node.mesh)
-            node.mesh.draw(buf, selectPipeline(node.mesh), trans, frameSet);
+        foreach(mesh; node.meshes)
+            mesh.draw(buf, selectPipeline(mesh), trans, frameSet);
 
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c);
