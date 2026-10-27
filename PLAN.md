@@ -146,8 +146,6 @@ single queue fence with no per-frame fences.
 - [ ] Run whole glTF loads (file read, JSON and image decode, accessor decode,
       vertex conversion, GPU creation, upload) on `std.parallelism` workers,
       one task per file, `totalCPUs - 1` of them. No custom pool.
-- [ ] Per loading thread: its own `DescriptorAllocator` for the same technique
-      layout and its own `CommandPool`.
 - [ ] Record all copies and image uploads of a load phase into one command
       buffer and submit once, dropping the per-buffer submit-and-wait in
       `uploadImmediate`, `copyFromBuffer` and `loadImageToMemory`. `vkQueueSubmit`

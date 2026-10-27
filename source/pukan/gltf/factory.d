@@ -5,7 +5,7 @@ import pukan.gltf;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
+import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique, TechniqueId;
 import std.meta: AliasSeq;
 
 class GltfFactory
@@ -21,7 +21,8 @@ class GltfFactory
 
     LogicalDevice device;
     private immutable bool computeJointsOnGPU;
-    private DescriptorAllocator allocator;
+    private PipelineFactory pipelines;
+    private TechniqueId technique;
     private MeshResources resources;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
@@ -35,9 +36,10 @@ class GltfFactory
     {
         this.device = device;
         this.computeJointsOnGPU = computeJointsOnGPU;
+        this.pipelines = pipelines;
         this.resources = resources;
 
-        const technique = pipelines.declare(RenderTechnique(
+        technique = pipelines.declare(RenderTechnique(
             name: "glTF",
             stages: shaderStages(device),
             vertexBindings: ShaderVertex.getBindingDescriptions,
@@ -46,7 +48,6 @@ class GltfFactory
             dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
         ), 20);
 
-        allocator = pipelines.descriptorAllocator(technique);
         graphicsPipelineCfg = pipelines.acquire(technique, renderPass, 1);
     }
 
@@ -94,6 +95,9 @@ class GltfFactory
     auto create(string filename)
     {
         assert(device);
+
+        // A private allocator, so loads can run on different threads.
+        auto allocator = pipelines.createDescriptorAllocator(technique);
 
         try
             return loadGlTF2(

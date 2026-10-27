@@ -203,7 +203,10 @@ final class PipelineFactory
     {
         RenderTechnique description;
         VkPipelineLayout pipelineLayout;
+        VkDescriptorSetLayout setLayout;
+        VkDescriptorSetLayoutBinding[] bindings;
         DescriptorAllocator allocator;
+        uint setsPerPool;
     }
 
     private struct RenderTarget
@@ -243,6 +246,9 @@ final class PipelineFactory
 
         entry.pipelineLayout = internPipelineLayout(setLayout, pushConstantRanges(technique.stages));
 
+        entry.setLayout = setLayout;
+        entry.bindings = bindings;
+        entry.setsPerPool = setsPerPool;
         entry.allocator = new DescriptorAllocator(device, setLayout, bindings, setsPerPool);
 
         techniques ~= entry;
@@ -273,6 +279,16 @@ final class PipelineFactory
         assert(id.value < techniques.length);
 
         return techniques[id.value].allocator;
+    }
+
+    /// A private allocator for the same technique, for one loading thread.
+    DescriptorAllocator createDescriptorAllocator(TechniqueId id)
+    {
+        assert(id.value < techniques.length);
+
+        ref technique = techniques[id.value];
+
+        return new DescriptorAllocator(device, technique.setLayout, technique.bindings, technique.setsPerPool);
     }
 
     string techniqueName(TechniqueId id) const
