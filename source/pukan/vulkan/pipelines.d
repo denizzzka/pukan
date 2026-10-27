@@ -337,6 +337,7 @@ final class DescriptorAllocator
     }
 }
 
+//TODO: move to pukan: technique and pipeline caching is engine policy, not a Vulkan wrapper
 /// Creates pipelines once per technique and render target
 final class PipelineFactory
 {
