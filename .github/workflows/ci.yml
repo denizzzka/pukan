@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-latest
+
+      - name: Install Vulkan and X11 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libvulkan-dev \
+            libglfw3 \
+            libglfw3-dev \
+            mesa-vulkan-drivers \
+            vulkan-validationlayers \
+            xvfb
+
+      - name: Use lavapipe
+        run: |
+          ICD=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1)
+          test -n "$ICD"
+          echo "VK_ICD_FILENAMES=$ICD" >> "$GITHUB_ENV"
+          echo "VK_DRIVER_FILES=$ICD" >> "$GITHUB_ENV"
+
+      - name: Build library
+        run: dub build
+
+      - name: Run unittests
+        run: dub test
+
+      - name: Build demo
+        working-directory: demo
+        run: dub build
+
+      - name: Build compute demo
+        working-directory: demo_compute
+        run: dub build
+
+      - name: Run compute demo
+        run: |
+          set -euo pipefail
+          timeout 120 ./demo_compute/demo_compute 2>&1 | tee compute.log
+          grep -q "PASS" compute.log
+          if grep -E "VUID-|Validation Error" compute.log; then
+            echo "Vulkan validation errors detected in compute demo"
+            exit 1
+          fi
+
+      - name: Run demo under Xvfb with validation
+        run: |
+          set -euo pipefail
+          timeout 180 xvfb-run -a -s "-screen 0 1280x1024x24" \
+            ./demo/demo --frames 30 2>&1 | tee demo.log
+          if grep -E "VUID-|Validation Error" demo.log; then
+            echo "Vulkan validation errors detected"
+            exit 1
+          fi
