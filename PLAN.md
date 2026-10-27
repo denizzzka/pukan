@@ -8,6 +8,26 @@ order; the order below is only a suggested grouping.
 - [ ] Set up CI on GitHub: build the library and both demos and run them with
       the validation layers enabled.
 
+## Open GitHub issues
+
+- [ ] Resolve the tracker backlog. Discuss each item before starting work.
+  - [ ] #5 Add `Scene.surfaces`: support more than one surface for stereo and
+        mirrors. `Scene` currently holds one `surface`; stereo uses two
+        viewports on it.
+  - [ ] #6 Wrap `CommandPool` into `ScopedLogicalDeviceTemplateMixin`.
+  - [ ] #7 GPU-stored objects tree: keep node transforms, or at least the
+        whole-tree matrices, in a GPU buffer. `Bone.translationBufferIdx` is
+        unused, and only skin matrices are uploaded today.
+  - [ ] #9 TODO list
+    - [ ] Remove `updateDescriptorSetsAndUniformBuffers` and rely on RAII.
+    - [ ] Move the attribute descriptions from `ShaderVertex` to `ShaderInfo`.
+  - [ ] #11 glTF animation on GPU: sample and interpolate animation in a
+        compute shader. Only joint matrices are computed on the GPU today.
+  - [ ] #12 AABB from glTF JSON: use accessor `min` and `max` when present
+        instead of scanning every vertex.
+  - [ ] #15 Add USD/USDA/USDC support.
+  - [ ] #16 Add terrain support.
+
 ## Geometric algebra: PGA and CGA
 
 - [ ] Spike: evaluate adding PGA (Projective Geometric Algebra) and CGA
