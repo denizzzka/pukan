@@ -36,7 +36,7 @@ CI uses lavapipe too; GPU numbers must be recorded separately.
 | Entity update, p50 | 0.021 ms |
 | Entity update, p95 | 0.035 ms |
 
-## Start-up breakdown
+## Start-up breakdown, sequential
 
 Measured with the loader timers (`BENCH start_ms`) on the same machine, after
 uploads were batched. Time is summed over the 9 samples:
@@ -52,6 +52,24 @@ uploads were batched. Time is summed over the 9 samples:
 Decode covers image decoding, accessor conversion and GPU object creation, so
 it is the part worth splitting over files. Read, parse and upload are small in
 comparison. This is the sequential loader, before it runs on workers.
+
+## Start-up breakdown, parallel
+
+Median of three runs with whole glTF loads on the default `std.parallelism`
+task pool, one task per file. The machine is a 16-thread Ryzen 7 5800X, so the
+pool has 15 workers for 9 samples. Phases are still summed over the samples:
+
+| Phase | ms |
+|---|---|
+| Read | 35.4 |
+| Parse | 28.0 |
+| Decode | 1,611.7 |
+| Upload | 86.1 |
+| Wall, create and upload | 717.1 |
+
+Read and parse sums grow because the loads now overlap and share the machine.
+Decode still dominates the per-file time, while wall time is 2.4 times lower
+than the sequential 1,726.5 ms.
 
 ## Notes
 

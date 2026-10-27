@@ -113,6 +113,8 @@ class GlTF : DrawableByVulkan
 {
     LoadStats loadStats;
 
+    private bool uploaded;
+
     private Node rootSceneNode;
     private Trans rootSceneNodeTrans;
 
@@ -277,6 +279,13 @@ class GlTF : DrawableByVulkan
         gpuBuffs[$-1].buffer.cpuBuf[0 .. $] = weights;
     }
 
+    ~this()
+    {
+        foreach(ref texture; content.textures)
+            if(texture)
+                destroy(texture);
+    }
+
     string possibleName() const
     {
         if(rootSceneNode.name.length)
@@ -310,6 +319,9 @@ class GlTF : DrawableByVulkan
     {
         import core.time: MonoTime;
 
+        if(uploaded)
+            return;
+
         auto start = MonoTime.currTime;
 
         commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
@@ -326,6 +338,8 @@ class GlTF : DrawableByVulkan
 
         foreach(ref mesh; meshes)
             mesh.updateDescriptorSetsAndUniformBuffers(device);
+
+        uploaded = true;
     }
 
     private void setUpEachNode(ref Node node, LogicalDevice device)

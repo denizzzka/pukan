@@ -229,9 +229,13 @@ package GlTF loadGlTF2(
             .array;
     }
 
-    scope commandPool = device.createCommandPool();
-    scope commandBufs = commandPool.allocateBuffers(1);
-    scope(exit) commandPool.freeBuffers(commandBufs);
+    auto commandPool = device.createCommandPool();
+    auto commandBufs = commandPool.allocateBuffers(1);
+    scope(exit)
+    {
+        commandPool.freeBuffers(commandBufs);
+        destroy(commandPool);
+    }
 
     stats.readNs += walkReadNs;
     stats.parseNs += cast(ulong) (MonoTime.currTime - walkStart).total!"nsecs" - walkReadNs;

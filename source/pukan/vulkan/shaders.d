@@ -39,39 +39,42 @@ package mixin template Shaders()
     in(stage == VK_SHADER_STAGE_VERTEX_BIT ||
         (vertexInput.bindings.length == 0 && vertexInput.attributes.length == 0))
     {
-        const key = ShaderKey(sprivBinary, stage);
-
-        if(auto found = key in loadedShaders)
+        synchronized(this)
         {
-            enforce!PukanVulkanException(found.layoutBindings == layoutBindings,
-                "shader " ~ stage.to!string ~
-                " is uploaded with different descriptor set layout bindings");
-            enforce!PukanVulkanException(found.pushConstantRange == pushConstant,
-                "shader " ~ stage.to!string ~
-                " is uploaded with different push constant ranges");
-            enforce!PukanVulkanException(found.vertexInput == vertexInput,
-                "shader " ~ stage.to!string ~
-                " is uploaded with a different vertex input");
+            const key = ShaderKey(sprivBinary, stage);
 
-            return *found;
+            if(auto found = key in loadedShaders)
+            {
+                enforce!PukanVulkanException(found.layoutBindings == layoutBindings,
+                    "shader " ~ stage.to!string ~
+                    " is uploaded with different descriptor set layout bindings");
+                enforce!PukanVulkanException(found.pushConstantRange == pushConstant,
+                    "shader " ~ stage.to!string ~
+                    " is uploaded with different push constant ranges");
+                enforce!PukanVulkanException(found.vertexInput == vertexInput,
+                    "shader " ~ stage.to!string ~
+                    " is uploaded with a different vertex input");
+
+                return *found;
+            }
+
+            VkShaderModuleCreateInfo cinf = {
+                sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                codeSize: sprivBinary.length,
+                pCode: cast(uint*) sprivBinary.ptr,
+            };
+
+            ShaderInfo add;
+            vkCreateShaderModule(device, &cinf, this.alloc, &add.shaderModule).vkCheck;
+            add.stage = stage;
+            add.layoutBindings = layoutBindings;
+            add.pushConstantRange = pushConstant;
+            add.vertexInput = vertexInput;
+
+            loadedShaders[key] = add;
+
+            return add;
         }
-
-        VkShaderModuleCreateInfo cinf = {
-            sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            codeSize: sprivBinary.length,
-            pCode: cast(uint*) sprivBinary.ptr,
-        };
-
-        ShaderInfo add;
-        vkCreateShaderModule(device, &cinf, this.alloc, &add.shaderModule).vkCheck;
-        add.stage = stage;
-        add.layoutBindings = layoutBindings;
-        add.pushConstantRange = pushConstant;
-        add.vertexInput = vertexInput;
-
-        loadedShaders[key] = add;
-
-        return add;
     }
 
     //TODO: remove?

@@ -692,6 +692,7 @@ private string[] gltfFilesSearch(string dir, string[] only = null)
 GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
 {
     import std.math;
+    import std.parallelism: taskPool;
 
     const found = gltfFilesSearch("demo/assets/gltf_samples/", sampleNames);
 
@@ -704,9 +705,31 @@ GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
     const startPlace = Vector3f(0, 0, -radius);
 
     GlTF[] loaded;
-    foreach(i, filename; found)
+    loaded.length = found.length;
+
+    foreach(i, filename; taskPool.parallel(found, 1))
+        loaded[i] = scene.gltfFactory.create(filename);
+
+    CommandPool[] commandPools;
+    commandPools.length = loaded.length;
+
+    foreach(ref commandPool; commandPools)
+        commandPool = scene.device.createCommandPool();
+
+    scope(exit)
+        foreach(ref commandPool; commandPools)
+            destroy(commandPool);
+
+    foreach(i, ref obj; taskPool.parallel(loaded, 1))
     {
-        auto obj = scene.gltfFactory.create(filename);
+        auto commandBuffers = commandPools[i].allocateBuffers(1);
+        scope(exit) commandPools[i].freeBuffers(commandBuffers);
+
+        obj.uploadToGPUImmediate(scene.device, commandPools[i], commandBuffers[0]);
+    }
+
+    foreach(i, obj; loaded)
+    {
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
         const center = aabb.min + size/2;
@@ -723,8 +746,6 @@ GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
         node
             .addChild(Bone(mat: trans))
             .addChild(obj);
-
-        loaded ~= obj;
     }
 
     return loaded;

@@ -10,16 +10,19 @@ package mixin template DescriptorPools()
 
     VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
-        VkDescriptorSetLayoutCreateInfo descrLayoutCreateInfo = {
-            bindingCount: cast(uint) descriptorSetLayoutBindings.length,
-            pBindings: descriptorSetLayoutBindings.ptr,
-        };
+        synchronized(this)
+        {
+            VkDescriptorSetLayoutCreateInfo descrLayoutCreateInfo = {
+                bindingCount: cast(uint) descriptorSetLayoutBindings.length,
+                pBindings: descriptorSetLayoutBindings.ptr,
+            };
 
-        VkDescriptorSetLayout layout;
-        vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &layout);
-        descriptorLayouts ~= layout;
+            VkDescriptorSetLayout layout;
+            vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &layout);
+            descriptorLayouts ~= layout;
 
-        return layout;
+            return layout;
+        }
     }
 
     LockFreeList!(PoolAndLayoutInfo).Elem createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, uint maxSets)

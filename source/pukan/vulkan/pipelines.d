@@ -13,7 +13,8 @@ package mixin template Pipelines()
     /// Registers a pipeline layout to be destroyed after all pipelines
     void registerPipelineLayout(VkPipelineLayout layout)
     {
-        pipelineLayouts ~= layout;
+        synchronized(this)
+            pipelineLayouts ~= layout;
     }
 
     private void pipelinesDtor()
@@ -28,37 +29,43 @@ package mixin template Pipelines()
     VkPipeline[] createGraphicsPipelines(VkGraphicsPipelineCreateInfo[] infos)
     out(r; r.length == infos.length)
     {
-        size_t prevLen = pipelines.length;
-        pipelines.length += infos.length;
+        synchronized(this)
+        {
+            size_t prevLen = pipelines.length;
+            pipelines.length += infos.length;
 
-        vkCreateGraphicsPipelines(
-            this.device,
-            null, // pipelineCache
-            cast(uint) infos.length,
-            infos.ptr,
-            this.alloc,
-            &pipelines[prevLen]
-        ).vkCheck;
+            vkCreateGraphicsPipelines(
+                this.device,
+                null, // pipelineCache
+                cast(uint) infos.length,
+                infos.ptr,
+                this.alloc,
+                &pipelines[prevLen]
+            ).vkCheck;
 
-        return pipelines[prevLen .. $];
+            return pipelines[prevLen .. $];
+        }
     }
 
     VkPipeline[] createComputePipelines(VkComputePipelineCreateInfo[] infos)
     out(r; r.length == infos.length)
     {
-        size_t prevLen = pipelines.length;
-        pipelines.length += infos.length;
+        synchronized(this)
+        {
+            size_t prevLen = pipelines.length;
+            pipelines.length += infos.length;
 
-        vkCreateComputePipelines(
-            this.device,
-            null, // pipelineCache
-            cast(uint) infos.length,
-            infos.ptr,
-            this.alloc,
-            &pipelines[prevLen]
-        ).vkCheck;
+            vkCreateComputePipelines(
+                this.device,
+                null, // pipelineCache
+                cast(uint) infos.length,
+                infos.ptr,
+                this.alloc,
+                &pipelines[prevLen]
+            ).vkCheck;
 
-        return pipelines[prevLen .. $];
+            return pipelines[prevLen .. $];
+        }
     }
 }
 

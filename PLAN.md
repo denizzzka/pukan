@@ -161,17 +161,17 @@ rest are long-term spikes, each judged against the plain version it replaces.
 
 The frame is single-threaded end to end. Per-frame CPU work is 0.023 ms of a
 7.079 ms frame on the fixed scene, so parallelizing the frame loop buys nothing
-until the scene grows. The cost is at start-up, where loads are batched now but
-still sequential. What remains for the frame loop: one command pool per builder
-and a single queue fence with no per-frame fences.
+until the scene grows. The cost is at start-up, where whole loads now run on
+workers. What remains for the frame loop: one command pool per builder and a
+single queue fence with no per-frame fences.
 
 ### Asset loading
 
-- [ ] Run whole glTF loads (file read, JSON and image decode, accessor decode,
+- [x] Run whole glTF loads (file read, JSON and image decode, accessor decode,
       vertex conversion, GPU creation, upload) on `std.parallelism` workers,
       one task per file, `totalCPUs - 1` of them. No custom pool.
-- [ ] Record the start-up breakdown after loading runs on workers. The
-      sequential numbers are in `bench/baseline.md`.
+- [x] Record the start-up breakdown after loading runs on workers. The
+      sequential and parallel numbers are in `bench/baseline.md`.
 
 ### Frame loop
 

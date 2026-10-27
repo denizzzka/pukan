@@ -49,9 +49,13 @@ class Texture
 
 auto createFakeTexture1x1(LogicalDevice device)
 {
-    scope commandPool = device.createCommandPool();
-    scope commandBufs = commandPool.allocateBuffers(1);
-    scope(exit) commandPool.freeBuffers(commandBufs);
+    auto commandPool = device.createCommandPool();
+    auto commandBufs = commandPool.allocateBuffers(1);
+    scope(exit)
+    {
+        commandPool.freeBuffers(commandBufs);
+        destroy(commandPool);
+    }
 
     auto img = createFakeImage1x1(device, commandPool, commandBufs[0]);
 
