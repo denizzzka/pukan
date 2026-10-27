@@ -1,36 +1,29 @@
 module pukan.primitives_tree.factory;
 
 import pukan.scene: Vertex;
+import pukan.vulkan;
+import pukan.vulkan.frame_builder: FrameBuilder;
+import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 
 struct PrimitivesFactory(T)
 {
-    import pukan.vulkan;
-    import shaders = pukan.vulkan.shaders;
-    import pukan.vulkan.frame_builder;
-
     LogicalDevice device;
     private PoolAndLayoutInfo poolAndLayout;
-    private DefaultGraphicsPipelineInfoCreator!Vertex pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
-    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass)
+    this(LogicalDevice device, PipelineFactory pipelines, ShaderInfo[] shaderStages, RenderPass renderPass)
     {
         this.device = device;
 
-        auto layoutBindings = shaders.createLayoutBinding(shaderStages);
-        poolAndLayout = device.createDescriptorPool(layoutBindings, 10 /*FIXME*/);
+        const technique = pipelines.declare(RenderTechnique(
+            name: T.stringof,
+            stages: shaderStages,
+            vertexBindings: Vertex.getBindingDescriptions,
+            vertexAttributes: Vertex.getAttributeDescriptions,
+        ), 10);
 
-        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!Vertex(
-            device,
-            [poolAndLayout.descriptorSetLayout],
-            shaderStages,
-            renderPass,
-            1,
-        );
-        graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
-
-        auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
-        graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineCreateInfo])[0];
+        poolAndLayout = pipelines.poolAndLayout(technique);
+        graphicsPipelineCfg = pipelines.acquire(technique, renderPass, 1);
     }
 
     auto create(CTOR_ARGS...)(FrameBuilder frameBuilder, CTOR_ARGS args)

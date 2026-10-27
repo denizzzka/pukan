@@ -90,7 +90,20 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
     sphereVertShader = device.uploadShaderToGPU(
         cast(ubyte[]) import("sphere_vert.spv"),
         VK_SHADER_STAGE_VERTEX_BIT,
-        null,
+        [
+            VkDescriptorSetLayoutBinding(
+                binding: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: 1,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            ),
+        ],
         VkPushConstantRange(
             stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
             offset: 0,
@@ -107,7 +120,14 @@ void initShaders(size_t boneMatrixSize)(LogicalDevice device)
     cylinderVertShader = device.uploadShaderToGPU(
         cast(ubyte[]) import("cylinder_vert.spv"),
         VK_SHADER_STAGE_VERTEX_BIT,
-        null,
+        [
+            VkDescriptorSetLayoutBinding(
+                binding: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            ),
+        ],
         VkPushConstantRange(
             stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
             offset: 0,

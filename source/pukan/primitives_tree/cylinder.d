@@ -366,7 +366,6 @@ class CylinderRenderer : DrawablePrimitive
     private uint bucketCount;
 
     GraphicsPipelineCfg pipelineCfg;
-    private DefaultGraphicsPipelineInfoCreator!CylinderVertex pipelineInfoCreator;
     private PoolAndLayoutInfo graphicsPool;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
@@ -390,22 +389,28 @@ class CylinderRenderer : DrawablePrimitive
     private bool uploaded;
     private bool prepared;
 
-    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass, CylinderLod lod = CylinderLod())
+    this(
+        LogicalDevice device,
+        PipelineFactory pipelines,
+        ShaderInfo[] shaderStages,
+        RenderPass renderPass,
+        CylinderLod lod = CylinderLod(),
+    )
     {
         this.device = device;
         this.lod = lod;
         this.levelCount = lod.maxLevel + 1;
 
-        VkDescriptorSetLayoutBinding[] paletteBindings = [
-            VkDescriptorSetLayoutBinding(
-                binding: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-            ),
-        ];
+        const technique = pipelines.declare(RenderTechnique(
+            name: "cylinders",
+            stages: shaderStages,
+            vertexBindings: CylinderVertex.getBindingDescriptions,
+            vertexAttributes: CylinderVertex.getAttributeDescriptions,
+            // The instance basis is left-handed, so its winding is reversed.
+            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
+        ), 1);
 
-        graphicsPool = device.createDescriptorPool(paletteBindings, 1);
+        graphicsPool = pipelines.poolAndLayout(technique);
         graphicsSet = device.allocateDescriptorSet(graphicsPool);
 
         paletteBuffer = device.create!MemoryBufferMappedToCPU(
@@ -413,17 +418,7 @@ class CylinderRenderer : DrawablePrimitive
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         );
 
-        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!CylinderVertex(
-            device,
-            [graphicsPool.descriptorSetLayout],
-            shaderStages,
-            renderPass,
-            1,
-        );
-        // The instance basis is left-handed, so its winding is reversed.
-        pipelineInfoCreator.rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        pipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
-        pipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineInfoCreator.pipelineCreateInfo])[0];
+        pipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
         generator = new CylinderMeshGenerator(device, lod.maxLevel);
     }

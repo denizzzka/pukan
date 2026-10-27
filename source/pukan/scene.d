@@ -24,6 +24,7 @@ class Scene
     VkQueue presentQueue;
 
     import pukan.primitives_tree: PrimitivesFactory;
+    PipelineFactory pipelineFactory;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
     GltfFactory gltfFactory;
@@ -46,6 +47,8 @@ class Scene
 
         initShaders!(Bone.mat.sizeof)(device);
 
+        pipelineFactory = new PipelineFactory(device);
+
         auto coloredShaderStages = [
             vertShader,
             coloredFragShader,
@@ -56,10 +59,11 @@ class Scene
             texturedFragShader,
         ];
 
-        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, coloredShaderStages, renderPass);
-        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, texturedShaderStages, renderPass);
+        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, coloredShaderStages, renderPass);
+        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, texturedShaderStages, renderPass);
         gltfFactory = new GltfFactory(
             device,
+            pipelineFactory,
             [
                 gltf_vertShader,
                 gltf_fragShader,
@@ -68,6 +72,7 @@ class Scene
         );
         sphereRenderer = new SphereRenderer(
             device,
+            pipelineFactory,
             [
                 sphereVertShader,
                 sphereFragShader,
@@ -76,6 +81,7 @@ class Scene
         );
         cylinderRenderer = new CylinderRenderer(
             device,
+            pipelineFactory,
             [
                 cylinderVertShader,
                 cylinderFragShader,

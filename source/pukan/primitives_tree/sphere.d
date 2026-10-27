@@ -295,7 +295,6 @@ class SphereRenderer : DrawablePrimitive
     private uint bucketCount;
 
     GraphicsPipelineCfg pipelineCfg;
-    private DefaultGraphicsPipelineInfoCreator!SphereVertex pipelineInfoCreator;
     private PoolAndLayoutInfo graphicsPool;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
@@ -320,28 +319,26 @@ class SphereRenderer : DrawablePrimitive
     private bool uploaded;
     private bool prepared;
 
-    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass, SphereLod lod = SphereLod())
+    this(
+        LogicalDevice device,
+        PipelineFactory pipelines,
+        ShaderInfo[] shaderStages,
+        RenderPass renderPass,
+        SphereLod lod = SphereLod(),
+    )
     {
         this.device = device;
         this.lod = lod;
         this.levelCount = lod.maxLevel + 1;
 
-        VkDescriptorSetLayoutBinding[] paletteBindings = [
-            VkDescriptorSetLayoutBinding(
-                binding: 0,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: 1,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-            ),
-        ];
+        const technique = pipelines.declare(RenderTechnique(
+            name: "spheres",
+            stages: shaderStages,
+            vertexBindings: SphereVertex.getBindingDescriptions,
+            vertexAttributes: SphereVertex.getAttributeDescriptions,
+        ), 1);
 
-        graphicsPool = device.createDescriptorPool(paletteBindings, 1);
+        graphicsPool = pipelines.poolAndLayout(technique);
         graphicsSet = device.allocateDescriptorSet(graphicsPool);
 
         paletteBuffer = device.create!MemoryBufferMappedToCPU(
@@ -349,15 +346,7 @@ class SphereRenderer : DrawablePrimitive
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         );
 
-        pipelineInfoCreator = new DefaultGraphicsPipelineInfoCreator!SphereVertex(
-            device,
-            [graphicsPool.descriptorSetLayout],
-            shaderStages,
-            renderPass,
-            1,
-        );
-        pipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
-        pipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineInfoCreator.pipelineCreateInfo])[0];
+        pipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
         generator = new IcosphereGenerator(device, lod.maxLevel);
     }

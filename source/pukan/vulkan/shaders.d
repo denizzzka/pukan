@@ -120,12 +120,26 @@ VkDescriptorSetLayoutBinding[] createLayoutBinding(ShaderInfo[] shaders)
     VkDescriptorSetLayoutBinding[] ret;
 
     foreach(ref shader; shaders)
-    {
-        foreach(ref b; shader.layoutBindings)
-            assert(b.stageFlags == shader.stage);
+        foreach(ref binding; shader.layoutBindings)
+        {
+            assert(binding.stageFlags == shader.stage);
 
-        ret ~= shader.layoutBindings;
-    }
+            bool merged;
+            foreach(ref existing; ret)
+                if(existing.binding == binding.binding)
+                {
+                    assert(existing.descriptorType == binding.descriptorType);
+                    assert(existing.descriptorCount == binding.descriptorCount);
+                    assert(existing.pImmutableSamplers is binding.pImmutableSamplers);
+
+                    existing.stageFlags |= binding.stageFlags;
+                    merged = true;
+                    break;
+                }
+
+            if(!merged)
+                ret ~= binding;
+        }
 
     return ret;
 }

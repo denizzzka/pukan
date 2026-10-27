@@ -202,7 +202,7 @@ struct SkinnedMeshTechnique
 
 - [x] Add the shader cache: SPIR-V hash plus stage, declaration check, no
       duplicate modules.
-- [ ] Add `RenderTechnique`, `PipelineKey` and `PipelineFactory`; move glTF, the
+- [x] Add `RenderTechnique`, `PipelineKey` and `PipelineFactory`; move glTF, the
       primitive factories and the sphere and cylinder renderers onto them without
       changing the image.
 - [ ] Add `DescriptorAllocator`; grow pools; move per-mesh material UBOs into one

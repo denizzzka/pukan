@@ -3,27 +3,11 @@ module pukan.gltf.factory;
 import pukan.gltf;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import std.meta: AliasSeq;
-
-class PipelineInfoCreator : DefaultGraphicsPipelineInfoCreator!ShaderVertex
-{
-    import pukan.vulkan.bindings;
-    import pukan.vulkan.renderpass;
-
-    this(LogicalDevice dev, VkDescriptorSetLayout[] descriptorSetLayouts, ShaderInfo[] shads, RenderPass renderPass)
-    {
-        rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        dynamicStates ~= VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE;
-
-        super(dev, descriptorSetLayouts, shads, renderPass, 1);
-    }
-}
 
 class GltfFactory
 {
-    import pukan.vulkan;
-    import shaders = pukan.vulkan.shaders;
-    import pukan.vulkan.frame_builder;
     import pukan.gltf.skin_matrices: SkinMatrices;
 
     private alias requirements = AliasSeq!(
@@ -36,25 +20,31 @@ class GltfFactory
     LogicalDevice device;
     private immutable bool computeJointsOnGPU;
     private PoolAndLayoutInfo poolAndLayout;
-    //TODO: contains part of poolAndLayout data. Deduplicate?
-    private DefaultGraphicsPipelineInfoCreator!ShaderVertex pipelineInfoCreator;
     GraphicsPipelineCfg graphicsPipelineCfg;
     private Texture fakeTexture; /// Stub to fill texture shader arg of non-textured meshes
 
-    //TODO: remove shaderStages arg, set it implicitly
-    this(LogicalDevice device, ShaderInfo[] shaderStages, RenderPass renderPass, bool computeJointsOnGPU = true)
+    this(
+        LogicalDevice device,
+        PipelineFactory pipelines,
+        ShaderInfo[] shaderStages,
+        RenderPass renderPass,
+        bool computeJointsOnGPU = true,
+    )
     {
         this.device = device;
         this.computeJointsOnGPU = computeJointsOnGPU;
 
-        auto layoutBindings = shaders.createLayoutBinding(shaderStages);
-        poolAndLayout = device.createDescriptorPool(layoutBindings, 20 /*FIXME*/);
+        const technique = pipelines.declare(RenderTechnique(
+            name: "glTF",
+            stages: shaderStages,
+            vertexBindings: ShaderVertex.getBindingDescriptions,
+            vertexAttributes: ShaderVertex.getAttributeDescriptions,
+            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
+            dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
+        ), 20);
 
-        pipelineInfoCreator = new PipelineInfoCreator(device, [poolAndLayout.descriptorSetLayout], shaderStages, renderPass);
-        graphicsPipelineCfg.pipelineLayout = pipelineInfoCreator.pipelineLayout;
-
-        auto pipelineCreateInfo = pipelineInfoCreator.pipelineCreateInfo;
-        graphicsPipelineCfg.graphicsPipeline = device.createGraphicsPipelines([pipelineCreateInfo])[0];
+        poolAndLayout = pipelines.poolAndLayout(technique);
+        graphicsPipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
         fakeTexture = createFakeTexture1x1(device);
     }

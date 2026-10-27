@@ -5,42 +5,68 @@ import pukan.vulkan.bindings;
 package mixin template DescriptorPools()
 {
     import std.container.slist;
+    private VkDescriptorSetLayout[] descriptorLayouts;
     /* private FIXME*/ SList!PoolAndLayoutInfo descriptorPools;
+
+    VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
+    {
+        VkDescriptorSetLayoutCreateInfo descrLayoutCreateInfo = {
+            bindingCount: cast(uint) descriptorSetLayoutBindings.length,
+            pBindings: descriptorSetLayoutBindings.ptr,
+        };
+
+        VkDescriptorSetLayout layout;
+        vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &layout);
+        descriptorLayouts ~= layout;
+
+        return layout;
+    }
 
     ref PoolAndLayoutInfo createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, uint maxSets)
     {
+        auto layout = createDescriptorSetLayout(descriptorSetLayoutBindings);
+
+        return createDescriptorPool(layout, descriptorSetLayoutBindings, maxSets);
+    }
+
+    ref PoolAndLayoutInfo createDescriptorPool(
+        VkDescriptorSetLayout layout,
+        VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings,
+        uint maxSets,
+    )
+    {
+        VkDescriptorPoolSize[] poolSizes;
+
+        foreach(ref binding; descriptorSetLayoutBindings)
         {
-            // In general, VkDescriptorSetLayoutCreateInfo are not related to any pool.
-            // But for now it is convenient to place it here
-
-            VkDescriptorSetLayoutCreateInfo descrLayoutCreateInfo = {
-                bindingCount: cast(uint) descriptorSetLayoutBindings.length,
-                pBindings: descriptorSetLayoutBindings.ptr,
-            };
-
-            PoolAndLayoutInfo add;
-            vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &add.descriptorSetLayout);
-            descriptorPools.insert(add);
-        }
-
-        {
-            VkDescriptorPoolSize[] poolSizes;
-            poolSizes.length = descriptorSetLayoutBindings.length;
+            size_t existing = poolSizes.length;
 
             foreach(i, ref poolSize; poolSizes)
-            {
-                poolSize.type = descriptorSetLayoutBindings[i].descriptorType;
-                poolSize.descriptorCount = descriptorSetLayoutBindings[i].descriptorCount * maxSets;
-            }
+                if(poolSize.type == binding.descriptorType)
+                {
+                    existing = i;
+                    break;
+                }
 
-            VkDescriptorPoolCreateInfo descriptorPoolInfo = {
-                poolSizeCount: cast(uint) poolSizes.length,
-                pPoolSizes: poolSizes.ptr,
-                maxSets: maxSets,
-            };
-
-            vkCall(this.device, &descriptorPoolInfo, this.alloc, &descriptorPools.front.descriptorPool);
+            if(existing == poolSizes.length)
+                poolSizes ~= VkDescriptorPoolSize(binding.descriptorType, binding.descriptorCount * maxSets);
+            else
+                poolSizes[existing].descriptorCount += binding.descriptorCount * maxSets;
         }
+
+        VkDescriptorPoolCreateInfo descriptorPoolInfo = {
+            poolSizeCount: cast(uint) poolSizes.length,
+            pPoolSizes: poolSizes.ptr,
+            maxSets: maxSets,
+        };
+
+        VkDescriptorPool pool;
+        vkCall(this.device, &descriptorPoolInfo, this.alloc, &pool);
+
+        descriptorPools.insert(PoolAndLayoutInfo(
+            descriptorPool: pool,
+            descriptorSetLayout: layout,
+        ));
 
         return descriptorPools.front;
     }
@@ -48,13 +74,11 @@ package mixin template DescriptorPools()
     private void descriptorPoolsDtor()
     {
         foreach(ref e; descriptorPools)
-        {
-            // always unconditionally exists
-            vkDestroyDescriptorSetLayout(this.device, e.descriptorSetLayout, this.alloc);
-
             if(e.descriptorPool)
                 vkDestroyDescriptorPool(this.device, e.descriptorPool, this.alloc);
-        }
+
+        foreach(layout; descriptorLayouts)
+            vkDestroyDescriptorSetLayout(this.device, layout, this.alloc);
     }
 
     VkDescriptorSet allocateDescriptorSet(ref PoolAndLayoutInfo layout)
