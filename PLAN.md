@@ -87,6 +87,12 @@ Because the goal is vague here, the questions below decide the scope:
   the same render pass?
 - Are pipelines created at scene setup or on first use?
 
+## Rendering
+
+- [ ] Draw skinned meshes without animation with a separate simpler vertex
+      shader that skips joint matrix reads. Select it at load time when the
+      mesh's skin has no animation channels.
+
 ## Data layout and throughput
 
 Thesis: the remaining speed is in reducing the entropy of the data that moves
