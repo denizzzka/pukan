@@ -1,7 +1,7 @@
 module pukan.gltf;
 
 import dlib.math;
-public import pukan.gltf.loader: loadGlTF2;
+public import pukan.gltf.loader: LoadStats, loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
@@ -111,6 +111,8 @@ class Node : BaseNode
 
 class GlTF : DrawableByVulkan
 {
+    LoadStats loadStats;
+
     private Node rootSceneNode;
     private Trans rootSceneNodeTrans;
 
@@ -306,6 +308,10 @@ class GlTF : DrawableByVulkan
     //TODO: private
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
+        import core.time: MonoTime;
+
+        auto start = MonoTime.currTime;
+
         commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
             foreach(ref piece; gpuBuffs)
                 if(piece)
@@ -315,6 +321,8 @@ class GlTF : DrawableByVulkan
 
             uploadSkinMatricesStatic(buf);
         });
+
+        loadStats.uploadNs += cast(ulong) (MonoTime.currTime - start).total!"nsecs";
 
         foreach(ref mesh; meshes)
             mesh.updateDescriptorSetsAndUniformBuffers(device);

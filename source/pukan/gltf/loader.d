@@ -15,6 +15,15 @@ static import std.file;
 static import std.path;
 import vibe.data.json;
 
+/// Time spent loading one file, in nanoseconds.
+struct LoadStats
+{
+    ulong readNs;
+    ulong parseNs;
+    ulong decodeNs;
+    ulong uploadNs;
+}
+
 private struct Header
 {
     uint magic;
@@ -27,8 +36,11 @@ private struct Header
     }
 }
 
-private auto readGltfFile(string filename)
+private auto readGltfFile(string filename, out ulong readNs, out ulong parseNs)
 {
+    import core.time: MonoTime;
+
+    auto readStart = MonoTime.currTime;
     const fileContent = std.file.read(filename);
     enforce(fileContent.length > 12);
 
@@ -64,7 +76,11 @@ private auto readGltfFile(string filename)
         ret.buffer = cast(ubyte[]) fileContent[curr .. curr + binHdr.chunkLength];
     }
 
+    readNs = cast(ulong) (MonoTime.currTime - readStart).total!"nsecs";
+
+    auto parseStart = MonoTime.currTime;
     ret.json = (cast(string) jsonText).parseJsonString;
+    parseNs = cast(ulong) (MonoTime.currTime - parseStart).total!"nsecs";
 
     return ret;
 }
@@ -98,9 +114,15 @@ package GlTF loadGlTF2(
     bool computeJointsOnGPU,
 )
 {
-    auto gltfFile = readGltfFile(filename);
+    import core.time: MonoTime;
+
+    LoadStats stats;
+    auto gltfFile = readGltfFile(filename, stats.readNs, stats.parseNs);
     const json = gltfFile.json;
     const dir = std.path.dirName(filename);
+
+    auto walkStart = MonoTime.currTime;
+    ulong walkReadNs;
 
     {
         const ver = json["asset"]["version"].get!string;
@@ -117,7 +139,11 @@ package GlTF loadGlTF2(
         buffers ~= Buffer(buf: gltfFile.buffer);
     else
         foreach(buf; json["buffers"])
+        {
+            auto start = MonoTime.currTime;
             buffers ~= readBufUri(dir, buf);
+            walkReadNs += cast(ulong) (MonoTime.currTime - start).total!"nsecs";
+        }
 
     foreach(v; json["bufferViews"])
     {
@@ -207,12 +233,17 @@ package GlTF loadGlTF2(
     scope commandBufs = commandPool.allocateBuffers(1);
     scope(exit) commandPool.freeBuffers(commandBufs);
 
+    stats.readNs += walkReadNs;
+    stats.parseNs += cast(ulong) (MonoTime.currTime - walkStart).total!"nsecs" - walkReadNs;
+
     auto images = "images" in json;
     if(images)
     {
         MemoryBufferMappedToCPU[] staging;
 
-        commandPool.recordOneTimeAndSubmit(commandBufs[0], (buf) {
+        auto decodeStart = MonoTime.currTime;
+        beginOneTimeCommandBuffer(commandBufs[0]);
+        {
             foreach(ref img; *images) //FIXME: indent
             {
                 const viewIdxPtr = "bufferView" in img;
@@ -236,15 +267,24 @@ package GlTF loadGlTF2(
                 else
                     extFormatImg = loadImageFromUri(dir, img["uri"].get!string, format);
 
-                ret.images ~= loadImageToMemory(device, buf, extFormatImg, format, staging);
+                ret.images ~= loadImageToMemory(device, commandBufs[0], extFormatImg, format, staging);
             }
-        });
+        }
+        endCommandBuffer(commandBufs[0]);
+        stats.decodeNs += cast(ulong) (MonoTime.currTime - decodeStart).total!"nsecs";
+
+        auto submitStart = MonoTime.currTime;
+        commandPool.submitBuffers(commandBufs);
 
         foreach(buf; staging)
             destroy(buf);
+
+        stats.uploadNs += cast(ulong) (MonoTime.currTime - submitStart).total!"nsecs";
     }
 
     //FIXME: implement samplers reading
+
+    auto postStart = MonoTime.currTime;
 
     auto textures = "textures" in json;
     if(textures) foreach(tx; *textures)
@@ -302,15 +342,25 @@ package GlTF loadGlTF2(
         }
     }
 
+    stats.decodeNs += cast(ulong) (MonoTime.currTime - postStart).total!"nsecs";
+
+    auto ctorStart = MonoTime.currTime;
+    GlTF result;
+
     if(ret.skins.length > 0)
     {
         if(computeJointsOnGPU)
-            return new SkinnedGlTF_skinJointsGPU(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+            result = new SkinnedGlTF_skinJointsGPU(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
         else
-            return new SkinnedGlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+            result = new SkinnedGlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
     }
     else
-        return new GlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+        result = new GlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+
+    stats.decodeNs += cast(ulong) (MonoTime.currTime - ctorStart).total!"nsecs";
+    result.loadStats = stats;
+
+    return result;
 }
 
 private Trans readNodeTrans(in Json node)

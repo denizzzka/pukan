@@ -5,6 +5,7 @@ import pukan.primitives_tree.sphere: SphereGroup, SphereGroupFlag, SphereGroupFl
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
+import core.time: MonoTime;
 import glfw3.api;
 import std.algorithm: sort;
 import std.datetime.stopwatch;
@@ -209,6 +210,8 @@ void main(string[] args) {
     scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator, extendedLine, overlayLine);
     scope(exit) tree.destroy;
 
+    auto startupStart = MonoTime.currTime;
+
     GlTF[] arenaGltfs;
     {
         auto trans = Vector3f(0, 0, 0).translationMatrix;
@@ -217,6 +220,17 @@ void main(string[] args) {
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
+
+    const startupWallNs = cast(ulong) (MonoTime.currTime - startupStart).total!"nsecs";
+
+    LoadStats startupStats;
+    foreach(ref gltf; arenaGltfs)
+    {
+        startupStats.readNs += gltf.loadStats.readNs;
+        startupStats.parseNs += gltf.loadStats.parseNs;
+        startupStats.decodeNs += gltf.loadStats.decodeNs;
+        startupStats.uploadNs += gltf.loadStats.uploadNs;
+    }
 
     import pukan.exceptions;
 
@@ -389,7 +403,7 @@ void main(string[] args) {
     }
 
     if(benchMode)
-        printBench(device, scene, benchFrameNs, benchUpdateNs);
+        printBench(device, scene, benchFrameNs, benchUpdateNs, startupStats, startupWallNs);
 
     vkDeviceWaitIdle(device.device);
 }
@@ -406,7 +420,7 @@ private string presentModeName(VkPresentModeKHR mode)
     }
 }
 
-private void printBench(LogicalDevice device, Scene scene, ulong[] frameNs, ulong[] updateNs)
+private void printBench(LogicalDevice device, Scene scene, ulong[] frameNs, ulong[] updateNs, LoadStats startStats, ulong startWallNs)
 {
     if(frameNs.length == 0)
     {
@@ -463,6 +477,14 @@ private void printBench(LogicalDevice device, Scene scene, ulong[] frameNs, ulon
         averageMs(updateNs),
         percentile(updateNs, 0.5) / 1_000_000.0,
         percentile(updateNs, 0.95) / 1_000_000.0,
+    );
+    writefln(
+        "BENCH start_ms read=%.3f parse=%.3f decode=%.3f upload=%.3f wall=%.3f",
+        startStats.readNs / 1_000_000.0,
+        startStats.parseNs / 1_000_000.0,
+        startStats.decodeNs / 1_000_000.0,
+        startStats.uploadNs / 1_000_000.0,
+        startWallNs / 1_000_000.0,
     );
 }
 

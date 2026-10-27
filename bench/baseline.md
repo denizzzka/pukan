@@ -36,6 +36,23 @@ CI uses lavapipe too; GPU numbers must be recorded separately.
 | Entity update, p50 | 0.021 ms |
 | Entity update, p95 | 0.035 ms |
 
+## Start-up breakdown
+
+Measured with the loader timers (`BENCH start_ms`) on the same machine, after
+uploads were batched. Time is summed over the 9 samples:
+
+| Phase | ms |
+|---|---|
+| Read | 19.5 |
+| Parse | 3.8 |
+| Decode | 1,609.0 |
+| Upload | 84.3 |
+| Wall, create and upload | 1,726.5 |
+
+Decode covers image decoding, accessor conversion and GPU object creation, so
+it is the part worth splitting over files. Read, parse and upload are small in
+comparison. This is the sequential loader, before it runs on workers.
+
 ## Notes
 
 - VRAM is what the engine allocates through `DeviceMemory`. Swapchain images

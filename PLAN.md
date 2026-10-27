@@ -170,8 +170,8 @@ and a single queue fence with no per-frame fences.
 - [ ] Run whole glTF loads (file read, JSON and image decode, accessor decode,
       vertex conversion, GPU creation, upload) on `std.parallelism` workers,
       one task per file, `totalCPUs - 1` of them. No custom pool.
-- [ ] Record the start-up breakdown (read, parse, decode, upload) before and
-      after on the 9 tracked samples.
+- [ ] Record the start-up breakdown after loading runs on workers. The
+      sequential numbers are in `bench/baseline.md`.
 
 ### Frame loop
 
