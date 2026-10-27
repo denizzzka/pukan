@@ -746,7 +746,7 @@ GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
         const center = aabb.min + size/2;
-        const scale = 1.0 / size.length * 0.4;
+        const scale = 1.0 / size.length * 0.1;
 
         auto trans = Matrix4x4f.identity;
 
