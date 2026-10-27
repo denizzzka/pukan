@@ -6,12 +6,14 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
 import glfw3.api;
+import std.algorithm: sort;
 import std.datetime.stopwatch;
 import std.exception;
 import std.logger;
 import std.meta: AliasSeq;
+import std.path: buildPath;
 import std.stdio;
-import std.string: toStringz;
+import std.string: fromStringz, toStringz;
 
 alias appRequirements = Requirements!(SwapChain, GltfFactory, FrameBuilder, SphereRenderer, CylinderRenderer);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
@@ -52,12 +54,14 @@ void main(string[] args) {
 
     bool stereo;
     bool crossEyed;
+    bool bench;
     uint frames;
     auto getoptResult = getopt(
         args,
         "stereo", "render side-by-side stereo", &stereo,
         "cross-eyed", "swap stereo halves for cross-eyed viewing", &crossEyed,
         "frames", "exit after N frames (0 = run forever)", &frames,
+        "bench", "run the fixed benchmark scene and print metrics", &bench,
     );
 
     if(getoptResult.helpWanted)
@@ -68,6 +72,17 @@ void main(string[] args) {
 
     if(crossEyed)
         stereo = true;
+
+    benchMode = bench;
+    if(benchMode)
+    {
+        if(frames == 0)
+            frames = 300;
+
+        sceneYaw = 0;
+        scenePitch = 0;
+        cameraDistance = initialCameraDistance;
+    }
 
     version(linux)
     version(DigitalMars)
@@ -85,6 +100,12 @@ void main(string[] args) {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     //~ glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+    if(benchMode)
+    {
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+    }
 
     const windowWidth = stereo ? width * 2 : width;
     auto window = glfwCreateWindow(windowWidth, height, name.toStringz, null, null);
@@ -168,7 +189,12 @@ void main(string[] args) {
         }
     }
 
-    scope scene = new Scene(device, surface, &windowSizeChanged);
+    scope scene = new Scene(
+        device,
+        surface,
+        &windowSizeChanged,
+        benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
+    );
     scope(exit) destroy(scene);
 
     //TODO: remove
@@ -187,7 +213,7 @@ void main(string[] args) {
     {
         auto trans = Vector3f(0, 0, 0).translationMatrix;
         auto arenaNode = tree.addChild(Bone(mat: trans));
-        arenaGltfs = createArena(scene, arenaNode);
+        arenaGltfs = createArena(scene, arenaNode, benchMode ? benchSampleNames : null);
     }
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
@@ -198,11 +224,19 @@ void main(string[] args) {
 
     writeln(); // empty line for FPS counter
 
+    ulong[] benchFrameNs;
+    ulong[] benchUpdateNs;
+
     // Main loop
     uint frameCount;
     while (!glfwWindowShouldClose(window) && (frames == 0 || frameCount < frames))
     {
         frameCount++;
+
+        const frameStart = sw.peek;
+
+        if(benchMode && frameCount == benchWarmupFrames + 1)
+            device.resetUploadedBytes();
 
         frameTime = glfwGetTime();
         glfwPollEvents();
@@ -213,11 +247,21 @@ void main(string[] args) {
         const dt = curr - prevCurr;
         prevCurr = curr;
 
-        if(!sceneDragging && frameTime - lastInteractionTime > autoResumeDelay)
+        if(!benchMode && !sceneDragging && frameTime - lastInteractionTime > autoResumeDelay)
             sceneYaw += autoRotationSpeed * dt;
 
+        ulong entityUpdateNs;
+
         WorldTransformation wtb;
-        updateWorldTransformations(wtb, curr, scene.swapChain.imageExtent, tree, cubeRotator);
+        const updateStart = sw.peek;
+        updateWorldTransformations(
+            wtb,
+            benchMode ? cast(float) frameCount / 60.0f : curr,
+            scene.swapChain.imageExtent,
+            tree,
+            cubeRotator,
+        );
+        entityUpdateNs += cast(ulong) (sw.peek - updateStart).total!"nsecs";
         const transl = wtb.proj * wtb.view * wtb.model;
 
         const sphereViewModel = wtb.view * wtb.model * Vector3f(0, 0, sceneDepth).translationMatrix;
@@ -262,7 +306,9 @@ void main(string[] args) {
             scene.sphereRenderer.prepare(cb);
             scene.cylinderRenderer.prepare(cb);
 
+            const entityStart = sw.peek;
             tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
+            entityUpdateNs += cast(ulong) (sw.peek - entityStart).total!"nsecs";
 
             if(stereo)
             {
@@ -280,6 +326,14 @@ void main(string[] args) {
                 });
             }
         });
+
+        const frameEnd = sw.peek;
+
+        if(benchMode && frameCount > benchWarmupFrames)
+        {
+            benchFrameNs ~= cast(ulong) (frameEnd - frameStart).total!"nsecs";
+            benchUpdateNs ~= entityUpdateNs;
+        }
 
         version(asset)
         {
@@ -302,6 +356,7 @@ void main(string[] args) {
             }
         }
 
+        if(!benchMode)
         {
             import core.thread.osthread: Thread;
             import core.time;
@@ -333,7 +388,82 @@ void main(string[] args) {
         }
     }
 
+    if(benchMode)
+        printBench(device, scene, benchFrameNs, benchUpdateNs);
+
     vkDeviceWaitIdle(device.device);
+}
+
+private string presentModeName(VkPresentModeKHR mode)
+{
+    switch(mode)
+    {
+        case VK_PRESENT_MODE_IMMEDIATE_KHR: return "immediate";
+        case VK_PRESENT_MODE_MAILBOX_KHR: return "mailbox";
+        case VK_PRESENT_MODE_FIFO_KHR: return "fifo";
+        case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return "fifo_relaxed";
+        default: return "unknown";
+    }
+}
+
+private void printBench(LogicalDevice device, Scene scene, ulong[] frameNs, ulong[] updateNs)
+{
+    if(frameNs.length == 0)
+    {
+        writeln("BENCH no measured frames");
+        return;
+    }
+
+    double averageMs(ulong[] values)
+    {
+        ulong total;
+        foreach(v; values)
+            total += v;
+        return cast(double) total / values.length / 1_000_000.0;
+    }
+
+    ulong percentile(ulong[] values, double p)
+    {
+        auto sorted = values.dup;
+        sorted.sort;
+        return sorted[cast(size_t) (p * (sorted.length - 1))];
+    }
+
+    writefln(
+        "BENCH samples=%d frames=%d warmup=%d",
+        benchSampleNames.length,
+        frameNs.length,
+        benchWarmupFrames,
+    );
+    writefln(
+        "BENCH resolution=%dx%d present=%s",
+        scene.swapChain.imageExtent.width,
+        scene.swapChain.imageExtent.height,
+        presentModeName(scene.swapChain.presentMode),
+    );
+    writefln("BENCH device=%s", fromStringz(device.physicalDevice.properties.deviceName.ptr));
+    writefln(
+        "BENCH vram_device_local_bytes=%d vram_host_visible_bytes=%d allocations=%d",
+        device.deviceLocalMemoryBytes(),
+        device.hostVisibleMemoryBytes(),
+        device.deviceMemoryAllocationCount(),
+    );
+    writefln(
+        "BENCH upload_bytes_per_frame=%.1f",
+        cast(double) device.uploadedBytes() / frameNs.length,
+    );
+    writefln(
+        "BENCH frame_ms avg=%.3f p50=%.3f p95=%.3f",
+        averageMs(frameNs),
+        percentile(frameNs, 0.5) / 1_000_000.0,
+        percentile(frameNs, 0.95) / 1_000_000.0,
+    );
+    writefln(
+        "BENCH update_ms avg=%.3f p50=%.3f p95=%.3f",
+        averageMs(updateNs),
+        percentile(updateNs, 0.5) / 1_000_000.0,
+        percentile(updateNs, 0.95) / 1_000_000.0,
+    );
 }
 
 import dlib.math;
@@ -347,10 +477,28 @@ enum minCameraDistance = 0.6f;
 enum maxCameraDistance = 2.5f;
 enum sceneDepth = 1.0f;
 
+bool benchMode;
+enum benchWarmupFrames = 30;
+
+private string[] benchSampleNames = [
+    "AnimatedCube",
+    "Avocado",
+    "BarramundiFish",
+    "BoxTexturedNonPowerOfTwo",
+    "Fox",
+    "MandarinOrange",
+    "Palka",
+    "SimpleMeshes",
+    "SimpleTexture",
+];
+
 float cameraDistance = initialCameraDistance;
 
 extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
 {
+    if(benchMode)
+        return;
+
     auto distance = cameraDistance - cast(float) yoffset * 0.1f;
 
     if(distance < minCameraDistance)
@@ -376,7 +524,7 @@ float scenePitch = 0.0f;
 
 extern(C) void onMouseButton(GLFWwindow*, int button, int action, int) nothrow @nogc
 {
-    if(button != GLFW_MOUSE_BUTTON_LEFT)
+    if(benchMode || button != GLFW_MOUSE_BUTTON_LEFT)
         return;
 
     if(action == GLFW_PRESS)
@@ -393,6 +541,9 @@ extern(C) void onMouseButton(GLFWwindow*, int button, int action, int) nothrow @
 
 extern(C) void onCursorPos(GLFWwindow*, double xpos, double ypos) nothrow @nogc
 {
+    if(benchMode)
+        return;
+
     const dx = xpos - cursorX;
     const dy = ypos - cursorY;
     cursorX = xpos;
@@ -466,12 +617,36 @@ void updateWorldTransformations(out WorldTransformation wtb, float curr, in VkEx
     *cubeRotator = Bone(cubeRotation.toMatrix4x4);
 }
 
-private string[] gltfFilesSearch(string dir)
+private string[] gltfFilesSearch(string dir, string[] only = null)
 {
     import std.file;
 
-    auto samples = dirEntries(dir, "*", SpanMode.shallow);
     string[] found;
+
+    if(only.length)
+    {
+        foreach(name; only)
+        {
+            auto sampleDir = buildPath(dir, name);
+            if(!exists(sampleDir))
+                continue;
+
+            auto glbs = dirEntries(sampleDir, "*.glb", SpanMode.depth);
+            if(!glbs.empty)
+            {
+                found ~= glbs.front;
+                continue;
+            }
+
+            auto gltfs = dirEntries(sampleDir, "*.gltf", SpanMode.depth);
+            if(!gltfs.empty)
+                found ~= gltfs.front;
+        }
+
+        return found;
+    }
+
+    auto samples = dirEntries(dir, "*", SpanMode.shallow);
     foreach(sample_dir; samples)
     {
         if(!sample_dir.isDir)
@@ -492,11 +667,15 @@ private string[] gltfFilesSearch(string dir)
     return found;
 }
 
-GlTF[] createArena(T)(Scene scene, ref T node)
+GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
 {
     import std.math;
 
-    const found = gltfFilesSearch("demo/assets/gltf_samples/");
+    const found = gltfFilesSearch("demo/assets/gltf_samples/", sampleNames);
+
+    if(found.length == 0)
+        return null;
+
     const sectorAngle = PI*2 / found.length;
 
     const radius = 0.2;
@@ -667,7 +846,10 @@ auto createDemoTree(
 
         CylinderInstance[] instances;
 
-        const sampleCount = gltfFilesSearch("demo/assets/gltf_samples/").length;
+        const sampleCount = gltfFilesSearch(
+            "demo/assets/gltf_samples/",
+            benchMode ? benchSampleNames : null,
+        ).length;
         const sectorAngle = 2.0f * PI / sampleCount;
 
         foreach(i; 0 .. sampleCount)

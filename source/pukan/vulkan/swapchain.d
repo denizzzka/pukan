@@ -14,6 +14,7 @@ class SwapChain
 
     LogicalDevice device;
     VkSwapchainKHR swapchain;
+    VkPresentModeKHR presentMode;
     private SwapChain oldSwapChain;
     FrameBuilder frameBuilder;
     VkImage[] images;
@@ -26,15 +27,29 @@ class SwapChain
 
     private ubyte framesSinceSwapchainReplacement = 0;
 
-    this(LogicalDevice device, FrameBuilder fb, VkSurfaceKHR surface, RenderPass renderPass, SwapChain old)
+    this(
+        LogicalDevice device,
+        FrameBuilder fb,
+        VkSurfaceKHR surface,
+        RenderPass renderPass,
+        SwapChain old,
+        VkPresentModeKHR preferredPresentMode = VK_PRESENT_MODE_FIFO_KHR,
+    )
     {
         auto physDev = device.physicalDevice;
         const capab = physDev.instance.getSurfaceCapabilities(physDev.physicalDevice, surface);
 
-        this(device, fb, capab, renderPass, old);
+        this(device, fb, capab, renderPass, old, preferredPresentMode);
     }
 
-    this(LogicalDevice device, FrameBuilder fb, VkSurfaceCapabilitiesKHR capabilities, RenderPass renderPass, SwapChain old)
+    this(
+        LogicalDevice device,
+        FrameBuilder fb,
+        VkSurfaceCapabilitiesKHR capabilities,
+        RenderPass renderPass,
+        SwapChain old,
+        VkPresentModeKHR preferredPresentMode = VK_PRESENT_MODE_FIFO_KHR,
+    )
     {
         import pukan.exceptions: PukanVulkanException;
         import std.algorithm: any, canFind;
@@ -56,6 +71,19 @@ class SwapChain
         enforce(presentModes.canFind(VK_PRESENT_MODE_FIFO_KHR),
             new PukanVulkanException("surface does not support FIFO present mode"));
 
+        VkPresentModeKHR selectedPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+        foreach(candidate; [
+            preferredPresentMode,
+            VK_PRESENT_MODE_MAILBOX_KHR,
+            VK_PRESENT_MODE_IMMEDIATE_KHR,
+            VK_PRESENT_MODE_FIFO_KHR,
+        ])
+            if(presentModes.canFind(candidate))
+            {
+                selectedPresentMode = candidate;
+                break;
+            }
+
         VkSwapchainCreateInfoKHR cinf = {
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             surface: device.physicalDevice.instance.surface.handle,
@@ -65,7 +93,7 @@ class SwapChain
             imageArrayLayers: 1, // number of views in a multiview/stereo surface. For non-stereoscopic-3D applications, this value is 1
             imageUsage: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // specifies that the image can be used to create a VkImageView suitable for use as a color or resolve attachment in a VkFramebuffer
             imageSharingMode: VK_SHARING_MODE_EXCLUSIVE,
-            presentMode: VkPresentModeKHR.VK_PRESENT_MODE_FIFO_KHR,
+            presentMode: selectedPresentMode,
             minImageCount: 3, // triple buffering will be used
             preTransform: capabilities.currentTransform,
             compositeAlpha: VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -84,6 +112,7 @@ class SwapChain
         presentQueue = device.getQueue();
         imageFormat = cinf.imageFormat;
         imageExtent = cinf.imageExtent;
+        presentMode = cinf.presentMode;
 
         debug
         {

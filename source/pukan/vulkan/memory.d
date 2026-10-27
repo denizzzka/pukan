@@ -5,6 +5,10 @@ package mixin template Memory()
     import pukan.vulkan.slist: SimpleSList;
 
     private SimpleSList!VkDeviceMemory deviceMemoryChunks;
+    private ulong deviceLocalBytes;
+    private ulong hostVisibleBytes;
+    private size_t deviceMemoryAllocations;
+    private ulong uploadedBytesCount;
 
     auto allocateDeviceMemory(ref VkMemoryAllocateInfo allocInfo)
     {
@@ -12,6 +16,24 @@ package mixin template Memory()
             vkAllocateMemory(this.device, &allocInfo, this.alloc, &mem).vkCheck;
         });
     }
+
+    void addDeviceMemory(size_t bytes, VkMemoryPropertyFlags flags)
+    {
+        ++deviceMemoryAllocations;
+
+        if(flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+            deviceLocalBytes += bytes;
+        if(flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+            hostVisibleBytes += bytes;
+    }
+
+    ulong deviceLocalMemoryBytes() const => deviceLocalBytes;
+    ulong hostVisibleMemoryBytes() const => hostVisibleBytes;
+    size_t deviceMemoryAllocationCount() const => deviceMemoryAllocations;
+
+    void addUploadedBytes(size_t bytes) { uploadedBytesCount += bytes; }
+    ulong uploadedBytes() const => uploadedBytesCount;
+    void resetUploadedBytes() { uploadedBytesCount = 0; }
 
     private SimpleSList!VkBuffer buffers;
 
@@ -145,6 +167,7 @@ class DeviceMemory
         };
 
         deviceMemory = device.allocateDeviceMemory(allocInfo);
+        device.addDeviceMemory(allocInfo.allocationSize, propFlags);
     }
 }
 
@@ -193,6 +216,7 @@ class TransferBuffer
         assert(cpuBuffer);
         assert(cpuBuffer.cpuBuf.length > 0);
 
+        this.device = device;
         this.cpuBuffer = cpuBuffer;
 
         VkBufferCreateInfo dstBufInfo = {
@@ -219,10 +243,12 @@ class TransferBuffer
     {
         // Copy host RAM buffer to GPU RAM
         gpuBuffer.copyBufferImmediateSubmit(commandPool, buf, cpuBuffer.buf, gpuBuffer.buf, cpuBuf.length);
+        device.addUploadedBytes(cpuBuf.length);
     }
 
     void recordUpload(VkCommandBuffer buf)
     {
         gpuBuffer.recordCopyBuffer(buf, cpuBuffer.buf, gpuBuffer.buf, cpuBuf.length);
+        device.addUploadedBytes(cpuBuf.length);
     }
 }

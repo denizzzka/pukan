@@ -19,6 +19,7 @@ class Scene
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
     Checkerboard background;
+    VkPresentModeKHR presentMode;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -32,11 +33,17 @@ class Scene
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
 
-    this(LogicalDevice dev, VkSurfaceKHR surf, WindowSizeChangeDetectedCallback wsc)
+    this(
+        LogicalDevice dev,
+        VkSurfaceKHR surf,
+        WindowSizeChangeDetectedCallback wsc,
+        VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR,
+    )
     {
         device = dev;
         surface = surf;
         windowSizeChanged = wsc;
+        this.presentMode = presentMode;
 
         device.physicalDevice.instance.useSurface(surface);
 
@@ -48,7 +55,7 @@ class Scene
         background = new Checkerboard(device, pipelineFactory, renderPass);
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
-        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
+        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null, presentMode);
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
@@ -125,7 +132,7 @@ class Scene
 
     void recreateSwapChain()
     {
-        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain);
+        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain, presentMode);
     }
 
     void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
