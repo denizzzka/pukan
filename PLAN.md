@@ -87,13 +87,6 @@ Because the goal is vague here, the questions below decide the scope:
   the same render pass?
 - Are pipelines created at scene setup or on first use?
 
-## Rendering
-
-- [x] Draw meshes without a skin with a static PBR vertex shader. They no
-      longer create fake joint and weight buffers or read joint matrices.
-- [x] Draw skinned meshes without animation with a separate simpler vertex
-      shader. Bake the bind-pose skin into the vertices on the CPU at load time.
-
 ## Data layout and throughput
 
 Thesis: the remaining speed is in reducing the entropy of the data that moves
