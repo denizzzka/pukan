@@ -1,5 +1,7 @@
 #version 460
 
+#include "frame.glsl"
+
 layout(push_constant) uniform PushConsts
 {
     mat4 trans;
@@ -33,8 +35,10 @@ void main()
         jointMatrices[jointIndices.w] * weight.w;
 
     const vec4 positionOut = skinMatrix * vec4(position, 1.0);
+    const mat4 model = frameUbo.frame.invViewProj * trans;
+    const mat3 normalMatrix = transpose(inverse(mat3(model)));
 
-    fragPosition = positionOut.xyz;
-    fragNormal = mat3(skinMatrix) * vertNormal;
+    fragPosition = (model * positionOut).xyz;
+    fragNormal = normalMatrix * (mat3(skinMatrix) * vertNormal);
     gl_Position = trans * positionOut;
 }

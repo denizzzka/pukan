@@ -115,9 +115,22 @@ class Mesh
         }
     }
 
-    void draw(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    void draw(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans, VkDescriptorSet frameSet)
     {
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+
+        if(frameSet)
+            vkCmdBindDescriptorSets(
+                buf,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineLayout,
+                1,
+                1,
+                &frameSet,
+                0,
+                null,
+            );
+
         drawGeometry(buf, pipeline, trans);
     }
 

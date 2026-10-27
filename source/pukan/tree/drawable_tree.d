@@ -63,23 +63,18 @@ class DrawableTree(Payload) : DrawableByVulkan
     }
 
     import pukan.vulkan.pipelines: GraphicsPipelineCfg;
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans, VkDescriptorSet frameSet)
     {
-        assert(false, "remove this method");
+        drawingBufferFillingRecursive(buf, trans, frameSet, root);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
-    {
-        drawingBufferFillingRecursive(buf, trans, root);
-    }
-
-    private void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, Node curr)
+    private void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet, Node curr)
     {
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
 
-            dr.drawingBufferFilling(buf, trans);
+            dr.drawingBufferFilling(buf, trans, frameSet);
         }
         else if(curr.payload.type == typeid(Bone))
         {
@@ -87,6 +82,6 @@ class DrawableTree(Payload) : DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFillingRecursive(buf, trans, cast(Node) c);
+            drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c);
     }
 }

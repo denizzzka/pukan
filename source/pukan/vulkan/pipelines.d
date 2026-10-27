@@ -236,9 +236,27 @@ final class PipelineFactory
     private VkDescriptorSetLayoutBinding[][] setLayoutBindings;
     private PipelineLayoutEntry[] pipelineLayoutEntries;
 
+    private VkDescriptorSetLayout frameSetLayout;
+    private VkDescriptorSetLayoutBinding[] frameBindings;
+
     this(LogicalDevice device)
     {
         this.device = device;
+
+        frameBindings = [
+            VkDescriptorSetLayoutBinding(
+                binding: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
+        ];
+        frameSetLayout = device.createDescriptorSetLayout(frameBindings);
+    }
+
+    DescriptorAllocator createFrameAllocator()
+    {
+        return new DescriptorAllocator(device, frameSetLayout, frameBindings, 16);
     }
 
     TechniqueId declare(RenderTechnique technique, uint setsPerPool = 16)
@@ -326,7 +344,7 @@ final class PipelineFactory
             if(entry.setLayout == setLayout && entry.pushConstants == pushConstants)
                 return entry.layout;
 
-        auto layout = createPipelineLayout(device, [setLayout], pushConstants);
+        auto layout = createPipelineLayout(device, [setLayout, frameSetLayout], pushConstants);
         device.registerPipelineLayout(layout);
 
         pipelineLayoutEntries ~= PipelineLayoutEntry(setLayout, pushConstants.dup, layout);

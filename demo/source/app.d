@@ -333,13 +333,16 @@ void main(string[] args) {
                     const view = crossEyed ? 1 - eye : eye;
                     auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
                     tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
-                    tree.drawingBufferFilling(buf, Matrix4x4f.identity);
+                    scene.updateFrameUniforms(frame, view, stereoWtb[view]);
+                    tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet);
                 });
             }
             else
             {
+                scene.updateFrameUniforms(frame, 0, wtb);
+
                 scene.recordCommandBuffer(cb, (buf){
-                    tree.drawingBufferFilling(buf, Matrix4x4f.identity);
+                    tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet);
                 });
             }
         });

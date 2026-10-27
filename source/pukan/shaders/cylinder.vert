@@ -1,5 +1,7 @@
 #version 460
 
+#include "frame.glsl"
+
 layout(push_constant) uniform Push {
     mat4 mvp;
 } pc;
@@ -14,6 +16,7 @@ layout(location = 5) in vec4 instanceV;
 
 layout(location = 0) out vec3 normalOut;
 layout(location = 1) flat out uint materialIndex;
+layout(location = 2) out vec3 worldPosition;
 
 void main()
 {
@@ -23,6 +26,9 @@ void main()
         instanceU.xyz * position.x +
         instanceV.xyz * position.z;
 
+    const mat4 model = frameUbo.frame.invViewProj * pc.mvp;
+    const mat3 normalMatrix = transpose(inverse(mat3(model)));
+
     gl_Position = pc.mvp * vec4(world, 1.0);
 
     const vec3 n =
@@ -30,6 +36,7 @@ void main()
         instanceU.xyz * normal.x +
         instanceV.xyz * normal.z;
 
-    normalOut = normalize(n);
+    normalOut = normalize(normalMatrix * n);
     materialIndex = uint(instanceP0.w);
+    worldPosition = (model * vec4(world, 1.0)).xyz;
 }

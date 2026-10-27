@@ -31,5 +31,5 @@ struct Bone
 interface DrawablePrimitive
 {
     void uploadToGPUImmediate(LogicalDevice, CommandPool, scope VkCommandBuffer);
-    void drawingBufferFilling(VkCommandBuffer, GraphicsPipelineCfg, Matrix4x4f); //const
+    void drawingBufferFilling(VkCommandBuffer, GraphicsPipelineCfg, Matrix4x4f, VkDescriptorSet); //const
 }

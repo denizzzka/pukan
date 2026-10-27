@@ -1,5 +1,7 @@
 #version 460
 
+#include "frame.glsl"
+
 layout(push_constant) uniform PushConsts
 {
     mat4 trans;
@@ -32,7 +34,9 @@ void main()
         jointMatrices[jointIndices.w] * weight.w;
 
     const vec4 positionOut = skinMatrix * vec4(position, 1.0);
-    fragPosition = positionOut.xyz;
+    const mat4 model = frameUbo.frame.invViewProj * trans;
+
+    fragPosition = (model * positionOut).xyz;
     gl_Position = trans * positionOut;
 }
 #else
@@ -48,8 +52,10 @@ void main()
 {
     fragColor = color;
     fragTextureCoord = vertTextureCoord;
-    fragPosition = position;
 
+    const mat4 model = frameUbo.frame.invViewProj * trans;
+
+    fragPosition = (model * vec4(position, 1.0)).xyz;
     gl_Position = trans * vec4(position, 1.0);
 }
 #endif

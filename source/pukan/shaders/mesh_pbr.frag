@@ -73,9 +73,9 @@ void main()
         emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
 
     const vec3 color = shadePbr(
-        material,
         base.rgb,
         normal,
+        fragPosition,
         metallicRoughness.x,
         metallicRoughness.y,
         ao,

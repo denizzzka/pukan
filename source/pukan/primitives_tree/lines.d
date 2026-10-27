@@ -167,7 +167,12 @@ class LineRenderer : DrawablePrimitive
     {
     }
 
-    override void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    override void drawingBufferFilling(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        Matrix4x4f trans,
+        VkDescriptorSet frameSet,
+    )
     {
         if(lineCount == 0)
             return;

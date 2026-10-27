@@ -1,3 +1,5 @@
+#include "frame.glsl"
+
 struct Material
 {
     vec4 baseColorFactor;
@@ -49,12 +51,35 @@ vec3 materialAlbedo(Material material, vec3 tint, vec2 uv, sampler2D baseColorTe
     return materialBaseColor(material, tint, uv, baseColorTexture).rgb;
 }
 
-vec3 shadePbr(Material material, vec3 albedo, vec3 normal, float metallic, float roughness, float ao, vec3 emissive)
+vec3 environment(vec3 direction)
+{
+    const vec3 ground = vec3(0.04, 0.035, 0.03);
+    const vec3 sky = vec3(0.35, 0.45, 0.65);
+    const float horizon = clamp(direction.y * 0.5 + 0.5, 0.0, 1.0);
+
+    return mix(ground, sky, horizon);
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+vec3 shadePbr(
+    vec3 albedo,
+    vec3 normal,
+    vec3 worldPosition,
+    float metallic,
+    float roughness,
+    float ao,
+    vec3 emissive
+)
 {
     const vec3 N = normalize(normal);
-    const vec3 V = normalize(vec3(0.0, 0.0, 1.0));
-    const vec3 L = normalize(vec3(0.35, 0.5, 0.8));
+    const vec3 V = normalize(frameUbo.frame.cameraPosition.xyz - worldPosition);
+    const vec3 L = normalize(frameUbo.frame.lightDirection.xyz);
     const vec3 H = normalize(V + L);
+    const vec3 lightColor = frameUbo.frame.lightColor.rgb;
 
     const float NdotL = max(dot(N, L), 0.0);
     const float NdotV = max(dot(N, V), 0.0);
@@ -76,14 +101,19 @@ vec3 shadePbr(Material material, vec3 albedo, vec3 normal, float metallic, float
     const vec3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
     const vec3 specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
     const vec3 kD = (1.0 - F) * (1.0 - metallic);
-    const vec3 direct = (kD * albedo / MATERIAL_PI + specular) * NdotL;
+    const vec3 direct = (kD * albedo / MATERIAL_PI + specular) * lightColor * NdotL;
 
-    const vec3 ambient = (kD * albedo * 0.05 + F0 * 0.1) * ao;
+    const vec3 R = reflect(-V, N);
+    const vec3 irradiance = environment(N);
+    const vec3 reflection = mix(environment(R), vec3(0.1), roughness);
+    const vec3 Fenv = fresnelSchlickRoughness(NdotV, F0, roughness);
+    const vec3 kDEnv = (1.0 - Fenv) * (1.0 - metallic);
+    const vec3 ambient = (kDEnv * albedo * irradiance + reflection * Fenv) * ao;
 
     return direct + ambient + emissive;
 }
 
-vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal)
+vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPosition)
 {
     const vec3 unitNormal = normalize(normal);
     const uint mode = uint(material.params.x);
@@ -94,16 +124,15 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal)
 
     if(mode == MATERIAL_MODE_LIT)
     {
-        // TODO: world-space light; model-space light rotates with the object.
-        const vec3 lightDirection = normalize(vec3(0.35, 0.5, 0.8));
+        const vec3 lightDirection = normalize(frameUbo.frame.lightDirection.xyz);
         return albedo * (0.6 + 0.6 * max(dot(unitNormal, lightDirection), 0.0)) + emissive;
     }
 
     if(mode == MATERIAL_MODE_PBR)
         return shadePbr(
-            material,
             albedo,
             unitNormal,
+            worldPosition,
             material.metallicRoughness.x,
             material.metallicRoughness.y,
             1.0,

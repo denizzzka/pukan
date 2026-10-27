@@ -58,12 +58,44 @@ class FrameBuilder
     }
 }
 
+final class FrameSet
+{
+    private MemoryBufferMappedToCPU buffer;
+    VkDescriptorSet descriptorSet;
+
+    this(LogicalDevice device, DescriptorAllocator allocator, size_t size)
+    {
+        buffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        descriptorSet = allocator.allocate();
+
+        VkDescriptorBufferInfo info = { buffer: buffer.buf, offset: 0, range: size };
+        VkWriteDescriptorSet[] writes = [
+            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, info),
+        ];
+        device.updateDescriptorSets(writes);
+    }
+
+    ~this()
+    {
+        if(buffer)
+            destroy(buffer);
+    }
+
+    void update(T)(in T data)
+    {
+        import core.stdc.string: memcpy;
+
+        memcpy(buffer.cpuBuf.ptr, &data, T.sizeof);
+    }
+}
+
 class Frame
 {
     FrameBuilder fb;
     VkImageView imageView;
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
+    FrameSet[2] frameSets;
     package SyncFramesInFlight syncPrimitives;
     private OwnedHandles!VkCommandBuffer _commandBuffer;
 
@@ -103,6 +135,10 @@ class Frame
 
     ~this()
     {
+        foreach(ref set; frameSets)
+            if(set)
+                destroy(set);
+
         if(syncPrimitives)
             destroy(syncPrimitives);
 

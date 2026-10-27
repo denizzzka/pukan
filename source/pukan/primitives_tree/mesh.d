@@ -211,9 +211,9 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
         indexCount = cast(uint) indices.length;
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans, VkDescriptorSet frameSet)
     {
-        draw(buf, pipeline, trans);
+        draw(buf, pipeline, trans, frameSet);
     }
 
     protected void updateDescriptorSets(LogicalDevice device, VkDescriptorImageInfo imageInfo)

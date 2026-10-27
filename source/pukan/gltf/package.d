@@ -631,16 +631,21 @@ class GlTF : DrawableByVulkan
         animation.setPose(&animations[$-1], baseNodeTranslations);
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans)
+    void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet)
     {
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
-        drawingBufferFillingRecursive(buf, trans, rootSceneNode);
+        drawingBufferFillingRecursive(buf, trans, frameSet, rootSceneNode);
     }
 
     //TODO: not need to call this recursive - just call it in row and use fromSkinRootNodeTranslations to get coords
-    private void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, Node node)
+    private void drawingBufferFillingRecursive(
+        VkCommandBuffer buf,
+        Matrix4x4f trans,
+        VkDescriptorSet frameSet,
+        Node node,
+    )
     {
         import std.math;
 
@@ -649,10 +654,10 @@ class GlTF : DrawableByVulkan
         trans *= node.trans.calcMatrix;
 
         if(node.mesh)
-            node.mesh.draw(buf, selectPipeline(node.mesh), trans);
+            node.mesh.draw(buf, selectPipeline(node.mesh), trans, frameSet);
 
         foreach(c; node.children)
-            drawingBufferFillingRecursive(buf, trans, cast(Node) c);
+            drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c);
     }
 
     private GraphicsPipelineCfg selectPipeline(const MeshClass mesh)

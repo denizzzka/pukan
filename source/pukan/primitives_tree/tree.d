@@ -20,12 +20,18 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         forEachDrawablePayload((d) => d.destroy);
     }
 
-    override void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans)
+    override void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet)
     {
-        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, root);
+        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, frameSet, root);
     }
 
-    private void drawingBufferFillingRecursive(VkCommandBuffer buf, GraphicsPipelineCfg pipelineCfg, Matrix4x4f trans, Node curr)
+    private void drawingBufferFillingRecursive(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipelineCfg,
+        Matrix4x4f trans,
+        VkDescriptorSet frameSet,
+        Node curr,
+    )
     {
         // TODO: deduplicate code with DrawableTree.drawingBufferFillingRecursive ?
 
@@ -33,13 +39,13 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         {
             auto dr = curr.payload.peek!DrawablePrimitive;
 
-            dr.drawingBufferFilling(buf, pipelineCfg, trans);
+            dr.drawingBufferFilling(buf, pipelineCfg, trans, frameSet);
         }
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
 
-            dr.drawingBufferFilling(buf, trans);
+            dr.drawingBufferFilling(buf, trans, frameSet);
         }
         else if(curr.payload.type == typeid(Bone))
         {
@@ -51,7 +57,7 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFillingRecursive(buf, pipelineCfg, trans, cast(Node) c);
+            drawingBufferFillingRecursive(buf, pipelineCfg, trans, frameSet, cast(Node) c);
     }
 
     private void forEachPrimitive(void delegate(DrawablePrimitive) dg)

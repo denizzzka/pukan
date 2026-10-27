@@ -1,5 +1,7 @@
 #version 460
 
+#include "frame.glsl"
+
 layout(push_constant) uniform PushConsts
 {
     mat4 trans;
@@ -18,8 +20,11 @@ void main()
 {
     fragColor = vec3(1.0);
     fragTextureCoord = vertTextureCoord;
-    fragNormal = vertNormal;
-    fragPosition = position;
 
+    const mat4 model = frameUbo.frame.invViewProj * trans;
+    const mat3 normalMatrix = transpose(inverse(mat3(model)));
+
+    fragNormal = normalMatrix * vertNormal;
+    fragPosition = (model * vec4(position, 1.0)).xyz;
     gl_Position = trans * vec4(position, 1.0);
 }

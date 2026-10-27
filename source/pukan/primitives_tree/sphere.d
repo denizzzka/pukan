@@ -716,7 +716,12 @@ class SphereRenderer : DrawablePrimitive
         prepared = true;
     }
 
-    override void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f mvp)
+    override void drawingBufferFilling(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        Matrix4x4f mvp,
+        VkDescriptorSet frameSet,
+    )
     {
         if(instanceCount == 0 || !prepared)
             return;
@@ -730,6 +735,18 @@ class SphereRenderer : DrawablePrimitive
             Matrix4x4f.sizeof,
             &mvp,
         );
+
+        if(frameSet)
+            vkCmdBindDescriptorSets(
+                buf,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineLayout,
+                1,
+                1,
+                &frameSet,
+                0,
+                null,
+            );
 
         VkBuffer[2] vertexBuffers = [generator.vertexBufferHandle(), bucketCenters.buf];
         VkDeviceSize[2] offsets = [0, 0];

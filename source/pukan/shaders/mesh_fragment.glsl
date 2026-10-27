@@ -14,6 +14,7 @@ layout(location = 1) in vec2 fragTextureCoord;
 
 #ifdef HAS_NORMAL
 layout(location = 2) in vec3 fragNormal;
+layout(location = 3) in vec3 fragPosition;
 #else
 layout(location = 2) in vec3 fragPosition;
 #endif
@@ -31,5 +32,5 @@ void main()
     const vec3 normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));
 #endif
 
-    outColor = vec4(shadeMaterial(material, albedo, normal), 1.0);
+    outColor = vec4(shadeMaterial(material, albedo, normal, fragPosition), 1.0);
 }

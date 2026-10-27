@@ -1,5 +1,6 @@
 module pukan.scene;
 
+import dlib.math: translation, Vector3f, Vector4f;
 import pukan;
 import pukan.mesh: MeshResources;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
@@ -26,6 +27,7 @@ class Scene
 
     import pukan.primitives_tree: PrimitivesFactory;
     PipelineFactory pipelineFactory;
+    private DescriptorAllocator frameAllocator;
     MeshResources meshResources;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
@@ -51,12 +53,14 @@ class Scene
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
 
         pipelineFactory = new PipelineFactory(device);
+        frameAllocator = pipelineFactory.createFrameAllocator();
         meshResources = new MeshResources(device);
 
         background = new Checkerboard(device, pipelineFactory, renderPass);
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null, presentMode);
+        createFrameSets();
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
@@ -79,6 +83,28 @@ class Scene
 
         if(meshResources)
             destroy(meshResources);
+    }
+
+    private void createFrameSets()
+    {
+        foreach(ref frame; swapChain.frames)
+            foreach(eye; 0 .. 2)
+                frame.frameSets[eye] = new FrameSet(device, frameAllocator, FrameUniforms.sizeof);
+    }
+
+    void updateFrameUniforms(ref Frame frame, size_t eye, in WorldTransformation wtb)
+    {
+        const viewProj = wtb.proj * wtb.view;
+        const camera = translation(wtb.view.inverse);
+        const light = Vector3f(0.35f, 0.5f, 0.8f).normalized;
+
+        FrameUniforms data;
+        data.invViewProj = viewProj.inverse;
+        data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
+        data.lightDirection = Vector4f(light.x, light.y, light.z, 0);
+        data.lightColor = Vector4f(1, 1, 1, 1);
+
+        frame.frameSets[eye].update(data);
     }
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, void delegate(ref VkCommandBuffer) drawScene)
@@ -135,6 +161,7 @@ class Scene
     void recreateSwapChain()
     {
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain, presentMode);
+        createFrameSets();
     }
 
     void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
@@ -196,6 +223,14 @@ struct WorldTransformation
     Matrix4f model; /// model to World
     Matrix4f view; /// World to view (to camera)
     Matrix4f proj; /// view to projection (to projective/homogeneous coordinates)
+}
+
+struct FrameUniforms
+{
+    Matrix4x4f invViewProj;
+    Vector4f cameraPosition;
+    Vector4f lightDirection;
+    Vector4f lightColor;
 }
 
 ///
