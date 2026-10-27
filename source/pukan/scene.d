@@ -1,6 +1,7 @@
 module pukan.scene;
 
 import pukan;
+import pukan.mesh: MeshResources;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
@@ -24,6 +25,7 @@ class Scene
 
     import pukan.primitives_tree: PrimitivesFactory;
     PipelineFactory pipelineFactory;
+    MeshResources meshResources;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
     GltfFactory gltfFactory;
@@ -41,15 +43,16 @@ class Scene
         renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
 
         pipelineFactory = new PipelineFactory(device);
+        meshResources = new MeshResources(device);
 
         background = new Checkerboard(device, pipelineFactory, renderPass);
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null);
 
-        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, renderPass);
-        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, renderPass);
-        gltfFactory = new GltfFactory(device, pipelineFactory, renderPass);
+        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
+        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
+        gltfFactory = new GltfFactory(device, pipelineFactory, meshResources, renderPass);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass);
     }
@@ -64,6 +67,9 @@ class Scene
 
         if(gltfFactory)
             destroy(gltfFactory);
+
+        if(meshResources)
+            destroy(meshResources);
     }
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, void delegate(ref VkCommandBuffer) drawScene)

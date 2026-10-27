@@ -1,86 +1,108 @@
 module pukan.primitives_tree.mesh;
 
+import dlib.math: Matrix4x4f;
+import pukan.mesh: Mesh, MeshResources, VertexStream;
 import pukan.primitives_tree: DrawablePrimitive;
-import pukan.scene;
+import pukan.scene: Vertex;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
-class Mesh
+class ColoredMesh : Mesh, DrawablePrimitive
 {
     Vertex[] vertices;
     ushort[] indices;
 
-    this(Vertex[] vertices, ushort[] indices)
+    private MeshResources resources;
+    private size_t materialSlot;
+
+    private TransferBuffer vertexBuffer;
+    private TransferBuffer indicesBuffer;
+
+    this(LogicalDevice device, VkDescriptorSet ds, MeshResources resources, Vertex[] vertices, ushort[] indices)
     {
+        descriptorSet = ds;
+        this.resources = resources;
         this.vertices = vertices;
         this.indices = indices;
+
+        materialSlot = resources.materials.addSlot(descriptorSet);
+        resources.materials.content(materialSlot).material.renderType.x = 0;
+
+        updateDescriptorSets(device, imageInfo(resources.fakeTexture));
     }
-}
 
-class ColoredMesh : Mesh, DrawablePrimitive
-{
-    VkDescriptorSet[] descriptorSets;
-
-    this(LogicalDevice, VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices)
+    ~this()
     {
-        descriptorSets = ds;
-        super(vertices, indices);
+        if(vertexBuffer)
+            destroy(vertexBuffer);
+
+        if(indicesBuffer)
+            destroy(indicesBuffer);
     }
 
-    static struct VerticesGPUBuffer
-    {
-        TransferBuffer vertexBuffer;
-        TransferBuffer indicesBuffer;
-
-        @disable
-        this(ref return scope VerticesGPUBuffer rhs) {}
-
-        ~this()
-        {
-            vertexBuffer.destroy;
-            indicesBuffer.destroy;
-        }
-    }
-
-    VerticesGPUBuffer r;
-    alias this = r;
-
-    ///
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
 
-        r.vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        r.indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+        vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-        // Copy vertices to mapped memory
-        r.vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
-        r.indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
+        vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
+        indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
 
-        r.vertexBuffer.uploadImmediate(commandPool, commandBuffer);
-        r.indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+        vertexBuffer.uploadImmediate(commandPool, commandBuffer);
+        indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+
+        setStreams([
+            VertexStream(
+                buffer: vertexBuffer.gpuBuffer,
+                offset: 0,
+                size: vertexBuffer.length,
+                stride: Vertex.sizeof,
+            ),
+        ]);
+
+        vertexCount = cast(uint) vertices.length;
+
+        indexBuffer = indicesBuffer.gpuBuffer;
+        indexOffset = 0;
+        indexType = VK_INDEX_TYPE_UINT16;
+        indexCount = cast(uint) indices.length;
+
+        resources.materials.uploadImmediate(commandPool, commandBuffer);
     }
 
-    void refreshBuffers(VkCommandBuffer buf)
+    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
     {
+        draw(buf, pipeline, trans);
     }
 
-    import dlib.math: Matrix4x4f;
-
-    void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans) //const
+    private void setMaterialMode(int mode)
     {
-        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+        resources.materials.content(materialSlot).material.renderType.x = mode;
+    }
 
-        VkDeviceSize[] offsets = [VkDeviceSize(0)];
+    private void updateDescriptorSets(LogicalDevice device, VkDescriptorImageInfo imageInfo)
+    {
+        auto uboInfo = resources.materials.info(materialSlot);
 
-        vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
+        VkWriteDescriptorSet[] descriptorWrites = [
+            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
+            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageInfo),
+            bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, resources.identityJointsInfo),
+        ];
 
-        vkCmdBindVertexBuffers(buf, 0, 1, &(vertexBuffer.gpuBuffer.buf.getVal()), offsets.ptr);
-        vkCmdBindIndexBuffer(buf, indicesBuffer.gpuBuffer.buf, 0, VK_INDEX_TYPE_UINT16);
-        vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, cast(uint) descriptorSets.length, descriptorSets.ptr, 0, null);
+        device.updateDescriptorSets(descriptorWrites);
+    }
 
-        vkCmdDrawIndexed(buf, cast(uint) indices.length, 1, 0, 0, 0);
+    private static VkDescriptorImageInfo imageInfo(Texture texture)
+    {
+        return VkDescriptorImageInfo(
+            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            imageView: texture.imageView,
+            sampler: texture.sampler,
+        );
     }
 }
 
@@ -88,33 +110,24 @@ class TexturedMesh : ColoredMesh
 {
     Texture texture;
 
-    this(LogicalDevice device, VkDescriptorSet[] ds, Vertex[] vertices, ushort[] indices, Texture texture)
+    this(
+        LogicalDevice device,
+        VkDescriptorSet ds,
+        MeshResources resources,
+        Vertex[] vertices,
+        ushort[] indices,
+        Texture texture,
+    )
     {
         this.texture = texture;
-        super(device, ds, vertices, indices);
+        super(device, ds, resources, vertices, indices);
 
-        updateDescriptorSets(device);
+        setMaterialMode(1);
+        updateDescriptorSets(device, imageInfo(texture));
     }
 
     ~this()
     {
         texture.destroy;
-    }
-
-    private void updateDescriptorSets(LogicalDevice device)
-    {
-        VkDescriptorImageInfo imageInfo = {
-            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            imageView: texture.imageView,
-            sampler: texture.sampler,
-        };
-
-        assert(descriptorSets.length == 1);
-
-        VkWriteDescriptorSet[] descriptorWrites = [
-            imageWriteDescriptor(descriptorSets[0], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageInfo),
-        ];
-
-        device.updateDescriptorSets(descriptorWrites);
     }
 }

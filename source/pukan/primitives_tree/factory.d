@@ -1,7 +1,7 @@
 module pukan.primitives_tree.factory;
 
 import dlib.math: Matrix4x4f;
-import pukan.primitives_tree.mesh: TexturedMesh;
+import pukan.mesh: MeshResources;
 import pukan.scene: Vertex;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -12,17 +12,20 @@ struct PrimitivesFactory(T)
 {
     LogicalDevice device;
     private DescriptorAllocator allocator;
+    private MeshResources resources;
     GraphicsPipelineCfg graphicsPipelineCfg;
 
-    this(LogicalDevice device, PipelineFactory pipelines, RenderPass renderPass)
+    this(LogicalDevice device, PipelineFactory pipelines, MeshResources resources, RenderPass renderPass)
     {
         this.device = device;
+        this.resources = resources;
 
         const technique = pipelines.declare(RenderTechnique(
             name: T.stringof,
             stages: shaderStages(device),
             vertexBindings: Vertex.getBindingDescriptions,
             vertexAttributes: Vertex.getAttributeDescriptions,
+            dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
         ), 10);
 
         allocator = pipelines.descriptorAllocator(technique);
@@ -31,24 +34,34 @@ struct PrimitivesFactory(T)
 
     private static ShaderInfo[] shaderStages(LogicalDevice device)
     {
-        ShaderInfo[] stages = [
+        return [
             device.uploadShaderToGPU(
-                cast(ubyte[]) import("vert.spv"),
+                cast(ubyte[]) import("mesh_static_vert.spv"),
                 VK_SHADER_STAGE_VERTEX_BIT,
-                null,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: 2,
+                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    ),
+                ],
                 VkPushConstantRange(
                     stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
                     offset: 0,
                     size: Matrix4x4f.sizeof,
                 ),
             ),
-        ];
-
-        static if(is(T == TexturedMesh))
-            stages ~= device.uploadShaderToGPU(
-                cast(ubyte[]) import("textured_frag.spv"),
+            device.uploadShaderToGPU(
+                cast(ubyte[]) import("mesh_frag.spv"),
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 [
+                    VkDescriptorSetLayoutBinding(
+                        binding: 0,
+                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
                     VkDescriptorSetLayoutBinding(
                         binding: 1,
                         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -56,15 +69,8 @@ struct PrimitivesFactory(T)
                         stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
                     ),
                 ],
-            );
-        else
-            stages ~= device.uploadShaderToGPU(
-                cast(ubyte[]) import("colored_frag.spv"),
-                VK_SHADER_STAGE_FRAGMENT_BIT,
-                null,
-            );
-
-        return stages;
+            ),
+        ];
     }
 
     auto create(CTOR_ARGS...)(FrameBuilder frameBuilder, CTOR_ARGS args)
@@ -72,7 +78,7 @@ struct PrimitivesFactory(T)
         assert(device);
         auto descriptorsSet = allocator.allocate();
 
-        auto r = new T(device, [descriptorsSet], args);
+        auto r = new T(device, descriptorsSet, resources, args);
 
         return r;
     }

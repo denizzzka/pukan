@@ -2,7 +2,7 @@ module pukan.gltf.factory;
 
 import dlib.math: Matrix4x4f;
 import pukan.gltf;
-import pukan.gltf.mesh: MaterialBuffer;
+import pukan.mesh: MeshResources;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
@@ -22,19 +22,20 @@ class GltfFactory
     LogicalDevice device;
     private immutable bool computeJointsOnGPU;
     private DescriptorAllocator allocator;
-    private MaterialBuffer materialBuffer;
+    private MeshResources resources;
     GraphicsPipelineCfg graphicsPipelineCfg;
-    private Texture fakeTexture; /// Stub to fill texture shader arg of non-textured meshes
 
     this(
         LogicalDevice device,
         PipelineFactory pipelines,
+        MeshResources resources,
         RenderPass renderPass,
         bool computeJointsOnGPU = true,
     )
     {
         this.device = device;
         this.computeJointsOnGPU = computeJointsOnGPU;
+        this.resources = resources;
 
         const technique = pipelines.declare(RenderTechnique(
             name: "glTF",
@@ -47,22 +48,13 @@ class GltfFactory
 
         allocator = pipelines.descriptorAllocator(technique);
         graphicsPipelineCfg = pipelines.acquire(technique, renderPass, 1);
-        materialBuffer = new MaterialBuffer(device);
-
-        fakeTexture = createFakeTexture1x1(device);
-    }
-
-    ~this()
-    {
-        if(materialBuffer)
-            destroy(materialBuffer);
     }
 
     private static ShaderInfo[] shaderStages(LogicalDevice device)
     {
         return [
             device.uploadShaderToGPU(
-                cast(ubyte[]) import("gltf_vertices.spv"),
+                cast(ubyte[]) import("mesh_skinned_vert.spv"),
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -79,7 +71,7 @@ class GltfFactory
                 ),
             ),
             device.uploadShaderToGPU(
-                cast(ubyte[]) import("gltf_fragment.spv"),
+                cast(ubyte[]) import("mesh_frag.spv"),
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -104,7 +96,15 @@ class GltfFactory
         assert(device);
 
         try
-            return loadGlTF2(filename, allocator, materialBuffer, device, graphicsPipelineCfg, fakeTexture, computeJointsOnGPU);
+            return loadGlTF2(
+                filename,
+                allocator,
+                resources.materials,
+                device,
+                graphicsPipelineCfg,
+                resources.fakeTexture,
+                computeJointsOnGPU,
+            );
         catch(Exception e)
         {
             e.msg = filename~": "~e.msg;

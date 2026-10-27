@@ -209,7 +209,7 @@ struct SkinnedMeshTechnique
       buffer with offsets.
 - [x] Remove `PrimitivesFactory` and `GltfFactory` as pipeline owners; make
       `Scene` passive.
-- [ ] Merge the mesh paths using static and skinned techniques.
+- [x] Merge the mesh paths using static and skinned techniques.
 - [ ] Consider instancing and batching, including a palette offset for skinned
       instances.
 
@@ -231,8 +231,8 @@ fields).
 
 ## Mesh rendering merge
 
-- [ ] Unify `Mesh` rendering paths after the steps above are validated.
-- [ ] Validate the generalized rendering and automatic pipelines first.
+- [x] Unify `Mesh` rendering paths after the steps above are validated.
+- [x] Validate the generalized rendering and automatic pipelines first.
 
 This is the last step on purpose: merging mesh paths before the new
 technique/pipeline machinery is proven would hide its defects.

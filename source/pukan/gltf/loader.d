@@ -4,7 +4,7 @@ import dlib.math;
 import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
 import pukan.gltf.accessor;
 import pukan.gltf.animation;
-import pukan.gltf.mesh: MaterialBuffer;
+import pukan.mesh: MaterialBuffer;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;

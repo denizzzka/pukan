@@ -212,10 +212,21 @@ final class PipelineFactory
         uint subpass;
     }
 
+    private struct PipelineLayoutEntry
+    {
+        VkDescriptorSetLayout setLayout;
+        VkPushConstantRange[] pushConstants;
+        VkPipelineLayout layout;
+    }
+
     private LogicalDevice device;
     private Technique[] techniques;
     private RenderTarget[] targets;
     private GraphicsPipelineCfg[PipelineKey] cache;
+
+    private VkDescriptorSetLayout[] setLayouts;
+    private VkDescriptorSetLayoutBinding[][] setLayoutBindings;
+    private PipelineLayoutEntry[] pipelineLayoutEntries;
 
     this(LogicalDevice device)
     {
@@ -228,14 +239,9 @@ final class PipelineFactory
         entry.description = technique;
 
         auto bindings = createLayoutBinding(technique.stages);
-        auto setLayout = device.createDescriptorSetLayout(bindings);
+        auto setLayout = internSetLayout(bindings);
 
-        entry.pipelineLayout = createPipelineLayout(
-            device,
-            [setLayout],
-            pushConstantRanges(technique.stages),
-        );
-        device.registerPipelineLayout(entry.pipelineLayout);
+        entry.pipelineLayout = internPipelineLayout(setLayout, pushConstantRanges(technique.stages));
 
         entry.allocator = new DescriptorAllocator(device, setLayout, bindings, setsPerPool);
 
@@ -274,6 +280,37 @@ final class PipelineFactory
         assert(id.value < techniques.length);
 
         return techniques[id.value].description.name;
+    }
+
+    private VkDescriptorSetLayout internSetLayout(VkDescriptorSetLayoutBinding[] bindings)
+    {
+        foreach(i, ref existing; setLayoutBindings)
+            if(existing == bindings)
+                return setLayouts[i];
+
+        auto layout = device.createDescriptorSetLayout(bindings);
+
+        setLayouts ~= layout;
+        setLayoutBindings ~= bindings.dup;
+
+        return layout;
+    }
+
+    private VkPipelineLayout internPipelineLayout(
+        VkDescriptorSetLayout setLayout,
+        VkPushConstantRange[] pushConstants,
+    )
+    {
+        foreach(ref entry; pipelineLayoutEntries)
+            if(entry.setLayout == setLayout && entry.pushConstants == pushConstants)
+                return entry.layout;
+
+        auto layout = createPipelineLayout(device, [setLayout], pushConstants);
+        device.registerPipelineLayout(layout);
+
+        pipelineLayoutEntries ~= PipelineLayoutEntry(setLayout, pushConstants.dup, layout);
+
+        return layout;
     }
 
     private RenderTargetId targetId(RenderPass renderPass, uint subpass)

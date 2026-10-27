@@ -6,7 +6,8 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, MaterialBuffer, TexturedMesh, UploadedVertices;
+import pukan.gltf.mesh: MeshClass = GltfMesh, IndicesDescr, JustColoredMesh, TexturedMesh, UploadedVertices;
+import pukan.mesh: MaterialBuffer;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -215,11 +216,11 @@ class GlTF : DrawableByVulkan
             }
         }
 
+        setupFakeJointVertexBuffers(device, nodes.length);
+
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device);
         });
-
-        setupFakeJointVertexBuffers(device, nodes.length);
 
         // For skin support:
         this.rootSceneNode.refreshTransFromRootValues;
@@ -362,7 +363,7 @@ class GlTF : DrawableByVulkan
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         if(!content.textures.length)
-            node.mesh = new JustColoredMesh(mesh.name, uplVert, allocator, materialBuffer, texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
+            node.mesh = new JustColoredMesh(mesh.name, uplVert, allocator, materialBuffer, gpuBuffs, texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
         else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
@@ -401,7 +402,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(mesh.name, uplVert, allocator, materialBuffer, jointsUboInfo);
+                auto m = new TexturedMesh(mesh.name, uplVert, allocator, materialBuffer, gpuBuffs, jointsUboInfo);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
@@ -459,11 +460,7 @@ class GlTF : DrawableByVulkan
         trans *= node.trans.calcMatrix;
 
         if(node.mesh)
-        {
-            vkCmdPushConstants(buf, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, cast(uint) trans.sizeof, cast(void*) &trans);
-
-            node.mesh.drawingBufferFilling(gpuBuffs, pipeline, buf);
-        }
+            node.mesh.draw(buf, *pipeline, trans);
 
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
