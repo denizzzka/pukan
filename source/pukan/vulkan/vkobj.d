@@ -10,7 +10,6 @@ enum VkParentKind
     none,
     instance,
     device,
-    physicalDevice,
 }
 
 template VkHandleInfo(Handle)

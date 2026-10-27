@@ -111,11 +111,6 @@ class MemoryBuffer : DeviceMemory
         vkBindBufferMemory(device, buf, deviceMemory, 0 /*memoryOffset*/).vkCheck;
     }
 
-    ~this()
-    {
-        buf.dispose();
-    }
-
     //TODO: static?
     void recordCopyBuffer(VkCommandBuffer cmdBuf, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
     {
@@ -150,11 +145,6 @@ class DeviceMemory
         };
 
         deviceMemory = device.allocateDeviceMemory(allocInfo);
-    }
-
-    this()
-    {
-        deviceMemory.dispose();
     }
 }
 
