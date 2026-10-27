@@ -85,6 +85,7 @@ class LineRenderer : DrawablePrimitive
         PipelineFactory pipelines,
         RenderPass renderPass,
         VkExtent2D viewport,
+        bool overlay = false,
         size_t instanceCapacity = 4096,
     )
     in(instanceCapacity > 0)
@@ -93,13 +94,15 @@ class LineRenderer : DrawablePrimitive
         this.instanceCapacity = instanceCapacity;
 
         const technique = pipelines.declare(RenderTechnique(
-            name: "lines",
+            name: overlay ? "lines overlay" : "lines",
             stages: shaderStages(device),
             vertexBindings: LineVertex.getBindingDescriptions,
             vertexAttributes: LineVertex.getAttributeDescriptions,
             state: FixedState(
                 topology: VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
                 cullMode: VK_CULL_MODE_NONE,
+                depthTestEnable: overlay ? VK_FALSE : VK_TRUE,
+                depthWriteEnable: overlay ? VK_FALSE : VK_TRUE,
             ),
         ), 1);
 

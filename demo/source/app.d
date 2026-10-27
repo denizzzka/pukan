@@ -176,8 +176,9 @@ void main(string[] args) {
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
     Bone* cubeRotator;
-    LineRenderer lineRenderer;
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator, lineRenderer);
+    LineRenderer extendedLine;
+    LineRenderer overlayLine;
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator, extendedLine, overlayLine);
     scope(exit) tree.destroy;
 
     GlTF[] arenaGltfs;
@@ -236,7 +237,8 @@ void main(string[] args) {
             cameraFar,
         );
 
-        lineRenderer.setViewport(scene.swapChain.imageExtent);
+        extendedLine.setViewport(scene.swapChain.imageExtent);
+        overlayLine.setViewport(scene.swapChain.imageExtent);
 
         if(!stereo)
             tree.root.payload = Bone(transl);
@@ -534,9 +536,21 @@ private struct SphereSpec
     SphereGroupFlags flags;
 }
 
-auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder, scope VkCommandBuffer commandBuffer, out Bone* cubeRotator, out LineRenderer lineRenderer)
+auto createDemoTree(
+    LogicalDevice device,
+    Scene scene,
+    FrameBuilder frameBuilder,
+    scope VkCommandBuffer commandBuffer,
+    out Bone* cubeRotator,
+    out LineRenderer extendedLine,
+    out LineRenderer overlayLine,
+)
 {
     auto tree = new SceneTree;
+
+    // Added first so it is traversed and drawn last
+    auto overlayTree = new PrimitivesTree;
+    tree.addChild(overlayTree);
 
     auto primitTree = new PrimitivesTree;
 
@@ -679,25 +693,57 @@ auto createDemoTree(LogicalDevice device, Scene scene, FrameBuilder frameBuilder
 
         scene.cylinderRenderer.setInstances(instances, groups);
         cylindersBranch.addChild(cast(DrawablePrimitive) scene.cylinderRenderer);
-    }
 
-    {
-        lineRenderer = new LineRenderer(
+        const axisA = instances[0];
+        const axisB = instances[1];
+
+        const dirA = axisA.p1 - axisA.p0;
+        const dirB = axisB.p1 - axisB.p0;
+
+        const extA0 = axisA.p0 - dirA * 0.5f;
+        const extA1 = axisA.p1 + dirA * 0.5f;
+        const extB0 = axisB.p0 - dirB * 0.5f;
+        const extB1 = axisB.p1 + dirB * 0.5f;
+
+        extendedLine = new LineRenderer(
             device,
             scene.pipelineFactory,
             scene.renderPass,
             scene.swapChain.imageExtent,
         );
-
-        lineRenderer.setLines([
-            LineInstance(Vector4f(-0.55f, -0.55f, -0.1f, 2), Vector4f(0.55f, -0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
-            LineInstance(Vector4f(-0.55f, 0.55f, -0.1f, 2), Vector4f(0.55f, 0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
-            LineInstance(Vector4f(-0.55f, -0.55f, -0.1f, 2), Vector4f(-0.55f, 0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
-            LineInstance(Vector4f(0.55f, -0.55f, -0.1f, 2), Vector4f(0.55f, 0.55f, -0.1f, 1), Vector4f(1, 1, 1, 1)),
+        extendedLine.setLines([
+            LineInstance(
+                Vector4f(extA0.x, extA0.y, extA0.z, 2.0f),
+                Vector4f(extA1.x, extA1.y, extA1.z, 1.0f),
+                Vector4f(1.0f, 1.0f, 0.0f, 1.0f),
+            ),
+            LineInstance(
+                Vector4f(extB0.x, extB0.y, extB0.z, 2.0f),
+                Vector4f(extB1.x, extB1.y, extB1.z, 1.0f),
+                Vector4f(1.0f, 0.5f, 0.0f, 1.0f),
+            ),
         ]);
 
-        auto linesBranch = primitTree.addChild(lineRenderer.pipelineCfg);
-        linesBranch.addChild(cast(DrawablePrimitive) lineRenderer);
+        auto extendedLineBranch = cylinderPrimitives.addChild(extendedLine.pipelineCfg);
+        extendedLineBranch.addChild(cast(DrawablePrimitive) extendedLine);
+
+        overlayLine = new LineRenderer(
+            device,
+            scene.pipelineFactory,
+            scene.renderPass,
+            scene.swapChain.imageExtent,
+            true,
+        );
+        overlayLine.setLines([
+            LineInstance(
+                Vector4f(axisA.p0.x, axisA.p0.y, axisA.p0.z, 3.0f),
+                Vector4f(axisA.p1.x, axisA.p1.y, axisA.p1.z, 1.0f),
+                Vector4f(1.0f, 0.0f, 1.0f, 1.0f),
+            ),
+        ]);
+
+        auto overlayBranch = overlayTree.addChild(overlayLine.pipelineCfg);
+        overlayBranch.addChild(cast(DrawablePrimitive) overlayLine);
     }
 
     return tree;
