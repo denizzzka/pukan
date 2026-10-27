@@ -7,7 +7,7 @@ import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.gltf.mesh: MeshClass = GltfMesh, IndicesDescr, JustColoredMesh, TexturedMesh, UploadedVertices;
-import pukan.mesh: MaterialBuffer;
+import pukan.material: MaterialBuffer;
 import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
@@ -446,6 +446,7 @@ class GlTF : DrawableByVulkan
             }
         }
 
+        node.mesh.applyMaterial(primitive.material);
         meshes ~= node.mesh;
     }
 

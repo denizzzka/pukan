@@ -3,10 +3,12 @@ module pukan.gltf.mesh;
 import dlib.math;
 import pukan.gltf.accessor;
 public import pukan.gltf.loader: ComponentType;
-import pukan.mesh: MaterialBuffer, Mesh, UBOContent, VertexStream;
+import pukan.material: MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
+import pukan.mesh: Mesh, VertexStream;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import vibe.data.json: Json, deserializeJson;
 
 struct IndicesDescr
 {
@@ -54,9 +56,6 @@ class GltfMesh : Mesh
 {
     package UploadedVertices vert;
 
-    private MaterialBuffer materialBuffer;
-    private size_t materialSlot;
-
     private VkWriteDescriptorSet jointsUboWriteDescr;
 
     package this(
@@ -68,20 +67,20 @@ class GltfMesh : Mesh
         ref VkDescriptorBufferInfo jointsUboInfo,
     )
     {
+        super(materialBuffer);
+
         this.name = name;
-        this.materialBuffer = materialBuffer;
         this.descriptorSet = allocator.allocate();
         this.vert = vert;
-
-        materialSlot = materialBuffer.addSlot();
 
         assert(vert.vertices.viewIdx >= 0);
 
         if(vert.texCoords.viewIdx < 0)
             this.vert.texCoords = vert.vertices; // fake data to fill out texture coords buffer on non-textured objects
 
-        ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
-        ubo.material.renderType.x = 2; // base color factor
+        material.baseColorFactor = Vector4f(0, 1, 1, 1);
+        material.mode = MaterialMode.unlit;
+        writeMaterial();
 
         jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
 
@@ -150,9 +149,25 @@ class GltfMesh : Mesh
             isClose(a.max.z, b.max.z, tolerance, tolerance);
     }
 
-    private ref UBOContent ubo()
+    package void applyMaterial(Json json)
     {
-        return materialBuffer.content(materialSlot);
+        if(json.type != Json.Type.object)
+            return;
+
+        if(auto pbr = "pbrMetallicRoughness" in json)
+            if(auto factor = "baseColorFactor" in *pbr)
+            {
+                const c = (*factor).deserializeJson!(float[4]);
+                material.baseColorFactor = Vector4f(c[0], c[1], c[2], c[3]);
+            }
+
+        if(auto factor = "emissiveFactor" in json)
+        {
+            const e = (*factor).deserializeJson!(float[3]);
+            material.emissiveFactor = Vector4f(e[0], e[1], e[2], 0);
+        }
+
+        writeMaterial();
     }
 
     abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
@@ -224,7 +239,7 @@ final class JustColoredMesh : GltfMesh
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        auto uboInfo = materialBuffer.info(materialSlot);
+        auto uboInfo = materialInfo();
 
         VkWriteDescriptorSet[] descriptorWrites = [
             jointsUboWriteDescr,
@@ -252,12 +267,14 @@ final class TexturedMesh : GltfMesh
     {
         super(name, vert, allocator, materialBuffer, gpuBuffs, jointsUboInfo);
 
-        ubo.material.renderType.x = 1; // is textured
+        material.baseColorFactor = Vector4f(1, 1, 1, 1);
+        material.flags = MaterialFlags(MaterialFlag.baseColorTexture);
+        writeMaterial();
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        auto uboInfo = materialBuffer.info(materialSlot);
+        auto uboInfo = materialInfo();
 
         VkWriteDescriptorSet[] descriptorWrites = [
             jointsUboWriteDescr,

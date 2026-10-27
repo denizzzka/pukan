@@ -1,7 +1,8 @@
 import pukan;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
-import pukan.primitives_tree.sphere: SphereGroup, SphereGroupFlag, SphereGroupFlags, SphereInstance, SphereRenderer;
+import pukan.primitives_tree.mesh: LitVertex;
+import pukan.primitives_tree.sphere: SphereGroup, SphereInstance, SphereRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
@@ -205,9 +206,10 @@ void main(string[] args) {
     auto initBuf = &scene.swapChain.frames[0].commandBuffer();
 
     Bone* cubeRotator;
+    Bone* litCubeRotator;
     LineRenderer extendedLine;
     LineRenderer overlayLine;
-    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator, extendedLine, overlayLine);
+    scope tree = createDemoTree(device, scene, *frameBuilder, *initBuf, cubeRotator, litCubeRotator, extendedLine, overlayLine);
     scope(exit) tree.destroy;
 
     auto startupStart = MonoTime.currTime;
@@ -274,6 +276,7 @@ void main(string[] args) {
             scene.swapChain.imageExtent,
             tree,
             cubeRotator,
+            litCubeRotator,
         );
         entityUpdateNs += cast(ulong) (sw.peek - updateStart).total!"nsecs";
         const transl = wtb.proj * wtb.view * wtb.model;
@@ -631,12 +634,22 @@ WorldTransformation[2] calculateStereoWTB(in VkExtent2D eyeExtent, float currDel
     return ret;
 }
 
-void updateWorldTransformations(out WorldTransformation wtb, float curr, in VkExtent2D imageExtent, SceneTree tree, Bone* cubeRotator)
+void updateWorldTransformations(
+    out WorldTransformation wtb,
+    float curr,
+    in VkExtent2D imageExtent,
+    SceneTree tree,
+    Bone* cubeRotator,
+    Bone* litCubeRotator,
+)
 {
     wtb = calculateWTB(imageExtent, curr);
 
     auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
     *cubeRotator = Bone(cubeRotation.toMatrix4x4);
+
+    if(litCubeRotator)
+        *litCubeRotator = Bone(rotationMatrix!float(Axis.x, 0.4f) * cubeRotation.toMatrix4x4);
 }
 
 private string[] gltfFilesSearch(string dir, string[] only = null)
@@ -760,7 +773,7 @@ private struct SphereSpec
     float xStep;
     float yStep;
     float y0;
-    SphereGroupFlags flags;
+    MaterialMode mode = MaterialMode.lit;
 }
 
 auto createDemoTree(
@@ -769,6 +782,7 @@ auto createDemoTree(
     FrameBuilder frameBuilder,
     scope VkCommandBuffer commandBuffer,
     out Bone* cubeRotator,
+    out Bone* litCubeRotator,
     out LineRenderer extendedLine,
     out LineRenderer overlayLine,
 )
@@ -798,6 +812,22 @@ auto createDemoTree(
         cubeRotator = n.payload.peek!Bone;
 
         n.addChild(cast(DrawablePrimitive) cube);
+    }
+
+    if(!benchMode)
+    {
+        auto litBranch = primitTree.addChild(scene.litMeshFactory.graphicsPipelineCfg);
+        auto v = createLitCubeVertices;
+        auto cube = scene.litMeshFactory.create(scene.frameBuilder, v[0], v[1]);
+
+        cube.setMaterial(Material(Vector3f(0.9f, 0.55f, 0.2f), MaterialMode.lit));
+
+        auto rotator = litBranch
+            .addChild(Bone(mat: Vector3f(0.5f, 0.0f, 0.0f).translationMatrix))
+            .addChild(Bone(mat: rotationMatrix!float(Axis.x, 0.4f)));
+
+        litCubeRotator = rotator.payload.peek!Bone;
+        rotator.addChild(cast(DrawablePrimitive) cube);
     }
 
     auto textureBranch = primitTree.addChild(scene.texturedMeshFactory.graphicsPipelineCfg);
@@ -838,7 +868,7 @@ auto createDemoTree(
             SphereSpec(Vector3f(0.4f, 0.6f, 1.0f), 8, 3, 0.030f, 0.090f, 0.060f, 0.46f),
             SphereSpec(
                 Vector3f(1.0f, 0.5f, 0.4f), 5, 1, 0.080f, 0.140f, 0.000f, 0.66f,
-                SphereGroupFlags(SphereGroupFlag.normals),
+                MaterialMode.normalsDebug,
             ),
         ];
 
@@ -847,7 +877,7 @@ auto createDemoTree(
 
         foreach(groupIndex, spec; specs)
         {
-            groups ~= SphereGroup(spec.color, spec.flags);
+            groups ~= SphereGroup(Material(spec.color, spec.mode));
 
             foreach(row; 0 .. spec.rows)
             {
@@ -874,16 +904,16 @@ auto createDemoTree(
 
         CylinderGroup[] groups = [
             CylinderGroup(
-                Vector3f(0.3f, 1.0f, 0.4f),
+                Material(Vector3f(0.3f, 1.0f, 0.4f)),
                 CylinderGroupFlags(CylinderGroupFlag.firstCap, CylinderGroupFlag.secondCap),
             ),
             CylinderGroup(
-                Vector3f(0.4f, 0.6f, 1.0f),
+                Material(Vector3f(0.4f, 0.6f, 1.0f)),
                 CylinderGroupFlags(CylinderGroupFlag.firstCap),
             ),
             CylinderGroup(
-                Vector3f(1.0f, 0.5f, 0.4f),
-                CylinderGroupFlags(CylinderGroupFlag.normals),
+                Material(Vector3f(1.0f, 0.5f, 0.4f), MaterialMode.normalsDebug),
+                CylinderGroupFlags(),
             ),
         ];
 
@@ -1019,5 +1049,51 @@ auto createCubeVertices()
     ];
 
     import std.typecons;
+    return tuple(vertices, indices);
+}
+
+auto createLitCubeVertices()
+{
+    import dlib.math: cross;
+    import std.typecons: tuple;
+
+    const positions = [
+        Vector3f(-0.2f, -0.2f, -0.2f), // 0
+        Vector3f(-0.2f, -0.2f,  0.2f), // 1
+        Vector3f( 0.2f, -0.2f, -0.2f), // 2
+        Vector3f( 0.2f, -0.2f,  0.2f), // 3
+        Vector3f( 0.2f,  0.2f, -0.2f), // 4
+        Vector3f( 0.2f,  0.2f,  0.2f), // 5
+        Vector3f(-0.2f,  0.2f,  0.2f), // 6
+        Vector3f(-0.2f,  0.2f, -0.2f), // 7
+    ];
+
+    const ushort[] triangleIndices = [
+        2, 1, 0, 1, 2, 3,
+        2, 4, 3, 3, 4, 5,
+        3, 5, 6, 1, 3, 6,
+        4, 7, 6, 4, 6, 5,
+        0, 1, 6, 0, 6, 7,
+        0, 7, 2, 2, 7, 4,
+    ];
+
+    LitVertex[] vertices;
+    ushort[] indices;
+
+    foreach(t; 0 .. triangleIndices.length / 3)
+    {
+        const a = positions[triangleIndices[t * 3 + 0]];
+        const b = positions[triangleIndices[t * 3 + 1]];
+        const c = positions[triangleIndices[t * 3 + 2]];
+        const normal = cross(b - a, c - a).normalized;
+
+        const base = cast(ushort) vertices.length;
+
+        foreach(p; [a, b, c])
+            vertices ~= LitVertex(p, normal, Vector3f(1, 1, 1), Vector2f(0, 0));
+
+        indices ~= [base, cast(ushort)(base + 1), cast(ushort)(base + 2)];
+    }
+
     return tuple(vertices, indices);
 }

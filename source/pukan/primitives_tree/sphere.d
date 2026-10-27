@@ -1,19 +1,13 @@
 module pukan.primitives_tree.sphere;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
+import pukan.material: Material;
 import pukan.primitives_tree: DrawablePrimitive;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirement;
+import pukan.vulkan.textures: Texture;
 import std.meta: AliasSeq;
-import std.typecons: BitFlags;
-
-enum SphereGroupFlag: uint
-{
-    normals = 1u << 0,
-}
-
-alias SphereGroupFlags = BitFlags!SphereGroupFlag;
 
 struct SphereVertex
 {
@@ -54,8 +48,7 @@ private ShaderVertexInput vertexInput()
 
 struct SphereGroup
 {
-    Vector3f color;
-    SphereGroupFlags flags;
+    Material material;
 }
 
 struct SphereInstance
@@ -295,6 +288,7 @@ class SphereRenderer : DrawablePrimitive
     GraphicsPipelineCfg pipelineCfg;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
+    private VkDescriptorImageInfo baseColorTexture;
 
     private IcosphereGenerator generator;
     private SphereKernel classify;
@@ -320,12 +314,19 @@ class SphereRenderer : DrawablePrimitive
         LogicalDevice device,
         PipelineFactory pipelines,
         RenderPass renderPass,
+        Texture fakeTexture,
         SphereLod lod = SphereLod(),
     )
     {
         this.device = device;
         this.lod = lod;
         this.levelCount = lod.maxLevel + 1;
+
+        baseColorTexture = VkDescriptorImageInfo(
+            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            imageView: fakeTexture.imageView,
+            sampler: fakeTexture.sampler,
+        );
 
         const technique = pipelines.declare(RenderTechnique(
             name: "spheres",
@@ -336,7 +337,7 @@ class SphereRenderer : DrawablePrimitive
         graphicsSet = allocator.allocate();
 
         paletteBuffer = device.create!MemoryBufferMappedToCPU(
-            paletteSize * Vector4f.sizeof,
+            paletteSize * Material.sizeof,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         );
 
@@ -352,12 +353,6 @@ class SphereRenderer : DrawablePrimitive
                 cast(ubyte[]) import("sphere_vert.spv"),
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
-                    VkDescriptorSetLayoutBinding(
-                        binding: 0,
-                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                    ),
                     VkDescriptorSetLayoutBinding(
                         binding: 1,
                         descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -375,7 +370,20 @@ class SphereRenderer : DrawablePrimitive
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("sphere_frag.spv"),
                 VK_SHADER_STAGE_FRAGMENT_BIT,
-                null,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: 0,
+                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 2,
+                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                ],
             ),
         ];
     }
@@ -489,19 +497,20 @@ class SphereRenderer : DrawablePrimitive
         }
 
         {
-            auto paletteData = cast(Vector4f[]) paletteBuffer.cpuBuf;
+            auto paletteData = cast(Material[]) paletteBuffer.cpuBuf;
             foreach(i, ref group; groups)
-                paletteData[i] = Vector4f(group.color.x, group.color.y, group.color.z, cast(float) cast(uint) group.flags);
+                paletteData[i] = group.material;
             foreach(i; groups.length .. paletteSize)
-                paletteData[i] = Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+                paletteData[i] = Material.init;
         }
 
         {
-            VkDescriptorBufferInfo paletteInfo = { buffer: paletteBuffer.buf, offset: 0, range: paletteSize * Vector4f.sizeof };
+            VkDescriptorBufferInfo paletteInfo = { buffer: paletteBuffer.buf, offset: 0, range: paletteSize * Material.sizeof };
             VkDescriptorBufferInfo colorsInfo = { buffer: bucketColors.buf, offset: 0, range: VK_WHOLE_SIZE };
             VkWriteDescriptorSet[] writes = [
                 bufferWriteDescriptor(graphicsSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, paletteInfo),
                 bufferWriteDescriptor(graphicsSet, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, colorsInfo),
+                imageWriteDescriptor(graphicsSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, baseColorTexture),
             ];
             device.updateDescriptorSets(writes);
         }

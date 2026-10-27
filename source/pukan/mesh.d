@@ -1,8 +1,7 @@
 module pukan.mesh;
 
-import core.atomic: atomicOp;
-import core.sync.mutex: Mutex;
-import dlib.math: Matrix4x4f, Vector4f, Vector4i;
+import dlib.math: Matrix4x4f;
+import pukan.material: Material, MaterialBuffer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
@@ -13,108 +12,6 @@ struct VertexStream
     VkDeviceSize offset;
     VkDeviceSize size;
     uint stride;
-}
-
-struct Material
-{
-    Vector4i renderType;
-    Vector4f baseColorFactor;
-}
-
-struct UBOContent
-{
-    Material material;
-}
-
-/// Material uniforms of all meshes, one slot per mesh
-final class MaterialBuffer
-{
-    private LogicalDevice device;
-    private TransferBuffer[] chunks;
-    private size_t chunkCapacity;
-    private size_t slotSize;
-    private shared size_t used;
-    private Mutex chunkMutex;
-
-    this(LogicalDevice device, size_t chunkCapacity = 16)
-    in(chunkCapacity > 0)
-    {
-        this.device = device;
-        this.chunkCapacity = chunkCapacity;
-
-        const alignment = cast(size_t) device.physicalDevice.properties.limits.minUniformBufferOffsetAlignment;
-        slotSize = alignment > 1
-            ? (UBOContent.sizeof + alignment - 1) / alignment * alignment
-            : UBOContent.sizeof;
-
-        chunkMutex = new Mutex;
-    }
-
-    ~this()
-    {
-        foreach(chunk; chunks)
-            if(chunk)
-                destroy(chunk);
-    }
-
-    /// Reserves a slot, adding a chunk when the last one fills up.
-    size_t addSlot()
-    {
-        const slot = atomicOp!"+="(used, 1);
-        const chunkIndex = slot / chunkCapacity;
-
-        synchronized(chunkMutex)
-        {
-            while(chunkIndex >= chunks.length)
-                chunks ~= device.create!TransferBuffer(
-                    chunkCapacity * slotSize,
-                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                );
-        }
-
-        return slot;
-    }
-
-    ref UBOContent content(size_t slot)
-    {
-        auto chunk = chunkAt(slot);
-
-        return *cast(UBOContent*) (cast(ubyte*) chunk.cpuBuf.ptr + (slot % chunkCapacity) * slotSize);
-    }
-
-    VkDescriptorBufferInfo info(size_t slot)
-    {
-        auto chunk = chunkAt(slot);
-
-        return VkDescriptorBufferInfo(
-            buffer: chunk.gpuBuffer,
-            offset: (slot % chunkCapacity) * slotSize,
-            range: UBOContent.sizeof,
-        );
-    }
-
-    void recordUpload(VkCommandBuffer commandBuffer)
-    {
-        TransferBuffer[] snapshot;
-
-        synchronized(chunkMutex)
-            snapshot = chunks;
-
-        foreach(chunk; snapshot)
-            chunk.recordUpload(commandBuffer);
-    }
-
-    private TransferBuffer chunkAt(size_t slot)
-    {
-        TransferBuffer chunk;
-
-        synchronized(chunkMutex)
-            chunk = chunks[slot / chunkCapacity];
-
-        assert(chunk !is null);
-
-        return chunk;
-    }
 }
 
 /// Resources shared by static and skinned meshes
@@ -162,16 +59,44 @@ class Mesh
     string name;
     VkDescriptorSet descriptorSet;
     uint vertexCount;
+    Material material;
 
     VkBuffer indexBuffer;
     VkDeviceSize indexOffset;
     VkIndexType indexType;
     uint indexCount;
 
+    protected MaterialBuffer materialBuffer;
+    protected size_t materialSlot;
+
     private VkBuffer[] buffers;
     private VkDeviceSize[] offsets;
     private VkDeviceSize[] sizes;
     private VkDeviceSize[] strides;
+
+    this(MaterialBuffer materialBuffer)
+    {
+        this.materialBuffer = materialBuffer;
+        materialSlot = materialBuffer.addSlot();
+        writeMaterial();
+    }
+
+    /// The material reaches the GPU on the next `recordUpload`.
+    void setMaterial(Material value)
+    {
+        material = value;
+        writeMaterial();
+    }
+
+    protected void writeMaterial()
+    {
+        materialBuffer.content(materialSlot).material = material;
+    }
+
+    protected VkDescriptorBufferInfo materialInfo()
+    {
+        return materialBuffer.info(materialSlot);
+    }
 
     /// Sets the vertex streams in vertex input binding order
     void setStreams(VertexStream[] streams)

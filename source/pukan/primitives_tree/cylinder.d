@@ -1,18 +1,19 @@
 module pukan.primitives_tree.cylinder;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
+import pukan.material: Material;
 import pukan.primitives_tree: DrawablePrimitive;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirement;
+import pukan.vulkan.textures: Texture;
 import std.meta: AliasSeq;
 import std.typecons: BitFlags;
 
 enum CylinderGroupFlag: uint
 {
-    normals = 1u << 0,
-    firstCap = 1u << 1,
-    secondCap = 1u << 2,
+    firstCap = 1u << 0,
+    secondCap = 1u << 1,
 }
 
 alias CylinderGroupFlags = BitFlags!CylinderGroupFlag;
@@ -27,8 +28,8 @@ struct CylinderInstance
 
 struct CylinderGroup
 {
-    Vector3f color;
-    CylinderGroupFlags flags = CylinderGroupFlags(CylinderGroupFlag.firstCap, CylinderGroupFlag.secondCap);
+    Material material;
+    CylinderGroupFlags caps = CylinderGroupFlags(CylinderGroupFlag.firstCap, CylinderGroupFlag.secondCap);
 }
 
 struct CylinderLod
@@ -366,6 +367,7 @@ class CylinderRenderer : DrawablePrimitive
     GraphicsPipelineCfg pipelineCfg;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
+    private VkDescriptorImageInfo baseColorTexture;
 
     private CylinderMeshGenerator generator;
     private CylinderKernel classify;
@@ -390,12 +392,19 @@ class CylinderRenderer : DrawablePrimitive
         LogicalDevice device,
         PipelineFactory pipelines,
         RenderPass renderPass,
+        Texture fakeTexture,
         CylinderLod lod = CylinderLod(),
     )
     {
         this.device = device;
         this.lod = lod;
         this.levelCount = lod.maxLevel + 1;
+
+        baseColorTexture = VkDescriptorImageInfo(
+            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            imageView: fakeTexture.imageView,
+            sampler: fakeTexture.sampler,
+        );
 
         const technique = pipelines.declare(RenderTechnique(
             name: "cylinders",
@@ -408,7 +417,7 @@ class CylinderRenderer : DrawablePrimitive
         graphicsSet = allocator.allocate();
 
         paletteBuffer = device.create!MemoryBufferMappedToCPU(
-            paletteSize * Vector4f.sizeof,
+            paletteSize * Material.sizeof,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         );
 
@@ -423,14 +432,7 @@ class CylinderRenderer : DrawablePrimitive
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("cylinder_vert.spv"),
                 VK_SHADER_STAGE_VERTEX_BIT,
-                [
-                    VkDescriptorSetLayoutBinding(
-                        binding: 0,
-                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                    ),
-                ],
+                null,
                 VkPushConstantRange(
                     stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
                     offset: 0,
@@ -441,7 +443,20 @@ class CylinderRenderer : DrawablePrimitive
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("cylinder_frag.spv"),
                 VK_SHADER_STAGE_FRAGMENT_BIT,
-                null,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: 0,
+                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 1,
+                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                ],
             ),
         ];
     }
@@ -541,7 +556,7 @@ class CylinderRenderer : DrawablePrimitive
 
             foreach(group; 0 .. groupCount)
             {
-                const flags = groups[group].flags;
+                const caps = groups[group].caps;
 
                 foreach(level; 0 .. levelCount)
                 {
@@ -556,14 +571,14 @@ class CylinderRenderer : DrawablePrimitive
                         firstInstance: 0,
                     );
                     indirect[base + 1u] = VkDrawIndexedIndirectCommand(
-                        indexCount: flags.firstCap ? lvl.capIndices : 0,
+                        indexCount: caps.firstCap ? lvl.capIndices : 0,
                         instanceCount: 0,
                         firstIndex: lvl.indexOffset + lvl.sideIndices,
                         vertexOffset: lvl.vertexOffset,
                         firstInstance: 0,
                     );
                     indirect[base + 2u] = VkDrawIndexedIndirectCommand(
-                        indexCount: flags.secondCap ? lvl.capIndices : 0,
+                        indexCount: caps.secondCap ? lvl.capIndices : 0,
                         instanceCount: 0,
                         firstIndex: lvl.indexOffset + lvl.sideIndices + lvl.capIndices,
                         vertexOffset: lvl.vertexOffset,
@@ -574,21 +589,22 @@ class CylinderRenderer : DrawablePrimitive
         }
 
         {
-            auto palette = cast(Vector4f[]) paletteBuffer.cpuBuf;
+            auto palette = cast(Material[]) paletteBuffer.cpuBuf;
             foreach(i, ref group; groups)
-                palette[i] = Vector4f(group.color.x, group.color.y, group.color.z, cast(float) cast(uint) group.flags);
+                palette[i] = group.material;
             foreach(i; groups.length .. paletteSize)
-                palette[i] = Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
+                palette[i] = Material.init;
         }
 
         {
             VkDescriptorBufferInfo paletteInfo = {
                 buffer: paletteBuffer.buf,
                 offset: 0,
-                range: paletteSize * Vector4f.sizeof,
+                range: paletteSize * Material.sizeof,
             };
             VkWriteDescriptorSet[] writes = [
                 bufferWriteDescriptor(graphicsSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, paletteInfo),
+                imageWriteDescriptor(graphicsSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, baseColorTexture),
             ];
             device.updateDescriptorSets(writes);
         }

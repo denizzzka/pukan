@@ -4,7 +4,7 @@ import dlib.math;
 import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
 import pukan.gltf.accessor;
 import pukan.gltf.animation;
-import pukan.mesh: MaterialBuffer;
+import pukan.material: MaterialBuffer;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
@@ -165,10 +165,15 @@ package GlTF loadGlTF2(
             enforce(primitive["mode"].opt!ushort(4) == 4, "only supported mode = 4 (TRIANGLES)");
             const indicesAccessorIdx = primitive["indices"].opt!int(-1);
 
+            Json material;
+            const materialIdx = primitive["material"].opt!int(-1);
+            if(materialIdx >= 0)
+                material = json["materials"][cast(size_t) materialIdx];
+
             primitives ~= Primitive(
                 indicesAccessorIdx: indicesAccessorIdx,
                 attributes: primitive["attributes"],
-                material: primitive["material"],
+                material: material,
             );
         }
 

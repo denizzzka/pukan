@@ -1,33 +1,49 @@
 module pukan.primitives_tree.mesh;
 
-import dlib.math: Matrix4x4f;
+import dlib.math: Matrix4x4f, Vector2f, Vector3f;
+import pukan.material: Material, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.mesh: Mesh, MeshResources, VertexStream;
 import pukan.primitives_tree: DrawablePrimitive;
 import pukan.scene: Vertex;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.textures: Texture;
 
-class ColoredMesh : Mesh, DrawablePrimitive
+struct LitVertex
 {
-    Vertex[] vertices;
+    Vector3f pos;
+    Vector3f normal;
+    Vector3f color;
+    Vector2f texCoord;
+}
+
+private enum hasNormal(VertexT) = __traits(hasMember, VertexT, "normal");
+
+class VertexMesh(VertexT) : Mesh, DrawablePrimitive
+{
+    VertexT[] vertices;
     ushort[] indices;
 
     private MeshResources resources;
-    private size_t materialSlot;
 
     private TransferBuffer vertexBuffer;
     private TransferBuffer indicesBuffer;
 
-    this(LogicalDevice device, VkDescriptorSet ds, MeshResources resources, Vertex[] vertices, ushort[] indices)
+    this(LogicalDevice device, VkDescriptorSet ds, MeshResources resources, VertexT[] vertices, ushort[] indices)
     {
+        super(resources.materials);
+
         descriptorSet = ds;
         this.resources = resources;
         this.vertices = vertices;
         this.indices = indices;
 
-        materialSlot = resources.materials.addSlot();
-        resources.materials.content(materialSlot).material.renderType.x = 0;
+        static if(hasNormal!VertexT)
+            material = Material(Vector3f(1, 1, 1), MaterialMode.lit, MaterialFlags(MaterialFlag.vertexColor));
+        else
+            material = Material(Vector3f(1, 1, 1), MaterialMode.unlit, MaterialFlags(MaterialFlag.vertexColor));
 
+        writeMaterial();
         updateDescriptorSets(device, imageInfo(resources.fakeTexture));
     }
 
@@ -40,12 +56,133 @@ class ColoredMesh : Mesh, DrawablePrimitive
             destroy(indicesBuffer);
     }
 
+    static string techniqueName()
+    {
+        static if(hasNormal!VertexT)
+            return "lit meshes";
+        else
+            return "colored meshes";
+    }
+
+    static ShaderVertexInput vertexInput()
+    {
+        VkVertexInputAttributeDescription[] attributes = [
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 0,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+                offset: VertexT.pos.offsetof,
+            ),
+        ];
+
+        static if(hasNormal!VertexT)
+        {
+            attributes ~= VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 1,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+                offset: VertexT.normal.offsetof,
+            );
+            attributes ~= VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 2,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+                offset: VertexT.color.offsetof,
+            );
+            attributes ~= VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 3,
+                format: VK_FORMAT_R32G32_SFLOAT,
+                offset: VertexT.texCoord.offsetof,
+            );
+        }
+        else
+        {
+            attributes ~= VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 1,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+                offset: VertexT.color.offsetof,
+            );
+            attributes ~= VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 2,
+                format: VK_FORMAT_R32G32_SFLOAT,
+                offset: VertexT.texCoord.offsetof,
+            );
+        }
+
+        return ShaderVertexInput(
+            [
+                VkVertexInputBindingDescription(
+                    binding: 0,
+                    stride: VertexT.sizeof,
+                    inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+                ),
+            ],
+            attributes,
+        );
+    }
+
+    static ShaderInfo[] shaderStages(LogicalDevice device)
+    {
+        static if(hasNormal!VertexT)
+        {
+            return [
+                device.uploadShaderToGPU(
+                    cast(ubyte[]) import("mesh_lit_vert.spv"),
+                    VK_SHADER_STAGE_VERTEX_BIT,
+                    null,
+                    VkPushConstantRange(
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                        offset: 0,
+                        size: Matrix4x4f.sizeof,
+                    ),
+                    vertexInput(),
+                ),
+                device.uploadShaderToGPU(
+                    cast(ubyte[]) import("mesh_lit_frag.spv"),
+                    VK_SHADER_STAGE_FRAGMENT_BIT,
+                    fragmentBindings(),
+                ),
+            ];
+        }
+        else
+        {
+            return [
+                device.uploadShaderToGPU(
+                    cast(ubyte[]) import("mesh_static_vert.spv"),
+                    VK_SHADER_STAGE_VERTEX_BIT,
+                    [
+                        VkDescriptorSetLayoutBinding(
+                            binding: 2,
+                            descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                            descriptorCount: 1,
+                            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                        ),
+                    ],
+                    VkPushConstantRange(
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                        offset: 0,
+                        size: Matrix4x4f.sizeof,
+                    ),
+                    vertexInput(),
+                ),
+                device.uploadShaderToGPU(
+                    cast(ubyte[]) import("mesh_frag.spv"),
+                    VK_SHADER_STAGE_FRAGMENT_BIT,
+                    fragmentBindings(),
+                ),
+            ];
+        }
+    }
+
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
         assert(indices.length > 0);
 
-        vertexBuffer = device.create!TransferBuffer(Vertex.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        vertexBuffer = device.create!TransferBuffer(VertexT.sizeof * vertices.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         indicesBuffer = device.create!TransferBuffer(ushort.sizeof * indices.length, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
         vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
@@ -62,7 +199,7 @@ class ColoredMesh : Mesh, DrawablePrimitive
                 buffer: vertexBuffer.gpuBuffer,
                 offset: 0,
                 size: vertexBuffer.length,
-                stride: Vertex.sizeof,
+                stride: VertexT.sizeof,
             ),
         ]);
 
@@ -79,25 +216,22 @@ class ColoredMesh : Mesh, DrawablePrimitive
         draw(buf, pipeline, trans);
     }
 
-    private void setMaterialMode(int mode)
+    protected void updateDescriptorSets(LogicalDevice device, VkDescriptorImageInfo imageInfo)
     {
-        resources.materials.content(materialSlot).material.renderType.x = mode;
-    }
-
-    private void updateDescriptorSets(LogicalDevice device, VkDescriptorImageInfo imageInfo)
-    {
-        auto uboInfo = resources.materials.info(materialSlot);
+        auto materialBufferInfo = materialInfo();
 
         VkWriteDescriptorSet[] descriptorWrites = [
-            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
+            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, materialBufferInfo),
             imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageInfo),
-            bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, resources.identityJointsInfo),
         ];
+
+        static if(!hasNormal!VertexT)
+            descriptorWrites ~= bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, resources.identityJointsInfo);
 
         device.updateDescriptorSets(descriptorWrites);
     }
 
-    private static VkDescriptorImageInfo imageInfo(Texture texture)
+    protected static VkDescriptorImageInfo imageInfo(Texture texture)
     {
         return VkDescriptorImageInfo(
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -105,7 +239,28 @@ class ColoredMesh : Mesh, DrawablePrimitive
             sampler: texture.sampler,
         );
     }
+
+    private static VkDescriptorSetLayoutBinding[] fragmentBindings()
+    {
+        return [
+            VkDescriptorSetLayoutBinding(
+                binding: 0,
+                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: 1,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
+        ];
+    }
 }
+
+alias ColoredMesh = VertexMesh!Vertex;
+alias LitMesh = VertexMesh!LitVertex;
 
 class TexturedMesh : ColoredMesh
 {
@@ -123,7 +278,9 @@ class TexturedMesh : ColoredMesh
         this.texture = texture;
         super(device, ds, resources, vertices, indices);
 
-        setMaterialMode(1);
+        material.mode = MaterialMode.unlit;
+        material.flags = MaterialFlags(MaterialFlag.baseColorTexture);
+        writeMaterial();
         updateDescriptorSets(device, imageInfo(texture));
     }
 
@@ -131,4 +288,6 @@ class TexturedMesh : ColoredMesh
     {
         texture.destroy;
     }
+
+    static string techniqueName() => "textured meshes";
 }

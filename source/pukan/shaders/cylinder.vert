@@ -1,14 +1,8 @@
 #version 460
 
-#include "shade.glsl"
-
 layout(push_constant) uniform Push {
     mat4 mvp;
 } pc;
-
-layout(set = 0, binding = 0) uniform Palette {
-    vec4 colors[16];
-} palette;
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
@@ -19,8 +13,7 @@ layout(location = 4) in vec4 instanceU;
 layout(location = 5) in vec4 instanceV;
 
 layout(location = 0) out vec3 normalOut;
-layout(location = 1) flat out vec3 instanceColor;
-layout(location = 2) flat out uint instanceFlags;
+layout(location = 1) flat out uint materialIndex;
 
 void main()
 {
@@ -37,9 +30,6 @@ void main()
         instanceU.xyz * normal.x +
         instanceV.xyz * normal.z;
 
-    const vec4 group = palette.colors[uint(instanceP0.w)];
-
     normalOut = normalize(n);
-    instanceColor = group.rgb;
-    instanceFlags = uint(group.w);
+    materialIndex = uint(instanceP0.w);
 }

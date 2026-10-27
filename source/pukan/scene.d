@@ -29,6 +29,7 @@ class Scene
     MeshResources meshResources;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
+    PrimitivesFactory!(pukan.primitives_tree.mesh.LitMesh) litMeshFactory;
     GltfFactory gltfFactory;
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
@@ -59,9 +60,10 @@ class Scene
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
+        litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
         gltfFactory = new GltfFactory(device, pipelineFactory, meshResources, renderPass);
-        sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass);
-        cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass);
+        sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
+        cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
     }
 
     ~this()
