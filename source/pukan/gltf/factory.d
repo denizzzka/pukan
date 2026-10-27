@@ -1,9 +1,10 @@
 module pukan.gltf.factory;
 
 import pukan.gltf;
+import pukan.gltf.mesh: MaterialBuffer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
+import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import std.meta: AliasSeq;
 
 class GltfFactory
@@ -19,7 +20,8 @@ class GltfFactory
 
     LogicalDevice device;
     private immutable bool computeJointsOnGPU;
-    private PoolAndLayoutInfo poolAndLayout;
+    private DescriptorAllocator allocator;
+    private MaterialBuffer materialBuffer;
     GraphicsPipelineCfg graphicsPipelineCfg;
     private Texture fakeTexture; /// Stub to fill texture shader arg of non-textured meshes
 
@@ -43,10 +45,17 @@ class GltfFactory
             dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
         ), 20);
 
-        poolAndLayout = pipelines.poolAndLayout(technique);
+        allocator = pipelines.descriptorAllocator(technique);
         graphicsPipelineCfg = pipelines.acquire(technique, renderPass, 1);
+        materialBuffer = new MaterialBuffer(device);
 
         fakeTexture = createFakeTexture1x1(device);
+    }
+
+    ~this()
+    {
+        if(materialBuffer)
+            destroy(materialBuffer);
     }
 
     auto create(string filename)
@@ -54,7 +63,7 @@ class GltfFactory
         assert(device);
 
         try
-            return loadGlTF2(filename, poolAndLayout, device, graphicsPipelineCfg, fakeTexture, computeJointsOnGPU);
+            return loadGlTF2(filename, allocator, materialBuffer, device, graphicsPipelineCfg, fakeTexture, computeJointsOnGPU);
         catch(Exception e)
         {
             e.msg = filename~": "~e.msg;

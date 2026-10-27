@@ -6,7 +6,7 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, TexturedMesh, UploadedVertices;
+import pukan.gltf.mesh: MeshClass = Mesh, IndicesDescr, JustColoredMesh, MaterialBuffer, TexturedMesh, UploadedVertices;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -109,6 +109,8 @@ class GlTF : DrawableByVulkan
     private GraphicsPipelineCfg* pipeline;
 
     private MeshClass[] meshes;
+    private DescriptorAllocator allocator;
+    private MaterialBuffer materialBuffer;
 
     version(assert)
         package ReadableTransferBuffer jointMatricesUniformBuf;
@@ -122,9 +124,20 @@ class GlTF : DrawableByVulkan
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
-    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
+    package this(
+        ref GraphicsPipelineCfg pipeline,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        LogicalDevice device,
+        GltfContent cont,
+        LoaderNode[] nodes,
+        LoaderNode rootSceneNode,
+        Texture fakeTexture,
+    )
     {
         this.pipeline = &pipeline;
+        this.allocator = allocator;
+        this.materialBuffer = materialBuffer;
         content = cont;
 
         assert(content.meshes.length > 0);
@@ -203,7 +216,7 @@ class GlTF : DrawableByVulkan
         }
 
         this.rootSceneNode.traversal((node){
-            setUpEachNode(node, device, poolAndLayout);
+            setUpEachNode(node, device);
         });
 
         setupFakeJointVertexBuffers(device, nodes.length);
@@ -284,16 +297,15 @@ class GlTF : DrawableByVulkan
             if(buf)
                 buf.uploadImmediate(commandPool, commandBuffer);
 
+        materialBuffer.uploadImmediate(commandPool, commandBuffer);
+
         uploadSkinMatricesStatic(device, commandPool, commandBuffer);
 
         foreach(ref mesh; meshes)
             mesh.updateDescriptorSetsAndUniformBuffers(device);
-
-        foreach(m; meshes)
-            m.uploadImmediate(commandPool, commandBuffer);
     }
 
-    private void setUpEachNode(ref Node node, LogicalDevice device, ref PoolAndLayoutInfo poolAndLayout)
+    private void setUpEachNode(ref Node node, LogicalDevice device)
     {
         // Node without mesh attached
         if(node.meshIdx < 0) return;
@@ -350,7 +362,7 @@ class GlTF : DrawableByVulkan
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
         if(!content.textures.length)
-            node.mesh = new JustColoredMesh(device, mesh.name, uplVert, poolAndLayout, texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
+            node.mesh = new JustColoredMesh(mesh.name, uplVert, allocator, materialBuffer, texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
         else
         {
             const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
@@ -389,7 +401,7 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             {
-                auto m = new TexturedMesh(device, mesh.name, uplVert, poolAndLayout, jointsUboInfo);
+                auto m = new TexturedMesh(mesh.name, uplVert, allocator, materialBuffer, jointsUboInfo);
                 //TODO: only one first texture for everything is used, need to implement "materials":
                 m.textureDescrImageInfo = &texturesDescrInfos[0];
                 node.mesh = m;
@@ -469,9 +481,18 @@ class GlTF : DrawableByVulkan
 
 class SkinnedGlTF : GlTF
 {
-    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
+    package this(
+        ref GraphicsPipelineCfg pipeline,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        LogicalDevice device,
+        GltfContent cont,
+        LoaderNode[] nodes,
+        LoaderNode rootSceneNode,
+        Texture fakeTexture,
+    )
     {
-        super(pipeline, poolAndLayout, device, cont, nodes, rootSceneNode, fakeTexture);
+        super(pipeline, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -525,9 +546,18 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
 {
     package SkinMatrices skinMatrices;
 
-    package this(ref GraphicsPipelineCfg pipeline, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, GltfContent cont, LoaderNode[] nodes, LoaderNode rootSceneNode, Texture fakeTexture)
+    package this(
+        ref GraphicsPipelineCfg pipeline,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        LogicalDevice device,
+        GltfContent cont,
+        LoaderNode[] nodes,
+        LoaderNode rootSceneNode,
+        Texture fakeTexture,
+    )
     {
-        super(pipeline, poolAndLayout, device, cont, nodes, rootSceneNode, fakeTexture);
+        super(pipeline, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)

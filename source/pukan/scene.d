@@ -97,6 +97,9 @@ class Scene
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
         frameBuilder.destroy;
+
+        if(gltfFactory)
+            destroy(gltfFactory);
     }
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, void delegate(ref VkCommandBuffer) drawScene)

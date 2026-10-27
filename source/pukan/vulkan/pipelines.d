@@ -273,6 +273,69 @@ struct RenderTechnique
     VkDynamicState[] dynamicStates;
 }
 
+/// Allocates descriptor sets, adding a pool when the current one is full
+final class DescriptorAllocator
+{
+    private LogicalDevice device;
+    private VkDescriptorSetLayout layout;
+    private VkDescriptorSetLayoutBinding[] bindings;
+    private uint setsPerPool;
+    private VkDescriptorPool[] pools;
+    private uint allocatedInCurrentPool;
+
+    this(
+        LogicalDevice device,
+        VkDescriptorSetLayout layout,
+        VkDescriptorSetLayoutBinding[] bindings,
+        uint setsPerPool = 16,
+    )
+    in(setsPerPool > 0)
+    {
+        this.device = device;
+        this.layout = layout;
+        this.bindings = bindings;
+        this.setsPerPool = setsPerPool;
+    }
+
+    VkDescriptorSet allocate()
+    {
+        if(pools.length == 0 || allocatedInCurrentPool == setsPerPool)
+            addPool();
+
+        VkDescriptorSetAllocateInfo info = {
+            sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            descriptorPool: pools[$ - 1],
+            descriptorSetCount: 1,
+            pSetLayouts: &layout,
+        };
+
+        while(true)
+        {
+            VkDescriptorSet set;
+            const result = vkAllocateDescriptorSets(device, &info, &set);
+
+            if(result == VK_SUCCESS)
+            {
+                ++allocatedInCurrentPool;
+                return set;
+            }
+
+            if(result != VK_ERROR_OUT_OF_POOL_MEMORY && result != VK_ERROR_FRAGMENTED_POOL)
+                result.vkCheck;
+
+            addPool();
+            info.descriptorPool = pools[$ - 1];
+        }
+    }
+
+    private void addPool()
+    {
+        auto poolAndLayout = device.createDescriptorPool(layout, bindings, setsPerPool);
+        pools ~= poolAndLayout.descriptorPool;
+        allocatedInCurrentPool = 0;
+    }
+}
+
 /// Creates pipelines once per technique and render target
 final class PipelineFactory
 {
@@ -282,7 +345,7 @@ final class PipelineFactory
         ShaderInfo[] stages;
         VkDescriptorSetLayout setLayout;
         VkPipelineLayout pipelineLayout;
-        PoolAndLayoutInfo pool;
+        DescriptorAllocator allocator;
     }
 
     private struct RenderTarget
@@ -301,7 +364,7 @@ final class PipelineFactory
         this.device = device;
     }
 
-    TechniqueId declare(RenderTechnique technique, uint maxSets = 1)
+    TechniqueId declare(RenderTechnique technique, uint setsPerPool = 16)
     {
         Technique entry;
         entry.description = technique;
@@ -317,7 +380,7 @@ final class PipelineFactory
         );
         device.registerPipelineLayout(entry.pipelineLayout);
 
-        entry.pool = device.createDescriptorPool(entry.setLayout, bindings, maxSets);
+        entry.allocator = new DescriptorAllocator(device, entry.setLayout, bindings, setsPerPool);
 
         techniques ~= entry;
 
@@ -336,11 +399,11 @@ final class PipelineFactory
         return cache[key];
     }
 
-    PoolAndLayoutInfo poolAndLayout(TechniqueId id)
+    DescriptorAllocator descriptorAllocator(TechniqueId id)
     {
         assert(id.value < techniques.length);
 
-        return techniques[id.value].pool;
+        return techniques[id.value].allocator;
     }
 
     string techniqueName(TechniqueId id) const

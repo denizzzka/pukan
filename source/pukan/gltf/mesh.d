@@ -59,6 +59,100 @@ package struct UploadedVertices
     }
 }
 
+/// Material uniforms of all meshes, one slot per mesh
+final class MaterialBuffer
+{
+    private LogicalDevice device;
+    private TransferBuffer buffer;
+    private size_t capacity;
+    private size_t used;
+    private VkDescriptorSet[] descriptorSets;
+    private size_t slotSize;
+
+    this(LogicalDevice device, size_t initialCapacity = 16)
+    in(initialCapacity > 0)
+    {
+        this.device = device;
+        this.capacity = initialCapacity;
+
+        const alignment = cast(size_t) device.physicalDevice.properties.limits.minUniformBufferOffsetAlignment;
+        slotSize = alignment > 1
+            ? (UBOContent.sizeof + alignment - 1) / alignment * alignment
+            : UBOContent.sizeof;
+
+        buffer = device.create!TransferBuffer(capacity * slotSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    }
+
+    ~this()
+    {
+        if(buffer)
+            destroy(buffer);
+    }
+
+    /// Reserves a slot for the given descriptor set
+    size_t addSlot(VkDescriptorSet set)
+    {
+        if(used == capacity)
+            grow();
+
+        const slot = used++;
+        descriptorSets ~= set;
+
+        return slot;
+    }
+
+    ref UBOContent content(size_t slot)
+    {
+        assert(slot < used);
+
+        return *cast(UBOContent*) (cast(ubyte*) buffer.cpuBuf.ptr + slot * slotSize);
+    }
+
+    VkDescriptorBufferInfo info(size_t slot)
+    {
+        assert(slot < used);
+
+        return VkDescriptorBufferInfo(
+            buffer: buffer.gpuBuffer,
+            offset: slot * slotSize,
+            range: UBOContent.sizeof,
+        );
+    }
+
+    void uploadImmediate(CommandPool commandPool, VkCommandBuffer commandBuffer)
+    {
+        buffer.uploadImmediate(commandPool, commandBuffer);
+    }
+
+    private void grow()
+    {
+        const newCapacity = capacity * 2;
+
+        auto newBuffer = device.create!TransferBuffer(
+            newCapacity * slotSize,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        );
+
+        const usedBytes = used * slotSize;
+        newBuffer.cpuBuf[0 .. usedBytes] = buffer.cpuBuf[0 .. usedBytes];
+
+        buffer.destroy;
+        buffer = newBuffer;
+        capacity = newCapacity;
+
+        foreach(i, set; descriptorSets)
+        {
+            auto bufferInfo = info(i);
+
+            VkWriteDescriptorSet[] writes = [
+                bufferWriteDescriptor(set, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, bufferInfo),
+            ];
+
+            device.updateDescriptorSets(writes);
+        }
+    }
+}
+
 class Mesh
 {
     string name;
@@ -66,58 +160,35 @@ class Mesh
     alias this = vert;
     /*private*/ VkDescriptorSet descriptorSet;
 
-    private TransferBuffer uniformBuffer;
-    private VkDescriptorBufferInfo uboInfo;
-    private VkWriteDescriptorSet uboWriteDescriptor;
+    private MaterialBuffer materialBuffer;
+    private size_t materialSlot;
+
     private VkWriteDescriptorSet jointsUboWriteDescr;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref PoolAndLayoutInfo poolAndLayout, ref VkDescriptorBufferInfo jointsUboInfo)
+    package this(
+        string name,
+        UploadedVertices vert,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        ref VkDescriptorBufferInfo jointsUboInfo,
+    )
     {
         this.name = name;
-        this.descriptorSet = device.allocateDescriptorSet(poolAndLayout);
-
+        this.materialBuffer = materialBuffer;
+        this.descriptorSet = allocator.allocate();
         this.vert = vert;
+
+        materialSlot = materialBuffer.addSlot(descriptorSet);
 
         assert(vertices.viewIdx >= 0);
 
         if(vert.texCoords.viewIdx < 0)
             this.vert.texCoords = vert.vertices; // fake data to fill out texture coords buffer on non-textured objects
 
-        if(vert.weights.viewIdx < 0)
-        {
-            //~ this.vert.joints = vert.vertices; // ditto
-            //~ this.vert.weights = this.vert.joints; // ditto
-        }
+        ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
+        ubo.material.renderType.x = 0; // is not textured
 
-        {
-            // TODO: bad idea to allocate a memory buffer only for one uniform buffer,
-            // need to allocate more memory then divide it into pieces
-            uniformBuffer = device.create!TransferBuffer(UBOContent.sizeof, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-
-            ubo.material.baseColorFactor = Vector4f(0, 1, 1, 1);
-            ubo.material.renderType.x = 0; // is not textured
-
-            // Prepare descriptor
-            uboInfo = VkDescriptorBufferInfo(
-                buffer: uniformBuffer.gpuBuffer,
-                offset: 0,
-                range: UBOContent.sizeof,
-            );
-
-            uboWriteDescriptor = bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo);
-
-            jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
-        }
-    }
-
-    ~this()
-    {
-        uniformBuffer.destroy;
-    }
-
-    void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
-    {
-        uniformBuffer.uploadImmediate(commandPool, commandBuffer);
+        jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
@@ -140,7 +211,7 @@ class Mesh
 
     private ref UBOContent ubo()
     {
-        return *cast(UBOContent*) uniformBuffer.cpuBuf.ptr;
+        return materialBuffer.content(materialSlot);
     }
 
     abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
@@ -219,18 +290,27 @@ final class JustColoredMesh : Mesh
 {
     private VkDescriptorImageInfo fakeTexture;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref PoolAndLayoutInfo poolAndLayout, VkDescriptorImageInfo fakeTexture, ref VkDescriptorBufferInfo jointsUboInfo)
+    package this(
+        string name,
+        UploadedVertices vert,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        VkDescriptorImageInfo fakeTexture,
+        ref VkDescriptorBufferInfo jointsUboInfo,
+    )
     {
         this.fakeTexture = fakeTexture;
 
-        super(device, name, vert, poolAndLayout, jointsUboInfo);
+        super(name, vert, allocator, materialBuffer, jointsUboInfo);
     }
 
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
+        auto uboInfo = materialBuffer.info(materialSlot);
+
         VkWriteDescriptorSet[] descriptorWrites = [
             jointsUboWriteDescr,
-            uboWriteDescriptor,
+            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
             imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, fakeTexture),
         ];
 
@@ -243,24 +323,26 @@ final class TexturedMesh : Mesh
 {
     /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
 
-    package this(LogicalDevice device, string name, UploadedVertices vert, ref PoolAndLayoutInfo poolAndLayout, ref VkDescriptorBufferInfo jointsUboInfo)
+    package this(
+        string name,
+        UploadedVertices vert,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        ref VkDescriptorBufferInfo jointsUboInfo,
+    )
     {
-        super(device, name, vert, poolAndLayout, jointsUboInfo);
+        super(name, vert, allocator, materialBuffer, jointsUboInfo);
 
         ubo.material.renderType.x = 1; // is textured
     }
 
-    override void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
-    {
-        super.uploadImmediate(commandPool, commandBuffer);
-    }
-
     override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
-        //TODO: store all these VkWriteDescriptorSet in one array to best updating performance?
+        auto uboInfo = materialBuffer.info(materialSlot);
+
         VkWriteDescriptorSet[] descriptorWrites = [
             jointsUboWriteDescr,
-            uboWriteDescriptor,
+            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
             imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, *textureDescrImageInfo),
         ];
 

@@ -295,7 +295,6 @@ class SphereRenderer : DrawablePrimitive
     private uint bucketCount;
 
     GraphicsPipelineCfg pipelineCfg;
-    private PoolAndLayoutInfo graphicsPool;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
 
@@ -338,8 +337,8 @@ class SphereRenderer : DrawablePrimitive
             vertexAttributes: SphereVertex.getAttributeDescriptions,
         ), 1);
 
-        graphicsPool = pipelines.poolAndLayout(technique);
-        graphicsSet = device.allocateDescriptorSet(graphicsPool);
+        auto allocator = pipelines.descriptorAllocator(technique);
+        graphicsSet = allocator.allocate();
 
         paletteBuffer = device.create!MemoryBufferMappedToCPU(
             paletteSize * Vector4f.sizeof,

@@ -205,7 +205,7 @@ struct SkinnedMeshTechnique
 - [x] Add `RenderTechnique`, `PipelineKey` and `PipelineFactory`; move glTF, the
       primitive factories and the sphere and cylinder renderers onto them without
       changing the image.
-- [ ] Add `DescriptorAllocator`; grow pools; move per-mesh material UBOs into one
+- [x] Add `DescriptorAllocator`; grow pools; move per-mesh material UBOs into one
       buffer with offsets.
 - [ ] Remove `PrimitivesFactory` and `GltfFactory` as pipeline owners; make
       `Scene` passive.

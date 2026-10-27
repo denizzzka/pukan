@@ -4,6 +4,7 @@ import dlib.math;
 import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
 import pukan.gltf.accessor;
 import pukan.gltf.animation;
+import pukan.gltf.mesh: MaterialBuffer;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
@@ -87,7 +88,15 @@ private struct ChunkHeader
 }
 
 ///
-package GlTF loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, LogicalDevice device, ref GraphicsPipelineCfg pipeline, Texture fakeTexture, bool computeJointsOnGPU)
+package GlTF loadGlTF2(
+    string filename,
+    DescriptorAllocator allocator,
+    MaterialBuffer materialBuffer,
+    LogicalDevice device,
+    ref GraphicsPipelineCfg pipeline,
+    Texture fakeTexture,
+    bool computeJointsOnGPU,
+)
 {
     auto gltfFile = readGltfFile(filename);
     const json = gltfFile.json;
@@ -287,12 +296,12 @@ package GlTF loadGlTF2(string filename, PoolAndLayoutInfo poolAndLayout, Logical
     if(ret.skins.length > 0)
     {
         if(computeJointsOnGPU)
-            return new SkinnedGlTF_skinJointsGPU(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+            return new SkinnedGlTF_skinJointsGPU(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
         else
-            return new SkinnedGlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+            return new SkinnedGlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
     }
     else
-        return new GlTF(pipeline, poolAndLayout, device, ret, nodes, rootSceneNode, fakeTexture);
+        return new GlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
 }
 
 private Trans readNodeTrans(in Json node)

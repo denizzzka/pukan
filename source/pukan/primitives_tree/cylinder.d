@@ -366,7 +366,6 @@ class CylinderRenderer : DrawablePrimitive
     private uint bucketCount;
 
     GraphicsPipelineCfg pipelineCfg;
-    private PoolAndLayoutInfo graphicsPool;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
 
@@ -410,8 +409,8 @@ class CylinderRenderer : DrawablePrimitive
             state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
         ), 1);
 
-        graphicsPool = pipelines.poolAndLayout(technique);
-        graphicsSet = device.allocateDescriptorSet(graphicsPool);
+        auto allocator = pipelines.descriptorAllocator(technique);
+        graphicsSet = allocator.allocate();
 
         paletteBuffer = device.create!MemoryBufferMappedToCPU(
             paletteSize * Vector4f.sizeof,
