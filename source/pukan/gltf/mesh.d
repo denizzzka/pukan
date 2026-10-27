@@ -3,11 +3,12 @@ module pukan.gltf.mesh;
 import dlib.math;
 import pukan.gltf.accessor;
 public import pukan.gltf.loader: ComponentType;
-import pukan.material: MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
+import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.mesh: Mesh, VertexStream;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import std.exception: enforce;
 import vibe.data.json: Json, deserializeJson;
 
 struct IndicesDescr
@@ -37,7 +38,7 @@ package struct UploadedVertices
     IndicesDescr indices;
     union
     {
-        BufAccess[4] allBuffers;
+        BufAccess[5] allBuffers;
         struct
         {
             BufAccess vertices;
@@ -46,23 +47,35 @@ package struct UploadedVertices
             // Skin support
             BufAccess joints;
             BufAccess weights;
+
+            BufAccess normals;
         }
     }
 
     Boxf aabb; /// Accessor bounds; NaN when the file omits them
 }
 
-class GltfMesh : Mesh
+final class GltfMesh : Mesh
 {
+    private enum baseColorSlot = 0;
+    private enum metallicRoughnessSlot = 1;
+    private enum normalSlot = 2;
+    private enum occlusionSlot = 3;
+    private enum emissiveSlot = 4;
+
     package UploadedVertices vert;
+    package AlphaMode alphaMode;
+    package bool doubleSided;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
+    private VkDescriptorImageInfo[5] materialTextures;
 
     package this(
         string name,
         UploadedVertices vert,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
+        VkDescriptorImageInfo fakeTexture,
         ref BufferPieceOnGPU[] gpuBuffs,
         ref VkDescriptorBufferInfo jointsUboInfo,
     )
@@ -72,14 +85,14 @@ class GltfMesh : Mesh
         this.name = name;
         this.descriptorSet = allocator.allocate();
         this.vert = vert;
+        materialTextures[] = fakeTexture;
 
         assert(vert.vertices.viewIdx >= 0);
 
         if(vert.texCoords.viewIdx < 0)
             this.vert.texCoords = vert.vertices; // fake data to fill out texture coords buffer on non-textured objects
 
-        material.baseColorFactor = Vector4f(0, 1, 1, 1);
-        material.mode = MaterialMode.unlit;
+        material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
         writeMaterial();
 
         jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
@@ -149,28 +162,126 @@ class GltfMesh : Mesh
             isClose(a.max.z, b.max.z, tolerance, tolerance);
     }
 
-    package void applyMaterial(Json json)
+    package void applyMaterial(in Json json, VkDescriptorImageInfo[] images, bool hasTexCoords, bool hasNormals)
     {
-        if(json.type != Json.Type.object)
-            return;
+        material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
+        alphaMode = AlphaMode.opaque;
+        doubleSided = false;
 
-        if(auto pbr = "pbrMetallicRoughness" in json)
-            if(auto factor = "baseColorFactor" in *pbr)
+        if(json.type == Json.Type.object)
+        {
+            if(auto pbr = "pbrMetallicRoughness" in json)
             {
-                const c = (*factor).deserializeJson!(float[4]);
-                material.baseColorFactor = Vector4f(c[0], c[1], c[2], c[3]);
+                if(auto factor = "baseColorFactor" in *pbr)
+                {
+                    const c = (*factor).deserializeJson!(float[4]);
+                    material.baseColorFactor = Vector4f(c[0], c[1], c[2], c[3]);
+                }
+
+                if(auto factor = "metallicFactor" in *pbr)
+                    material.metallic = readFloat(*factor);
+
+                if(auto factor = "roughnessFactor" in *pbr)
+                    material.roughness = readFloat(*factor);
+
+                if(auto texture = "baseColorTexture" in *pbr)
+                    bindTexture(*texture, baseColorSlot, MaterialFlag.baseColorTexture, images, hasTexCoords);
+
+                if(auto texture = "metallicRoughnessTexture" in *pbr)
+                    bindTexture(*texture, metallicRoughnessSlot, MaterialFlag.metallicRoughnessTexture, images, hasTexCoords);
             }
 
-        if(auto factor = "emissiveFactor" in json)
-        {
-            const e = (*factor).deserializeJson!(float[3]);
-            material.emissiveFactor = Vector4f(e[0], e[1], e[2], 0);
+            if(auto texture = "normalTexture" in json)
+            {
+                bindTexture(*texture, normalSlot, MaterialFlag.normalTexture, images, hasTexCoords);
+
+                if(auto scale = "scale" in *texture)
+                    material.normalScale = readFloat(*scale);
+            }
+
+            if(auto texture = "occlusionTexture" in json)
+            {
+                bindTexture(*texture, occlusionSlot, MaterialFlag.occlusionTexture, images, hasTexCoords);
+
+                if(auto strength = "strength" in *texture)
+                    material.occlusionStrength = readFloat(*strength);
+            }
+
+            if(auto texture = "emissiveTexture" in json)
+                bindTexture(*texture, emissiveSlot, MaterialFlag.emissiveTexture, images, hasTexCoords);
+
+            if(auto factor = "emissiveFactor" in json)
+            {
+                const e = (*factor).deserializeJson!(float[3]);
+                material.emissiveFactor = Vector4f(e[0], e[1], e[2], 0);
+            }
+
+            if(auto mode = "alphaMode" in json)
+            {
+                const value = (*mode).get!string;
+                if(value == "MASK")
+                    alphaMode = AlphaMode.mask;
+                else if(value == "BLEND")
+                    alphaMode = AlphaMode.blend;
+            }
+
+            if(auto cutoff = "alphaCutoff" in json)
+                material.alphaCutoff = readFloat(*cutoff);
+
+            if(auto value = "doubleSided" in json)
+                doubleSided = (*value).get!bool;
         }
+
+        material.alphaMode = alphaMode;
+
+        if(!hasNormals)
+            material.flags = material.flags | MaterialFlags(MaterialFlag.derivedNormals);
 
         writeMaterial();
     }
 
-    abstract void updateDescriptorSetsAndUniformBuffers(LogicalDevice device);
+    private static float readFloat(in Json value)
+    {
+        if(value.type == Json.Type.int_)
+            return cast(float) value.get!long;
+
+        return cast(float) value.get!double;
+    }
+
+    private void bindTexture(
+        in Json texture,
+        size_t slot,
+        MaterialFlag flag,
+        VkDescriptorImageInfo[] images,
+        bool hasTexCoords,
+    )
+    {
+        if(!hasTexCoords)
+            return;
+
+        const index = texture["index"].get!size_t;
+        enforce(index < images.length, "glTF material references a missing texture");
+
+        materialTextures[slot] = images[index];
+        material.flags = material.flags | MaterialFlags(flag);
+    }
+
+    void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
+    {
+        auto uboInfo = materialInfo();
+
+        VkWriteDescriptorSet[] descriptorWrites = [
+            jointsUboWriteDescr,
+            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
+            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[baseColorSlot]),
+            imageWriteDescriptor(descriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[metallicRoughnessSlot]),
+            imageWriteDescriptor(descriptorSet, 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[normalSlot]),
+            imageWriteDescriptor(descriptorSet, 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[occlusionSlot]),
+            imageWriteDescriptor(descriptorSet, 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[emissiveSlot]),
+        ];
+
+        device.updateDescriptorSets(descriptorWrites);
+    }
 
     //TODO: remove?
     package void refreshBuffers(VkCommandBuffer buf)
@@ -183,21 +294,16 @@ class GltfMesh : Mesh
 
         foreach(i, accessor; vert.allBuffers)
         {
-            auto acc = accessor;
+            assert(accessor.viewIdx >= 0);
 
-            if(acc.viewIdx < 0 && i >= 2)
-                acc.viewIdx = gpuBuffs.length - (4 - i);
-
-            assert(acc.viewIdx >= 0);
-
-            auto gpuBuf = gpuBuffs[acc.viewIdx];
+            auto gpuBuf = gpuBuffs[accessor.viewIdx];
             assert(gpuBuf !is null);
 
             streams ~= VertexStream(
                 buffer: gpuBuf.buffer.gpuBuffer,
-                offset: acc.offset,
-                size: gpuBuf.buffer.cpuBuf.length - acc.offset,
-                stride: acc.stride,
+                offset: accessor.offset,
+                size: gpuBuf.buffer.cpuBuf.length - accessor.offset,
+                stride: accessor.stride,
             );
         }
 
@@ -214,74 +320,5 @@ class GltfMesh : Mesh
             indexType = vert.indices.indexType;
             indexCount = vert.indices.accessor.count;
         }
-    }
-}
-
-///
-final class JustColoredMesh : GltfMesh
-{
-    private VkDescriptorImageInfo fakeTexture;
-
-    package this(
-        string name,
-        UploadedVertices vert,
-        DescriptorAllocator allocator,
-        MaterialBuffer materialBuffer,
-        ref BufferPieceOnGPU[] gpuBuffs,
-        VkDescriptorImageInfo fakeTexture,
-        ref VkDescriptorBufferInfo jointsUboInfo,
-    )
-    {
-        this.fakeTexture = fakeTexture;
-
-        super(name, vert, allocator, materialBuffer, gpuBuffs, jointsUboInfo);
-    }
-
-    override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
-    {
-        auto uboInfo = materialInfo();
-
-        VkWriteDescriptorSet[] descriptorWrites = [
-            jointsUboWriteDescr,
-            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
-            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, fakeTexture),
-        ];
-
-        device.updateDescriptorSets(descriptorWrites);
-    }
-}
-
-///
-final class TexturedMesh : GltfMesh
-{
-    /*private*/ VkDescriptorImageInfo* textureDescrImageInfo;
-
-    package this(
-        string name,
-        UploadedVertices vert,
-        DescriptorAllocator allocator,
-        MaterialBuffer materialBuffer,
-        ref BufferPieceOnGPU[] gpuBuffs,
-        ref VkDescriptorBufferInfo jointsUboInfo,
-    )
-    {
-        super(name, vert, allocator, materialBuffer, gpuBuffs, jointsUboInfo);
-
-        material.baseColorFactor = Vector4f(1, 1, 1, 1);
-        material.flags = MaterialFlags(MaterialFlag.baseColorTexture);
-        writeMaterial();
-    }
-
-    override void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
-    {
-        auto uboInfo = materialInfo();
-
-        VkWriteDescriptorSet[] descriptorWrites = [
-            jointsUboWriteDescr,
-            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
-            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, *textureDescrImageInfo),
-        ];
-
-        device.updateDescriptorSets(descriptorWrites);
     }
 }

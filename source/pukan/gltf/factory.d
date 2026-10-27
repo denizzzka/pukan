@@ -2,6 +2,8 @@ module pukan.gltf.factory;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f;
 import pukan.gltf;
+import pukan.gltf.pipelines: GltfPipelines;
+import pukan.material: MaterialBuffer;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -30,6 +32,11 @@ private ShaderVertexInput vertexInput()
                 binding: 3,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: 4,
+                stride: Vector3f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
         ],
         [
             VkVertexInputAttributeDescription(
@@ -52,6 +59,11 @@ private ShaderVertexInput vertexInput()
                 location: 3,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
             ),
+            VkVertexInputAttributeDescription(
+                binding: 4,
+                location: 4,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+            ),
         ],
     );
 }
@@ -72,7 +84,7 @@ class GltfFactory
     private PipelineFactory pipelines;
     private TechniqueId technique;
     private MeshResources resources;
-    GraphicsPipelineCfg graphicsPipelineCfg;
+    GltfPipelines pipelineCfgs;
 
     this(
         LogicalDevice device,
@@ -87,21 +99,60 @@ class GltfFactory
         this.pipelines = pipelines;
         this.resources = resources;
 
+        auto stages = shaderStages(device);
+        VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE];
+
         technique = pipelines.declare(RenderTechnique(
             name: "glTF",
-            stages: shaderStages(device),
+            stages: stages,
             state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
-            dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
+            dynamicStates: dynamicStates,
         ), 20);
 
-        graphicsPipelineCfg = pipelines.acquire(technique, renderPass, 1);
+        const doubleSidedTechnique = pipelines.declare(RenderTechnique(
+            name: "glTF double sided",
+            stages: stages,
+            state: FixedState(
+                frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                cullMode: VK_CULL_MODE_NONE,
+            ),
+            dynamicStates: dynamicStates,
+        ), 20);
+
+        const blendTechnique = pipelines.declare(RenderTechnique(
+            name: "glTF blend",
+            stages: stages,
+            state: FixedState(
+                frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                blendEnable: VK_TRUE,
+                depthWriteEnable: VK_FALSE,
+            ),
+            dynamicStates: dynamicStates,
+        ), 20);
+
+        const doubleSidedBlendTechnique = pipelines.declare(RenderTechnique(
+            name: "glTF double sided blend",
+            stages: stages,
+            state: FixedState(
+                frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                cullMode: VK_CULL_MODE_NONE,
+                blendEnable: VK_TRUE,
+                depthWriteEnable: VK_FALSE,
+            ),
+            dynamicStates: dynamicStates,
+        ), 20);
+
+        pipelineCfgs.opaque = pipelines.acquire(technique, renderPass, 1);
+        pipelineCfgs.doubleSided = pipelines.acquire(doubleSidedTechnique, renderPass, 1);
+        pipelineCfgs.blend = pipelines.acquire(blendTechnique, renderPass, 1);
+        pipelineCfgs.doubleSidedBlend = pipelines.acquire(doubleSidedBlendTechnique, renderPass, 1);
     }
 
     private static ShaderInfo[] shaderStages(LogicalDevice device)
     {
         return [
             device.uploadShaderToGPU(
-                cast(ubyte[]) import("mesh_skinned_vert.spv"),
+                cast(ubyte[]) import("mesh_pbr_vert.spv"),
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -119,7 +170,7 @@ class GltfFactory
                 vertexInput(),
             ),
             device.uploadShaderToGPU(
-                cast(ubyte[]) import("mesh_frag.spv"),
+                cast(ubyte[]) import("mesh_pbr_frag.spv"),
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -130,6 +181,30 @@ class GltfFactory
                     ),
                     VkDescriptorSetLayoutBinding(
                         binding: 1,
+                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 3,
+                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 4,
+                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 5,
+                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                    ),
+                    VkDescriptorSetLayoutBinding(
+                        binding: 6,
                         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                         descriptorCount: 1,
                         stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -152,7 +227,7 @@ class GltfFactory
                 allocator,
                 resources.materials,
                 device,
-                graphicsPipelineCfg,
+                pipelineCfgs,
                 resources.fakeTexture,
                 computeJointsOnGPU,
             );

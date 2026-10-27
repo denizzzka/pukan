@@ -12,15 +12,28 @@ enum MaterialMode: uint
     unlit,
     lit,
     normalsDebug,
+    pbr,
 }
 
 enum MaterialFlag: uint
 {
     vertexColor = 1u << 0,
     baseColorTexture = 1u << 1,
+    metallicRoughnessTexture = 1u << 2,
+    normalTexture = 1u << 3,
+    occlusionTexture = 1u << 4,
+    emissiveTexture = 1u << 5,
+    derivedNormals = 1u << 6,
 }
 
 alias MaterialFlags = BitFlags!MaterialFlag;
+
+enum AlphaMode: uint
+{
+    opaque,
+    mask,
+    blend,
+}
 
 // Array elements in std140/std430 are 16-byte aligned, so the D and GLSL
 // layouts must match exactly.
@@ -28,7 +41,9 @@ struct Material
 {
     Vector4f baseColorFactor = Vector4f(1, 1, 1, 1);
     Vector4f emissiveFactor = Vector4f(0, 0, 0, 0);
-    Vector4i params = Vector4i(0, 0, 0, 0);
+    Vector4f metallicRoughness = Vector4f(0, 1, 1, 1); // metallic, roughness, normal scale, occlusion strength
+    Vector4f alphaParams = Vector4f(0.5f, 0, 0, 0);    // x = cutoff
+    Vector4i params = Vector4i(0, 0, 0, 0);            // x = mode, y = flags, z = AlphaMode
 
     this(Vector3f color, MaterialMode mode = MaterialMode.lit, MaterialFlags flags = MaterialFlags.init)
     {
@@ -55,9 +70,69 @@ struct Material
     {
         params.y = cast(int) cast(uint) value;
     }
+
+    @property AlphaMode alphaMode() const
+    {
+        return cast(AlphaMode) params.z;
+    }
+
+    @property void alphaMode(AlphaMode value)
+    {
+        params.z = cast(int) value;
+    }
+
+    @property float alphaCutoff() const
+    {
+        return alphaParams.x;
+    }
+
+    @property void alphaCutoff(float value)
+    {
+        alphaParams.x = value;
+    }
+
+    @property float metallic() const
+    {
+        return metallicRoughness.x;
+    }
+
+    @property void metallic(float value)
+    {
+        metallicRoughness.x = value;
+    }
+
+    @property float roughness() const
+    {
+        return metallicRoughness.y;
+    }
+
+    @property void roughness(float value)
+    {
+        metallicRoughness.y = value;
+    }
+
+    @property float normalScale() const
+    {
+        return metallicRoughness.z;
+    }
+
+    @property void normalScale(float value)
+    {
+        metallicRoughness.z = value;
+    }
+
+    @property float occlusionStrength() const
+    {
+        return metallicRoughness.w;
+    }
+
+    @property void occlusionStrength(float value)
+    {
+        metallicRoughness.w = value;
+    }
 }
 
-static assert(Material.sizeof == 48);
+static assert(Material.sizeof == 80);
 
 struct MaterialBlock
 {

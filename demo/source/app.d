@@ -746,7 +746,7 @@ GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
         const aabb = obj.calcAABB;
         const size = aabb.max - aabb.min;
         const center = aabb.min + size/2;
-        const scale = 1.0 / size.length * 0.1;
+        const scale = 1.0 / size.length * 0.4;
 
         auto trans = Matrix4x4f.identity;
 
@@ -820,7 +820,10 @@ auto createDemoTree(
         auto v = createLitCubeVertices;
         auto cube = scene.litMeshFactory.create(scene.frameBuilder, v[0], v[1]);
 
-        cube.setMaterial(Material(Vector3f(0.9f, 0.55f, 0.2f), MaterialMode.lit));
+        auto material = Material(Vector3f(0.9f, 0.55f, 0.2f), MaterialMode.pbr);
+        material.metallic = 0.1f;
+        material.roughness = 0.35f;
+        cube.setMaterial(material);
 
         auto rotator = litBranch
             .addChild(Bone(mat: Vector3f(0.5f, 0.0f, 0.0f).translationMatrix))

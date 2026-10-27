@@ -4,6 +4,7 @@ import dlib.math;
 import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
 import pukan.gltf.accessor;
 import pukan.gltf.animation;
+import pukan.gltf.pipelines: GltfPipelines;
 import pukan.material: MaterialBuffer;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -109,7 +110,7 @@ package GlTF loadGlTF2(
     DescriptorAllocator allocator,
     MaterialBuffer materialBuffer,
     LogicalDevice device,
-    ref GraphicsPipelineCfg pipeline,
+    ref GltfPipelines pipelines,
     Texture fakeTexture,
     bool computeJointsOnGPU,
 )
@@ -359,12 +360,12 @@ package GlTF loadGlTF2(
     if(ret.skins.length > 0)
     {
         if(computeJointsOnGPU)
-            result = new SkinnedGlTF_skinJointsGPU(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
         else
-            result = new SkinnedGlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
     }
     else
-        result = new GlTF(pipeline, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+        result = new GlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
 
     stats.decodeNs += cast(ulong) (MonoTime.currTime - ctorStart).total!"nsecs";
     result.loadStats = stats;

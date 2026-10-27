@@ -6,8 +6,9 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.mesh: MeshClass = GltfMesh, IndicesDescr, JustColoredMesh, TexturedMesh, UploadedVertices;
-import pukan.material: MaterialBuffer;
+import pukan.gltf.pipelines: GltfPipelines;
+import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
+import pukan.material: AlphaMode, MaterialBuffer;
 import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
@@ -123,7 +124,8 @@ class GlTF : DrawableByVulkan
 
     private BufferPieceOnGPU[] gpuBuffs;
     private VkDescriptorImageInfo[] texturesDescrInfos;
-    private GraphicsPipelineCfg* pipeline;
+    private VkDescriptorImageInfo fakeTextureInfo;
+    private GltfPipelines pipelines;
 
     private MeshClass[] meshes;
     private DescriptorAllocator allocator;
@@ -142,7 +144,7 @@ class GlTF : DrawableByVulkan
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
     package this(
-        ref GraphicsPipelineCfg pipeline,
+        ref GltfPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
@@ -152,10 +154,16 @@ class GlTF : DrawableByVulkan
         Texture fakeTexture,
     )
     {
-        this.pipeline = &pipeline;
+        this.pipelines = pipelines;
         this.allocator = allocator;
         this.materialBuffer = materialBuffer;
         content = cont;
+
+        fakeTextureInfo = VkDescriptorImageInfo(
+            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            imageView: fakeTexture.imageView,
+            sampler: fakeTexture.sampler,
+        );
 
         assert(content.meshes.length > 0);
 
@@ -213,11 +221,7 @@ class GlTF : DrawableByVulkan
                 passed to the shader.
                 */
                 texturesDescrInfos.length = 1;
-                texturesDescrInfos[0] = VkDescriptorImageInfo(
-                    imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    imageView: fakeTexture.imageView,
-                    sampler: fakeTexture.sampler,
-                );
+                texturesDescrInfos[0] = fakeTextureInfo;
             }
             else
             {
@@ -231,8 +235,6 @@ class GlTF : DrawableByVulkan
                     );
             }
         }
-
-        setupFakeJointVertexBuffers(device, nodes.length);
 
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device);
@@ -262,25 +264,15 @@ class GlTF : DrawableByVulkan
         // no skin in base GlTF
     }
 
-    protected void setupFakeJointVertexBuffers(LogicalDevice device, size_t nodesNum)
-    {
-        // Adds fake buffer for joints and weights when skins not used to allow skinned vertices shader work as usual
-        gpuBuffs ~= new BufferPieceOnGPU;
-        gpuBuffs ~= new BufferPieceOnGPU;
-
-        // joints (zeroed)
-        gpuBuffs[$-2].buffer = new TransferBuffer(device, Vector4us.sizeof * nodesNum, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        // weights
-        gpuBuffs[$-1].buffer = new TransferBuffer(device, Vector4f.sizeof * nodesNum, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-        auto weights = new Vector4f[nodesNum];
-        weights[0..$] = Vector4f(1, 1, 1, 1);
-
-        gpuBuffs[$-1].buffer.cpuBuf[0 .. $] = weights;
-    }
-
     ~this()
     {
+        foreach(ref piece; gpuBuffs)
+            if(piece && piece.buffer)
+                destroy(piece.buffer);
+
+        if(jointMatricesUniformBuf)
+            destroy(jointMatricesUniformBuf);
+
         foreach(ref texture; content.textures)
             if(texture)
                 destroy(texture);
@@ -371,6 +363,8 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
+        const vertexCount = uplVert.vertices.count;
+
         if("WEIGHTS_0" in primitive.attributes)
         {
             uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(
@@ -383,6 +377,27 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.joints, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             createGpuBufIfNeed(device, uplVert.weights, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
+        else
+        {
+            uplVert.joints = createFakeVertexBuffer!Vector4us(device, vertexCount, Vector4us.init, gpuBuffs);
+            uplVert.weights = createFakeVertexBuffer!Vector4f(device, vertexCount, Vector4f(1, 0, 0, 0), gpuBuffs);
+        }
+
+        const hasNormals = ("NORMAL" in primitive.attributes) !is null;
+        if(hasNormals)
+        {
+            const normalIdx = primitive.attributes["NORMAL"].get!ushort;
+            auto normals = &accessors[normalIdx];
+
+            enforce(normals.count > 0);
+            debug assert(normals.type == "VEC3");
+            enforce(normals.componentType == ComponentType.FLOAT);
+
+            uplVert.normals = content.getAccess!(Type.VEC3, Vector3f)(*normals);
+            createGpuBufIfNeed(device, uplVert.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        }
+        else
+            uplVert.normals = createFakeVertexBuffer!Vector3f(device, vertexCount, Vector3f(0, 0, 1), gpuBuffs);
 
         // If indexed mesh:
         if(primitive.indicesAccessorIdx >= 0)
@@ -399,55 +414,48 @@ class GlTF : DrawableByVulkan
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
 
-        if(!content.textures.length)
-            node.mesh = new JustColoredMesh(mesh.name, uplVert, allocator, materialBuffer, gpuBuffs, texturesDescrInfos[0] /* fake texture, always available */, jointsUboInfo);
-        else
+        const hasTexCoords = ("TEXCOORD_0" in primitive.attributes) !is null;
+        if(hasTexCoords)
         {
-            const idx = primitive.attributes["TEXCOORD_0"].get!ushort;
-            auto texCoords = &accessors[idx];
+            const texCoordsIdx = primitive.attributes["TEXCOORD_0"].get!ushort;
+            auto texCoords = &accessors[texCoordsIdx];
 
             enforce(texCoords.count > 0);
             debug assert(texCoords.type == "VEC2");
             debug assert(texCoords.componentType == ComponentType.FLOAT);
 
             uplVert.texCoords = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
-            auto ta = &uplVert.texCoords;
-
-            //~ auto textCoordsRange = content.rangify!Vector2f(uplVert.texCoords);
-
-            // Need to normalize coordinates?
-            //~ if(texCoords.min_max != Json.emptyObject)
-            version(none)
-            {
-                texCoords.min_max.writeln;
-
-                const min = Vector2f(texCoords.min_max["min"].deserializeJson!(float[2]));
-                const max = Vector2f(texCoords.min_max["max"].deserializeJson!(float[2]));
-
-                if(!(min == Vector2f(0, 0) && max == Vector2f(1, 1)))
-                {
-                    const range = max - min;
-
-                    auto texOutput = content.rangify!(Vector2f, true)(texCoordsAccessor);
-
-                    textCoordsRange
-                        .map!((Vector2f e) => (e - min) / range)
-                        .copy(texOutput);
-                }
-            }
-
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-            {
-                auto m = new TexturedMesh(mesh.name, uplVert, allocator, materialBuffer, gpuBuffs, jointsUboInfo);
-                //TODO: only one first texture for everything is used, need to implement "materials":
-                m.textureDescrImageInfo = &texturesDescrInfos[0];
-                node.mesh = m;
-            }
         }
 
-        node.mesh.applyMaterial(primitive.material);
+        auto m = new GltfMesh(
+            mesh.name,
+            uplVert,
+            allocator,
+            materialBuffer,
+            fakeTextureInfo,
+            gpuBuffs,
+            jointsUboInfo,
+        );
+
+        m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals);
+        node.mesh = m;
         meshes ~= node.mesh;
+    }
+
+    private BufAccess createFakeVertexBuffer(T)(
+        LogicalDevice device,
+        uint count,
+        T value,
+        ref BufferPieceOnGPU[] gpuBuffs,
+    )
+    {
+        auto piece = new BufferPieceOnGPU;
+        piece.buffer = new TransferBuffer(device, T.sizeof * count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        (cast(T[]) piece.buffer.cpuBuf)[] = value;
+        gpuBuffs ~= piece;
+
+        return BufAccess(cast(ptrdiff_t)(gpuBuffs.length - 1), 0, cast(ubyte) T.sizeof, count);
     }
 
     private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
@@ -483,8 +491,6 @@ class GlTF : DrawableByVulkan
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
-        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
-
         drawingBufferFillingRecursive(buf, trans, rootSceneNode);
     }
 
@@ -498,10 +504,18 @@ class GlTF : DrawableByVulkan
         trans *= node.trans.calcMatrix;
 
         if(node.mesh)
-            node.mesh.drawGeometry(buf, *pipeline, trans);
+            node.mesh.draw(buf, selectPipeline(node.mesh), trans);
 
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
+    }
+
+    private GraphicsPipelineCfg selectPipeline(const MeshClass mesh)
+    {
+        if(mesh.doubleSided)
+            return mesh.alphaMode == AlphaMode.blend ? pipelines.doubleSidedBlend : pipelines.doubleSided;
+
+        return mesh.alphaMode == AlphaMode.blend ? pipelines.blend : pipelines.opaque;
     }
 
     protected void uploadSkinMatricesStatic(scope VkCommandBuffer commandBuffer)
@@ -517,7 +531,7 @@ class GlTF : DrawableByVulkan
 class SkinnedGlTF : GlTF
 {
     package this(
-        ref GraphicsPipelineCfg pipeline,
+        ref GltfPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
@@ -527,7 +541,7 @@ class SkinnedGlTF : GlTF
         Texture fakeTexture,
     )
     {
-        super(pipeline, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
+        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -582,7 +596,7 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
     package SkinMatrices skinMatrices;
 
     package this(
-        ref GraphicsPipelineCfg pipeline,
+        ref GltfPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
@@ -592,7 +606,7 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
         Texture fakeTexture,
     )
     {
-        super(pipeline, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
+        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
