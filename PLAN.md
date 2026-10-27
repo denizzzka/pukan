@@ -1,12 +1,10 @@
 # Plan
 
-Checkboxes track progress: `[ ]` is open, `[x]` is done. Items can be done in any
-order; the order below is only a suggested grouping.
+Checkboxes track open work. Items can be done in any order; the order below is
+only a suggested grouping.
 
 - [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
       used independently of the rest of `pukan`. Keep module names unchanged.
-- [ ] Set up CI on GitHub: build the library and both demos and run them with
-      the validation layers enabled.
 - [ ] Check format availability before use. `VK_FORMAT_R32G32B32_SFLOAT` and
       similar are not mandatory: query `vkGetPhysicalDeviceFormatProperties`
       (and `vkGetPhysicalDeviceImageFormatProperties` for images) instead of
@@ -24,11 +22,8 @@ order; the order below is only a suggested grouping.
         unused, and only skin matrices are uploaded today.
   - [ ] #9 TODO list
     - [ ] Remove `updateDescriptorSetsAndUniformBuffers` and rely on RAII.
-    - [x] Move the attribute descriptions from `ShaderVertex` to `ShaderInfo`.
   - [ ] #11 glTF animation on GPU: sample and interpolate animation in a
         compute shader. Only joint matrices are computed on the GPU today.
-  - [x] #12 AABB from glTF JSON: use accessor `min` and `max` when present
-        instead of scanning every vertex.
   - [ ] #15 Add USD/USDA/USDC support.
   - [ ] #16 Add terrain support.
 
@@ -164,14 +159,6 @@ The frame is single-threaded end to end. Per-frame CPU work is 0.023 ms of a
 until the scene grows. The cost is at start-up, where whole loads now run on
 workers. What remains for the frame loop: one command pool per builder and a
 single queue fence with no per-frame fences.
-
-### Asset loading
-
-- [x] Run whole glTF loads (file read, JSON and image decode, accessor decode,
-      vertex conversion, GPU creation, upload) on `std.parallelism` workers,
-      one task per file, `totalCPUs - 1` of them. No custom pool.
-- [x] Record the start-up breakdown after loading runs on workers. The
-      sequential and parallel numbers are in `bench/baseline.md`.
 
 ### Frame loop
 
