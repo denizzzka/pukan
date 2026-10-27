@@ -87,6 +87,61 @@ Because the goal is vague here, the questions below decide the scope:
   the same render pass?
 - Are pipelines created at scene setup or on first use?
 
+## Materials
+
+The shared `Material` covers simple unlit/lit shading and glTF metallic-roughness.
+The following pieces are still missing:
+
+- [ ] Linear texture formats. Normal, metallic-roughness and occlusion maps
+      must use UNORM views; base color and emissive stay sRGB.
+- [ ] Mipmaps and glTF samplers. Generate mip chains and honour each sampler's
+      wrap and filter modes instead of forcing MIRRORED_REPEAT.
+- [ ] Material textures on spheres and cylinders. Add procedural UVs and a
+      shared texture table or descriptor array so primitive groups can use the
+      same textures as meshes.
+- [ ] glTF material extensions: `KHR_materials_unlit` first, then emissive
+      strength, specular, clearcoat, sheen, transmission, iridescence, volume,
+      IOR, anisotropy and dispersion.
+- [ ] Tangent space. Load `TANGENT` when present and keep the derivative TBN as
+      a fallback; use `textureGrad` where UV derivatives cross seams.
+- [ ] Alpha handling. Sort blended primitives back to front and offer
+      alpha-to-coverage for masked materials.
+- [ ] Real IBL. Replace the analytic sky with irradiance and prefiltered
+      environment maps plus a BRDF LUT.
+- [ ] Shared materials. A material table so meshes and primitives can reference
+      the same material instead of taking one slot per mesh.
+- [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin
+      per node and primitive.
+- [ ] Simple material override for glTF. Allow an unlit/lit `Material` on a
+      loaded mesh and map `KHR_materials_unlit` to it.
+- [ ] Texture compression. KTX2/BasisU and other compressed formats with a
+      fallback path.
+
+### Material seams and white dots
+
+Isolated white pixels appear at texture or mesh seams with MSAA disabled. The
+method:
+
+- [ ] Reproduce on a fixed sample, camera and distance; record the sample,
+      primitive and screen area.
+- [ ] Set the clear/background to a distinct colour. Dots that take that colour
+      are geometry gaps; dots that stay white are texture or shading.
+- [ ] Disable normal maps. Dots that disappear point at the derivative TBN on UV
+      seams or a missing tangent attribute.
+- [ ] Compare sampler states: CLAMP_TO_EDGE vs MIRRORED_REPEAT, nearest vs
+      linear, with and without mipmaps.
+- [ ] Check UV islands and texture borders: sampling across an island edge can
+      pull the opposite or border texel; use clamped samplers or gutters.
+- [ ] Compare culling: back-face culling vs none, and check the front-face
+      winding. Holes that vanish indicate reversed or missing triangles.
+- [ ] Compare MSAA 1x and 4x. If the dots only blur, they are subpixel coverage
+      gaps, not an MSAA defect.
+- [ ] Inspect shared edges between primitives for duplicated vertices,
+      T-junctions and floating-point differences; overlap or weld them.
+- [ ] Check depth precision and z-fighting at coplanar seams.
+- [ ] Keep the smallest fix that removes the dots without changing the rest of
+      the material path.
+
 ## Data layout and throughput
 
 Thesis: the remaining speed is in reducing the entropy of the data that moves
