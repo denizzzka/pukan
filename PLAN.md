@@ -18,12 +18,9 @@ belongs to `Images`. Extending `VkObj` to every Vulkan handle is not worth it:
 it cannot express parents, extension destroy functions, batch frees,
 non-owned handles or destruction order. Add `VkObj` specializations only for
 new standalone handles with a known parent; keep bulk and order-sensitive
-resources in their mixins. `VkInfoNames`, `vkCall` and `SimpleSList` already
-cover generic create/destroy naming and array storage; the missing part is
-ownership, not reflection.
-
-Deferred: an owned-handle array helper with a destroy delegate, if a batch owner
-needs it. Do not use `VkObj[]` for batch handles.
+resources in their mixins. `VkInfoNames`, `vkCall`, `SimpleSList` and
+`OwnedHandles` cover generic create/destroy naming and array ownership; do not
+use `VkObj[]` for batch handles.
 
 ## Geometric algebra: PGA and CGA
 

@@ -172,6 +172,47 @@ struct VkObj(Handle)
     }
 }
 
+/// Owns an array of handles and frees the whole array with one delegate call
+struct OwnedHandles(Handle)
+{
+    private Handle[] handles;
+    private void delegate(Handle[]) destroyer;
+
+    this(Handle[] handles, void delegate(Handle[]) destroyer)
+    {
+        this.handles = handles;
+        this.destroyer = destroyer;
+    }
+
+    @disable this(this);
+
+    ref OwnedHandles opAssign(OwnedHandles rhs)
+    {
+        if(&this is &rhs)
+            return this;
+
+        destroy(this);
+
+        handles = rhs.handles;
+        destroyer = rhs.destroyer;
+
+        rhs.handles = null;
+        rhs.destroyer = null;
+
+        return this;
+    }
+
+    ~this()
+    {
+        if(handles.length && destroyer !is null)
+            destroyer(handles);
+    }
+
+    ref Handle opIndex(size_t i) => handles[i];
+    size_t length() const => handles.length;
+    auto opSlice() => handles[];
+}
+
 unittest
 {
     static assert(is(VkHandleInfo!VkInstance.CreateInfo == VkInstanceCreateInfo));
