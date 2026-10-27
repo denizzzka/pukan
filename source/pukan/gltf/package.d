@@ -579,6 +579,8 @@ class SkinnedGlTF : GlTF
 
     private void recalcSkin()
     {
+        // TODO: bake skins without animation on the CPU at load time and skip
+        // this per-frame recalculation.
         assert(content.skins.length > 0);
         assert(jointMatricesUniformBuf.length > 0);
 
