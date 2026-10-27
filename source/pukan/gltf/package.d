@@ -364,8 +364,9 @@ class GlTF : DrawableByVulkan
         }
 
         const vertexCount = uplVert.vertices.count;
+        const hasSkin = ("WEIGHTS_0" in primitive.attributes) !is null;
 
-        if("WEIGHTS_0" in primitive.attributes)
+        if(hasSkin)
         {
             uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(
                 primitive.attributes["JOINTS_0"].get!uint
@@ -376,11 +377,6 @@ class GlTF : DrawableByVulkan
 
             createGpuBufIfNeed(device, uplVert.joints, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
             createGpuBufIfNeed(device, uplVert.weights, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        }
-        else
-        {
-            uplVert.joints = createFakeVertexBuffer!Vector4us(device, vertexCount, Vector4us.init, gpuBuffs);
-            uplVert.weights = createFakeVertexBuffer!Vector4f(device, vertexCount, Vector4f(1, 0, 0, 0), gpuBuffs);
         }
 
         const hasNormals = ("NORMAL" in primitive.attributes) !is null;
@@ -434,6 +430,7 @@ class GlTF : DrawableByVulkan
             allocator,
             materialBuffer,
             fakeTextureInfo,
+            hasSkin,
             gpuBuffs,
             jointsUboInfo,
         );
@@ -512,10 +509,12 @@ class GlTF : DrawableByVulkan
 
     private GraphicsPipelineCfg selectPipeline(const MeshClass mesh)
     {
-        if(mesh.doubleSided)
-            return mesh.alphaMode == AlphaMode.blend ? pipelines.doubleSidedBlend : pipelines.doubleSided;
+        auto variants = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
 
-        return mesh.alphaMode == AlphaMode.blend ? pipelines.blend : pipelines.opaque;
+        if(mesh.doubleSided)
+            return mesh.alphaMode == AlphaMode.blend ? variants.doubleSidedBlend : variants.doubleSided;
+
+        return mesh.alphaMode == AlphaMode.blend ? variants.blend : variants.opaque;
     }
 
     protected void uploadSkinMatricesStatic(scope VkCommandBuffer commandBuffer)

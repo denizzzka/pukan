@@ -66,6 +66,7 @@ final class GltfMesh : Mesh
     package UploadedVertices vert;
     package AlphaMode alphaMode;
     package bool doubleSided;
+    package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
     private VkDescriptorImageInfo[5] materialTextures;
@@ -76,6 +77,7 @@ final class GltfMesh : Mesh
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         VkDescriptorImageInfo fakeTexture,
+        bool hasSkin,
         ref BufferPieceOnGPU[] gpuBuffs,
         ref VkDescriptorBufferInfo jointsUboInfo,
     )
@@ -85,6 +87,7 @@ final class GltfMesh : Mesh
         this.name = name;
         this.descriptorSet = allocator.allocate();
         this.vert = vert;
+        this.hasSkin = hasSkin;
         materialTextures[] = fakeTexture;
 
         assert(vert.vertices.viewIdx >= 0);
@@ -290,22 +293,33 @@ final class GltfMesh : Mesh
 
     private void buildGeometry(ref BufferPieceOnGPU[] gpuBuffs)
     {
-        VertexStream[] streams;
-
-        foreach(i, accessor; vert.allBuffers)
+        VertexStream stream(BufAccess accessor)
         {
             assert(accessor.viewIdx >= 0);
 
             auto gpuBuf = gpuBuffs[accessor.viewIdx];
             assert(gpuBuf !is null);
 
-            streams ~= VertexStream(
+            return VertexStream(
                 buffer: gpuBuf.buffer.gpuBuffer,
                 offset: accessor.offset,
                 size: gpuBuf.buffer.cpuBuf.length - accessor.offset,
                 stride: accessor.stride,
             );
         }
+
+        VertexStream[] streams = [
+            stream(vert.vertices),
+            stream(vert.texCoords),
+        ];
+
+        if(hasSkin)
+        {
+            streams ~= stream(vert.joints);
+            streams ~= stream(vert.weights);
+        }
+
+        streams ~= stream(vert.normals);
 
         setStreams(streams);
         vertexCount = vert.vertices.count;

@@ -2,7 +2,7 @@ module pukan.gltf.factory;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f;
 import pukan.gltf;
-import pukan.gltf.pipelines: GltfPipelines;
+import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines;
 import pukan.material: MaterialBuffer;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
@@ -68,6 +68,88 @@ private ShaderVertexInput vertexInput()
     );
 }
 
+private ShaderVertexInput staticVertexInput()
+{
+    return ShaderVertexInput(
+        [
+            VkVertexInputBindingDescription(
+                binding: 0,
+                stride: Vector3f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+            VkVertexInputBindingDescription(
+                binding: 1,
+                stride: Vector2f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+            VkVertexInputBindingDescription(
+                binding: 2,
+                stride: Vector3f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+        ],
+        [
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 0,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 1,
+                location: 1,
+                format: VK_FORMAT_R32G32_SFLOAT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 2,
+                location: 2,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+            ),
+        ],
+    );
+}
+
+private VkDescriptorSetLayoutBinding[] fragmentBindings()
+{
+    return [
+        VkDescriptorSetLayoutBinding(
+            binding: 0,
+            descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+        VkDescriptorSetLayoutBinding(
+            binding: 1,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+        VkDescriptorSetLayoutBinding(
+            binding: 3,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+        VkDescriptorSetLayoutBinding(
+            binding: 4,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+        VkDescriptorSetLayoutBinding(
+            binding: 5,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+        VkDescriptorSetLayoutBinding(
+            binding: 6,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+    ];
+}
+
 class GltfFactory
 {
     import pukan.gltf.skin_matrices: SkinMatrices;
@@ -99,53 +181,57 @@ class GltfFactory
         this.pipelines = pipelines;
         this.resources = resources;
 
-        auto stages = shaderStages(device);
+        auto skinnedStages = shaderStages(device);
+        auto staticStages = staticShaderStages(device);
+
+        // A descriptor allocator needs a technique, but none of its pipelines.
+        technique = pipelines.declare(RenderTechnique(
+            name: "glTF descriptor layout",
+            stages: skinnedStages,
+        ), 20);
+
+        pipelineCfgs.skinned = createVariants("glTF", skinnedStages, renderPass);
+        pipelineCfgs.unskinned = createVariants("glTF static", staticStages, renderPass);
+    }
+
+    private GltfPipelineVariants createVariants(string prefix, ShaderInfo[] stages, RenderPass renderPass)
+    {
         VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE];
 
-        technique = pipelines.declare(RenderTechnique(
-            name: "glTF",
-            stages: stages,
-            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
-            dynamicStates: dynamicStates,
-        ), 20);
+        TechniqueId declare(string suffix, FixedState state)
+        {
+            return pipelines.declare(RenderTechnique(
+                name: prefix ~ suffix,
+                stages: stages,
+                state: state,
+                dynamicStates: dynamicStates,
+            ), 20);
+        }
 
-        const doubleSidedTechnique = pipelines.declare(RenderTechnique(
-            name: "glTF double sided",
-            stages: stages,
-            state: FixedState(
-                frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
-                cullMode: VK_CULL_MODE_NONE,
-            ),
-            dynamicStates: dynamicStates,
-        ), 20);
+        const opaque = declare("", FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE));
+        const doubleSided = declare(" double sided", FixedState(
+            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            cullMode: VK_CULL_MODE_NONE,
+        ));
+        const blend = declare(" blend", FixedState(
+            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            blendEnable: VK_TRUE,
+            depthWriteEnable: VK_FALSE,
+        ));
+        const doubleSidedBlend = declare(" double sided blend", FixedState(
+            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            cullMode: VK_CULL_MODE_NONE,
+            blendEnable: VK_TRUE,
+            depthWriteEnable: VK_FALSE,
+        ));
 
-        const blendTechnique = pipelines.declare(RenderTechnique(
-            name: "glTF blend",
-            stages: stages,
-            state: FixedState(
-                frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
-                blendEnable: VK_TRUE,
-                depthWriteEnable: VK_FALSE,
-            ),
-            dynamicStates: dynamicStates,
-        ), 20);
+        GltfPipelineVariants result;
+        result.opaque = pipelines.acquire(opaque, renderPass, 1);
+        result.doubleSided = pipelines.acquire(doubleSided, renderPass, 1);
+        result.blend = pipelines.acquire(blend, renderPass, 1);
+        result.doubleSidedBlend = pipelines.acquire(doubleSidedBlend, renderPass, 1);
 
-        const doubleSidedBlendTechnique = pipelines.declare(RenderTechnique(
-            name: "glTF double sided blend",
-            stages: stages,
-            state: FixedState(
-                frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
-                cullMode: VK_CULL_MODE_NONE,
-                blendEnable: VK_TRUE,
-                depthWriteEnable: VK_FALSE,
-            ),
-            dynamicStates: dynamicStates,
-        ), 20);
-
-        pipelineCfgs.opaque = pipelines.acquire(technique, renderPass, 1);
-        pipelineCfgs.doubleSided = pipelines.acquire(doubleSidedTechnique, renderPass, 1);
-        pipelineCfgs.blend = pipelines.acquire(blendTechnique, renderPass, 1);
-        pipelineCfgs.doubleSidedBlend = pipelines.acquire(doubleSidedBlendTechnique, renderPass, 1);
+        return result;
     }
 
     private static ShaderInfo[] shaderStages(LogicalDevice device)
@@ -169,49 +255,42 @@ class GltfFactory
                 ),
                 vertexInput(),
             ),
+            fragmentStage(device),
+        ];
+    }
+
+    private static ShaderInfo[] staticShaderStages(LogicalDevice device)
+    {
+        return [
             device.uploadShaderToGPU(
-                cast(ubyte[]) import("mesh_pbr_frag.spv"),
-                VK_SHADER_STAGE_FRAGMENT_BIT,
+                cast(ubyte[]) import("mesh_pbr_static_vert.spv"),
+                VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
-                        binding: 0,
-                        descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        binding: 2,
+                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                         descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-                    ),
-                    VkDescriptorSetLayoutBinding(
-                        binding: 1,
-                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-                    ),
-                    VkDescriptorSetLayoutBinding(
-                        binding: 3,
-                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-                    ),
-                    VkDescriptorSetLayoutBinding(
-                        binding: 4,
-                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-                    ),
-                    VkDescriptorSetLayoutBinding(
-                        binding: 5,
-                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-                    ),
-                    VkDescriptorSetLayoutBinding(
-                        binding: 6,
-                        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
                     ),
                 ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+                staticVertexInput(),
             ),
+            fragmentStage(device),
         ];
+    }
+
+    private static ShaderInfo fragmentStage(LogicalDevice device)
+    {
+        return device.uploadShaderToGPU(
+            cast(ubyte[]) import("mesh_pbr_frag.spv"),
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            fragmentBindings(),
+        );
     }
 
     auto create(string filename)
