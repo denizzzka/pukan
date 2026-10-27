@@ -23,6 +23,44 @@ import vibe.data.json;
 
 alias LoaderNode = pukan.gltf.loader.Node;
 
+private bool isSkinAnimated(GltfContent content, LoaderNode[] nodes)
+{
+    if(content.skins.length == 0 || content.animations.length == 0)
+        return false;
+
+    int[] parents;
+    parents.length = nodes.length;
+    parents[] = -1;
+
+    foreach(i, ref node; nodes)
+        foreach(child; node.childrenNodeIndices)
+            parents[child] = cast(int) i;
+
+    bool[] animated;
+    animated.length = nodes.length;
+
+    foreach(ref animation; content.animations)
+        foreach(ref channel; animation.channels)
+            if(channel.targetNode < nodes.length)
+                animated[channel.targetNode] = true;
+
+    foreach(ref skin; content.skins)
+        foreach(joint; skin.nodesIndices)
+        {
+            int current = cast(int) joint;
+
+            while(current >= 0)
+            {
+                if(animated[current])
+                    return true;
+
+                current = parents[current];
+            }
+        }
+
+    return false;
+}
+
 private Boxf accessorAabb(in Accessor accessor)
 {
     if(accessor.min_max == Json.emptyObject)
@@ -115,6 +153,7 @@ class GlTF : DrawableByVulkan
     LoadStats loadStats;
 
     private bool uploaded;
+    private bool skinsBaked;
 
     private Node rootSceneNode;
     private Trans rootSceneNodeTrans;
@@ -169,6 +208,7 @@ class GlTF : DrawableByVulkan
 
         animation = AnimationSupport(&content, nodes.length);
         gpuBuffs.length = content.bufferViews.length;
+        skinsBaked = content.skins.length > 0 && !isSkinAnimated(content, nodes);
 
         {
             baseNodeTranslations.length = nodes.length;
@@ -236,12 +276,12 @@ class GlTF : DrawableByVulkan
             }
         }
 
+        // Baked skins need the bind-pose joint transforms.
+        this.rootSceneNode.refreshTransFromRootValues;
+
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device);
         });
-
-        // For skin support:
-        this.rootSceneNode.refreshTransFromRootValues;
     }
 
     protected void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -359,12 +399,10 @@ class GlTF : DrawableByVulkan
 
             uplVert.vertices = content.getAccess!(Type.VEC3, Vector3f)(*vertices);
             uplVert.aabb = accessorAabb(*vertices);
-
-            createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         const vertexCount = uplVert.vertices.count;
-        const hasSkin = ("WEIGHTS_0" in primitive.attributes) !is null;
+        bool hasSkin = ("WEIGHTS_0" in primitive.attributes) !is null;
 
         if(hasSkin)
         {
@@ -374,9 +412,6 @@ class GlTF : DrawableByVulkan
             uplVert.weights = content.getAccess!(Type.VEC4, Vector4f)(
                 primitive.attributes["WEIGHTS_0"].get!uint
             );
-
-            createGpuBufIfNeed(device, uplVert.joints, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            createGpuBufIfNeed(device, uplVert.weights, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         const hasNormals = ("NORMAL" in primitive.attributes) !is null;
@@ -390,10 +425,7 @@ class GlTF : DrawableByVulkan
             enforce(normals.componentType == ComponentType.FLOAT);
 
             uplVert.normals = content.getAccess!(Type.VEC3, Vector3f)(*normals);
-            createGpuBufIfNeed(device, uplVert.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
-        else
-            uplVert.normals = createFakeVertexBuffer!Vector3f(device, vertexCount, Vector3f(0, 0, 1), gpuBuffs);
 
         // If indexed mesh:
         if(primitive.indicesAccessorIdx >= 0)
@@ -424,6 +456,94 @@ class GlTF : DrawableByVulkan
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
+        if(hasSkin && skinsBaked)
+        {
+            const jointMatrices = content.skins[0].calculateJointMatrices();
+
+            Vector3f[] bakedPositions;
+            bakedPositions.length = vertexCount;
+
+            auto positionRange = AccessRange!(Vector3f, false)(
+                content.bufferViews[uplVert.vertices.viewIdx].buf,
+                uplVert.vertices,
+            );
+            auto jointRange = AccessRange!(Vector4us, false)(
+                content.bufferViews[uplVert.joints.viewIdx].buf,
+                uplVert.joints,
+            );
+            auto weightRange = AccessRange!(Vector4f, false)(
+                content.bufferViews[uplVert.weights.viewIdx].buf,
+                uplVert.weights,
+            );
+
+            foreach(i; 0 .. vertexCount)
+            {
+                const p = positionRange.front;
+                positionRange.popFront;
+                const j = jointRange.front;
+                jointRange.popFront;
+                const w = weightRange.front;
+                weightRange.popFront;
+
+                const baked = Vector4f(p.x, p.y, p.z, 1) * skinMatrix(jointMatrices, j, w);
+                bakedPositions[i] = Vector3f(baked.x, baked.y, baked.z);
+            }
+
+            Vector3f[] bakedNormals;
+            bakedNormals.length = vertexCount;
+
+            if(hasNormals)
+            {
+                auto normalRange = AccessRange!(Vector3f, false)(
+                    content.bufferViews[uplVert.normals.viewIdx].buf,
+                    uplVert.normals,
+                );
+                auto normalJointRange = AccessRange!(Vector4us, false)(
+                    content.bufferViews[uplVert.joints.viewIdx].buf,
+                    uplVert.joints,
+                );
+                auto normalWeightRange = AccessRange!(Vector4f, false)(
+                    content.bufferViews[uplVert.weights.viewIdx].buf,
+                    uplVert.weights,
+                );
+
+                foreach(i; 0 .. vertexCount)
+                {
+                    const n = normalRange.front;
+                    normalRange.popFront;
+                    const j = normalJointRange.front;
+                    normalJointRange.popFront;
+                    const w = normalWeightRange.front;
+                    normalWeightRange.popFront;
+
+                    const baked = Vector4f(n.x, n.y, n.z, 0) * skinMatrix(jointMatrices, j, w);
+                    bakedNormals[i] = Vector3f(baked.x, baked.y, baked.z).normalized;
+                }
+            }
+            else
+                bakedNormals[] = Vector3f(0, 0, 1);
+
+            uplVert.vertices = createVertexBuffer(device, bakedPositions, gpuBuffs);
+            uplVert.normals = createVertexBuffer(device, bakedNormals, gpuBuffs);
+            uplVert.aabb = Boxf.init;
+            hasSkin = false;
+        }
+        else
+        {
+            createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+            if(hasNormals)
+                createGpuBufIfNeed(device, uplVert.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            else
+                uplVert.normals = createFakeVertexBuffer!Vector3f(device, vertexCount, Vector3f(0, 0, 1), gpuBuffs);
+
+            if(hasSkin)
+            {
+                createGpuBufIfNeed(device, uplVert.joints, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+                createGpuBufIfNeed(device, uplVert.weights, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            }
+        }
+
         auto m = new GltfMesh(
             mesh.name,
             uplVert,
@@ -438,6 +558,34 @@ class GlTF : DrawableByVulkan
         m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals);
         node.mesh = m;
         meshes ~= node.mesh;
+    }
+
+    private static Matrix4x4f skinMatrix(
+        const Matrix4x4f[] jointMatrices,
+        Vector4us joints,
+        Vector4f weights,
+    )
+    {
+        Matrix4x4f result = jointMatrices[joints.x] * weights.x;
+        result += jointMatrices[joints.y] * weights.y;
+        result += jointMatrices[joints.z] * weights.z;
+        result += jointMatrices[joints.w] * weights.w;
+
+        return result;
+    }
+
+    private BufAccess createVertexBuffer(T)(
+        LogicalDevice device,
+        T[] data,
+        ref BufferPieceOnGPU[] gpuBuffs,
+    )
+    {
+        auto piece = new BufferPieceOnGPU;
+        piece.buffer = new TransferBuffer(device, T.sizeof * data.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        (cast(T[]) piece.buffer.cpuBuf)[] = data;
+        gpuBuffs ~= piece;
+
+        return BufAccess(cast(ptrdiff_t)(gpuBuffs.length - 1), 0, cast(ubyte) T.sizeof, cast(uint) data.length);
     }
 
     private BufAccess createFakeVertexBuffer(T)(
@@ -572,6 +720,9 @@ class SkinnedGlTF : GlTF
 
     protected override void refreshSkinMatrices(VkCommandBuffer buf)
     {
+        if(skinsBaked)
+            return;
+
         //FIXME: recalc skin for each mesh
         recalcSkin();
         jointMatricesUniformBuf.recordUpload(buf);
@@ -579,8 +730,7 @@ class SkinnedGlTF : GlTF
 
     private void recalcSkin()
     {
-        // TODO: bake skins without animation on the CPU at load time and skip
-        // this per-frame recalculation.
+        // TODO: move animated skin matrix updates to the GPU.
         assert(content.skins.length > 0);
         assert(jointMatricesUniformBuf.length > 0);
 
@@ -614,6 +764,9 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
     {
         super.initJointMatricesBuffer(device, nodes);
 
+        if(skinsBaked)
+            return;
+
         //FIXME: hardcoded skin is used
         auto skin = &content.skins[0];
 
@@ -634,6 +787,9 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
 
     protected override void refreshSkinMatrices(VkCommandBuffer buf)
     {
+        if(skinsBaked)
+            return;
+
         auto skin = &content.skins[0];
 
         Matrix4x4f skinRootInverse = Matrix4x4f.identity;
@@ -655,6 +811,9 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
     version(assert)
     void debugVerifySkinJoints(LogicalDevice device, CommandPool commandPool, scope ref VkCommandBuffer commandBuffer)
     {
+        if(skinsBaked)
+            return;
+
         jointMatricesUniformBuf.downloadImmediate(commandPool, commandBuffer);
 
         auto gpuData = cast(const(float)[]) jointMatricesUniformBuf.cpuBuf;
