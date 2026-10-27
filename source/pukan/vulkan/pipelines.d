@@ -273,6 +273,7 @@ struct RenderTechnique
     VkDynamicState[] dynamicStates;
 }
 
+//TODO: move to pukan: pool growth is engine policy, not a Vulkan wrapper
 /// Allocates descriptor sets, adding a pool when the current one is full
 final class DescriptorAllocator
 {
