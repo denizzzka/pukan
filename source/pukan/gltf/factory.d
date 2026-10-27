@@ -1,12 +1,60 @@
 module pukan.gltf.factory;
 
-import dlib.math: Matrix4x4f;
+import dlib.math: Matrix4x4f, Vector2f, Vector3f;
 import pukan.gltf;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique, TechniqueId;
 import std.meta: AliasSeq;
+
+private ShaderVertexInput vertexInput()
+{
+    return ShaderVertexInput(
+        [
+            VkVertexInputBindingDescription(
+                binding: 0,
+                stride: Vector3f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+            VkVertexInputBindingDescription(
+                binding: 1,
+                stride: Vector2f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+            VkVertexInputBindingDescription(
+                binding: 2,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+            VkVertexInputBindingDescription(
+                binding: 3,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+        ],
+        [
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 0,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 1,
+                location: 1,
+                format: VK_FORMAT_R32G32_SFLOAT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 2,
+                location: 2,
+                format: VK_FORMAT_R16G16B16A16_UINT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 3,
+                location: 3,
+                format: VK_FORMAT_R32G32B32A32_SFLOAT,
+            ),
+        ],
+    );
+}
 
 class GltfFactory
 {
@@ -42,8 +90,6 @@ class GltfFactory
         technique = pipelines.declare(RenderTechnique(
             name: "glTF",
             stages: shaderStages(device),
-            vertexBindings: ShaderVertex.getBindingDescriptions,
-            vertexAttributes: ShaderVertex.getAttributeDescriptions,
             state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
             dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
         ), 20);
@@ -70,6 +116,7 @@ class GltfFactory
                     offset: 0,
                     size: Matrix4x4f.sizeof,
                 ),
+                vertexInput(),
             ),
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("mesh_frag.spv"),

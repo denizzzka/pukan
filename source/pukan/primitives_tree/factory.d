@@ -8,6 +8,39 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.frame_builder: FrameBuilder;
 import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 
+private ShaderVertexInput vertexInput()
+{
+    return ShaderVertexInput(
+        [
+            VkVertexInputBindingDescription(
+                binding: 0,
+                stride: Vertex.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+        ],
+        [
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 0,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+                offset: Vertex.pos.offsetof,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 1,
+                format: VK_FORMAT_R32G32B32_SFLOAT,
+                offset: Vertex.color.offsetof,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 0,
+                location: 2,
+                format: VK_FORMAT_R32G32_SFLOAT,
+                offset: Vertex.texCoord.offsetof,
+            ),
+        ],
+    );
+}
+
 struct PrimitivesFactory(T)
 {
     LogicalDevice device;
@@ -23,8 +56,6 @@ struct PrimitivesFactory(T)
         const technique = pipelines.declare(RenderTechnique(
             name: T.stringof,
             stages: shaderStages(device),
-            vertexBindings: Vertex.getBindingDescriptions,
-            vertexAttributes: Vertex.getAttributeDescriptions,
             dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
         ), 10);
 
@@ -51,6 +82,7 @@ struct PrimitivesFactory(T)
                     offset: 0,
                     size: Matrix4x4f.sizeof,
                 ),
+                vertexInput(),
             ),
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("mesh_frag.spv"),

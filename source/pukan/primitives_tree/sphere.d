@@ -18,13 +18,15 @@ alias SphereGroupFlags = BitFlags!SphereGroupFlag;
 struct SphereVertex
 {
     Vector3f pos;
+}
 
-    static auto getBindingDescriptions()
-    {
-        return [
+private ShaderVertexInput vertexInput()
+{
+    return ShaderVertexInput(
+        [
             VkVertexInputBindingDescription(
                 binding: 0,
-                stride: pos.sizeof,
+                stride: SphereVertex.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
             VkVertexInputBindingDescription(
@@ -32,12 +34,8 @@ struct SphereVertex
                 stride: 4 * float.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_INSTANCE,
             ),
-        ];
-    }
-
-    static auto getAttributeDescriptions()
-    {
-        return [
+        ],
+        [
             VkVertexInputAttributeDescription(
                 binding: 0,
                 location: 0,
@@ -50,8 +48,8 @@ struct SphereVertex
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: 0,
             ),
-        ];
-    }
+        ],
+    );
 }
 
 struct SphereGroup
@@ -332,8 +330,6 @@ class SphereRenderer : DrawablePrimitive
         const technique = pipelines.declare(RenderTechnique(
             name: "spheres",
             stages: shaderStages(device),
-            vertexBindings: SphereVertex.getBindingDescriptions,
-            vertexAttributes: SphereVertex.getAttributeDescriptions,
         ), 1);
 
         auto allocator = pipelines.descriptorAllocator(technique);
@@ -374,6 +370,7 @@ class SphereRenderer : DrawablePrimitive
                     offset: 0,
                     size: Matrix4x4f.sizeof,
                 ),
+                vertexInput(),
             ),
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("sphere_frag.spv"),

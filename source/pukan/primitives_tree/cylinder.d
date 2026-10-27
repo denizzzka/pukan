@@ -41,13 +41,15 @@ struct CylinderVertex
 {
     Vector3f pos;
     Vector3f normal;
+}
 
-    static auto getBindingDescriptions()
-    {
-        return [
+private ShaderVertexInput vertexInput()
+{
+    return ShaderVertexInput(
+        [
             VkVertexInputBindingDescription(
                 binding: 0,
-                stride: pos.sizeof + normal.sizeof,
+                stride: CylinderVertex.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
             VkVertexInputBindingDescription(
@@ -55,12 +57,8 @@ struct CylinderVertex
                 stride: 4 * Vector4f.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_INSTANCE,
             ),
-        ];
-    }
-
-    static auto getAttributeDescriptions()
-    {
-        return [
+        ],
+        [
             VkVertexInputAttributeDescription(
                 binding: 0,
                 location: 0,
@@ -71,7 +69,7 @@ struct CylinderVertex
                 binding: 0,
                 location: 1,
                 format: VK_FORMAT_R32G32B32_SFLOAT,
-                offset: pos.sizeof,
+                offset: Vector3f.sizeof,
             ),
             VkVertexInputAttributeDescription(
                 binding: 1,
@@ -97,8 +95,8 @@ struct CylinderVertex
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: 48,
             ),
-        ];
-    }
+        ],
+    );
 }
 
 private struct CylinderLevel
@@ -402,8 +400,6 @@ class CylinderRenderer : DrawablePrimitive
         const technique = pipelines.declare(RenderTechnique(
             name: "cylinders",
             stages: shaderStages(device),
-            vertexBindings: CylinderVertex.getBindingDescriptions,
-            vertexAttributes: CylinderVertex.getAttributeDescriptions,
             // The instance basis is left-handed, so its winding is reversed.
             state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
         ), 1);
@@ -440,6 +436,7 @@ class CylinderRenderer : DrawablePrimitive
                     offset: 0,
                     size: Matrix4x4f.sizeof,
                 ),
+                vertexInput(),
             ),
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("cylinder_frag.spv"),

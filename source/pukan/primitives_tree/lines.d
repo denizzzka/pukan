@@ -19,11 +19,10 @@ private struct LinePush
     Vector2f viewport;
 }
 
-private struct LineVertex
+private ShaderVertexInput vertexInput()
 {
-    static auto getBindingDescriptions()
-    {
-        return [
+    return ShaderVertexInput(
+        [
             VkVertexInputBindingDescription(
                 binding: 0,
                 stride: 2 * float.sizeof,
@@ -34,12 +33,8 @@ private struct LineVertex
                 stride: LineInstance.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_INSTANCE,
             ),
-        ];
-    }
-
-    static auto getAttributeDescriptions()
-    {
-        return [
+        ],
+        [
             VkVertexInputAttributeDescription(
                 binding: 0,
                 location: 0,
@@ -64,8 +59,8 @@ private struct LineVertex
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: LineInstance.color.offsetof,
             ),
-        ];
-    }
+        ],
+    );
 }
 
 /// Screen-space expanded line segments, for debug output
@@ -96,8 +91,6 @@ class LineRenderer : DrawablePrimitive
         const technique = pipelines.declare(RenderTechnique(
             name: overlay ? "lines overlay" : "lines",
             stages: shaderStages(device),
-            vertexBindings: LineVertex.getBindingDescriptions,
-            vertexAttributes: LineVertex.getAttributeDescriptions,
             state: FixedState(
                 topology: VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
                 cullMode: VK_CULL_MODE_NONE,
@@ -160,6 +153,7 @@ class LineRenderer : DrawablePrimitive
                     offset: 0,
                     size: LinePush.sizeof,
                 ),
+                vertexInput(),
             ),
             device.uploadShaderToGPU(
                 cast(ubyte[]) import("line_frag.spv"),

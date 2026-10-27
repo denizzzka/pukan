@@ -125,8 +125,6 @@ struct RenderTechnique
 {
     string name;
     ShaderInfo[] stages;
-    VkVertexInputBindingDescription[] vertexBindings;
-    VkVertexInputAttributeDescription[] vertexAttributes;
     FixedState state;
     VkDynamicState[] dynamicStates;
 }
@@ -363,12 +361,14 @@ final class PipelineFactory
             pDynamicStates: dynamicStates.ptr,
         };
 
+        auto vertexInput = techniqueVertexInput(technique.description.stages);
+
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
             sType: VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-            vertexBindingDescriptionCount: cast(uint) technique.description.vertexBindings.length,
-            pVertexBindingDescriptions: technique.description.vertexBindings.ptr,
-            vertexAttributeDescriptionCount: cast(uint) technique.description.vertexAttributes.length,
-            pVertexAttributeDescriptions: technique.description.vertexAttributes.ptr,
+            vertexBindingDescriptionCount: cast(uint) vertexInput.bindings.length,
+            pVertexBindingDescriptions: vertexInput.bindings.ptr,
+            vertexAttributeDescriptionCount: cast(uint) vertexInput.attributes.length,
+            pVertexAttributeDescriptions: vertexInput.attributes.ptr,
         };
 
         VkPipelineViewportStateCreateInfo viewportState = {
@@ -450,6 +450,22 @@ final class PipelineFactory
             graphicsPipeline: device.createGraphicsPipelines([pipelineCreateInfo])[0],
             pipelineLayout: technique.pipelineLayout,
         );
+    }
+
+    private static ShaderVertexInput techniqueVertexInput(ShaderInfo[] stages)
+    {
+        ShaderVertexInput result;
+        bool found;
+
+        foreach(ref stage; stages)
+            if(stage.stage == VK_SHADER_STAGE_VERTEX_BIT)
+            {
+                assert(!found, "multiple vertex shader stages in one technique");
+                result = stage.vertexInput;
+                found = true;
+            }
+
+        return result;
     }
 
     private static VkPushConstantRange[] pushConstantRanges(ShaderInfo[] stages)

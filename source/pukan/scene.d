@@ -201,42 +201,4 @@ struct Vertex {
     Vector3f pos;
     Vector3f color;
     Vector2f texCoord;
-
-    static auto getBindingDescriptions() {
-        return [
-            VkVertexInputBindingDescription(
-                binding: 0,
-                stride: this.sizeof,
-                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
-            ),
-        ];
-    }
-
-    static auto getAttributeDescriptions()
-    {
-        VkVertexInputAttributeDescription[3] ad;
-
-        ad[0] = VkVertexInputAttributeDescription(
-            binding: 0,
-            location: 0,
-            format: VK_FORMAT_R32G32B32_SFLOAT,
-            offset: pos.offsetof,
-        );
-
-        ad[1] = VkVertexInputAttributeDescription(
-            binding: 0,
-            location: 1,
-            format: VK_FORMAT_R32G32B32_SFLOAT,
-            offset: color.offsetof,
-        );
-
-        ad[2] = VkVertexInputAttributeDescription(
-            binding: 0,
-            location: 2,
-            format: VK_FORMAT_R32G32_SFLOAT,
-            offset: texCoord.offsetof,
-        );
-
-        return ad;
-    }
 };
