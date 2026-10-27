@@ -135,5 +135,46 @@ rest are long-term spikes, each judged against the plain version it replaces.
 
 ## CPU multithreading
 
-- [ ] Discuss CPU multithreading support: which frame stages to parallelize,
-      and the job and memory model.
+The frame is single-threaded end to end. Per-frame CPU work is 0.023 ms of a
+7.079 ms frame on the fixed scene, so parallelizing the frame loop buys nothing
+until the scene grows; the cost is at start-up and in the per-buffer blocking
+upload. Blockers: `SimpleSList` resource tracking, the growable
+`MaterialBuffer`, the shared `DescriptorAllocator`, one command pool, and a
+single queue fence with no per-frame fences.
+
+### Asset loading
+
+- [ ] Run whole glTF loads (file read, JSON and image decode, accessor decode,
+      vertex conversion, GPU creation, upload) on `std.parallelism` workers,
+      one task per file, `totalCPUs - 1` of them. No custom pool.
+- [ ] Make resource tracking thread-safe: a push-only list with an atomic head,
+      one GC node per created resource, iterated only at teardown, so no removal
+      and no ABA. The owner keeps the node, so its value stays reachable, and the
+      tree's `SList` stays single-threaded.
+- [ ] Chunk `MaterialBuffer`: fixed-size chunks and an atomic slot counter, so a
+      new slot never reallocates the buffer or rewrites existing sets.
+- [ ] Per loading thread: its own `DescriptorAllocator` for the same technique
+      layout and its own `CommandPool`.
+- [ ] Record all copies and image uploads of a load phase into one command
+      buffer and submit once, dropping the per-buffer submit-and-wait in
+      `uploadImmediate`, `copyFromBuffer` and `loadImageToMemory`. `vkQueueSubmit`
+      is externally synchronized: one submitter per queue.
+- [ ] Record the start-up breakdown (read, parse, decode, upload) before and
+      after on the 9 tracked samples.
+
+### Frame loop
+
+- [ ] After archetype storage: split update, upload and record into explicit
+      stages, flatten the tree into (drawable, world matrix) chunks in draw
+      order, and run update and record on `totalCPUs - 1` workers with static
+      chunking.
+- [ ] Frame model: per-worker command pool and bump arena reset at the frame
+      barrier, no allocation in the frame, per-frame fences first, per-slot
+      staging for joints. The deferred destruction queue recycles its nodes
+      through a shared free list.
+- [ ] Keep recording in draw order so blending is unchanged; judge against the
+      single-threaded path on 1k / 10k / 100k drawables and keep recording
+      single-threaded until those numbers exist.
+
+Not parallelized: present, event polling, swapchain maintenance, pipeline and
+shader creation.
