@@ -152,14 +152,6 @@ rest are long-term spikes, each judged against the plain version it replaces.
     the shader only needs the result. This item waits until there is a
     volumetric or absorptive effect in the scene to measure it on.
 
-## CPU multithreading
-
-The frame is single-threaded end to end. Per-frame CPU work is 0.023 ms of a
-7.079 ms frame on the fixed scene, so parallelizing the frame loop buys nothing
-until the scene grows. The cost is at start-up, where whole loads now run on
-workers. What remains for the frame loop: one command pool per builder and a
-single queue fence with no per-frame fences.
-
 ### Frame loop
 
 - [ ] After archetype storage: split update, upload and record into explicit
