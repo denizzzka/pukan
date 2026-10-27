@@ -7,6 +7,10 @@ order; the order below is only a suggested grouping.
       used independently of the rest of `pukan`. Keep module names unchanged.
 - [ ] Set up CI on GitHub: build the library and both demos and run them with
       the validation layers enabled.
+- [ ] Check format availability before use. `VK_FORMAT_R32G32B32_SFLOAT` and
+      similar are not mandatory: query `vkGetPhysicalDeviceFormatProperties`
+      (and `vkGetPhysicalDeviceImageFormatProperties` for images) instead of
+      assuming the format is usable.
 
 ## Open GitHub issues
 
