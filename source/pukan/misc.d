@@ -65,4 +65,8 @@ void expandAABB(ref Boxf box, in Vector3f v)
     if(v.y < box.min.y) box.min.y = v.y;
     else
     if(v.y > box.max.y) box.max.y = v.y;
+
+    if(v.z < box.min.z) box.min.z = v.z;
+    else
+    if(v.z > box.max.z) box.max.z = v.z;
 }

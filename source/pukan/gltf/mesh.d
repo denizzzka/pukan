@@ -46,6 +46,8 @@ package struct UploadedVertices
             BufAccess weights;
         }
     }
+
+    Boxf aabb; /// Accessor bounds; NaN when the file omits them
 }
 
 class GltfMesh : Mesh
@@ -89,6 +91,22 @@ class GltfMesh : Mesh
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
     {
         import std.math: isNaN;
+
+        if(!vert.aabb.min.x.isNaN)
+        {
+            if(box.min.x.isNaN)
+            {
+                box.min = vert.aabb.min;
+                box.max = vert.aabb.max;
+            }
+            else
+            {
+                expandAABB(box, vert.aabb.min);
+                expandAABB(box, vert.aabb.max);
+            }
+
+            return;
+        }
 
         auto range = AccessRange!(Vector3f, false)(gpuBuffs[vert.vertices.viewIdx].buffer.cpuBuf, vert.vertices);
 

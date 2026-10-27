@@ -8,6 +8,7 @@ import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.gltf.mesh: MeshClass = GltfMesh, IndicesDescr, JustColoredMesh, TexturedMesh, UploadedVertices;
 import pukan.mesh: MaterialBuffer;
+import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -20,6 +21,17 @@ import std.exception: enforce;
 import vibe.data.json;
 
 alias LoaderNode = pukan.gltf.loader.Node;
+
+private Boxf accessorAabb(in Accessor accessor)
+{
+    if(accessor.min_max == Json.emptyObject)
+        return Boxf.init;
+
+    return Boxf(
+        Vector3f(accessor.min_max["min"].deserializeJson!(float[3])),
+        Vector3f(accessor.min_max["max"].deserializeJson!(float[3])),
+    );
+}
 
 struct Trans
 {
@@ -332,6 +344,7 @@ class GlTF : DrawableByVulkan
             static assert(Vector3f.sizeof == float.sizeof * 3);
 
             uplVert.vertices = content.getAccess!(Type.VEC3, Vector3f)(*vertices);
+            uplVert.aabb = accessorAabb(*vertices);
 
             createGpuBufIfNeed(device, uplVert.vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }

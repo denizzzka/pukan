@@ -27,7 +27,7 @@ order; the order below is only a suggested grouping.
     - [x] Move the attribute descriptions from `ShaderVertex` to `ShaderInfo`.
   - [ ] #11 glTF animation on GPU: sample and interpolate animation in a
         compute shader. Only joint matrices are computed on the GPU today.
-  - [ ] #12 AABB from glTF JSON: use accessor `min` and `max` when present
+  - [x] #12 AABB from glTF JSON: use accessor `min` and `max` when present
         instead of scanning every vertex.
   - [ ] #15 Add USD/USDA/USDC support.
   - [ ] #16 Add terrain support.
