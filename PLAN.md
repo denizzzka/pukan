@@ -89,9 +89,11 @@ Because the goal is vague here, the questions below decide the scope:
 
 ## Rendering
 
+- [x] Draw meshes without a skin with a static PBR vertex shader. They no
+      longer create fake joint and weight buffers or read joint matrices.
 - [ ] Draw skinned meshes without animation with a separate simpler vertex
-      shader that skips joint matrix reads. Select it at load time when the
-      mesh's skin has no animation channels.
+      shader. Bake the bind-pose skin at load time or precompute its joint
+      palette, since the mesh still needs the skin transform.
 
 ## Data layout and throughput
 
