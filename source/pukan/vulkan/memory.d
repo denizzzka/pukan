@@ -2,13 +2,14 @@ module pukan.vulkan.memory;
 
 package mixin template Memory()
 {
+    import core.atomic: atomicLoad, atomicOp, atomicStore;
     import lockfree.list: LockFreeList;
 
     private LockFreeList!VkDeviceMemory deviceMemoryChunks;
-    private ulong deviceLocalBytes;
-    private ulong hostVisibleBytes;
-    private size_t deviceMemoryAllocations;
-    private ulong uploadedBytesCount;
+    private shared ulong deviceLocalBytes;
+    private shared ulong hostVisibleBytes;
+    private shared size_t deviceMemoryAllocations;
+    private shared ulong uploadedBytesCount;
 
     auto allocateDeviceMemory(ref VkMemoryAllocateInfo allocInfo)
     {
@@ -19,21 +20,21 @@ package mixin template Memory()
 
     void addDeviceMemory(size_t bytes, VkMemoryPropertyFlags flags)
     {
-        ++deviceMemoryAllocations;
+        atomicOp!"+="(deviceMemoryAllocations, 1);
 
         if(flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-            deviceLocalBytes += bytes;
+            atomicOp!"+="(deviceLocalBytes, cast(ulong) bytes);
         if(flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-            hostVisibleBytes += bytes;
+            atomicOp!"+="(hostVisibleBytes, cast(ulong) bytes);
     }
 
-    ulong deviceLocalMemoryBytes() const => deviceLocalBytes;
-    ulong hostVisibleMemoryBytes() const => hostVisibleBytes;
-    size_t deviceMemoryAllocationCount() const => deviceMemoryAllocations;
+    ulong deviceLocalMemoryBytes() const => atomicLoad(deviceLocalBytes);
+    ulong hostVisibleMemoryBytes() const => atomicLoad(hostVisibleBytes);
+    size_t deviceMemoryAllocationCount() const => atomicLoad(deviceMemoryAllocations);
 
-    void addUploadedBytes(size_t bytes) { uploadedBytesCount += bytes; }
-    ulong uploadedBytes() const => uploadedBytesCount;
-    void resetUploadedBytes() { uploadedBytesCount = 0; }
+    void addUploadedBytes(size_t bytes) { atomicOp!"+="(uploadedBytesCount, cast(ulong) bytes); }
+    ulong uploadedBytes() const => atomicLoad(uploadedBytesCount);
+    void resetUploadedBytes() { atomicStore(uploadedBytesCount, 0); }
 
     private LockFreeList!VkBuffer buffers;
 
