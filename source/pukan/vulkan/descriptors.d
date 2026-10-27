@@ -4,9 +4,9 @@ import pukan.vulkan.bindings;
 
 package mixin template DescriptorPools()
 {
-    import std.container.slist;
+    import lockfree.list: LockFreeList;
     private VkDescriptorSetLayout[] descriptorLayouts;
-    /* private FIXME*/ SList!PoolAndLayoutInfo descriptorPools;
+    /* private FIXME*/ LockFreeList!PoolAndLayoutInfo descriptorPools;
 
     VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
@@ -22,14 +22,14 @@ package mixin template DescriptorPools()
         return layout;
     }
 
-    ref PoolAndLayoutInfo createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, uint maxSets)
+    LockFreeList!(PoolAndLayoutInfo).Elem createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, uint maxSets)
     {
         auto layout = createDescriptorSetLayout(descriptorSetLayoutBindings);
 
         return createDescriptorPool(layout, descriptorSetLayoutBindings, maxSets);
     }
 
-    ref PoolAndLayoutInfo createDescriptorPool(
+    LockFreeList!(PoolAndLayoutInfo).Elem createDescriptorPool(
         VkDescriptorSetLayout layout,
         VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings,
         uint maxSets,
@@ -63,12 +63,12 @@ package mixin template DescriptorPools()
         VkDescriptorPool pool;
         vkCall(this.device, &descriptorPoolInfo, this.alloc, &pool);
 
-        descriptorPools.insert(PoolAndLayoutInfo(
-            descriptorPool: pool,
-            descriptorSetLayout: layout,
-        ));
-
-        return descriptorPools.front;
+        return descriptorPools.insertOne((ref PoolAndLayoutInfo e) {
+            e = PoolAndLayoutInfo(
+                descriptorPool: pool,
+                descriptorSetLayout: layout,
+            );
+        });
     }
 
     private void descriptorPoolsDtor()

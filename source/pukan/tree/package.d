@@ -1,6 +1,5 @@
 module pukan.tree;
 
-import pukan.vulkan.slist: SimpleSList;
 import std.container.slist;
 import std.traits;
 

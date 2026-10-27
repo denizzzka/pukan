@@ -2,9 +2,9 @@ module pukan.vulkan.image;
 
 package mixin template Images()
 {
-    import pukan.vulkan.slist: SimpleSList;
+    import lockfree.list: LockFreeList;
 
-    private SimpleSList!VkImage images;
+    private LockFreeList!VkImage images;
 
     auto createImage(ref VkImageCreateInfo createInfo)
     {

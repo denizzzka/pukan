@@ -2,9 +2,9 @@ module pukan.vulkan.memory;
 
 package mixin template Memory()
 {
-    import pukan.vulkan.slist: SimpleSList;
+    import lockfree.list: LockFreeList;
 
-    private SimpleSList!VkDeviceMemory deviceMemoryChunks;
+    private LockFreeList!VkDeviceMemory deviceMemoryChunks;
     private ulong deviceLocalBytes;
     private ulong hostVisibleBytes;
     private size_t deviceMemoryAllocations;
@@ -35,16 +35,16 @@ package mixin template Memory()
     ulong uploadedBytes() const => uploadedBytesCount;
     void resetUploadedBytes() { uploadedBytesCount = 0; }
 
-    private SimpleSList!VkBuffer buffers;
+    private LockFreeList!VkBuffer buffers;
 
-    buffers.ElemType createBuffer(ref VkBufferCreateInfo createInfo)
+    LockFreeList!(VkBuffer).Elem createBuffer(ref VkBufferCreateInfo createInfo)
     {
         return buffers.insertOne((e){
             vkCreateBuffer(this.device, &createInfo, this.alloc, &e).vkCheck;
         });
     }
 
-    private SimpleSList!(VkBuffer[]) buffersArrays;
+    private LockFreeList!(VkBuffer[]) buffersArrays;
 
     auto createBuffersArray(/*in*/ VkBufferCreateInfo createInfo, size_t num = 1)
     {
@@ -76,10 +76,10 @@ package mixin template Memory()
     }
 }
 
-import pukan.vulkan.slist: SimpleSList;
+import lockfree.list: LockFreeList;
 
-alias MemChunk = SimpleSList!VkDeviceMemory.ElemType;
-alias BufChunk = SimpleSList!VkBuffer.ElemType;
+alias MemChunk = LockFreeList!(VkDeviceMemory).Elem;
+alias BufChunk = LockFreeList!(VkBuffer).Elem;
 
 import pukan.vulkan;
 import pukan.vulkan.bindings;

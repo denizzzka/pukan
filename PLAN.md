@@ -138,19 +138,15 @@ rest are long-term spikes, each judged against the plain version it replaces.
 The frame is single-threaded end to end. Per-frame CPU work is 0.023 ms of a
 7.079 ms frame on the fixed scene, so parallelizing the frame loop buys nothing
 until the scene grows; the cost is at start-up and in the per-buffer blocking
-upload. Blockers: `SimpleSList` resource tracking, the growable
-`MaterialBuffer`, the shared `DescriptorAllocator`, one command pool, and a
-single queue fence with no per-frame fences.
+upload. Blockers: the growable `MaterialBuffer`, the shared
+`DescriptorAllocator`, one command pool, and a single queue fence with no
+per-frame fences.
 
 ### Asset loading
 
 - [ ] Run whole glTF loads (file read, JSON and image decode, accessor decode,
       vertex conversion, GPU creation, upload) on `std.parallelism` workers,
       one task per file, `totalCPUs - 1` of them. No custom pool.
-- [ ] Make resource tracking thread-safe: a push-only list with an atomic head,
-      one GC node per created resource, iterated only at teardown, so no removal
-      and no ABA. The owner keeps the node, so its value stays reachable, and the
-      tree's `SList` stays single-threaded.
 - [ ] Chunk `MaterialBuffer`: fixed-size chunks and an atomic slot counter, so a
       new slot never reallocates the buffer or rewrites existing sets.
 - [ ] Per loading thread: its own `DescriptorAllocator` for the same technique
