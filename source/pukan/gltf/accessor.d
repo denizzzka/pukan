@@ -9,9 +9,9 @@ class BufferPieceOnGPU
     TransferBuffer buffer;
 
     //TODO: add flag if CPU buf is not needed after uploading
-    void uploadImmediate(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    void recordUpload(scope VkCommandBuffer commandBuffer)
     {
-        buffer.uploadImmediate(commandPool, commandBuffer);
+        buffer.recordUpload(commandBuffer);
     }
 }
 

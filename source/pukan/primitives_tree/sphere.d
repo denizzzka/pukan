@@ -635,10 +635,12 @@ class SphereRenderer : DrawablePrimitive
 
         generator.generate(commandPool, commandBuffer);
 
-        sourceCenters.uploadImmediate(commandPool, commandBuffer);
-        sourceColors.uploadImmediate(commandPool, commandBuffer);
-        levels.uploadImmediate(commandPool, commandBuffer);
-        commands.uploadImmediate(commandPool, commandBuffer);
+        commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
+            sourceCenters.recordUpload(buf);
+            sourceColors.recordUpload(buf);
+            levels.recordUpload(buf);
+            commands.recordUpload(buf);
+        });
 
         uploaded = true;
     }

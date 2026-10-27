@@ -88,7 +88,7 @@ class CommandPool
         scope(exit) destroy(fence);
 
         vkResetFences(device, 1, &fence.fence.handle).vkCheck;
-        vkQueueSubmit(device.getQueue(), 1, &submitInfo, fence).vkCheck;
+        device.submitQueue(submitInfo, fence.fence.handle);
         vkWaitForFences(device.device, 1, &fence.fence.handle, VK_TRUE, uint.max).vkCheck;
     }
 }

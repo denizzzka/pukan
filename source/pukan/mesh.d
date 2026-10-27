@@ -93,7 +93,7 @@ final class MaterialBuffer
         );
     }
 
-    void uploadImmediate(CommandPool commandPool, VkCommandBuffer commandBuffer)
+    void recordUpload(VkCommandBuffer commandBuffer)
     {
         TransferBuffer[] snapshot;
 
@@ -101,7 +101,7 @@ final class MaterialBuffer
             snapshot = chunks;
 
         foreach(chunk; snapshot)
-            chunk.uploadImmediate(commandPool, commandBuffer);
+            chunk.recordUpload(commandBuffer);
     }
 
     private TransferBuffer chunkAt(size_t slot)

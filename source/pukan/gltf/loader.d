@@ -209,30 +209,39 @@ package GlTF loadGlTF2(
 
     auto images = "images" in json;
     if(images)
-        foreach(ref img; *images) //FIXME: indent
     {
-        const viewIdxPtr = "bufferView" in img;
+        MemoryBufferMappedToCPU[] staging;
 
-        import pukan.misc: loadImageFromMemory;
-        import std.traits: ReturnType;
+        commandPool.recordOneTimeAndSubmit(commandBufs[0], (buf) {
+            foreach(ref img; *images) //FIXME: indent
+            {
+                const viewIdxPtr = "bufferView" in img;
 
-        ReturnType!loadImageFromMemory extFormatImg;
-        VkFormat format;
+                import pukan.misc: loadImageFromMemory;
+                import std.traits: ReturnType;
 
-        if(viewIdxPtr !is null)
-        {
-            const mime = "mimeType" in img;
-            enforce(mime);
-            enforceImageMime(mime.get!string);
+                ReturnType!loadImageFromMemory extFormatImg;
+                VkFormat format;
 
-            const View view = ret.bufferViews[viewIdxPtr.get!ushort];
+                if(viewIdxPtr !is null)
+                {
+                    const mime = "mimeType" in img;
+                    enforce(mime);
+                    enforceImageMime(mime.get!string);
 
-            extFormatImg = loadImageFromMemory(view.buf, format);
-        }
-        else
-            extFormatImg = loadImageFromUri(dir, img["uri"].get!string, format);
+                    const View view = ret.bufferViews[viewIdxPtr.get!ushort];
 
-        ret.images ~= loadImageToMemory(device, commandPool, commandBufs[0], extFormatImg, format);
+                    extFormatImg = loadImageFromMemory(view.buf, format);
+                }
+                else
+                    extFormatImg = loadImageFromUri(dir, img["uri"].get!string, format);
+
+                ret.images ~= loadImageToMemory(device, buf, extFormatImg, format, staging);
+            }
+        });
+
+        foreach(buf; staging)
+            destroy(buf);
     }
 
     //FIXME: implement samplers reading

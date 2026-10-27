@@ -147,10 +147,10 @@ class SkinMatrices : Compute
     }
 
     /// Uploads static data (nodeIndices, inverseBindMatrices) to GPU once
-    void uploadStatic(scope CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    void recordStatic(scope VkCommandBuffer commandBuffer)
     {
-        nodeIndicesBuf.uploadImmediate(commandPool, commandBuffer);
-        invBindBuf.uploadImmediate(commandPool, commandBuffer);
+        nodeIndicesBuf.recordUpload(commandBuffer);
+        invBindBuf.recordUpload(commandBuffer);
     }
 
     /// Sets per-frame transform of each node relative to the skin root

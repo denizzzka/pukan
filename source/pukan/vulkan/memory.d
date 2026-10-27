@@ -239,13 +239,6 @@ class TransferBuffer
     auto cpuBuf() const => cpuBuffer.cpuBuf;
     uint length() const => cast(uint) cpuBuffer.cpuBuf.length;
 
-    void uploadImmediate(CommandPool commandPool, ref VkCommandBuffer buf)
-    {
-        // Copy host RAM buffer to GPU RAM
-        gpuBuffer.copyBufferImmediateSubmit(commandPool, buf, cpuBuffer.buf, gpuBuffer.buf, cpuBuf.length);
-        device.addUploadedBytes(cpuBuf.length);
-    }
-
     void recordUpload(VkCommandBuffer buf)
     {
         gpuBuffer.recordCopyBuffer(buf, cpuBuffer.buf, gpuBuffer.buf, cpuBuf.length);

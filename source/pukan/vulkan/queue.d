@@ -6,11 +6,13 @@ import pukan.vulkan.helpers;
 
 class Queue
 {
+    private LogicalDevice device;
     private VkQueue queue;
     private Fence sync;
 
     this(LogicalDevice dev)
     {
+        device = dev;
         queue = dev.getQueue();
         sync = dev.create!Fence;
     }
@@ -20,6 +22,6 @@ class Queue
     {
         sync.wait();
         sync.reset();
-        vkQueueSubmit(queue, 1, &submitInfo, sync).vkCheck;
+        device.submitQueue(submitInfo, sync.fence.handle);
     }
 }

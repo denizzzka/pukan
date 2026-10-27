@@ -91,7 +91,9 @@ class ImageMemory : DeviceMemory
         );
     }
 
-    void copyFromBuffer(CommandPool commandPool, VkCommandBuffer buf, VkBuffer srcBuffer)
+    /// Records the layout transitions and the copy; the source buffer must stay
+    /// alive until the command buffer is submitted.
+    void recordCopyFromBuffer(VkCommandBuffer buf, VkBuffer srcBuffer)
     {
         VkBufferImageCopy region;
         region.bufferOffset = 0;
@@ -106,24 +108,24 @@ class ImageMemory : DeviceMemory
         region.imageOffset = VkOffset3D(0, 0, 0);
         region.imageExtent = imageExtent;
 
-        commandPool.recordOneTimeAndSubmit(buf, (buf){
-            addPipelineBarrier(buf, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        addPipelineBarrier(buf, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-            vkCmdCopyBufferToImage(
-                buf,
-                srcBuffer,
-                image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1, // regionCount
-                &region
-            );
+        vkCmdCopyBufferToImage(
+            buf,
+            srcBuffer,
+            image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1, // regionCount
+            &region
+        );
 
-            addPipelineBarrier(buf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        });
+        addPipelineBarrier(buf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 }
 
-ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, ref Img image, in VkFormat pixelFormat)
+/// Records the image upload into `commandBuf` and keeps the staging buffer in
+/// `staging`, to be destroyed after the submit.
+ImageMemory loadImageToMemory(Img)(LogicalDevice device, VkCommandBuffer commandBuf, ref Img image, in VkFormat pixelFormat, ref MemoryBufferMappedToCPU[] staging)
 {
     VkDeviceSize imageSize;
 
@@ -145,8 +147,8 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool
     }
 
     //FIXME: TransferBuffer is used only as src buffer
-    scope buf = device.create!MemoryBufferMappedToCPU(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-    scope(exit) destroy(buf);
+    auto buf = device.create!MemoryBufferMappedToCPU(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    staging ~= buf;
 
     buf.cpuBuf[0 .. $] = cast(void[]) image.allPixelsAtOnce;
 
@@ -172,7 +174,23 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool
     auto ret = device.create!ImageMemory(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     // TODO: fix ugly args naming
-    ret.copyFromBuffer(commandPool, commandBuf, buf.buf);
+    ret.recordCopyFromBuffer(commandBuf, buf.buf);
+
+    return ret;
+}
+
+/// Records and submits a single image upload.
+ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool, VkCommandBuffer commandBuf, ref Img image, in VkFormat pixelFormat)
+{
+    ImageMemory ret;
+    MemoryBufferMappedToCPU[] staging;
+
+    commandPool.recordOneTimeAndSubmit(commandBuf, (buf) {
+        ret = loadImageToMemory(device, buf, image, pixelFormat, staging);
+    });
+
+    foreach(buf; staging)
+        destroy(buf);
 
     return ret;
 }

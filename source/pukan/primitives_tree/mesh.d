@@ -51,8 +51,11 @@ class ColoredMesh : Mesh, DrawablePrimitive
         vertexBuffer.cpuBuf[0..$] = cast(void[]) vertices;
         indicesBuffer.cpuBuf[0..$] = cast(void[]) indices;
 
-        vertexBuffer.uploadImmediate(commandPool, commandBuffer);
-        indicesBuffer.uploadImmediate(commandPool, commandBuffer);
+        commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
+            vertexBuffer.recordUpload(buf);
+            indicesBuffer.recordUpload(buf);
+            resources.materials.recordUpload(buf);
+        });
 
         setStreams([
             VertexStream(
@@ -69,8 +72,6 @@ class ColoredMesh : Mesh, DrawablePrimitive
         indexOffset = 0;
         indexType = VK_INDEX_TYPE_UINT16;
         indexCount = cast(uint) indices.length;
-
-        resources.materials.uploadImmediate(commandPool, commandBuffer);
     }
 
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)

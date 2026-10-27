@@ -719,10 +719,12 @@ class CylinderRenderer : DrawablePrimitive
 
         generator.generate(commandPool, commandBuffer);
 
-        sourceA.uploadImmediate(commandPool, commandBuffer);
-        sourceB.uploadImmediate(commandPool, commandBuffer);
-        levels.uploadImmediate(commandPool, commandBuffer);
-        commands.uploadImmediate(commandPool, commandBuffer);
+        commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
+            sourceA.recordUpload(buf);
+            sourceB.recordUpload(buf);
+            levels.recordUpload(buf);
+            commands.recordUpload(buf);
+        });
 
         uploaded = true;
     }

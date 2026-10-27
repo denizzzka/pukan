@@ -1,5 +1,6 @@
 module pukan.vulkan.logical_device;
 
+import core.sync.mutex: Mutex;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.physical_device: PhysicalDevice;
@@ -20,12 +21,14 @@ class LogicalDevice
     private ChainMask enabledChainMask;
     private VkQueueFlags selectedQueueFlags;
     private const(char)*[] enabledExtensions;
+    private Mutex queueMutex;
 
     package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures,
         ChainMask enabledChainMask, FeatureChain chain, VkQueueFlags requiredQueueFlags)
     {
         physicalDevice = pd;
         selectedQueueFlags = requiredQueueFlags;
+        queueMutex = new Mutex;
 
         const fqIdxs = pd.findSuitableQueueFamilies(requiredQueueFlags);
         enforce(fqIdxs.length > 0);
@@ -121,6 +124,13 @@ class LogicalDevice
     }
 
     auto alloc() => physicalDevice.instance.allocator;
+
+    /// Host access to a queue must be externally synchronized.
+    void submitQueue(ref VkSubmitInfo submitInfo, VkFence fence)
+    {
+        synchronized(queueMutex)
+            vkQueueSubmit(getQueue(), 1, &submitInfo, fence).vkCheck;
+    }
 
     //TODO: remove
     auto getQueue()

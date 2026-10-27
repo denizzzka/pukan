@@ -294,13 +294,15 @@ class GlTF : DrawableByVulkan
     //TODO: private
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
-        foreach(ref buf; gpuBuffs)
-            if(buf)
-                buf.uploadImmediate(commandPool, commandBuffer);
+        commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
+            foreach(ref piece; gpuBuffs)
+                if(piece)
+                    piece.recordUpload(buf);
 
-        materialBuffer.uploadImmediate(commandPool, commandBuffer);
+            materialBuffer.recordUpload(buf);
 
-        uploadSkinMatricesStatic(device, commandPool, commandBuffer);
+            uploadSkinMatricesStatic(buf);
+        });
 
         foreach(ref mesh; meshes)
             mesh.updateDescriptorSetsAndUniformBuffers(device);
@@ -466,7 +468,7 @@ class GlTF : DrawableByVulkan
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
     }
 
-    protected void uploadSkinMatricesStatic(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    protected void uploadSkinMatricesStatic(scope VkCommandBuffer commandBuffer)
     {
     }
 
@@ -591,10 +593,10 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
         skinMatrices.run(buf, skinRootInverse);
     }
 
-    protected override void uploadSkinMatricesStatic(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
+    protected override void uploadSkinMatricesStatic(scope VkCommandBuffer commandBuffer)
     {
         if(skinMatrices)
-            skinMatrices.uploadStatic(commandPool, commandBuffer);
+            skinMatrices.recordStatic(commandBuffer);
     }
 
     /// Debug-only: downloads GPU-computed joint matrices and compares them against the CPU path.
