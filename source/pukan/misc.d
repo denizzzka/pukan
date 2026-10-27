@@ -50,6 +50,8 @@ private void check(ref Image image, out VkFormat format)
 
 import dlib.math: Vector3f;
 
+//TODO: try dlib.geometry.aabb.AABB instead: it provides intersectsAABB and
+// closestPoint, but has no comparison for two boxes
 struct Boxf
 {
     Vector3f min;
