@@ -108,6 +108,10 @@ The following pieces are still missing:
       alpha-to-coverage for masked materials.
 - [ ] Real IBL. Replace the analytic sky with irradiance and prefiltered
       environment maps plus a BRDF LUT.
+- [ ] Exposure and IBL balance. Add configurable exposure and tone mapping,
+      separate the IBL/ambient intensity from the direct light, and treat the
+      environment sky and ground as linear radiance. Tune both on the fixed
+      scene; for the simple lit path only verify the world-space light.
 - [ ] Shared materials. A material table so meshes and primitives can reference
       the same material instead of taking one slot per mesh.
 - [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin
