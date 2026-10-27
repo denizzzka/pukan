@@ -194,7 +194,12 @@ class Mesh
     void draw(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
     {
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+        drawGeometry(buf, pipeline, trans);
+    }
 
+    /// Draws assuming the pipeline is already bound
+    void drawGeometry(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    {
         vkCmdPushConstants(
             buf,
             pipeline.pipelineLayout,

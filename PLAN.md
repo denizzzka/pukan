@@ -210,8 +210,15 @@ struct SkinnedMeshTechnique
 - [x] Remove `PrimitivesFactory` and `GltfFactory` as pipeline owners; make
       `Scene` passive.
 - [x] Merge the mesh paths using static and skinned techniques.
-- [ ] Consider instancing and batching, including a palette offset for skinned
+- [x] Consider instancing and batching, including a palette offset for skinned
       instances.
+
+Batching decision: instancing is deferred. Every mesh in the demo has unique geometry,
+so instancing would not reduce draw calls here. A reusable design needs a per-instance
+transform buffer for static meshes and a palette base offset into one joint matrix
+buffer for skinned meshes: the vertex shader indexes `jointMatrices[base + joint]`,
+because a dynamic SSBO offset works per draw, not per instance inside one draw. Revisit
+when a scene with many identical instances appears.
 
 ## Primitive rendering
 

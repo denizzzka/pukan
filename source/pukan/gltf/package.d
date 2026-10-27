@@ -460,7 +460,7 @@ class GlTF : DrawableByVulkan
         trans *= node.trans.calcMatrix;
 
         if(node.mesh)
-            node.mesh.draw(buf, *pipeline, trans);
+            node.mesh.drawGeometry(buf, *pipeline, trans);
 
         foreach(c; node.children)
             drawingBufferFillingRecursive(buf, trans, cast(Node) c);
