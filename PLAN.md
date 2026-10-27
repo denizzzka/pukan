@@ -185,3 +185,8 @@ are long-term spikes, each judged against the plain version it replaces.
   - The holonomic D-module formalism is where such a closed form comes from;
     the shader only needs the result. This item waits until there is a
     volumetric or absorptive effect in the scene to measure it on.
+
+## CPU multithreading
+
+- [ ] Discuss CPU multithreading support: which frame stages to parallelize,
+      and the job and memory model.
