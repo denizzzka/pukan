@@ -8,20 +8,6 @@ order; the order below is only a suggested grouping.
 - [ ] Set up CI on GitHub: build the library and both demos and run them with
       the validation layers enabled.
 
-## VkObj coverage
-
-Audit result: `VkObj` owns standalone handles (`VkInstance`, `VkSurfaceKHR`,
-`VkSemaphore`, `VkFence`, `VkCommandPool`). The rest already have owners:
-`Memory`, `Images`, `Shaders`, `DescriptorPools` and `Pipelines` mixins, or
-their containing objects. `Texture` owns only its view and sampler; the image
-belongs to `Images`. Extending `VkObj` to every Vulkan handle is not worth it:
-it cannot express parents, extension destroy functions, batch frees,
-non-owned handles or destruction order. Add `VkObj` specializations only for
-new standalone handles with a known parent; keep bulk and order-sensitive
-resources in their mixins. `VkInfoNames`, `vkCall`, `SimpleSList` and
-`OwnedHandles` cover generic create/destroy naming and array ownership; do not
-use `VkObj[]` for batch handles.
-
 ## Geometric algebra: PGA and CGA
 
 - [ ] Spike: evaluate adding PGA (Projective Geometric Algebra) and CGA
