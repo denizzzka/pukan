@@ -10,6 +10,7 @@
 		"mir-core": "1.7.3",
 		"mir-cpuid": "1.2.11",
 		"mir-ion": "2.3.4",
+		"misc": "0.0.5",
 		"silly": "1.1.1",
 		"stdx-allocator": "2.77.5",
 		"vibe-container": "1.7.0",
