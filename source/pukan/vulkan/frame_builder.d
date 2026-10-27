@@ -5,6 +5,7 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;
+import pukan.vulkan.vkobj: OwnedHandles;
 import std.meta: AliasSeq;
 
 // This class should gradually become shared thread-safe
@@ -64,7 +65,7 @@ class Frame
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
     package SyncFramesInFlight syncPrimitives;
-    VkCommandBuffer[] _commandBuffer; // array used for distinction if not initialized
+    private OwnedHandles!VkCommandBuffer _commandBuffer;
 
     ref VkCommandBuffer commandBuffer() => _commandBuffer[0];
 
@@ -72,7 +73,10 @@ class Frame
     {
         this.fb = fb;
         syncPrimitives = new SyncFramesInFlight(fb);
-        _commandBuffer = fb.commandPool.allocateBuffers(1);
+        _commandBuffer = OwnedHandles!VkCommandBuffer(
+            fb.commandPool.allocateBuffers(1),
+            (VkCommandBuffer[] bufs) { fb.commandPool.freeBuffers(bufs); },
+        );
 
         createImageView(imageView, fb.device, imageFormat, image);
         depthBuf = DepthBuf(fb.device, imageExtent);
@@ -99,8 +103,6 @@ class Frame
 
     ~this()
     {
-        fb.commandPool.freeBuffers(_commandBuffer);
-
         if(syncPrimitives)
             destroy(syncPrimitives);
 

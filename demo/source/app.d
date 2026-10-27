@@ -52,10 +52,12 @@ void main(string[] args) {
 
     bool stereo;
     bool crossEyed;
+    uint frames;
     auto getoptResult = getopt(
         args,
         "stereo", "render side-by-side stereo", &stereo,
         "cross-eyed", "swap stereo halves for cross-eyed viewing", &crossEyed,
+        "frames", "exit after N frames (0 = run forever)", &frames,
     );
 
     if(getoptResult.helpWanted)
@@ -197,8 +199,11 @@ void main(string[] args) {
     writeln(); // empty line for FPS counter
 
     // Main loop
-    while (!glfwWindowShouldClose(window))
+    uint frameCount;
+    while (!glfwWindowShouldClose(window) && (frames == 0 || frameCount < frames))
     {
+        frameCount++;
+
         frameTime = glfwGetTime();
         glfwPollEvents();
 

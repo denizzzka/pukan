@@ -11,10 +11,10 @@ struct SimpleSList(T, alias elementDtor = null)
 
     ~this()
     {
-        static if(elementDtor !is null)
+        static if(!is(typeof(elementDtor) == typeof(null)))
         {
             foreach(ref e; list)
-                e.elementDtor;
+                elementDtor(e);
         }
     }
 
@@ -42,16 +42,41 @@ struct SimpleSList(T, alias elementDtor = null)
 
         void detach()
         {
-            //FIXME: enable
-            //~ list.linearRemove(oneElemRange);
+            import std.range: take;
+
+            list.linearRemove(oneElemRange.take(1));
         }
 
+        /// Destroys the element if elementDtor is set, then removes it
         void dispose()
         {
-            static if(elementDtor !is null)
-                getVal.elementDtor;
+            static if(!is(typeof(elementDtor) == typeof(null)))
+                elementDtor(getVal);
 
             detach();
         }
     }
+}
+
+private void testElementDtor(ref int value)
+{
+    value = -1;
+}
+
+unittest
+{
+    SimpleSList!(int, testElementDtor) list;
+    list.insert(1);
+    list.insert(2);
+    list.insert(3);
+
+    auto e = list.front;
+    assert(e.getVal == 3);
+    e.dispose();
+
+    int[] values;
+    foreach (v; list[])
+        values ~= v;
+
+    assert(values == [2, 1]);
 }

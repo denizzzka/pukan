@@ -42,7 +42,7 @@ abstract class Compute
         );
 
         pipelineLayout = createPipelineLayout(device, [poolAndLayout.descriptorSetLayout], [pushConstant]);
-        scope(failure) destroy(pipelineLayout);
+        device.registerPipelineLayout(pipelineLayout);
 
         auto stage = shader.createShaderStageInfo;
         stage.pSpecializationInfo = specialization;
@@ -56,12 +56,6 @@ abstract class Compute
         );
 
         pipeline = device.createComputePipelines([pipelineCreateInfo])[0];
-    }
-
-    ~this()
-    {
-        if(pipelineLayout)
-            vkDestroyPipelineLayout(device, pipelineLayout, device.alloc);
     }
 
     protected void bindBuffer(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorBufferInfo bufferInfo)

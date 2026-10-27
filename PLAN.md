@@ -8,17 +8,6 @@ order; the order below is only a suggested grouping.
 - [ ] Set up CI on GitHub: build the library and both demos and run them with
       the validation layers enabled.
 
-## VkObj coverage
-
-Needs thinking first.
-
-- [ ] Extend `VkObj` to all Vulkan objects automatically: locate the argument
-      holding the created or destroyed handle by its type rather than by its
-      position in the argument list, and call the matching destructor on
-      destruction.
-- [ ] Cover handles that come as a static or dynamic array.
-- [ ] Check whether such or similar functionality already exists in the code.
-
 ## Geometric algebra: PGA and CGA
 
 - [ ] Spike: evaluate adding PGA (Projective Geometric Algebra) and CGA
