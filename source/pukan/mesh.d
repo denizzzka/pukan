@@ -1,5 +1,7 @@
 module pukan.mesh;
 
+import core.atomic: atomicOp;
+import core.sync.mutex: Mutex;
 import dlib.math: Matrix4x4f, Vector4f, Vector4i;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -28,93 +30,90 @@ struct UBOContent
 final class MaterialBuffer
 {
     private LogicalDevice device;
-    private TransferBuffer buffer;
-    private size_t capacity;
-    private size_t used;
-    private VkDescriptorSet[] descriptorSets;
+    private TransferBuffer[] chunks;
+    private size_t chunkCapacity;
     private size_t slotSize;
+    private shared size_t used;
+    private Mutex chunkMutex;
 
-    this(LogicalDevice device, size_t initialCapacity = 16)
-    in(initialCapacity > 0)
+    this(LogicalDevice device, size_t chunkCapacity = 16)
+    in(chunkCapacity > 0)
     {
         this.device = device;
-        this.capacity = initialCapacity;
+        this.chunkCapacity = chunkCapacity;
 
         const alignment = cast(size_t) device.physicalDevice.properties.limits.minUniformBufferOffsetAlignment;
         slotSize = alignment > 1
             ? (UBOContent.sizeof + alignment - 1) / alignment * alignment
             : UBOContent.sizeof;
 
-        buffer = device.create!TransferBuffer(capacity * slotSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        chunkMutex = new Mutex;
     }
 
     ~this()
     {
-        if(buffer)
-            destroy(buffer);
+        foreach(chunk; chunks)
+            if(chunk)
+                destroy(chunk);
     }
 
-    /// Reserves a slot for the given descriptor set
-    size_t addSlot(VkDescriptorSet set)
+    /// Reserves a slot, adding a chunk when the last one fills up.
+    size_t addSlot()
     {
-        if(used == capacity)
-            grow();
+        const slot = atomicOp!"+="(used, 1);
+        const chunkIndex = slot / chunkCapacity;
 
-        const slot = used++;
-        descriptorSets ~= set;
+        synchronized(chunkMutex)
+        {
+            while(chunkIndex >= chunks.length)
+                chunks ~= device.create!TransferBuffer(
+                    chunkCapacity * slotSize,
+                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                );
+        }
 
         return slot;
     }
 
     ref UBOContent content(size_t slot)
     {
-        assert(slot < used);
+        auto chunk = chunkAt(slot);
 
-        return *cast(UBOContent*) (cast(ubyte*) buffer.cpuBuf.ptr + slot * slotSize);
+        return *cast(UBOContent*) (cast(ubyte*) chunk.cpuBuf.ptr + (slot % chunkCapacity) * slotSize);
     }
 
     VkDescriptorBufferInfo info(size_t slot)
     {
-        assert(slot < used);
+        auto chunk = chunkAt(slot);
 
         return VkDescriptorBufferInfo(
-            buffer: buffer.gpuBuffer,
-            offset: slot * slotSize,
+            buffer: chunk.gpuBuffer,
+            offset: (slot % chunkCapacity) * slotSize,
             range: UBOContent.sizeof,
         );
     }
 
     void uploadImmediate(CommandPool commandPool, VkCommandBuffer commandBuffer)
     {
-        buffer.uploadImmediate(commandPool, commandBuffer);
+        TransferBuffer[] snapshot;
+
+        synchronized(chunkMutex)
+            snapshot = chunks;
+
+        foreach(chunk; snapshot)
+            chunk.uploadImmediate(commandPool, commandBuffer);
     }
 
-    private void grow()
+    private TransferBuffer chunkAt(size_t slot)
     {
-        const newCapacity = capacity * 2;
+        TransferBuffer chunk;
 
-        auto newBuffer = device.create!TransferBuffer(
-            newCapacity * slotSize,
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        );
+        synchronized(chunkMutex)
+            chunk = chunks[slot / chunkCapacity];
 
-        const usedBytes = used * slotSize;
-        newBuffer.cpuBuf[0 .. usedBytes] = buffer.cpuBuf[0 .. usedBytes];
+        assert(chunk !is null);
 
-        buffer.destroy;
-        buffer = newBuffer;
-        capacity = newCapacity;
-
-        foreach(i, set; descriptorSets)
-        {
-            auto bufferInfo = info(i);
-
-            VkWriteDescriptorSet[] writes = [
-                bufferWriteDescriptor(set, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, bufferInfo),
-            ];
-
-            device.updateDescriptorSets(writes);
-        }
+        return chunk;
     }
 }
 

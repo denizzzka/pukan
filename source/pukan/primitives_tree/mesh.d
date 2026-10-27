@@ -25,7 +25,7 @@ class ColoredMesh : Mesh, DrawablePrimitive
         this.vertices = vertices;
         this.indices = indices;
 
-        materialSlot = resources.materials.addSlot(descriptorSet);
+        materialSlot = resources.materials.addSlot();
         resources.materials.content(materialSlot).material.renderType.x = 0;
 
         updateDescriptorSets(device, imageInfo(resources.fakeTexture));

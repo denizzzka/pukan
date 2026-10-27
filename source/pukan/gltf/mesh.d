@@ -71,7 +71,7 @@ class GltfMesh : Mesh
         this.descriptorSet = allocator.allocate();
         this.vert = vert;
 
-        materialSlot = materialBuffer.addSlot(descriptorSet);
+        materialSlot = materialBuffer.addSlot();
 
         assert(vert.vertices.viewIdx >= 0);
 
