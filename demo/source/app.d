@@ -3,7 +3,7 @@ import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
 import pukan.vulkan.renderpass: DrawPhase;
 import pukan.material: runtimeMaterialOverride;
-import pukan.gltf.pipelines: LightingMode, lightingMode, transmissionPass;
+import pukan.gltf.pipelines: LightingMode, lightingMode;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.mesh: LitVertex;
@@ -248,8 +248,6 @@ void main(string[] args) {
     );
     scope(exit) destroy(scene);
 
-    scene.sceneColorAvailable = !stereo;
-    transmissionPass = !stereo;
 
     {
         GltfLoadOptions loadOptions;
@@ -435,13 +433,28 @@ void main(string[] args) {
 
             if(stereo)
             {
-                scene.recordStereoCommandBuffer(frame, (buf, eye, eyeExtent) {
-                    const view = crossEyed ? 1 - eye : eye;
-                    auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
-                    tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
-                    scene.updateFrameUniforms(frame, view, stereoWtb[view]);
-                    tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet);
-                });
+                scene.recordStereoCommandBuffer(
+                    frame,
+                    (buf, eye, eyeExtent) {
+                        const view = crossEyed ? 1 - eye : eye;
+                        auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
+                        tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
+                        scene.updateFrameUniforms(frame, view, stereoWtb[view]);
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet);
+                    },
+                    (buf, eye, eyeExtent) {
+                        const view = crossEyed ? 1 - eye : eye;
+                        auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
+                        tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
+                        scene.updateFrameUniforms(frame, view, stereoWtb[view]);
+                        tree.drawingBufferFilling(
+                            buf,
+                            Matrix4x4f.identity,
+                            frame.frameSets[view].descriptorSet,
+                            DrawPhase.transmission,
+                        );
+                    },
+                );
             }
             else
             {

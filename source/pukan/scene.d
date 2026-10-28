@@ -247,10 +247,9 @@ class Scene
         auto color = frame.sceneColor.textureImageMemory;
         const extent = swapChain.imageExtent;
 
-        // The first pass left the colour as a copy source
         imageBarrier(
             cb, frame.image,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
         );
@@ -390,57 +389,65 @@ class Scene
 
     alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent);
 
+    private void drawStereoEyes(VkCommandBuffer buf, StereoDrawCallback drawScene)
+    {
+        const extent = swapChain.imageExtent;
+        const leftWidth = extent.width / 2;
+        const rightWidth = extent.width - leftWidth;
+
+        foreach(size_t eye; 0 .. 2)
+        {
+            const width = eye == 0 ? leftWidth : rightWidth;
+            const x = eye == 0 ? 0 : leftWidth;
+            VkExtent2D eyeExtent = { width: width, height: extent.height };
+
+            VkViewport viewport = {
+                x: cast(float) x,
+                y: 0,
+                width: cast(float) width,
+                height: cast(float) extent.height,
+                minDepth: 0,
+                maxDepth: 1,
+            };
+            VkRect2D scissor = {
+                offset: VkOffset2D(x: cast(int) x, y: 0),
+                extent: eyeExtent,
+            };
+
+            vkCmdSetViewport(buf, 0, 1, &viewport);
+            vkCmdSetScissor(buf, 0, 1, &scissor);
+
+            drawScene(buf, eye, eyeExtent);
+        }
+    }
+
     /// Parallel stereo: left eye in the left half, right eye in the right half.
     /// Cross-eyed viewing needs the halves swapped.
-    void recordStereoCommandBuffer(ref Frame frame, StereoDrawCallback drawScene)
+    void recordStereoCommandBuffer(
+        ref Frame frame,
+        StereoDrawCallback drawScene,
+        StereoDrawCallback drawTransmission = null,
+    )
     {
         auto commandBuffer = frame.commandBuffer;
 
         renderPass.recordCommandBuffer(
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf); },
+            (ref VkCommandBuffer buf) { drawStereoEyes(buf, drawScene); },
+        );
+
+        // One copy serves both eyes: the fragment coordinate already carries the
+        // viewport offset, so it lands in that eye's half
+        copySceneColor(frame);
+
+        renderPass.recordTransmissionCommandBuffer(
+            commandBuffer,
             (ref VkCommandBuffer buf) {
-                const extent = swapChain.imageExtent;
-                const leftWidth = extent.width / 2;
-                const rightWidth = extent.width - leftWidth;
-
-                foreach(size_t eye; 0 .. 2)
-                {
-                    const width = eye == 0 ? leftWidth : rightWidth;
-                    const x = eye == 0 ? 0 : leftWidth;
-                    VkExtent2D eyeExtent = { width: width, height: extent.height };
-
-                    VkViewport viewport = {
-                        x: cast(float) x,
-                        y: 0,
-                        width: cast(float) width,
-                        height: cast(float) extent.height,
-                        minDepth: 0,
-                        maxDepth: 1,
-                    };
-                    VkRect2D scissor = {
-                        offset: VkOffset2D(x: cast(int) x, y: 0),
-                        extent: eyeExtent,
-                    };
-
-                    vkCmdSetViewport(buf, 0, 1, &viewport);
-                    vkCmdSetScissor(buf, 0, 1, &scissor);
-
-                    drawScene(buf, eye, eyeExtent);
-                }
+                if(drawTransmission !is null)
+                    drawStereoEyes(buf, drawTransmission);
             },
         );
-
-        // Each eye would need its own copy, so stereo keeps the environment
-        imageBarrier(
-            commandBuffer, frame.image,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        );
-
-        renderPass.recordTransmissionCommandBuffer(commandBuffer, (ref VkCommandBuffer) {});
     }
 
     void recreateSwapChain()
