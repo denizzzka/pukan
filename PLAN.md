@@ -42,6 +42,9 @@ fields).
 - [ ] 2D overlay on top of 3D: sprite/quad batch, alpha blending, orthographic
       projection, drawn after the 3D pass.
 - [ ] OSD: debug text and small overlays (FPS, counters, flags).
+- [ ] Object labels once the OSD exists: project an object's origin to the screen
+      and draw its name there, glTF nodes and meshes first; overlapping,
+      off-screen and behind-the-camera labels need their own handling.
 - [ ] Menu: prefer a ready-made solution (dimgui, bindbc-imgui, GTK, ...) and
       evaluate how it integrates with the existing frame loop.
 
