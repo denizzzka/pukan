@@ -141,6 +141,20 @@ method:
 - [ ] Keep the smallest fix that removes the dots without changing the rest of
       the material path.
 
+## Lighting
+
+The frame carries one directional light, `lightDirection` and `lightColor`;
+there are no shadows, and point and spot lights do not exist. Missing:
+
+- [ ] A light list. Upload directional, point and spot lights into a storage
+      buffer and loop over them in the PBR shader; the sun becomes one entry
+      instead of a fixed uniform.
+- [ ] Shadow maps. A cascaded directional map first, then an atlas for the
+      local lights; both need a depth-only pass, so they follow the pass
+      composition above.
+- [ ] Shadow filtering: PCF, normal offset bias and cascade blending.
+- [ ] Light culling by distance and screen size.
+
 ## Data layout and throughput
 
 Thesis: the remaining speed is in reducing the entropy of the data that moves
