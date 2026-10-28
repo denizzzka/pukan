@@ -9,6 +9,7 @@ struct Material
     ivec4 params; // x = mode, y = flags, z = alpha mode
     vec4 specular; // rgb = F0 color, a = strength
     vec4 iorParams; // x = index of refraction
+    vec4 clearcoat; // x = factor, y = roughness, z = normal scale
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -26,6 +27,9 @@ const uint MATERIAL_FLAG_DERIVED_NORMALS = 1u << 6;
 const uint MATERIAL_FLAG_VERTEX_TANGENT = 1u << 7;
 const uint MATERIAL_FLAG_SPECULAR_TEXTURE = 1u << 8;
 const uint MATERIAL_FLAG_SPECULAR_COLOR_TEXTURE = 1u << 9;
+const uint MATERIAL_FLAG_CLEARCOAT_TEXTURE = 1u << 10;
+const uint MATERIAL_FLAG_CLEARCOAT_ROUGHNESS_TEXTURE = 1u << 11;
+const uint MATERIAL_FLAG_CLEARCOAT_NORMAL_TEXTURE = 1u << 12;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -70,20 +74,26 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-vec3 shadePbr(
-    vec3 albedo,
-    vec3 normal,
-    vec3 worldPosition,
-    float metallic,
-    float roughness,
-    float ao,
-    vec3 emissive,
-    vec3 dielectricF0,
-    float dielectricF90
-)
+struct Surface
 {
-    const vec3 N = normalize(normal);
-    const vec3 V = normalize(frameUbo.frame.cameraPosition.xyz - worldPosition);
+    vec3 albedo;
+    vec3 normal;
+    vec3 clearcoatNormal;
+    vec3 position;
+    vec3 emissive;
+    vec3 dielectricF0;
+    float dielectricF90;
+    float metallic;
+    float roughness;
+    float ao;
+    float clearcoat;
+    float clearcoatRoughness;
+};
+
+vec3 shadePbr(Surface s)
+{
+    const vec3 N = normalize(s.normal);
+    const vec3 V = normalize(frameUbo.frame.cameraPosition.xyz - s.position);
     const vec3 L = normalize(frameUbo.frame.lightDirection.xyz);
     const vec3 H = normalize(V + L);
     const vec3 lightColor = frameUbo.frame.lightColor.rgb;
@@ -93,8 +103,8 @@ vec3 shadePbr(
     const float NdotH = max(dot(N, H), 0.0);
     const float VdotH = max(dot(V, H), 0.0);
 
-    metallic = clamp(metallic, 0.0, 1.0);
-    roughness = clamp(roughness, 0.04, 1.0);
+    const float metallic = clamp(s.metallic, 0.0, 1.0);
+    const float roughness = clamp(s.roughness, 0.04, 1.0);
 
     const float a = roughness * roughness;
     const float a2 = a * a;
@@ -104,21 +114,51 @@ vec3 shadePbr(
     const float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
     const float G = (NdotL / (NdotL * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
 
-    const vec3 F0 = mix(dielectricF0, albedo, metallic);
-    const vec3 F90 = vec3(mix(dielectricF90, 1.0, metallic));
+    const vec3 F0 = mix(s.dielectricF0, s.albedo, metallic);
+    const vec3 F90 = vec3(mix(s.dielectricF90, 1.0, metallic));
     const vec3 F = F0 + (F90 - F0) * pow(1.0 - VdotH, 5.0);
     const vec3 specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
     const vec3 kD = (1.0 - F) * (1.0 - metallic);
-    const vec3 direct = (kD * albedo / MATERIAL_PI + specular) * lightColor * NdotL;
+
+    vec3 brdf = kD * s.albedo / MATERIAL_PI + specular;
+
+    const float clearcoat = clamp(s.clearcoat, 0.0, 1.0);
+    const float clearcoatRoughness = clamp(s.clearcoatRoughness, 0.04, 1.0);
+    float coatFresnel = 0.0;
+
+    if(clearcoat > 0.0)
+    {
+        const vec3 Nc = normalize(s.clearcoatNormal);
+        const float NdotLc = max(dot(Nc, L), 0.0);
+        const float NdotVc = max(dot(Nc, V), 0.0);
+        const float NdotHc = max(dot(Nc, H), 0.0);
+
+        const float aC = clearcoatRoughness * clearcoatRoughness;
+        const float aC2 = aC * aC;
+        const float denominatorC = NdotHc * NdotHc * (aC2 - 1.0) + 1.0;
+        const float Dc = aC2 / (MATERIAL_PI * denominatorC * denominatorC);
+
+        const float kC = (clearcoatRoughness + 1.0) * (clearcoatRoughness + 1.0) / 8.0;
+        const float Gc = (NdotLc / (NdotLc * (1.0 - kC) + kC)) * (NdotVc / (NdotVc * (1.0 - kC) + kC));
+
+        coatFresnel = 0.04 + 0.96 * pow(1.0 - NdotVc, 5.0);
+
+        const vec3 clearcoatBrdf = vec3(Dc * Gc / max(4.0 * NdotLc * NdotVc, 0.001));
+        brdf = mix(brdf, clearcoatBrdf, clearcoat * coatFresnel);
+    }
+
+    const vec3 direct = brdf * lightColor * NdotL;
 
     const vec3 R = reflect(-V, N);
     const vec3 irradiance = environment(N);
     const vec3 reflection = mix(environment(R), vec3(0.1), roughness);
     const vec3 Fenv = fresnelSchlickRoughness(NdotV, F0, roughness);
     const vec3 kDEnv = (1.0 - Fenv) * (1.0 - metallic);
-    const vec3 ambient = (kDEnv * albedo * irradiance + reflection * Fenv) * ao;
+    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao;
 
-    return direct + ambient + emissive;
+    const float coating = 1.0 - clearcoat * coatFresnel;
+
+    return direct + ambient * coating + s.emissive * coating;
 }
 
 // The IOR sets the base reflectance, specular tints and scales it
@@ -146,17 +186,23 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
     }
 
     if(mode == MATERIAL_MODE_PBR)
-        return shadePbr(
-            albedo,
-            unitNormal,
-            worldPosition,
-            material.metallicRoughness.x,
-            material.metallicRoughness.y,
-            1.0,
-            emissive,
-            dielectricF0(material, material.specular.rgb, material.specular.a),
-            material.specular.a
-        );
+    {
+        Surface surface;
+        surface.albedo = albedo;
+        surface.normal = unitNormal;
+        surface.clearcoatNormal = unitNormal;
+        surface.position = worldPosition;
+        surface.emissive = emissive;
+        surface.dielectricF0 = dielectricF0(material, material.specular.rgb, material.specular.a);
+        surface.dielectricF90 = material.specular.a;
+        surface.metallic = material.metallicRoughness.x;
+        surface.roughness = material.metallicRoughness.y;
+        surface.ao = 1.0;
+        surface.clearcoat = material.clearcoat.x;
+        surface.clearcoatRoughness = material.clearcoat.y;
+
+        return shadePbr(surface);
+    }
 
     return albedo;
 }

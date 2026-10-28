@@ -179,6 +179,24 @@ private VkDescriptorSetLayoutBinding[] fragmentBindings()
             descriptorCount: 1,
             stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
         ),
+        VkDescriptorSetLayoutBinding(
+            binding: 9,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+        VkDescriptorSetLayoutBinding(
+            binding: 10,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
+        VkDescriptorSetLayoutBinding(
+            binding: 11,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        ),
     ];
 }
 

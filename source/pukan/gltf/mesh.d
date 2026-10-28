@@ -65,6 +65,9 @@ final class GltfMesh : Mesh
     private enum emissiveSlot = 4;
     private enum specularSlot = 5;
     private enum specularColorSlot = 6;
+    private enum clearcoatSlot = 7;
+    private enum clearcoatRoughnessSlot = 8;
+    private enum clearcoatNormalSlot = 9;
 
     package UploadedVertices vert;
     package AlphaMode alphaMode;
@@ -72,7 +75,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[7] materialTextures;
+    private VkDescriptorImageInfo[10] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -264,6 +267,29 @@ final class GltfMesh : Mesh
                         if(auto texture = "specularColorTexture" in *specular)
                             bindTexture(*texture, specularColorSlot, MaterialFlag.specularColorTexture, images, hasTexCoords);
                     }
+
+                    if(auto clearcoat = "KHR_materials_clearcoat" in *extensions)
+                    {
+                        if(auto value = "clearcoatFactor" in *clearcoat)
+                            material.clearcoat.x = readFloat(*value);
+
+                        if(auto value = "clearcoatRoughnessFactor" in *clearcoat)
+                            material.clearcoat.y = readFloat(*value);
+
+                        if(auto texture = "clearcoatTexture" in *clearcoat)
+                            bindTexture(*texture, clearcoatSlot, MaterialFlag.clearcoatTexture, images, hasTexCoords);
+
+                        if(auto texture = "clearcoatRoughnessTexture" in *clearcoat)
+                            bindTexture(*texture, clearcoatRoughnessSlot, MaterialFlag.clearcoatRoughnessTexture, images, hasTexCoords);
+
+                        if(auto texture = "clearcoatNormalTexture" in *clearcoat)
+                        {
+                            bindTexture(*texture, clearcoatNormalSlot, MaterialFlag.clearcoatNormalTexture, images, hasTexCoords);
+
+                            if(auto scale = "scale" in *texture)
+                                material.clearcoat.z = readFloat(*scale);
+                        }
+                    }
                 }
             }
 
@@ -334,6 +360,9 @@ final class GltfMesh : Mesh
             imageWriteDescriptor(descriptorSet, 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[emissiveSlot]),
             imageWriteDescriptor(descriptorSet, 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[specularSlot]),
             imageWriteDescriptor(descriptorSet, 8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[specularColorSlot]),
+            imageWriteDescriptor(descriptorSet, 9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatSlot]),
+            imageWriteDescriptor(descriptorSet, 10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatRoughnessSlot]),
+            imageWriteDescriptor(descriptorSet, 11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatNormalSlot]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);
