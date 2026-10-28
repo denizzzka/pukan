@@ -70,6 +70,7 @@ final class GltfMesh : Mesh
     private enum clearcoatNormalSlot = 9;
     private enum sheenColorSlot = 10;
     private enum sheenRoughnessSlot = 11;
+    private enum anisotropySlot = 12;
 
     package UploadedVertices vert;
     package AlphaMode alphaMode;
@@ -77,7 +78,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[12] materialTextures;
+    private VkDescriptorImageInfo[13] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -312,6 +313,18 @@ final class GltfMesh : Mesh
                         if(auto texture = "sheenRoughnessTexture" in *sheen)
                             bindTexture(*texture, sheenRoughnessSlot, MaterialFlag.sheenRoughnessTexture, images, hasTexCoords);
                     }
+
+                    if(auto anisotropy = "KHR_materials_anisotropy" in *extensions)
+                    {
+                        if(auto value = "anisotropyStrength" in *anisotropy)
+                            material.anisotropy.x = readFloat(*value);
+
+                        if(auto value = "anisotropyRotation" in *anisotropy)
+                            material.anisotropy.y = readFloat(*value);
+
+                        if(auto texture = "anisotropyTexture" in *anisotropy)
+                            bindTexture(*texture, anisotropySlot, MaterialFlag.anisotropyTexture, images, hasTexCoords);
+                    }
                 }
             }
 
@@ -387,6 +400,7 @@ final class GltfMesh : Mesh
             imageWriteDescriptor(descriptorSet, 11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatNormalSlot]),
             imageWriteDescriptor(descriptorSet, 12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[sheenColorSlot]),
             imageWriteDescriptor(descriptorSet, 13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[sheenRoughnessSlot]),
+            imageWriteDescriptor(descriptorSet, 14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[anisotropySlot]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

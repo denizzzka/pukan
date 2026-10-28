@@ -32,6 +32,7 @@ enum MaterialFlag: uint
     clearcoatNormalTexture = 1u << 12,
     sheenColorTexture = 1u << 13,
     sheenRoughnessTexture = 1u << 14,
+    anisotropyTexture = 1u << 15,
 }
 
 alias MaterialFlags = BitFlags!MaterialFlag;
@@ -56,6 +57,7 @@ struct Material
     Vector4f iorParams = Vector4f(1.5f, 0, 0, 0);      // x = index of refraction
     Vector4f clearcoat = Vector4f(0, 0, 1, 0);         // x = factor, y = roughness, z = normal scale
     Vector4f sheen = Vector4f(0, 0, 0, 0);             // rgb = color, a = roughness
+    Vector4f anisotropy = Vector4f(0, 0, 0, 0);        // x = strength, y = rotation
 
     this(Vector3f color, MaterialMode mode = MaterialMode.lit, MaterialFlags flags = MaterialFlags.init)
     {
@@ -144,7 +146,7 @@ struct Material
     }
 }
 
-static assert(Material.sizeof == 144);
+static assert(Material.sizeof == 160);
 
 struct MaterialBlock
 {

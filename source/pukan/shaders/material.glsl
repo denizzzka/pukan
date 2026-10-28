@@ -11,6 +11,7 @@ struct Material
     vec4 iorParams; // x = index of refraction
     vec4 clearcoat; // x = factor, y = roughness, z = normal scale
     vec4 sheen; // rgb = color, a = roughness
+    vec4 anisotropy; // x = strength, y = rotation
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -33,6 +34,7 @@ const uint MATERIAL_FLAG_CLEARCOAT_ROUGHNESS_TEXTURE = 1u << 11;
 const uint MATERIAL_FLAG_CLEARCOAT_NORMAL_TEXTURE = 1u << 12;
 const uint MATERIAL_FLAG_SHEEN_COLOR_TEXTURE = 1u << 13;
 const uint MATERIAL_FLAG_SHEEN_ROUGHNESS_TEXTURE = 1u << 14;
+const uint MATERIAL_FLAG_ANISOTROPY_TEXTURE = 1u << 15;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -86,6 +88,9 @@ struct Surface
     vec3 emissive;
     vec3 dielectricF0;
     vec3 sheenColor;
+    vec3 tangent;
+    vec3 bitangent;
+    vec2 anisotropyDirection;
     float dielectricF90;
     float metallic;
     float roughness;
@@ -93,6 +98,7 @@ struct Surface
     float clearcoat;
     float clearcoatRoughness;
     float sheenRoughness;
+    float anisotropy;
 };
 
 // Estevez and Kulla 2017, "Production Friendly Microfacet Sheen BRDF"
@@ -128,6 +134,32 @@ float maxComponent(vec3 v)
     return max(max(v.r, v.g), v.b);
 }
 
+float D_GGX_anisotropic(float NdotH, float TdotH, float BdotH, float at, float ab)
+{
+    const float a2 = at * ab;
+    const vec3 f = vec3(ab * TdotH, at * BdotH, a2 * NdotH);
+    const float w2 = a2 / dot(f, f);
+
+    return a2 * w2 * w2 / MATERIAL_PI;
+}
+
+float V_GGX_anisotropic(
+    float NdotL,
+    float NdotV,
+    float BdotV,
+    float TdotV,
+    float TdotL,
+    float BdotL,
+    float at,
+    float ab
+)
+{
+    const float GGXV = NdotL * length(vec3(at * TdotV, ab * BdotV, NdotV));
+    const float GGXL = NdotV * length(vec3(at * TdotL, ab * BdotL, NdotL));
+
+    return clamp(0.5 / (GGXV + GGXL), 0.0, 1.0);
+}
+
 vec3 shadePbr(Surface s)
 {
     const vec3 N = normalize(s.normal);
@@ -155,7 +187,32 @@ vec3 shadePbr(Surface s)
     const vec3 F0 = mix(s.dielectricF0, s.albedo, metallic);
     const vec3 F90 = vec3(mix(s.dielectricF90, 1.0, metallic));
     const vec3 F = F0 + (F90 - F0) * pow(1.0 - VdotH, 5.0);
-    const vec3 specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
+
+    vec3 specular;
+
+    if(s.anisotropy > 0.0)
+    {
+        const float at = mix(a, 1.0, s.anisotropy * s.anisotropy);
+        const float ab = a;
+
+        const vec3 anisotropicT = normalize(s.tangent * s.anisotropyDirection.x + s.bitangent * s.anisotropyDirection.y);
+        const vec3 anisotropicB = normalize(cross(N, anisotropicT));
+
+        const float TdotL = dot(anisotropicT, L);
+        const float BdotL = dot(anisotropicB, L);
+        const float TdotV = dot(anisotropicT, V);
+        const float BdotV = dot(anisotropicB, V);
+        const float TdotH = dot(anisotropicT, H);
+        const float BdotH = dot(anisotropicB, H);
+
+        const float anisotropicD = D_GGX_anisotropic(NdotH, TdotH, BdotH, at, ab);
+        const float anisotropicV = V_GGX_anisotropic(NdotL, NdotV, BdotV, TdotV, TdotL, BdotL, at, ab);
+
+        specular = F * anisotropicV * anisotropicD;
+    }
+    else
+        specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
+
     const vec3 kD = (1.0 - F) * (1.0 - metallic);
 
     vec3 brdf = kD * s.albedo / MATERIAL_PI + specular;
@@ -253,6 +310,7 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.clearcoatRoughness = material.clearcoat.y;
         surface.sheenColor = material.sheen.rgb;
         surface.sheenRoughness = material.sheen.a;
+        surface.anisotropy = 0.0;
 
         return shadePbr(surface);
     }

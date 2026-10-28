@@ -19,6 +19,7 @@ layout(binding = 10) uniform sampler2D clearcoatRoughnessTexture;
 layout(binding = 11) uniform sampler2D clearcoatNormalTexture;
 layout(binding = 12) uniform sampler2D sheenColorTexture;
 layout(binding = 13) uniform sampler2D sheenRoughnessTexture;
+layout(binding = 14) uniform sampler2D anisotropyTexture;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTextureCoord;
@@ -155,6 +156,50 @@ void main()
         if((flags & MATERIAL_FLAG_SHEEN_ROUGHNESS_TEXTURE) != 0u)
             sheenRoughness *= texture(sheenRoughnessTexture, fragTextureCoord).a;
 
+        float anisotropy = material.anisotropy.x;
+        vec2 anisotropyDirection = vec2(1.0, 0.0);
+
+        if((flags & MATERIAL_FLAG_ANISOTROPY_TEXTURE) != 0u)
+        {
+            const vec3 sampled = texture(anisotropyTexture, fragTextureCoord).rgb;
+            anisotropyDirection = sampled.rg * 2.0 - 1.0;
+            anisotropy *= sampled.b;
+        }
+
+        vec3 anisotropyTangent = vec3(1.0, 0.0, 0.0);
+        vec3 anisotropyBitangent = vec3(0.0, 1.0, 0.0);
+
+        if(anisotropy > 0.0)
+        {
+            const float rotation = material.anisotropy.y;
+            const vec2 rotationCosSin = vec2(cos(rotation), sin(rotation));
+            anisotropyDirection = mat2(
+                rotationCosSin.x, rotationCosSin.y,
+                -rotationCosSin.y, rotationCosSin.x
+            ) * normalize(anisotropyDirection);
+
+            if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
+            {
+                anisotropyTangent = fragTangent.xyz;
+                anisotropyBitangent = cross(normal, anisotropyTangent) * (fragTangent.w < 0.0 ? -1.0 : 1.0);
+            }
+            else
+            {
+                const vec3 dp1 = dFdx(fragPosition);
+                const vec3 dp2 = dFdy(fragPosition);
+                const vec2 duv1 = dFdx(fragTextureCoord);
+                const vec2 duv2 = dFdy(fragTextureCoord);
+                const vec3 dp2perp = cross(dp2, normal);
+                const vec3 dp1perp = cross(normal, dp1);
+                anisotropyTangent = dp2perp * duv1.x + dp1perp * duv2.x;
+                anisotropyBitangent = dp2perp * duv1.y + dp1perp * duv2.y;
+            }
+
+            // Keep the frame orthonormal against the shading normal
+            anisotropyTangent = normalize(anisotropyTangent - normal * dot(normal, anisotropyTangent));
+            anisotropyBitangent = normalize(cross(normal, anisotropyTangent));
+        }
+
         Surface surface;
         surface.albedo = base.rgb;
         surface.normal = normal;
@@ -170,6 +215,10 @@ void main()
         surface.clearcoatRoughness = clearcoatRoughness;
         surface.sheenColor = sheenColor;
         surface.sheenRoughness = sheenRoughness;
+        surface.tangent = anisotropyTangent;
+        surface.bitangent = anisotropyBitangent;
+        surface.anisotropyDirection = anisotropyDirection;
+        surface.anisotropy = anisotropy;
 
         color = shadePbr(surface);
     }
