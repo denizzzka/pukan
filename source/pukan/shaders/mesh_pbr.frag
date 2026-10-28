@@ -72,49 +72,57 @@ void main()
 
     const vec4 base = materialBaseColor(material, fragColor, fragTextureCoord, baseColorTexture);
 
-    vec3 normal = normalize(fragNormal);
-    if((flags & MATERIAL_FLAG_DERIVED_NORMALS) != 0u)
-        normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));
-    if((flags & MATERIAL_FLAG_NORMAL_TEXTURE) != 0u)
-    {
-        if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
-            normal = perturbNormalFromTangent(material, normal, fragPosition, fragTextureCoord, fragTangent);
-        else
-            normal = perturbNormalFromDerivatives(material, normal, fragPosition, fragTextureCoord);
-    }
-
-    vec2 metallicRoughness = material.metallicRoughness.xy;
-    if((flags & MATERIAL_FLAG_METALLIC_ROUGHNESS_TEXTURE) != 0u)
-    {
-        const vec3 sampled = texture(metallicRoughnessTexture, fragTextureCoord).rgb;
-        metallicRoughness.y *= sampled.g;
-        metallicRoughness.x *= sampled.b;
-    }
-
-    float ao = 1.0;
-    if((flags & MATERIAL_FLAG_OCCLUSION_TEXTURE) != 0u)
-    {
-        const float occlusion = texture(occlusionTexture, fragTextureCoord).r;
-        ao = mix(1.0, occlusion, material.metallicRoughness.w);
-    }
+    const uint alphaMode = uint(material.params.z);
+    if(alphaMode == MATERIAL_ALPHA_MASK && base.a < material.alphaParams.x)
+        discard;
 
     vec3 emissive = material.emissiveFactor.rgb;
     if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
         emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
 
-    const vec3 color = shadePbr(
-        base.rgb,
-        normal,
-        fragPosition,
-        metallicRoughness.x,
-        metallicRoughness.y,
-        ao,
-        emissive
-    );
+    vec3 color;
 
-    const uint alphaMode = uint(material.params.z);
-    if(alphaMode == MATERIAL_ALPHA_MASK && base.a < material.alphaParams.x)
-        discard;
+    // Unlit output ignores the normal, so none of the basis work is worth doing
+    if(uint(material.params.x) == MATERIAL_MODE_UNLIT)
+        color = base.rgb + emissive;
+    else
+    {
+        vec3 normal = normalize(fragNormal);
+        if((flags & MATERIAL_FLAG_DERIVED_NORMALS) != 0u)
+            normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));
+        if((flags & MATERIAL_FLAG_NORMAL_TEXTURE) != 0u)
+        {
+            if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
+                normal = perturbNormalFromTangent(material, normal, fragPosition, fragTextureCoord, fragTangent);
+            else
+                normal = perturbNormalFromDerivatives(material, normal, fragPosition, fragTextureCoord);
+        }
+
+        vec2 metallicRoughness = material.metallicRoughness.xy;
+        if((flags & MATERIAL_FLAG_METALLIC_ROUGHNESS_TEXTURE) != 0u)
+        {
+            const vec3 sampled = texture(metallicRoughnessTexture, fragTextureCoord).rgb;
+            metallicRoughness.y *= sampled.g;
+            metallicRoughness.x *= sampled.b;
+        }
+
+        float ao = 1.0;
+        if((flags & MATERIAL_FLAG_OCCLUSION_TEXTURE) != 0u)
+        {
+            const float occlusion = texture(occlusionTexture, fragTextureCoord).r;
+            ao = mix(1.0, occlusion, material.metallicRoughness.w);
+        }
+
+        color = shadePbr(
+            base.rgb,
+            normal,
+            fragPosition,
+            metallicRoughness.x,
+            metallicRoughness.y,
+            ao,
+            emissive
+        );
+    }
 
     outColor = vec4(color, alphaMode == MATERIAL_ALPHA_BLEND ? base.a : 1.0);
 }
