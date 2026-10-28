@@ -1,3 +1,4 @@
+import arena: placeOnIcosahedron;
 import pukan;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
@@ -744,18 +745,12 @@ private string[] gltfFilesSearch(string dir, string[] only = null)
 
 GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
 {
-    import std.math;
     import std.parallelism: taskPool;
 
     const found = gltfFilesSearch("demo/assets/gltf_samples/", sampleNames);
 
     if(found.length == 0)
         return null;
-
-    const sectorAngle = PI*2 / found.length;
-
-    const radius = 0.2;
-    const startPlace = Vector3f(0, 0, -radius);
 
     GlTF[] loaded;
     loaded.length = found.length;
@@ -781,25 +776,7 @@ GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
         obj.uploadToGPUImmediate(scene.device, commandPools[i], commandBuffers[0]);
     }
 
-    foreach(i, obj; loaded)
-    {
-        const aabb = obj.calcAABB;
-        const size = aabb.max - aabb.min;
-        const center = aabb.min + size/2;
-        const scale = 1.0 / size.length * 0.1;
-
-        auto trans = Matrix4x4f.identity;
-
-        trans *= rotationMatrix!float(Axis.y, sectorAngle * i);
-        trans *= startPlace.translationMatrix;
-
-        trans *= (Vector3f(1, 1, 1) * scale).scaleMatrix;
-        trans *= center.translationMatrix;
-
-        node
-            .addChild(Bone(mat: trans))
-            .addChild(obj);
-    }
+    placeOnIcosahedron(node, loaded);
 
     return loaded;
 }
