@@ -92,8 +92,6 @@ Because the goal is vague here, the questions below decide the scope:
 The shared `Material` covers simple unlit/lit shading and glTF metallic-roughness.
 The following pieces are still missing:
 
-- [ ] Linear texture formats. Normal, metallic-roughness and occlusion maps
-      must use UNORM views; base color and emissive stay sRGB.
 - [ ] Mipmaps and glTF samplers. Generate mip chains and honour each sampler's
       wrap and filter modes instead of forcing MIRRORED_REPEAT.
 - [ ] glTF material extensions: `KHR_materials_unlit` first, then emissive

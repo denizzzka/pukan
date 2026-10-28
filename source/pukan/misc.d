@@ -48,6 +48,17 @@ private void check(ref Image image, out VkFormat format)
     }
 }
 
+/// Same texel layout, but sampled without the sRGB transfer function
+VkFormat linearFormat(VkFormat format) @safe nothrow pure
+{
+    switch(format)
+    {
+        case VkFormat.VK_FORMAT_R8G8B8A8_SRGB: return VkFormat.VK_FORMAT_R8G8B8A8_UNORM;
+        case VkFormat.VK_FORMAT_R8G8B8_SRGB: return VkFormat.VK_FORMAT_R8G8B8_UNORM;
+        default: return format;
+    }
+}
+
 import dlib.math: Vector3f;
 
 //TODO: try dlib.geometry.aabb.AABB instead: it provides intersectsAABB and

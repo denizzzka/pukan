@@ -28,6 +28,7 @@ class ImageMemory : DeviceMemory
     VkImage image;
     alias this = image;
     VkExtent3D imageExtent;
+    VkFormat format;
 
     this(LogicalDevice device, ref VkImageCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
     {
@@ -42,6 +43,7 @@ class ImageMemory : DeviceMemory
         image = device.createImage(createInfo);
 
         imageExtent = createInfo.extent;
+        format = createInfo.format;
 
         VkMemoryRequirements memRequirements;
         vkGetImageMemoryRequirements(device, image, &memRequirements);
@@ -140,10 +142,12 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, VkCommandBuffer command
     switch(pixelFormat)
     {
         case VK_FORMAT_R8G8B8A8_SRGB:
+        case VK_FORMAT_R8G8B8A8_UNORM:
             imageSize = image.width * image.height * 4;
             break;
 
         case VK_FORMAT_R8G8B8_SRGB:
+        case VK_FORMAT_R8G8B8_UNORM:
             imageSize = image.width * image.height * 3;
             break;
 

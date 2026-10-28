@@ -6,6 +6,7 @@ import pukan.gltf.accessor;
 import pukan.gltf.animation;
 import pukan.gltf.pipelines: GltfPipelines;
 import pukan.material: MaterialBuffer;
+import pukan.misc: linearFormat;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
@@ -102,6 +103,78 @@ private struct ChunkHeader
 
         assert(0);
     }
+}
+
+/// Images sampled by data maps skip the sRGB decode; shared color images keep it
+private bool[] linearImages(in Json json)
+{
+    auto images = "images" in json;
+    auto textures = "textures" in json;
+    auto materials = "materials" in json;
+
+    if(images is null || textures is null || materials is null)
+        return null;
+
+    bool[] usedAsColor;
+    bool[] usedAsData;
+    usedAsColor.length = images.length;
+    usedAsData.length = images.length;
+
+    size_t imageOf(in Json texture)
+    {
+        return (*textures)[texture["index"].get!size_t]["source"].get!size_t;
+    }
+
+    foreach(ref material; *materials)
+    {
+        if(auto pbr = "pbrMetallicRoughness" in material)
+        {
+            if(auto texture = "baseColorTexture" in *pbr)
+                usedAsColor[imageOf(*texture)] = true;
+
+            if(auto texture = "metallicRoughnessTexture" in *pbr)
+                usedAsData[imageOf(*texture)] = true;
+        }
+
+        if(auto texture = "normalTexture" in material)
+            usedAsData[imageOf(*texture)] = true;
+
+        if(auto texture = "occlusionTexture" in material)
+            usedAsData[imageOf(*texture)] = true;
+
+        if(auto texture = "emissiveTexture" in material)
+            usedAsColor[imageOf(*texture)] = true;
+    }
+
+    bool[] result;
+    result.length = images.length;
+
+    foreach(i; 0 .. result.length)
+        result[i] = usedAsData[i] && !usedAsColor[i];
+
+    return result;
+}
+
+unittest
+{
+    const json = parseJsonString(`{
+        "images": [{}, {}, {}, {}],
+        "textures": [{"source": 0}, {"source": 1}, {"source": 2}, {"source": 3}],
+        "materials": [{
+            "pbrMetallicRoughness": {
+                "baseColorTexture": {"index": 0},
+                "metallicRoughnessTexture": {"index": 1}
+            },
+            "normalTexture": {"index": 2},
+            "occlusionTexture": {"index": 3},
+            "emissiveTexture": {"index": 0}
+        }, {
+            "normalTexture": {"index": 0}
+        }]
+    }`);
+
+    // Image 0 serves a color map too, so it keeps the sRGB decode
+    assert(linearImages(json) == [false, true, true, true]);
 }
 
 ///
@@ -248,6 +321,7 @@ package GlTF loadGlTF2(
     auto images = "images" in json;
     if(images)
     {
+        const linear = linearImages(json);
         MemoryBufferMappedToCPU[] staging;
 
         auto decodeStart = MonoTime.currTime;
@@ -276,7 +350,13 @@ package GlTF loadGlTF2(
                 else
                     extFormatImg = loadImageFromUri(dir, img["uri"].get!string, format);
 
-                ret.images ~= loadImageToMemory(device, commandBufs[0], extFormatImg, format, staging);
+                ret.images ~= loadImageToMemory(
+                    device,
+                    commandBufs[0],
+                    extFormatImg,
+                    linear !is null && linear[ret.images.length] ? linearFormat(format) : format,
+                    staging,
+                );
             }
         }
         endCommandBuffer(commandBufs[0]);

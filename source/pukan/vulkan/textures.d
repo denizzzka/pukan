@@ -32,7 +32,7 @@ class Texture
 
         textureImageMemory = image;
 
-        createImageView(imageView, device, VK_FORMAT_R8G8B8A8_SRGB, textureImageMemory.image);
+        createImageView(imageView, device, textureImageMemory.format, textureImageMemory.image);
 
         vkCall(device.device, cast() &samplerInfo, device.alloc, &sampler);
     }
