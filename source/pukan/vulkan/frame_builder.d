@@ -1,5 +1,7 @@
 module pukan.vulkan.frame_builder;
 
+import frame_bindings;
+
 //~ import pukan.exceptions;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -78,10 +80,10 @@ final class FrameSet
 
         VkDescriptorBufferInfo info = { buffer: buffer.buf, offset: 0, range: size };
         VkWriteDescriptorSet[] writes = [
-            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, info),
-            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, irradiance),
-            imageWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, prefiltered),
-            imageWriteDescriptor(descriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, brdfLut),
+            bufferWriteDescriptor(descriptorSet, FRAME_UNIFORM, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, info),
+            imageWriteDescriptor(descriptorSet, FRAME_IRRADIANCE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, irradiance),
+            imageWriteDescriptor(descriptorSet, FRAME_PREFILTERED, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, prefiltered),
+            imageWriteDescriptor(descriptorSet, FRAME_BRDF_LUT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, brdfLut),
         ];
         device.updateDescriptorSets(writes);
     }

@@ -7,7 +7,9 @@ struct FrameData
     vec4 exposureParams; // x = exposure, y = IBL intensity
 };
 
-layout(set = 1, binding = 0) uniform FrameBlock
+#include "frame_bindings.h"
+
+layout(set = 1, binding = FRAME_UNIFORM) uniform FrameBlock
 {
     FrameData frame;
 } frameUbo;

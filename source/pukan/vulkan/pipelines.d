@@ -1,5 +1,7 @@
 module pukan.vulkan.pipelines;
 
+import frame_bindings;
+
 import pukan.exceptions: PukanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -245,25 +247,25 @@ final class PipelineFactory
 
         frameBindings = [
             VkDescriptorSetLayoutBinding(
-                binding: 0,
+                binding: FRAME_UNIFORM,
                 descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
             VkDescriptorSetLayoutBinding(
-                binding: 1,
+                binding: FRAME_IRRADIANCE,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
             VkDescriptorSetLayoutBinding(
-                binding: 2,
+                binding: FRAME_PREFILTERED,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
             VkDescriptorSetLayoutBinding(
-                binding: 3,
+                binding: FRAME_BRDF_LUT,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,

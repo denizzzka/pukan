@@ -65,9 +65,9 @@ vec3 materialAlbedo(Material material, vec3 tint, vec2 uv, sampler2D baseColorTe
     return materialBaseColor(material, tint, uv, baseColorTexture).rgb;
 }
 
-layout(set = 1, binding = 1) uniform sampler2D irradianceMap;
-layout(set = 1, binding = 2) uniform sampler2D prefilteredMap;
-layout(set = 1, binding = 3) uniform sampler2D brdfLut;
+layout(set = 1, binding = FRAME_IRRADIANCE) uniform sampler2D irradianceMap;
+layout(set = 1, binding = FRAME_PREFILTERED) uniform sampler2D prefilteredMap;
+layout(set = 1, binding = FRAME_BRDF_LUT) uniform sampler2D brdfLut;
 
 #ifdef SKY_ANALYTIC
 vec3 environment(vec3 direction)
