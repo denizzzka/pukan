@@ -595,7 +595,7 @@ private void printBench(LogicalDevice device, Scene scene, ulong[] frameNs, ulon
 import dlib.math;
 
 enum cameraFovY = 45.0f;
-enum cameraNear = 0.1f;
+enum cameraNear = 0.01f;
 enum cameraFar = 10.0f;
 enum stereoEyeSeparation = 0.06f;
 enum initialCameraDistance = 2.2f;
