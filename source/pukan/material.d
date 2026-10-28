@@ -165,7 +165,7 @@ else
     else enum runtimeMaterialOverride = false;
 }
 
-/// Material uniforms of all meshes, one slot per mesh
+/// Material uniforms of all meshes, one slot per distinct material
 final class MaterialBuffer
 {
     static if(runtimeMaterialOverride)
@@ -178,6 +178,7 @@ final class MaterialBuffer
     private size_t chunkCapacity;
     private size_t slotSize;
     private shared size_t used;
+    private size_t[Material] slotIndex;
     private Mutex chunkMutex;
 
     this(LogicalDevice device, size_t chunkCapacity = 16)
@@ -201,8 +202,25 @@ final class MaterialBuffer
                 destroy(chunk);
     }
 
+    /// Slot of an identical material, reserved when the table lacks it
+    size_t addMaterial(Material material)
+    {
+        synchronized(chunkMutex)
+        {
+            if(auto existing = material in slotIndex)
+                return *existing;
+
+            const slot = addSlot();
+
+            content(slot).material = material;
+            slotIndex[material] = slot;
+
+            return slot;
+        }
+    }
+
     /// Reserves a slot, adding a chunk when the last one fills up.
-    size_t addSlot()
+    private size_t addSlot()
     {
         const slot = atomicOp!"+="(used, 1);
         const chunkIndex = slot / chunkCapacity;

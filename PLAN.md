@@ -108,8 +108,6 @@ The following pieces are still missing:
       the gain has to be measured before the pipelines multiply.
 - [ ] Alpha-to-coverage for masked materials, once the render pass is
       multisampled.
-- [ ] Shared materials. A material table so meshes and primitives can reference
-      the same material instead of taking one slot per mesh.
 - [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin
       per node and primitive.
 - [ ] Texture compression. KTX2/BasisU and other compressed formats with a

@@ -91,7 +91,6 @@ class Mesh
     this(MaterialBuffer materialBuffer)
     {
         this.materialBuffer = materialBuffer;
-        materialSlot = materialBuffer.addSlot();
         writeMaterial();
     }
 
@@ -104,7 +103,7 @@ class Mesh
 
     protected void writeMaterial()
     {
-        materialBuffer.content(materialSlot).material = material;
+        materialSlot = materialBuffer.addMaterial(material);
     }
 
     protected VkDescriptorBufferInfo materialInfo()
