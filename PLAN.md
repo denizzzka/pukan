@@ -183,6 +183,28 @@ better draw path, and it comes after the forward batch path has been measured.
       on llvmpipe it is expected to lose. It earns its place only if the draws
       or the overdraw it removes outweigh that.
 
+## Temporal antialiasing
+
+Per-pixel shading aliases over time: a specular highlight or a Fresnel rim one
+pixel wide jumps between pixels as the camera or the object moves, and MSAA
+cannot fix it because MSAA averages coverage, not shading. The black helmet's
+ridges show it as white dots that come and go at half a turn. Jittering the
+projection and accumulating frames averages those pixels out, which no
+per-pixel fix can do. It also smooths edges beyond 4x MSAA, and the history
+buffer is what screen-space reflections, temporal shadows and upscaling would
+need later.
+
+- [ ] Jitter the projection by a subpixel offset per frame, cycling a fixed
+      sample pattern; undo the jitter for picking.
+- [ ] Keep a history colour buffer and reproject it with the previous
+      view-projection.
+- [ ] Reject history where depth or the normal moved, and clamp it to the
+      current neighbourhood so moving objects do not ghost.
+- [ ] Resolve between the surface pass and the colour copy, so transmission
+      still samples an antialiased image.
+- [ ] Judge it on the fixed scene against 4x MSAA without TAA: the aliasing it
+      removes, the ghosting it adds, and its cost on llvmpipe.
+
 ## Data layout and throughput
 
 Thesis: the remaining speed is in reducing the entropy of the data that moves
