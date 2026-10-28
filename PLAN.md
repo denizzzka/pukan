@@ -96,14 +96,9 @@ The following pieces are still missing:
       must use UNORM views; base color and emissive stay sRGB.
 - [ ] Mipmaps and glTF samplers. Generate mip chains and honour each sampler's
       wrap and filter modes instead of forcing MIRRORED_REPEAT.
-- [ ] Material textures on spheres and cylinders. Add procedural UVs and a
-      shared texture table or descriptor array so primitive groups can use the
-      same textures as meshes.
 - [ ] glTF material extensions: `KHR_materials_unlit` first, then emissive
       strength, specular, clearcoat, sheen, transmission, iridescence, volume,
       IOR, anisotropy and dispersion.
-- [ ] Tangent space. Load `TANGENT` when present and keep the derivative TBN as
-      a fallback; use `textureGrad` where UV derivatives cross seams.
 - [ ] Alpha handling. Sort blended primitives back to front and offer
       alpha-to-coverage for masked materials.
 - [ ] Real IBL. Replace the analytic sky with irradiance and prefiltered
