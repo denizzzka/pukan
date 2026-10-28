@@ -164,6 +164,7 @@ class GlTF : DrawableByVulkan
     private BufferPieceOnGPU[] gpuBuffs;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private VkDescriptorImageInfo fakeTextureInfo;
+    private VkBuffer vertexFallback;
     private GltfPipelines pipelines;
 
     private MeshClass[] meshes;
@@ -191,11 +192,13 @@ class GlTF : DrawableByVulkan
         LoaderNode[] nodes,
         LoaderNode rootSceneNode,
         Texture fakeTexture,
+        VkBuffer vertexFallback,
     )
     {
         this.pipelines = pipelines;
         this.allocator = allocator;
         this.materialBuffer = materialBuffer;
+        this.vertexFallback = vertexFallback;
         content = cont;
 
         fakeTextureInfo = VkDescriptorImageInfo(
@@ -437,7 +440,6 @@ class GlTF : DrawableByVulkan
 
             uplVert.normals = content.getAccess!(Type.VEC3, Vector3f)(*normals);
         }
-
         // If indexed mesh:
         if(primitive.indicesAccessorIdx >= 0)
         {
@@ -465,6 +467,24 @@ class GlTF : DrawableByVulkan
 
             uplVert.texCoords = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        }
+
+        // Tangent data is only needed when a normal map samples it
+        const hasTangents = hasNormals
+            && hasTexCoords
+            && hasNormalTexture(primitive.material)
+            && ("TANGENT" in primitive.attributes) !is null;
+
+        if(hasTangents)
+        {
+            const tangentIdx = primitive.attributes["TANGENT"].get!ushort;
+            auto tangents = &accessors[tangentIdx];
+
+            enforce(tangents.count > 0);
+            debug assert(tangents.type == "VEC4");
+            enforce(tangents.componentType == ComponentType.FLOAT);
+
+            uplVert.tangents = content.getAccess!(Type.VEC4, Vector4f)(*tangents);
         }
 
         if(hasSkin && skinsBaked)
@@ -500,11 +520,11 @@ class GlTF : DrawableByVulkan
                 bakedPositions[i] = Vector3f(baked.x, baked.y, baked.z);
             }
 
-            Vector3f[] bakedNormals;
-            bakedNormals.length = vertexCount;
-
             if(hasNormals)
             {
+                Vector3f[] bakedNormals;
+                bakedNormals.length = vertexCount;
+
                 auto normalRange = AccessRange!(Vector3f, false)(
                     content.bufferViews[uplVert.normals.viewIdx].buf,
                     uplVert.normals,
@@ -530,12 +550,47 @@ class GlTF : DrawableByVulkan
                     const baked = Vector4f(n.x, n.y, n.z, 0) * skinMatrix(jointMatrices, j, w);
                     bakedNormals[i] = Vector3f(baked.x, baked.y, baked.z).normalized;
                 }
+
+                uplVert.normals = createVertexBuffer(device, bakedNormals, gpuBuffs);
             }
-            else
-                bakedNormals[] = Vector3f(0, 0, 1);
+
+            if(hasTangents)
+            {
+                Vector4f[] bakedTangents;
+                bakedTangents.length = vertexCount;
+
+                auto tangentRange = AccessRange!(Vector4f, false)(
+                    content.bufferViews[uplVert.tangents.viewIdx].buf,
+                    uplVert.tangents,
+                );
+                auto tangentJointRange = AccessRange!(Vector4us, false)(
+                    content.bufferViews[uplVert.joints.viewIdx].buf,
+                    uplVert.joints,
+                );
+                auto tangentWeightRange = AccessRange!(Vector4f, false)(
+                    content.bufferViews[uplVert.weights.viewIdx].buf,
+                    uplVert.weights,
+                );
+
+                foreach(i; 0 .. vertexCount)
+                {
+                    const t = tangentRange.front;
+                    tangentRange.popFront;
+                    const j = tangentJointRange.front;
+                    tangentJointRange.popFront;
+                    const w = tangentWeightRange.front;
+                    tangentWeightRange.popFront;
+
+                    const baked = Vector4f(t.x, t.y, t.z, 0) * skinMatrix(jointMatrices, j, w);
+                    const n = Vector3f(baked.x, baked.y, baked.z).normalized;
+                    bakedTangents[i] = Vector4f(n.x, n.y, n.z, t.w);
+                }
+
+                uplVert.tangents = createVertexBuffer(device, bakedTangents, gpuBuffs);
+            }
 
             uplVert.vertices = createVertexBuffer(device, bakedPositions, gpuBuffs);
-            uplVert.normals = createVertexBuffer(device, bakedNormals, gpuBuffs);
+
             uplVert.aabb = Boxf.init;
             hasSkin = false;
         }
@@ -545,8 +600,9 @@ class GlTF : DrawableByVulkan
 
             if(hasNormals)
                 createGpuBufIfNeed(device, uplVert.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-            else
-                uplVert.normals = createFakeVertexBuffer!Vector3f(device, vertexCount, Vector3f(0, 0, 1), gpuBuffs);
+
+            if(hasTangents)
+                createGpuBufIfNeed(device, uplVert.tangents, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
             if(hasSkin)
             {
@@ -562,12 +618,18 @@ class GlTF : DrawableByVulkan
             materialBuffer,
             fakeTextureInfo,
             hasSkin,
-            gpuBuffs,
+            vertexFallback,
             jointsUboInfo,
         );
 
-        m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals);
+        m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents);
+        m.buildGeometry(gpuBuffs);
         return m;
+    }
+
+    private static bool hasNormalTexture(in Json json)
+    {
+        return json.type == Json.Type.object && ("normalTexture" in json) !is null;
     }
 
     private static Matrix4x4f skinMatrix(
@@ -596,21 +658,6 @@ class GlTF : DrawableByVulkan
         gpuBuffs ~= piece;
 
         return BufAccess(cast(ptrdiff_t)(gpuBuffs.length - 1), 0, cast(ubyte) T.sizeof, cast(uint) data.length);
-    }
-
-    private BufAccess createFakeVertexBuffer(T)(
-        LogicalDevice device,
-        uint count,
-        T value,
-        ref BufferPieceOnGPU[] gpuBuffs,
-    )
-    {
-        auto piece = new BufferPieceOnGPU;
-        piece.buffer = new TransferBuffer(device, T.sizeof * count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        (cast(T[]) piece.buffer.cpuBuf)[] = value;
-        gpuBuffs ~= piece;
-
-        return BufAccess(cast(ptrdiff_t)(gpuBuffs.length - 1), 0, cast(ubyte) T.sizeof, count);
     }
 
     private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
@@ -701,9 +748,10 @@ class SkinnedGlTF : GlTF
         LoaderNode[] nodes,
         LoaderNode rootSceneNode,
         Texture fakeTexture,
+        VkBuffer vertexFallback,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
+        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -770,9 +818,10 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
         LoaderNode[] nodes,
         LoaderNode rootSceneNode,
         Texture fakeTexture,
+        VkBuffer vertexFallback,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture);
+        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)

@@ -4,7 +4,7 @@ import dlib.math;
 import pukan.gltf.accessor;
 public import pukan.gltf.loader: ComponentType;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
-import pukan.mesh: Mesh, VertexStream;
+import pukan.mesh: Mesh, VertexStream, fallbackVertexSize;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -38,7 +38,7 @@ package struct UploadedVertices
     IndicesDescr indices;
     union
     {
-        BufAccess[5] allBuffers;
+        BufAccess[6] allBuffers;
         struct
         {
             BufAccess vertices;
@@ -49,6 +49,7 @@ package struct UploadedVertices
             BufAccess weights;
 
             BufAccess normals;
+            BufAccess tangents;
         }
     }
 
@@ -70,6 +71,7 @@ final class GltfMesh : Mesh
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
     private VkDescriptorImageInfo[5] materialTextures;
+    private VkBuffer fallbackVertex;
 
     package this(
         string name,
@@ -78,7 +80,7 @@ final class GltfMesh : Mesh
         MaterialBuffer materialBuffer,
         VkDescriptorImageInfo fakeTexture,
         bool hasSkin,
-        ref BufferPieceOnGPU[] gpuBuffs,
+        VkBuffer fallbackVertex,
         ref VkDescriptorBufferInfo jointsUboInfo,
     )
     {
@@ -88,19 +90,15 @@ final class GltfMesh : Mesh
         this.descriptorSet = allocator.allocate();
         this.vert = vert;
         this.hasSkin = hasSkin;
+        this.fallbackVertex = fallbackVertex;
         materialTextures[] = fakeTexture;
 
         assert(vert.vertices.viewIdx >= 0);
-
-        if(vert.texCoords.viewIdx < 0)
-            this.vert.texCoords = vert.vertices; // fake data to fill out texture coords buffer on non-textured objects
 
         material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
         writeMaterial();
 
         jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
-
-        buildGeometry(gpuBuffs);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
@@ -165,7 +163,13 @@ final class GltfMesh : Mesh
             isClose(a.max.z, b.max.z, tolerance, tolerance);
     }
 
-    package void applyMaterial(in Json json, VkDescriptorImageInfo[] images, bool hasTexCoords, bool hasNormals)
+    package void applyMaterial(
+        in Json json,
+        VkDescriptorImageInfo[] images,
+        bool hasTexCoords,
+        bool hasNormals,
+        bool hasTangents,
+    )
     {
         material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
         alphaMode = AlphaMode.opaque;
@@ -237,8 +241,11 @@ final class GltfMesh : Mesh
 
         material.alphaMode = alphaMode;
 
-        if(!hasNormals)
-            material.flags = material.flags | MaterialFlags(MaterialFlag.derivedNormals);
+        if(hasTangents && material.flags.normalTexture)
+            material.flags = material.flags | MaterialFlag.vertexTangent;
+
+        if(!hasNormals || material.mode == MaterialMode.unlit)
+            material.flags = material.flags | MaterialFlag.derivedNormals;
 
         writeMaterial();
     }
@@ -291,7 +298,8 @@ final class GltfMesh : Mesh
     {
     }
 
-    private void buildGeometry(ref BufferPieceOnGPU[] gpuBuffs)
+    /// Binds the streams the material actually reads, zeroed fallbacks otherwise.
+    package void buildGeometry(ref BufferPieceOnGPU[] gpuBuffs)
     {
         VertexStream stream(BufAccess accessor)
         {
@@ -308,9 +316,23 @@ final class GltfMesh : Mesh
             );
         }
 
+        VertexStream constantVertex()
+        {
+            // A zero stride reads one element for every vertex
+            return VertexStream(
+                buffer: fallbackVertex,
+                offset: 0,
+                size: fallbackVertexSize,
+                stride: 0,
+            );
+        }
+
+        const bool needsNormals = material.mode != MaterialMode.unlit;
+        const bool needsTangents = needsNormals && material.flags.vertexTangent;
+
         VertexStream[] streams = [
             stream(vert.vertices),
-            stream(vert.texCoords),
+            vert.texCoords.viewIdx >= 0 ? stream(vert.texCoords) : constantVertex(),
         ];
 
         if(hasSkin)
@@ -319,7 +341,8 @@ final class GltfMesh : Mesh
             streams ~= stream(vert.weights);
         }
 
-        streams ~= stream(vert.normals);
+        streams ~= needsNormals && vert.normals.viewIdx >= 0 ? stream(vert.normals) : constantVertex();
+        streams ~= needsTangents ? stream(vert.tangents) : constantVertex();
 
         setStreams(streams);
         vertexCount = vert.vertices.count;

@@ -17,11 +17,13 @@ layout(location = 1) in vec2 vertTextureCoord;
 layout(location = 2) in uvec4 jointIndices;
 layout(location = 3) in vec4 weight;
 layout(location = 4) in vec3 vertNormal;
+layout(location = 5) in vec4 vertTangent;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTextureCoord;
 layout(location = 2) out vec3 fragNormal;
 layout(location = 3) out vec3 fragPosition;
+layout(location = 4) out vec4 fragTangent;
 
 void main()
 {
@@ -36,9 +38,12 @@ void main()
 
     const vec4 positionOut = skinMatrix * vec4(position, 1.0);
     const mat4 model = frameUbo.frame.invViewProj * trans;
-    const mat3 normalMatrix = transpose(inverse(mat3(model)));
+    const mat3 model3 = mat3(model);
+    const mat3 skin3 = mat3(skinMatrix);
+    const mat3 normalMatrix = transpose(inverse(model3));
 
     fragPosition = (model * positionOut).xyz;
-    fragNormal = normalMatrix * (mat3(skinMatrix) * vertNormal);
+    fragNormal = normalMatrix * (skin3 * vertNormal);
+    fragTangent = vec4(model3 * (skin3 * vertTangent.xyz), vertTangent.w * sign(determinant(model3 * skin3)));
     gl_Position = trans * positionOut;
 }

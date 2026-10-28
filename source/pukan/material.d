@@ -24,6 +24,7 @@ enum MaterialFlag: uint
     occlusionTexture = 1u << 4,
     emissiveTexture = 1u << 5,
     derivedNormals = 1u << 6,
+    vertexTangent = 1u << 7,
 }
 
 alias MaterialFlags = BitFlags!MaterialFlag;

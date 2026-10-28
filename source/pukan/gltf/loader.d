@@ -112,6 +112,7 @@ package GlTF loadGlTF2(
     LogicalDevice device,
     ref GltfPipelines pipelines,
     Texture fakeTexture,
+    VkBuffer vertexFallback,
     bool computeJointsOnGPU,
 )
 {
@@ -358,12 +359,12 @@ package GlTF loadGlTF2(
     if(ret.skins.length > 0)
     {
         if(computeJointsOnGPU)
-            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback);
         else
-            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback);
     }
     else
-        result = new GlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture);
+        result = new GlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback);
 
     stats.decodeNs += cast(ulong) (MonoTime.currTime - ctorStart).total!"nsecs";
     result.loadStats = stats;

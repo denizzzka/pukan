@@ -1,6 +1,6 @@
 module pukan.mesh;
 
-import dlib.math: Matrix4x4f;
+import dlib.math: Matrix4x4f, Vector4f;
 import pukan.material: Material, MaterialBuffer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -14,6 +14,9 @@ struct VertexStream
     uint stride;
 }
 
+/// Bytes a fallback vertex provides, wide enough for the largest attribute format
+enum fallbackVertexSize = Vector4f.sizeof;
+
 /// Resources shared by static and skinned meshes
 final class MeshResources
 {
@@ -21,10 +24,18 @@ final class MeshResources
     MemoryBufferMappedToCPU identityJoints;
     VkDescriptorBufferInfo identityJointsInfo;
     Texture fakeTexture;
+    /// Zeroed source for vertex attributes a mesh does not provide
+    MemoryBufferMappedToCPU fallbackVertex;
 
     this(LogicalDevice device, size_t materialCapacity = 16)
     {
         materials = new MaterialBuffer(device, materialCapacity);
+
+        fallbackVertex = device.create!MemoryBufferMappedToCPU(
+            fallbackVertexSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        );
+        (cast(ubyte[]) fallbackVertex.cpuBuf)[] = 0;
 
         identityJoints = device.create!MemoryBufferMappedToCPU(
             Matrix4x4f.sizeof,
@@ -44,6 +55,9 @@ final class MeshResources
     {
         if(fakeTexture)
             destroy(fakeTexture);
+
+        if(fallbackVertex)
+            destroy(fallbackVertex);
 
         if(identityJoints)
             destroy(identityJoints);

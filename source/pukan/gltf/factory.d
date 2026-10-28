@@ -1,6 +1,6 @@
 module pukan.gltf.factory;
 
-import dlib.math: Matrix4x4f, Vector2f, Vector3f;
+import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import pukan.gltf;
 import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines;
 import pukan.material: MaterialBuffer;
@@ -37,6 +37,11 @@ private ShaderVertexInput vertexInput()
                 stride: Vector3f.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: 5,
+                stride: Vector4f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
         ],
         [
             VkVertexInputAttributeDescription(
@@ -64,6 +69,11 @@ private ShaderVertexInput vertexInput()
                 location: 4,
                 format: VK_FORMAT_R32G32B32_SFLOAT,
             ),
+            VkVertexInputAttributeDescription(
+                binding: 5,
+                location: 5,
+                format: VK_FORMAT_R32G32B32A32_SFLOAT,
+            ),
         ],
     );
 }
@@ -87,6 +97,11 @@ private ShaderVertexInput staticVertexInput()
                 stride: Vector3f.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: 3,
+                stride: Vector4f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
         ],
         [
             VkVertexInputAttributeDescription(
@@ -103,6 +118,11 @@ private ShaderVertexInput staticVertexInput()
                 binding: 2,
                 location: 2,
                 format: VK_FORMAT_R32G32B32_SFLOAT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 3,
+                location: 3,
+                format: VK_FORMAT_R32G32B32A32_SFLOAT,
             ),
         ],
     );
@@ -310,6 +330,7 @@ class GltfFactory
                 device,
                 pipelineCfgs,
                 resources.fakeTexture,
+                resources.fallbackVertex.buf,
                 computeJointsOnGPU,
             );
         catch(Exception e)

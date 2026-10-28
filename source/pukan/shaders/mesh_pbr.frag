@@ -17,10 +17,11 @@ layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTextureCoord;
 layout(location = 2) in vec3 fragNormal;
 layout(location = 3) in vec3 fragPosition;
+layout(location = 4) in vec4 fragTangent;
 
 layout(location = 0) out vec4 outColor;
 
-vec3 perturbNormal(Material material, vec3 normal, vec3 position, vec2 uv)
+vec3 perturbNormalFromDerivatives(Material material, vec3 normal, vec3 position, vec2 uv)
 {
     const vec3 sampled = texture(normalTexture, uv).xyz * 2.0 - 1.0;
     const vec3 mapNormal = vec3(sampled.xy * material.metallicRoughness.z, sampled.z);
@@ -40,6 +41,30 @@ vec3 perturbNormal(Material material, vec3 normal, vec3 position, vec2 uv)
     return normalize(TBN * mapNormal);
 }
 
+vec3 perturbNormalFromTangent(Material material, vec3 normal, vec3 position, vec2 uv, vec4 tangent)
+{
+    const vec3 N = normalize(normal);
+    const vec3 T = tangent.xyz - N * dot(N, tangent.xyz);
+    const vec3 B = cross(N, T) * (tangent.w < 0.0 ? -1.0 : 1.0);
+
+    // Geometry derivatives stay continuous across UV seams, so they survive
+    // where the texture coordinate derivative flips.
+    const vec2 uvDx = vec2(
+        dot(dFdx(position), T) / dot(T, T),
+        dot(dFdx(position), B) / dot(B, B)
+    );
+    const vec2 uvDy = vec2(
+        dot(dFdy(position), T) / dot(T, T),
+        dot(dFdy(position), B) / dot(B, B)
+    );
+
+    const vec3 sampled = textureGrad(normalTexture, uv, uvDx, uvDy).xyz * 2.0 - 1.0;
+    const vec3 mapNormal = vec3(sampled.xy * material.metallicRoughness.z, sampled.z);
+    const mat3 TBN = mat3(normalize(T), normalize(B), N);
+
+    return normalize(TBN * mapNormal);
+}
+
 void main()
 {
     const Material material = ubo.material;
@@ -51,7 +76,12 @@ void main()
     if((flags & MATERIAL_FLAG_DERIVED_NORMALS) != 0u)
         normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));
     if((flags & MATERIAL_FLAG_NORMAL_TEXTURE) != 0u)
-        normal = perturbNormal(material, normal, fragPosition, fragTextureCoord);
+    {
+        if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
+            normal = perturbNormalFromTangent(material, normal, fragPosition, fragTextureCoord, fragTangent);
+        else
+            normal = perturbNormalFromDerivatives(material, normal, fragPosition, fragTextureCoord);
+    }
 
     vec2 metallicRoughness = material.metallicRoughness.xy;
     if((flags & MATERIAL_FLAG_METALLIC_ROUGHNESS_TEXTURE) != 0u)
