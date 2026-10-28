@@ -522,7 +522,7 @@ void main(string[] args) {
             static size_t fps;
 
             frameNum++;
-            write("\rFPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx);
+            write("\rFPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx, ", ");
 
             enum targetFPS = 80;
             enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
