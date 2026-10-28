@@ -537,8 +537,9 @@ enum cameraNear = 0.1f;
 enum cameraFar = 10.0f;
 enum stereoEyeSeparation = 0.06f;
 enum initialCameraDistance = 2.2f;
-enum minCameraDistance = 0.6f;
-enum maxCameraDistance = 2.5f;
+enum cameraPanLimit = 3.0f;
+enum cameraPanSensitivity = 0.002f;
+enum cameraWheelPanStep = 0.15f;
 enum sceneDepth = 1.0f;
 
 bool benchMode;
@@ -559,20 +560,23 @@ private string[] benchSampleNames = [
 ];
 
 float cameraDistance = initialCameraDistance;
+Vector3f cameraPan = Vector3f(0, 0, 0);
 
 extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
 {
     if(benchMode)
         return;
 
-    auto distance = cameraDistance - cast(float) yoffset * 0.1f;
+    auto pan = cameraPan.z + cast(float) yoffset * cameraWheelPanStep;
 
-    if(distance < minCameraDistance)
-        distance = minCameraDistance;
-    if(distance > maxCameraDistance)
-        distance = maxCameraDistance;
+    if(pan < -cameraPanLimit)
+        pan = -cameraPanLimit;
+    if(pan > cameraPanLimit)
+        pan = cameraPanLimit;
 
-    cameraDistance = distance;
+    cameraPan.z = pan;
+
+    lastInteractionTime = frameTime;
 }
 
 enum autoRotationSpeed = 90f.degtorad * 0.1f;
@@ -585,24 +589,26 @@ double lastInteractionTime = -1e9;
 double cursorX;
 double cursorY;
 bool sceneDragging;
+bool cameraDragging;
 float sceneYaw = 0.0f;
 float scenePitch = 0.0f;
 
 extern(C) void onMouseButton(GLFWwindow*, int button, int action, int) nothrow @nogc
 {
-    if(benchMode || button != GLFW_MOUSE_BUTTON_LEFT)
+    if(benchMode)
         return;
 
-    if(action == GLFW_PRESS)
+    lastInteractionTime = frameTime;
+
+    if(button == GLFW_MOUSE_BUTTON_LEFT)
     {
-        sceneDragging = true;
-        lastInteractionTime = frameTime;
+        if(action == GLFW_PRESS)
+            sceneDragging = true;
+        else if(action == GLFW_RELEASE)
+            sceneDragging = false;
     }
-    else if(action == GLFW_RELEASE)
-    {
-        sceneDragging = false;
-        lastInteractionTime = frameTime;
-    }
+    else if(button == GLFW_MOUSE_BUTTON_RIGHT)
+        cameraDragging = action == GLFW_PRESS;
 }
 
 extern(C) void onCursorPos(GLFWwindow*, double xpos, double ypos) nothrow @nogc
@@ -615,18 +621,43 @@ extern(C) void onCursorPos(GLFWwindow*, double xpos, double ypos) nothrow @nogc
     cursorX = xpos;
     cursorY = ypos;
 
+    if(cameraDragging)
+    {
+        cameraPan.x = clampPan(cameraPan.x + cast(float) dx * cameraPanSensitivity);
+        cameraPan.y = clampPan(cameraPan.y - cast(float) dy * cameraPanSensitivity);
+        return;
+    }
+
     if(!sceneDragging)
         return;
 
-    sceneYaw += cast(float) dx * manualRotationSensitivity;
-    scenePitch += cast(float) dy * manualRotationSensitivity;
+    sceneYaw -= cast(float) dx * manualRotationSensitivity;
+    scenePitch -= cast(float) dy * manualRotationSensitivity;
 
     if(scenePitch > maxScenePitch)
         scenePitch = maxScenePitch;
     if(scenePitch < -maxScenePitch)
         scenePitch = -maxScenePitch;
+}
 
-    lastInteractionTime = frameTime;
+private float clampPan(float value) nothrow @nogc
+{
+    if(value < -cameraPanLimit)
+        return -cameraPanLimit;
+    if(value > cameraPanLimit)
+        return cameraPanLimit;
+
+    return value;
+}
+
+private Vector3f cameraEye() nothrow @nogc
+{
+    return Vector3f(0, -0.2f, -cameraDistance) + cameraPan;
+}
+
+private Vector3f cameraTarget() nothrow @nogc
+{
+    return cameraPan;
 }
 
 WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
@@ -636,8 +667,8 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.model = rotationMatrix!float(Axis.y, sceneYaw) * rotationMatrix!float(Axis.x, scenePitch);
     // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
     wtb.view = lookAtMatrix(
-        Vector3f(0, -0.2f, -cameraDistance), // camera position
-        Vector3f(0, 0, 0), // point at which the camera is looking
+        cameraEye(),
+        cameraTarget(),
         Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
     );
     wtb.proj = perspectiveMatrix(
@@ -653,8 +684,8 @@ WorldTransformation[2] calculateStereoWTB(in VkExtent2D eyeExtent, float currDel
 {
     auto base = calculateWTB(eyeExtent, currDeltaTime);
     const views = makeStereoViews(
-        Vector3f(0, -0.2f, -cameraDistance),
-        Vector3f(0, 0, 0),
+        cameraEye(),
+        cameraTarget(),
         Vector3f(0, 1, 0),
         cameraFovY,
         eyeExtent,
