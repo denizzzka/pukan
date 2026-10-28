@@ -6,7 +6,7 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, SkyMode, skyMode;
+import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode;
 import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.misc: Boxf;
@@ -748,14 +748,14 @@ class GlTF : DrawableByVulkan
     {
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
 
-        if(mesh.material.mode == MaterialMode.unlit)
+        if(mesh.material.mode == MaterialMode.unlit || lightingMode == LightingMode.unlit)
             return selectVariant(modes.unlit, mesh);
 
         if(mesh.material.mode == MaterialMode.lit)
             return selectVariant(modes.lit, mesh);
 
-        auto pbr = skyMode == SkyMode.analytic ? modes.pbr.analytic
-            : skyMode == SkyMode.none ? modes.pbr.none
+        auto pbr = lightingMode == LightingMode.analytic ? modes.pbr.analytic
+            : lightingMode == LightingMode.none ? modes.pbr.none
             : modes.pbr.ibl;
 
         return selectVariant(pbr, mesh);

@@ -10,16 +10,17 @@ struct GltfPipelineVariants
     GraphicsPipelineCfg doubleSidedBlend;
 }
 
-/// One shader per sky, chosen at draw time
-enum SkyMode
+/// Lighting of the scene, chosen at draw time
+enum LightingMode
 {
     ibl,
     analytic,
     none,
+    unlit,
 }
 
 /// Render setting, read by the drawables on every draw
-SkyMode skyMode = SkyMode.ibl;
+LightingMode lightingMode = LightingMode.ibl;
 
 struct GltfSkyPipelines
 {

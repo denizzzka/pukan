@@ -1,7 +1,7 @@
 import arena: placeOnIcosahedron;
 import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
-import pukan.gltf.pipelines: SkyMode, skyMode;
+import pukan.gltf.pipelines: LightingMode, lightingMode;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.mesh: LitVertex;
@@ -385,7 +385,7 @@ void main(string[] args) {
         if(skyChanged)
         {
             skyChanged = false;
-            writefln("sky: %s", skyMode);
+            writefln("lighting: %s", lightingMode);
         }
 
         if(overrideChanged)
@@ -630,9 +630,10 @@ extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
 
     if(key == GLFW_KEY_S)
     {
-        skyMode = skyMode == SkyMode.ibl ? SkyMode.analytic
-            : skyMode == SkyMode.analytic ? SkyMode.none
-            : SkyMode.ibl;
+        lightingMode = lightingMode == LightingMode.ibl ? LightingMode.analytic
+            : lightingMode == LightingMode.analytic ? LightingMode.none
+            : lightingMode == LightingMode.none ? LightingMode.unlit
+            : LightingMode.ibl;
 
         skyChanged = true;
     }
