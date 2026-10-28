@@ -177,6 +177,13 @@ final class GltfMesh : Mesh
 
         if(json.type == Json.Type.object)
         {
+            if(auto extensions = "extensions" in json)
+                if("KHR_materials_unlit" in *extensions)
+                    material.mode = MaterialMode.unlit;
+
+            // Unlit keeps base color and alpha only
+            const bool lit = material.mode != MaterialMode.unlit;
+
             if(auto pbr = "pbrMetallicRoughness" in json)
             {
                 if(auto factor = "baseColorFactor" in *pbr)
@@ -194,33 +201,37 @@ final class GltfMesh : Mesh
                 if(auto texture = "baseColorTexture" in *pbr)
                     bindTexture(*texture, baseColorSlot, MaterialFlag.baseColorTexture, images, hasTexCoords);
 
-                if(auto texture = "metallicRoughnessTexture" in *pbr)
-                    bindTexture(*texture, metallicRoughnessSlot, MaterialFlag.metallicRoughnessTexture, images, hasTexCoords);
+                if(lit)
+                    if(auto texture = "metallicRoughnessTexture" in *pbr)
+                        bindTexture(*texture, metallicRoughnessSlot, MaterialFlag.metallicRoughnessTexture, images, hasTexCoords);
             }
 
-            if(auto texture = "normalTexture" in json)
+            if(lit)
             {
-                bindTexture(*texture, normalSlot, MaterialFlag.normalTexture, images, hasTexCoords);
+                if(auto texture = "normalTexture" in json)
+                {
+                    bindTexture(*texture, normalSlot, MaterialFlag.normalTexture, images, hasTexCoords);
 
-                if(auto scale = "scale" in *texture)
-                    material.normalScale = readFloat(*scale);
-            }
+                    if(auto scale = "scale" in *texture)
+                        material.normalScale = readFloat(*scale);
+                }
 
-            if(auto texture = "occlusionTexture" in json)
-            {
-                bindTexture(*texture, occlusionSlot, MaterialFlag.occlusionTexture, images, hasTexCoords);
+                if(auto texture = "occlusionTexture" in json)
+                {
+                    bindTexture(*texture, occlusionSlot, MaterialFlag.occlusionTexture, images, hasTexCoords);
 
-                if(auto strength = "strength" in *texture)
-                    material.occlusionStrength = readFloat(*strength);
-            }
+                    if(auto strength = "strength" in *texture)
+                        material.occlusionStrength = readFloat(*strength);
+                }
 
-            if(auto texture = "emissiveTexture" in json)
-                bindTexture(*texture, emissiveSlot, MaterialFlag.emissiveTexture, images, hasTexCoords);
+                if(auto texture = "emissiveTexture" in json)
+                    bindTexture(*texture, emissiveSlot, MaterialFlag.emissiveTexture, images, hasTexCoords);
 
-            if(auto factor = "emissiveFactor" in json)
-            {
-                const e = (*factor).deserializeJson!(float[3]);
-                material.emissiveFactor = Vector4f(e[0], e[1], e[2], 0);
+                if(auto factor = "emissiveFactor" in json)
+                {
+                    const e = (*factor).deserializeJson!(float[3]);
+                    material.emissiveFactor = Vector4f(e[0], e[1], e[2], 0);
+                }
             }
 
             if(auto mode = "alphaMode" in json)

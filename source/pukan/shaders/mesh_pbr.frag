@@ -76,15 +76,11 @@ void main()
     if(alphaMode == MATERIAL_ALPHA_MASK && base.a < material.alphaParams.x)
         discard;
 
-    vec3 emissive = material.emissiveFactor.rgb;
-    if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
-        emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
-
     vec3 color;
 
-    // Unlit output ignores the normal, so none of the basis work is worth doing
+    // Unlit output is the base color alone; no basis, maps or light
     if(uint(material.params.x) == MATERIAL_MODE_UNLIT)
-        color = base.rgb + emissive;
+        color = base.rgb;
     else
     {
         vec3 normal = normalize(fragNormal);
@@ -112,6 +108,10 @@ void main()
             const float occlusion = texture(occlusionTexture, fragTextureCoord).r;
             ao = mix(1.0, occlusion, material.metallicRoughness.w);
         }
+
+        vec3 emissive = material.emissiveFactor.rgb;
+        if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
+            emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
 
         color = shadePbr(
             base.rgb,

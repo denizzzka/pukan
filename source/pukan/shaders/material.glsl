@@ -140,5 +140,5 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
             emissive
         );
 
-    return albedo + emissive;
+    return albedo;
 }
