@@ -95,8 +95,8 @@ Because the goal is vague here, the questions below decide the scope:
 The shared `Material` covers simple unlit/lit shading and glTF metallic-roughness.
 The following pieces are still missing:
 
-- [ ] glTF material extensions: emissive strength, specular, clearcoat, sheen,
-      transmission, iridescence, volume, IOR, anisotropy and dispersion.
+- [ ] glTF material extensions: specular, clearcoat, sheen, transmission,
+      iridescence, volume, IOR, anisotropy and dispersion.
 - [ ] Alpha handling. Sort blended primitives back to front and offer
       alpha-to-coverage for masked materials.
 - [ ] Real IBL. Replace the analytic sky with irradiance and prefiltered

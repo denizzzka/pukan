@@ -232,6 +232,11 @@ final class GltfMesh : Mesh
                     const e = (*factor).deserializeJson!(float[3]);
                     material.emissiveFactor = Vector4f(e[0], e[1], e[2], 0);
                 }
+
+                if(auto extensions = "extensions" in json)
+                    if(auto emissive = "KHR_materials_emissive_strength" in *extensions)
+                        if(auto strength = "emissiveStrength" in *emissive)
+                            material.emissiveFactor = material.emissiveFactor * readFloat(*strength);
             }
 
             if(auto mode = "alphaMode" in json)
