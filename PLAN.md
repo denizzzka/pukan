@@ -152,6 +152,24 @@ there are no shadows, and point and spot lights do not exist. Missing:
 - [ ] Shadow filtering: PCF, normal offset bias and cascade blending.
 - [ ] Light culling by distance and screen size.
 
+## Deferred shading
+
+The other way to separate geometry from materials: batch geometry by pipeline
+alone and resolve the material in a second pass. A different frame shape, not a
+better draw path, and it comes after the forward batch path has been measured.
+
+- [ ] A G-buffer pass: depth, normal, UV, base color and a material id per pixel,
+      written by every opaque drawable with the same pipeline.
+- [ ] A shading pass that reads the G-buffer and applies the material its id
+      points at, sampling textures through the same descriptor array the forward
+      path needs.
+- [ ] Keep alpha-blended and transmissive materials on a forward path, and
+      decide whether masked ones go to the G-buffer.
+- [ ] Judge it on the fixed scene against the forward palette and texture
+      indexing: the deferred path pays MRT bandwidth and a full-screen pass, and
+      on llvmpipe it is expected to lose. It earns its place only if the draws
+      or the overdraw it removes outweigh that.
+
 ## Data layout and throughput
 
 Thesis: the remaining speed is in reducing the entropy of the data that moves
@@ -181,6 +199,12 @@ against the plain version it replaces.
         joint matrix buffer: the shader applies the instance transform after
         skinning, so a crowd in lockstep costs one draw. Different poses split
         into batches, each still instanced.
+  - [ ] Drop the texture set from the batch key: index textures from the
+        material through one descriptor array sampled with
+        `descriptorIndexing`, and store image and sampler indices in the
+        material. Bounded by the after-bind descriptor limits and by the
+        per-material sampler state; do it after the palette, when batches still
+        split on textures.
   - [ ] Measure on the iridescence grid: 346 primitives over two geometry sets,
         343 nodes differing only in translation and material. One llvmpipe draw
         costs about 0.11 ms whatever the triangle count, so the grid spends
