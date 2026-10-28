@@ -68,6 +68,8 @@ final class GltfMesh : Mesh
     private enum clearcoatSlot = 7;
     private enum clearcoatRoughnessSlot = 8;
     private enum clearcoatNormalSlot = 9;
+    private enum sheenColorSlot = 10;
+    private enum sheenRoughnessSlot = 11;
 
     package UploadedVertices vert;
     package AlphaMode alphaMode;
@@ -75,7 +77,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[10] materialTextures;
+    private VkDescriptorImageInfo[12] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -290,6 +292,26 @@ final class GltfMesh : Mesh
                                 material.clearcoat.z = readFloat(*scale);
                         }
                     }
+
+                    if(auto sheen = "KHR_materials_sheen" in *extensions)
+                    {
+                        if(auto value = "sheenColorFactor" in *sheen)
+                        {
+                            const c = (*value).deserializeJson!(float[3]);
+                            material.sheen.x = c[0];
+                            material.sheen.y = c[1];
+                            material.sheen.z = c[2];
+                        }
+
+                        if(auto value = "sheenRoughnessFactor" in *sheen)
+                            material.sheen.w = readFloat(*value);
+
+                        if(auto texture = "sheenColorTexture" in *sheen)
+                            bindTexture(*texture, sheenColorSlot, MaterialFlag.sheenColorTexture, images, hasTexCoords);
+
+                        if(auto texture = "sheenRoughnessTexture" in *sheen)
+                            bindTexture(*texture, sheenRoughnessSlot, MaterialFlag.sheenRoughnessTexture, images, hasTexCoords);
+                    }
                 }
             }
 
@@ -363,6 +385,8 @@ final class GltfMesh : Mesh
             imageWriteDescriptor(descriptorSet, 9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatSlot]),
             imageWriteDescriptor(descriptorSet, 10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatRoughnessSlot]),
             imageWriteDescriptor(descriptorSet, 11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatNormalSlot]),
+            imageWriteDescriptor(descriptorSet, 12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[sheenColorSlot]),
+            imageWriteDescriptor(descriptorSet, 13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[sheenRoughnessSlot]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

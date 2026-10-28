@@ -247,6 +247,15 @@ private bool[] linearImages(in Json json)
                 if(auto texture = "clearcoatNormalTexture" in *clearcoat)
                     usedAsData[imageOf(*texture)] = true;
             }
+
+            if(auto sheen = "KHR_materials_sheen" in *extensions)
+            {
+                if(auto texture = "sheenColorTexture" in *sheen)
+                    usedAsColor[imageOf(*texture)] = true;
+
+                if(auto texture = "sheenRoughnessTexture" in *sheen)
+                    usedAsData[imageOf(*texture)] = true;
+            }
         }
     }
 
@@ -262,11 +271,12 @@ private bool[] linearImages(in Json json)
 unittest
 {
     const json = parseJsonString(`{
-        "images": [{}, {}, {}, {}, {}, {}, {}, {}, {}],
+        "images": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}],
         "textures": [
             {"source": 0}, {"source": 1}, {"source": 2},
             {"source": 3}, {"source": 4}, {"source": 5},
-            {"source": 6}, {"source": 7}, {"source": 8}
+            {"source": 6}, {"source": 7}, {"source": 8},
+            {"source": 9}, {"source": 10}
         ],
         "materials": [{
             "pbrMetallicRoughness": {
@@ -293,12 +303,19 @@ unittest
                     "clearcoatNormalTexture": {"index": 8}
                 }
             }
+        }, {
+            "extensions": {
+                "KHR_materials_sheen": {
+                    "sheenColorTexture": {"index": 9},
+                    "sheenRoughnessTexture": {"index": 10}
+                }
+            }
         }]
     }`);
 
     // Image 0 serves a color map too, so it keeps the sRGB decode; the specular
     // color map is color data, the specular strength map is not
-    assert(linearImages(json) == [false, true, true, true, false, true, true, true, true]);
+    assert(linearImages(json) == [false, true, true, true, false, true, true, true, true, false, true]);
 }
 
 ///

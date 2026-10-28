@@ -17,6 +17,8 @@ layout(binding = 8) uniform sampler2D specularColorTexture;
 layout(binding = 9) uniform sampler2D clearcoatTexture;
 layout(binding = 10) uniform sampler2D clearcoatRoughnessTexture;
 layout(binding = 11) uniform sampler2D clearcoatNormalTexture;
+layout(binding = 12) uniform sampler2D sheenColorTexture;
+layout(binding = 13) uniform sampler2D sheenRoughnessTexture;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTextureCoord;
@@ -145,6 +147,14 @@ void main()
         if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
             emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
 
+        vec3 sheenColor = material.sheen.rgb;
+        if((flags & MATERIAL_FLAG_SHEEN_COLOR_TEXTURE) != 0u)
+            sheenColor *= texture(sheenColorTexture, fragTextureCoord).rgb;
+
+        float sheenRoughness = material.sheen.a;
+        if((flags & MATERIAL_FLAG_SHEEN_ROUGHNESS_TEXTURE) != 0u)
+            sheenRoughness *= texture(sheenRoughnessTexture, fragTextureCoord).a;
+
         Surface surface;
         surface.albedo = base.rgb;
         surface.normal = normal;
@@ -158,6 +168,8 @@ void main()
         surface.ao = ao;
         surface.clearcoat = clearcoat;
         surface.clearcoatRoughness = clearcoatRoughness;
+        surface.sheenColor = sheenColor;
+        surface.sheenRoughness = sheenRoughness;
 
         color = shadePbr(surface);
     }

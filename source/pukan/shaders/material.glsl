@@ -10,6 +10,7 @@ struct Material
     vec4 specular; // rgb = F0 color, a = strength
     vec4 iorParams; // x = index of refraction
     vec4 clearcoat; // x = factor, y = roughness, z = normal scale
+    vec4 sheen; // rgb = color, a = roughness
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -30,6 +31,8 @@ const uint MATERIAL_FLAG_SPECULAR_COLOR_TEXTURE = 1u << 9;
 const uint MATERIAL_FLAG_CLEARCOAT_TEXTURE = 1u << 10;
 const uint MATERIAL_FLAG_CLEARCOAT_ROUGHNESS_TEXTURE = 1u << 11;
 const uint MATERIAL_FLAG_CLEARCOAT_NORMAL_TEXTURE = 1u << 12;
+const uint MATERIAL_FLAG_SHEEN_COLOR_TEXTURE = 1u << 13;
+const uint MATERIAL_FLAG_SHEEN_ROUGHNESS_TEXTURE = 1u << 14;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -82,13 +85,48 @@ struct Surface
     vec3 position;
     vec3 emissive;
     vec3 dielectricF0;
+    vec3 sheenColor;
     float dielectricF90;
     float metallic;
     float roughness;
     float ao;
     float clearcoat;
     float clearcoatRoughness;
+    float sheenRoughness;
 };
+
+// Estevez and Kulla 2017, "Production Friendly Microfacet Sheen BRDF"
+float D_Charlie(float roughness, float NdotH)
+{
+    const float alpha = roughness * roughness;
+    const float invAlpha = 1.0 / alpha;
+    const float cos2h = NdotH * NdotH;
+    const float sin2h = max(1.0 - cos2h, 0.0078125);
+
+    return (2.0 + invAlpha) * pow(sin2h, invAlpha * 0.5) / (2.0 * MATERIAL_PI);
+}
+
+float V_Neubelt(float NdotV, float NdotL)
+{
+    return clamp(1.0 / (4.0 * (NdotL + NdotV - NdotL * NdotV)), 0.0, 1.0);
+}
+
+// Curve fit to the Charlie BRDF integrated over the hemisphere, as in Filament
+float sheenEnvironmentBRDF(vec3 N, vec3 V, float roughness)
+{
+    const float NdotV = clamp(dot(N, V), 0.0, 1.0);
+    const float r2 = roughness * roughness;
+    const float rInv = 1.0 / (roughness + 0.1);
+    const float a = -1.9362 + 1.0678 * roughness + 0.4573 * r2 - 0.8469 * rInv;
+    const float b = -0.6014 + 0.5538 * roughness - 0.4670 * r2 - 0.1255 * rInv;
+
+    return clamp(exp(a * NdotV + b), 0.0, 1.0);
+}
+
+float maxComponent(vec3 v)
+{
+    return max(max(v.r, v.g), v.b);
+}
 
 vec3 shadePbr(Surface s)
 {
@@ -158,7 +196,20 @@ vec3 shadePbr(Surface s)
 
     const float coating = 1.0 - clearcoat * coatFresnel;
 
-    return direct + ambient * coating + s.emissive * coating;
+    vec3 sheenDirect = vec3(0.0);
+    vec3 sheenAmbient = vec3(0.0);
+
+    if(maxComponent(s.sheenColor) > 0.0)
+    {
+        const float sheenRoughness = clamp(s.sheenRoughness, 0.0001, 1.0);
+        sheenDirect = s.sheenColor * D_Charlie(sheenRoughness, NdotH) * V_Neubelt(NdotV, NdotL);
+        sheenAmbient = s.sheenColor * sheenEnvironmentBRDF(N, V, sheenRoughness) * environment(R);
+    }
+
+    return direct
+        + sheenDirect * lightColor * NdotL
+        + (ambient + sheenAmbient) * coating
+        + s.emissive * coating;
 }
 
 // The IOR sets the base reflectance, specular tints and scales it
@@ -200,6 +251,8 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.ao = 1.0;
         surface.clearcoat = material.clearcoat.x;
         surface.clearcoatRoughness = material.clearcoat.y;
+        surface.sheenColor = material.sheen.rgb;
+        surface.sheenRoughness = material.sheen.a;
 
         return shadePbr(surface);
     }

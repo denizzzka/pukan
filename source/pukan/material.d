@@ -30,6 +30,8 @@ enum MaterialFlag: uint
     clearcoatTexture = 1u << 10,
     clearcoatRoughnessTexture = 1u << 11,
     clearcoatNormalTexture = 1u << 12,
+    sheenColorTexture = 1u << 13,
+    sheenRoughnessTexture = 1u << 14,
 }
 
 alias MaterialFlags = BitFlags!MaterialFlag;
@@ -53,6 +55,7 @@ struct Material
     Vector4f specular = Vector4f(1, 1, 1, 1);          // rgb = F0 color, a = strength
     Vector4f iorParams = Vector4f(1.5f, 0, 0, 0);      // x = index of refraction
     Vector4f clearcoat = Vector4f(0, 0, 1, 0);         // x = factor, y = roughness, z = normal scale
+    Vector4f sheen = Vector4f(0, 0, 0, 0);             // rgb = color, a = roughness
 
     this(Vector3f color, MaterialMode mode = MaterialMode.lit, MaterialFlags flags = MaterialFlags.init)
     {
@@ -141,7 +144,7 @@ struct Material
     }
 }
 
-static assert(Material.sizeof == 128);
+static assert(Material.sizeof == 144);
 
 struct MaterialBlock
 {
