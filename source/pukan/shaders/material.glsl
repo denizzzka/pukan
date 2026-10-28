@@ -14,6 +14,8 @@ struct Material
     vec4 anisotropy; // x = strength, y = rotation
     vec4 iridescence; // x = factor, y = ior, z = min thickness, w = max thickness
     vec4 transmission; // x = factor
+    vec4 volume; // x = thickness, y = attenuation distance
+    vec4 attenuationColor;
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -40,6 +42,7 @@ const uint MATERIAL_FLAG_ANISOTROPY_TEXTURE = 1u << 15;
 const uint MATERIAL_FLAG_IRIDESCENCE_TEXTURE = 1u << 16;
 const uint MATERIAL_FLAG_IRIDESCENCE_THICKNESS_TEXTURE = 1u << 17;
 const uint MATERIAL_FLAG_TRANSMISSION_TEXTURE = 1u << 18;
+const uint MATERIAL_FLAG_VOLUME_THICKNESS_TEXTURE = 1u << 19;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -153,6 +156,9 @@ struct Surface
     float iridescenceThickness;
     float transmission;
     float ior;
+    float volumeThickness;
+    float attenuationDistance;
+    vec3 attenuationColor;
 };
 
 // Estevez and Kulla 2017, "Production Friendly Microfacet Sheen BRDF"
@@ -478,9 +484,24 @@ vec3 shadePbr(Surface s)
 
         if(frameUbo.frame.exposureParams.z > 0.5)
         {
-            // A thin surface shows what lies behind at the same screen position
-            const vec2 uv = gl_FragCoord.xy / vec2(textureSize(sceneColorMap, 0));
-            transmitted = textureLod(sceneColorMap, uv, roughness * SCENE_COLOR_MAX_LOD).rgb;
+            vec2 uv = gl_FragCoord.xy / vec2(textureSize(sceneColorMap, 0));
+
+            if(s.volumeThickness > 0.0)
+            {
+                vec3 refracted = refract(-V, N, 1.0 / max(s.ior, 1.0));
+
+                if(dot(refracted, refracted) == 0.0)
+                    refracted = -N;
+
+                // Where a ray of that thickness leaves the surface, in screen space
+                const vec4 clipHere = frameUbo.frame.viewProj * vec4(s.position, 1.0);
+                const vec4 clipExit = frameUbo.frame.viewProj * vec4(s.position + refracted, 1.0);
+                const vec2 ndcDelta = clipExit.xy / clipExit.w - clipHere.xy / clipHere.w;
+
+                uv += ndcDelta * 0.10 * s.volumeThickness;
+            }
+
+            transmitted = textureLod(sceneColorMap, clamp(uv, vec2(0.0), vec2(1.0)), roughness * SCENE_COLOR_MAX_LOD).rgb;
         }
         else
         {
@@ -491,6 +512,10 @@ vec3 shadePbr(Surface s)
 
             transmitted = environmentRadiance(direction, roughness);
         }
+
+        // Beer-Lambert: the colour the medium turns white light into over its thickness
+        if(s.volumeThickness > 0.0 && s.attenuationDistance > 0.0)
+            transmitted *= pow(clamp(s.attenuationColor, 0.0, 1.0), vec3(s.volumeThickness / s.attenuationDistance));
 
         transmitted *= s.albedo;
 
@@ -549,6 +574,9 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.iridescenceThickness = material.iridescence.w;
         surface.transmission = material.transmission.x;
         surface.ior = material.iorParams.x;
+        surface.volumeThickness = material.volume.x;
+        surface.attenuationDistance = material.volume.y;
+        surface.attenuationColor = material.attenuationColor.rgb;
 
         return shadePbr(surface);
     }

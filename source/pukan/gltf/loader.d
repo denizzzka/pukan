@@ -284,6 +284,10 @@ private bool[] linearImages(in Json json, bool extensions)
             if(auto transmission = "KHR_materials_transmission" in *materialExtensions)
                 if(auto texture = "transmissionTexture" in *transmission)
                     usedAsData[imageOf(*texture)] = true;
+
+            if(auto volume = "KHR_materials_volume" in *materialExtensions)
+                if(auto texture = "thicknessTexture" in *volume)
+                    usedAsData[imageOf(*texture)] = true;
         }
     }
 

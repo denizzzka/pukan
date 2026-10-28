@@ -384,6 +384,7 @@ class Scene
 
         FrameUniforms data;
         data.invViewProj = viewProj.inverse;
+        data.viewProj = viewProj;
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
         data.lightDirection = Vector4f(light.x, light.y, light.z, 0);
         data.lightColor = Vector4f(1, 1, 1, 1);
@@ -579,6 +580,7 @@ struct PointLight
 struct FrameUniforms
 {
     Matrix4x4f invViewProj;
+    Matrix4x4f viewProj;
     Vector4f cameraPosition;
     Vector4f lightDirection;
     Vector4f lightColor;

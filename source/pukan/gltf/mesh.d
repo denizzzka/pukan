@@ -65,7 +65,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[MATERIAL_TRANSMISSION + 1] materialTextures;
+    private VkDescriptorImageInfo[MATERIAL_VOLUME_THICKNESS + 1] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -350,6 +350,26 @@ final class GltfMesh : Mesh
                         if(auto texture = "transmissionTexture" in *transmission)
                             bindTexture(*texture, MATERIAL_TRANSMISSION, MaterialFlag.transmissionTexture, images, hasTexCoords);
                     }
+
+                    if(auto volume = "KHR_materials_volume" in *extensions)
+                    {
+                        if(auto value = "thicknessFactor" in *volume)
+                            material.volume.x = readFloat(*value);
+
+                        if(auto value = "attenuationDistance" in *volume)
+                            material.volume.y = readFloat(*value);
+
+                        if(auto value = "attenuationColor" in *volume)
+                        {
+                            const c = (*value).deserializeJson!(float[3]);
+                            material.attenuationColor.x = c[0];
+                            material.attenuationColor.y = c[1];
+                            material.attenuationColor.z = c[2];
+                        }
+
+                        if(auto texture = "thicknessTexture" in *volume)
+                            bindTexture(*texture, MATERIAL_VOLUME_THICKNESS, MaterialFlag.volumeThicknessTexture, images, hasTexCoords);
+                    }
                 }
             }
 
@@ -429,6 +449,7 @@ final class GltfMesh : Mesh
             imageWriteDescriptor(descriptorSet, MATERIAL_IRIDESCENCE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_IRIDESCENCE]),
             imageWriteDescriptor(descriptorSet, MATERIAL_IRIDESCENCE_THICKNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_IRIDESCENCE_THICKNESS]),
             imageWriteDescriptor(descriptorSet, MATERIAL_TRANSMISSION, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_TRANSMISSION]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_VOLUME_THICKNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_VOLUME_THICKNESS]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

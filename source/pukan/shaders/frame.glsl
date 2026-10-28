@@ -7,6 +7,7 @@ struct PointLight
 struct FrameData
 {
     mat4 invViewProj;
+    mat4 viewProj;
     vec4 cameraPosition;
     vec4 lightDirection;
     vec4 lightColor;
