@@ -103,6 +103,10 @@ The following pieces are still missing:
 
 - [ ] glTF material extensions: sheen, transmission, iridescence, volume,
       anisotropy and dispersion.
+- [ ] Shader tiers for glTF materials. Split the uber shader into core PBR and
+      extended (specular/IOR, clearcoat, sheen) variants once the benchmark shows
+      register or instruction cache pressure; the branches are uniform today, so
+      the gain has to be measured before the pipelines multiply.
 - [ ] Alpha handling. Sort blended primitives back to front and offer
       alpha-to-coverage for masked materials.
 - [ ] Real IBL. Replace the analytic sky with irradiance and prefiltered
