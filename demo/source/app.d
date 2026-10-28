@@ -336,7 +336,7 @@ void main(string[] args) {
         const dt = curr - prevCurr;
         prevCurr = curr;
 
-        if(!benchMode && !sceneDragging && frameTime - lastInteractionTime > autoResumeDelay)
+        if(!benchMode && !sceneDragging && interactionTimer.idleFor(frameTime, autoResumeDelay))
             sceneYaw += autoRotationSpeed * dt;
 
         ulong entityUpdateNs;
@@ -626,6 +626,8 @@ extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
     if(benchMode || action != GLFW_PRESS)
         return;
 
+    interactionTimer.touch(frameTime);
+
     if(key == GLFW_KEY_S)
     {
         skyMode = skyMode == SkyMode.ibl ? SkyMode.analytic
@@ -655,8 +657,26 @@ extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
 
     cameraPan.z = pan;
 
-    lastInteractionTime = frameTime;
+    interactionTimer.touch(frameTime);
 }
+
+/// Last input time, so the auto rotation can resume on its own
+struct InteractionTimer
+{
+    private double lastInput = -1e9;
+
+    void touch(double now) nothrow @nogc
+    {
+        lastInput = now;
+    }
+
+    bool idleFor(double now, double delay) const nothrow @nogc
+    {
+        return now - lastInput > delay;
+    }
+}
+
+InteractionTimer interactionTimer;
 
 enum autoRotationSpeed = 90f.degtorad * 0.1f;
 enum autoResumeDelay = 10.0;
@@ -664,7 +684,6 @@ enum manualRotationSensitivity = 0.006f;
 enum maxScenePitch = 80f.degtorad;
 
 double frameTime;
-double lastInteractionTime = -1e9;
 double cursorX;
 double cursorY;
 bool sceneDragging;
@@ -677,7 +696,7 @@ extern(C) void onMouseButton(GLFWwindow*, int button, int action, int) nothrow @
     if(benchMode)
         return;
 
-    lastInteractionTime = frameTime;
+    interactionTimer.touch(frameTime);
 
     if(button == GLFW_MOUSE_BUTTON_LEFT)
     {
