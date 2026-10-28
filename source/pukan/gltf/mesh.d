@@ -370,6 +370,10 @@ final class GltfMesh : Mesh
                         if(auto texture = "thicknessTexture" in *volume)
                             bindTexture(*texture, MATERIAL_VOLUME_THICKNESS, MaterialFlag.volumeThicknessTexture, images, hasTexCoords);
                     }
+
+                    if(auto dispersion = "KHR_materials_dispersion" in *extensions)
+                        if(auto value = "dispersion" in *dispersion)
+                            material.volume.z = readFloat(*value);
                 }
             }
 

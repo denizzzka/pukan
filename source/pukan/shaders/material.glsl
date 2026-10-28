@@ -158,6 +158,7 @@ struct Surface
     float ior;
     float volumeThickness;
     float attenuationDistance;
+    float dispersion;
     vec3 attenuationColor;
 };
 
@@ -315,6 +316,29 @@ float V_GGX_anisotropic(
     const float GGXL = NdotV * length(vec3(at * TdotL, ab * BdotL, NdotL));
 
     return clamp(0.5 / (GGXV + GGXL), 0.0, 1.0);
+}
+
+/// Colour of the scene where a ray of this IOR and thickness leaves the surface
+vec3 transmissionSample(Surface s, vec3 N, vec3 V, float ior, float roughness)
+{
+    vec2 uv = gl_FragCoord.xy / vec2(textureSize(sceneColorMap, 0));
+
+    if(s.volumeThickness > 0.0)
+    {
+        vec3 refracted = refract(-V, N, 1.0 / max(ior, 1.0));
+
+        if(dot(refracted, refracted) == 0.0)
+            refracted = -N;
+
+        const vec4 clipHere = frameUbo.frame.viewProj * vec4(s.position, 1.0);
+        const vec4 clipExit = frameUbo.frame.viewProj * vec4(s.position + refracted, 1.0);
+        const vec2 ndcDelta = clipExit.xy / clipExit.w - clipHere.xy / clipHere.w;
+
+        // Wide offsets pull in neighbours at the silhouette, so cap them
+        uv += clamp(ndcDelta * s.volumeThickness, vec2(-0.1), vec2(0.1));
+    }
+
+    return textureLod(sceneColorMap, clamp(uv, vec2(0.0), vec2(1.0)), roughness * SCENE_COLOR_MAX_LOD).rgb;
 }
 
 vec3 shadePbr(Surface s)
@@ -484,24 +508,18 @@ vec3 shadePbr(Surface s)
 
         if(frameUbo.frame.exposureParams.z > 0.5)
         {
-            vec2 uv = gl_FragCoord.xy / vec2(textureSize(sceneColorMap, 0));
-
-            if(s.volumeThickness > 0.0)
+            if(s.dispersion > 0.0)
             {
-                vec3 refracted = refract(-V, N, 1.0 / max(s.ior, 1.0));
+                // Spread the IOR over the channels, as the reference does
+                const float halfSpread = (s.ior - 1.0) * 0.025 * s.dispersion;
+                const vec3 iors = vec3(s.ior - halfSpread, s.ior, s.ior + halfSpread);
 
-                if(dot(refracted, refracted) == 0.0)
-                    refracted = -N;
-
-                // Where a ray of that thickness leaves the surface, in screen space
-                const vec4 clipHere = frameUbo.frame.viewProj * vec4(s.position, 1.0);
-                const vec4 clipExit = frameUbo.frame.viewProj * vec4(s.position + refracted, 1.0);
-                const vec2 ndcDelta = clipExit.xy / clipExit.w - clipHere.xy / clipHere.w;
-
-                uv += ndcDelta * 0.10 * s.volumeThickness;
+                transmitted.r = transmissionSample(s, N, V, iors.r, roughness).r;
+                transmitted.g = transmissionSample(s, N, V, iors.g, roughness).g;
+                transmitted.b = transmissionSample(s, N, V, iors.b, roughness).b;
             }
-
-            transmitted = textureLod(sceneColorMap, clamp(uv, vec2(0.0), vec2(1.0)), roughness * SCENE_COLOR_MAX_LOD).rgb;
+            else
+                transmitted = transmissionSample(s, N, V, s.ior, roughness);
         }
         else
         {
@@ -576,6 +594,7 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.ior = material.iorParams.x;
         surface.volumeThickness = material.volume.x;
         surface.attenuationDistance = material.volume.y;
+        surface.dispersion = material.volume.z;
         surface.attenuationColor = material.attenuationColor.rgb;
 
         return shadePbr(surface);

@@ -101,7 +101,6 @@ Because the goal is vague here, the questions below decide the scope:
 The shared `Material` covers simple unlit/lit shading and glTF metallic-roughness.
 The following pieces are still missing:
 
-- [ ] glTF material extensions: dispersion.
 - [ ] Shader tiers for glTF materials. Split the uber shader into core PBR and
       extended (specular/IOR, clearcoat, sheen) variants once the benchmark shows
       register or instruction cache pressure; the branches are uniform today, so

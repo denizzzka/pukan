@@ -64,7 +64,7 @@ struct Material
     Vector4f anisotropy = Vector4f(0, 0, 0, 0);        // x = strength, y = rotation
     Vector4f iridescence = Vector4f(0, 1.3f, 100, 400); // x = factor, y = ior, z = min thickness, w = max thickness
     Vector4f transmission = Vector4f(0, 0, 0, 0);       // x = factor
-    Vector4f volume = Vector4f(0, 0, 0, 0);             // x = thickness, y = attenuation distance
+    Vector4f volume = Vector4f(0, 0, 0, 0);             // x = thickness, y = attenuation distance, z = dispersion
     Vector4f attenuationColor = Vector4f(1, 1, 1, 1);
 
     this(Vector3f color, MaterialMode mode = MaterialMode.lit, MaterialFlags flags = MaterialFlags.init)

@@ -266,6 +266,7 @@ void main()
         surface.ior = material.iorParams.x;
         surface.volumeThickness = volumeThickness;
         surface.attenuationDistance = material.volume.y;
+        surface.dispersion = material.volume.z;
         surface.attenuationColor = material.attenuationColor.rgb;
 
         color = shadePbr(surface);
