@@ -137,6 +137,12 @@ void main()
                 normal = perturbNormalFromDerivatives(normalTexture, material.metallicRoughness.z, normal, fragPosition, fragTextureCoord);
         }
 
+        // Isolated white pixels appeared on distant normal-mapped surfaces:
+        // a normal that changes within a pixel makes the lobe too narrow
+        const vec3 normalDx = dFdx(normal);
+        const vec3 normalDy = dFdy(normal);
+        const float roughnessVariance = 0.25 * (dot(normalDx, normalDx) + dot(normalDy, normalDy));
+
         vec2 metallicRoughness = material.metallicRoughness.xy;
         if((flags & MATERIAL_FLAG_METALLIC_ROUGHNESS_TEXTURE) != 0u)
         {
@@ -281,6 +287,7 @@ void main()
         surface.iridescenceThickness = iridescenceThickness;
         surface.transmission = transmission;
         surface.ior = material.iorParams.x;
+        surface.roughnessVariance = roughnessVariance;
         surface.volumeThickness = volumeThickness;
         surface.attenuationDistance = material.volume.y;
         surface.dispersion = material.volume.z;

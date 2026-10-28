@@ -156,6 +156,7 @@ struct Surface
     float iridescenceThickness;
     float transmission;
     float ior;
+    float roughnessVariance;
     float volumeThickness;
     float attenuationDistance;
     float dispersion;
@@ -355,7 +356,9 @@ vec3 shadePbr(Surface s)
     const float VdotH = max(dot(V, H), 0.0);
 
     const float metallic = clamp(s.metallic, 0.0, 1.0);
-    const float roughness = clamp(s.roughness, 0.04, 1.0);
+    // A normal that changes faster than a pixel widens the lobe, so distant
+    // highlights stop collapsing into single bright pixels
+    const float roughness = clamp(sqrt(s.roughness * s.roughness + s.roughnessVariance), 0.04, 1.0);
 
     const float a = roughness * roughness;
     const float a2 = a * a;
@@ -592,6 +595,7 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.iridescenceThickness = material.iridescence.w;
         surface.transmission = material.transmission.x;
         surface.ior = material.iorParams.x;
+        surface.roughnessVariance = 0.0;
         surface.volumeThickness = material.volume.x;
         surface.attenuationDistance = material.volume.y;
         surface.dispersion = material.volume.z;
