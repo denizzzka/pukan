@@ -162,9 +162,30 @@ more predictable order.
 
 Each item earns its place only with numbers: VRAM occupied, bytes per instance
 uploaded per frame, cache misses, frame time on a fixed scene. The baseline is
-recorded in `bench/baseline.md`, and the quantization item is the only
-near-term one; it touches the vertex layout that the mesh merge now owns. The
-rest are long-term spikes, each judged against the plain version it replaces.
+recorded in `bench/baseline.md`, and the quantization and instancing items are
+the near-term ones; the first touches the vertex layout that the mesh merge now
+owns, the second the draw path. The rest are long-term spikes, each judged
+against the plain version it replaces.
+
+- **Instanced static primitives**
+  - [ ] Batch any mesh that shares vertex and index buffers, pipeline variant
+        and texture set into one instanced draw, not glTF primitives only: the
+        loader is the first producer, not the boundary. The transform moves from
+        the push constant into an instance buffer, and the material becomes a
+        palette the fragment shader indexes by the instance instead of a
+        descriptor set per mesh. One batch carries one texture set, so materials
+        with different textures split it. The sphere and cylinder renderers
+        already issue instanced draws from compute-built commands and stay as
+        they are.
+  - [ ] Skinned meshes join the same batch while they share a pose, which is one
+        joint matrix buffer: the shader applies the instance transform after
+        skinning, so a crowd in lockstep costs one draw. Different poses split
+        into batches, each still instanced.
+  - [ ] Measure on the iridescence grid: 346 primitives over two geometry sets,
+        343 nodes differing only in translation and material. One llvmpipe draw
+        costs about 0.11 ms whatever the triangle count, so the grid spends
+        29 ms of its 32 ms there; with one draw the target is the shader and
+        setup that remain, about 14 ms.
 
 - **Quantized static geometry**
   - [ ] Optional extreme quantization for static batches: store positions and
