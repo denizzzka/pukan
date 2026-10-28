@@ -186,7 +186,7 @@ void main(string[] args) {
     //~ }
 
     auto device = selected.createLogicalDevice!(Texture)();
-    scope(success)
+    scope(exit)
     {
         import core.memory: GC;
 
@@ -438,10 +438,10 @@ void main(string[] args) {
         }
     }
 
+    vkDeviceWaitIdle(device.device);
+
     if(benchMode)
         printBench(device, scene, benchFrameNs, benchUpdateNs, startupStats, startupWallNs);
-
-    vkDeviceWaitIdle(device.device);
 }
 
 private string presentModeName(VkPresentModeKHR mode)
@@ -458,11 +458,7 @@ private string presentModeName(VkPresentModeKHR mode)
 
 private void printBench(LogicalDevice device, Scene scene, ulong[] frameNs, ulong[] updateNs, LoadStats startStats, ulong startWallNs)
 {
-    if(frameNs.length == 0)
-    {
-        writeln("BENCH no measured frames");
-        return;
-    }
+    enforce(frameNs.length > 0, "BENCH no measured frames");
 
     double averageMs(ulong[] values)
     {
