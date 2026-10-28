@@ -8,6 +8,9 @@ import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
+/// Swapchain color format the scene renders into
+enum swapchainFormat = VK_FORMAT_B8G8R8A8_SRGB;
+
 class Scene
 {
     LogicalDevice device;
@@ -50,7 +53,7 @@ class Scene
 
         device.physicalDevice.instance.useSurface(surface);
 
-        renderPass = device.create!DefaultRenderPass(VK_FORMAT_B8G8R8A8_SRGB);
+        renderPass = device.create!DefaultRenderPass(swapchainFormat);
 
         pipelineFactory = new PipelineFactory(device);
         frameAllocator = pipelineFactory.createFrameAllocator();

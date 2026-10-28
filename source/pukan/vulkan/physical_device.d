@@ -88,6 +88,20 @@ class PhysicalDevice
         return apprIndices;
     }
 
+    /// Device name for diagnostics
+    string name() const
+    {
+        import std.string: fromStringz;
+
+        return fromStringz(properties.deviceName.ptr).idup;
+    }
+
+    /// Returns false and a reason when the device cannot create the requested image
+    bool supportsImageFormat(in ImageFormatRequest request, out string reason)
+    {
+        return imageFormatSupported(physicalDevice, request, reason);
+    }
+
     /// Snapshots properties, supported features and extensions
     package bool createLogicalDeviceContext(Reqs...)(const(char)*[] extension_list, out DeviceContext ctx, out string reason)
     {

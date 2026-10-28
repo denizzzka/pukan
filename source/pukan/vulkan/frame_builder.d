@@ -12,7 +12,8 @@ import std.meta: AliasSeq;
 class FrameBuilder
 {
     private alias requirements = AliasSeq!(
-        FormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT),
+        ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT),
     );
 
     LogicalDevice device;

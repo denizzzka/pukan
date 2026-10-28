@@ -6,6 +6,30 @@ import pukan.vulkan.requirements: Requirement;
 import std.exception: enforce;
 import std.meta: AliasSeq;
 
+/// Returns false and a reason when the surface cannot back a swapchain with the given format
+bool surfaceUsable(VkPhysicalDevice pd, VkSurfaceKHR surface, VkFormat format, out string reason)
+{
+    import std.algorithm: any, canFind;
+
+    const formats = getArrayFrom!vkGetPhysicalDeviceSurfaceFormatsKHR(pd, surface);
+
+    if(!formats.any!(f => f.format == format && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR))
+    {
+        reason = "surface does not support the swapchain color format";
+        return false;
+    }
+
+    const presentModes = getArrayFrom!vkGetPhysicalDeviceSurfacePresentModesKHR(pd, surface);
+
+    if(!presentModes.canFind(VK_PRESENT_MODE_FIFO_KHR))
+    {
+        reason = "surface does not support FIFO present mode";
+        return false;
+    }
+
+    return true;
+}
+
 class SwapChain
 {
     private static alias requirements = AliasSeq!(
@@ -52,7 +76,7 @@ class SwapChain
     )
     {
         import pukan.exceptions: PukanVulkanException;
-        import std.algorithm: any, canFind;
+        import std.algorithm: canFind;
         import std.conv: to;
 
         auto cap = capabilities;
@@ -62,14 +86,11 @@ class SwapChain
         enforce(cap.maxImageCount == 0 || cap.maxImageCount >= 3, "maxImageCount: "~cap.maxImageCount.to!string);
 
         auto surface = device.physicalDevice.instance.surface.handle;
-        const formats = getArrayFrom!vkGetPhysicalDeviceSurfaceFormatsKHR(device.physicalDevice.physicalDevice, surface);
-        const presentModes = getArrayFrom!vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice.physicalDevice, surface);
+        string reason;
+        enforce(surfaceUsable(device.physicalDevice.physicalDevice, surface, renderPass.imageFormat, reason),
+            new PukanVulkanException(reason));
 
-        enforce(formats.any!(f => f.format == renderPass.imageFormat &&
-                f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
-            new PukanVulkanException("surface does not support the swapchain color format"));
-        enforce(presentModes.canFind(VK_PRESENT_MODE_FIFO_KHR),
-            new PukanVulkanException("surface does not support FIFO present mode"));
+        const presentModes = getArrayFrom!vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice.physicalDevice, surface);
 
         VkPresentModeKHR selectedPresentMode = VK_PRESENT_MODE_FIFO_KHR;
         foreach(candidate; [
