@@ -88,8 +88,24 @@ void main()
 
     const uint alphaMode = uint(material.params.z);
     const bool masked = alphaMode == MATERIAL_ALPHA_MASK;
-    if(masked && base.a < material.alphaParams.x)
-        discard;
+
+    // Alpha to coverage: a masked fragment keeps its alpha, and the
+    // multisampled pass resolves the fraction of samples it covers. The
+    // derivative widens the cutoff by one pixel; the discard below it stays,
+    // so masks survive a pass without multisampling, where alpha is ignored.
+    float outAlpha = 1.0;
+    if(masked)
+    {
+        const float width = max(fwidth(base.a), 1e-5);
+        const float coverage = clamp((base.a - material.alphaParams.x) / width + 0.5, 0.0, 1.0);
+
+        if(base.a < material.alphaParams.x)
+            discard;
+
+        outAlpha = coverage;
+    }
+    else if(alphaMode == MATERIAL_ALPHA_BLEND)
+        outAlpha = base.a;
 
     vec3 color;
 
@@ -275,8 +291,5 @@ void main()
     }
 #endif
 
-    // Masked fragments keep their alpha, which the multisample pass turns into
-    // coverage; opaque ones cover every sample
-    const float outAlpha = (alphaMode == MATERIAL_ALPHA_BLEND || masked) ? base.a : 1.0;
     outColor = vec4(color, outAlpha);
 }
