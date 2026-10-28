@@ -863,9 +863,9 @@ struct Skin
     package int skinRootNodeIdx = -1;
     //TODO: const
     package AccessRange!(Matrix4x4f, false) inverseBindMatrices;
-    package Matrix4x4f[] fromSkinRootNodeTranslations; /// Nodes coords relative to root of skin
 
-    Matrix4x4f[] calculateJointMatrices() const
+    /// `nodeTransforms` holds every node in glTF root space
+    Matrix4x4f[] calculateJointMatrices(const Matrix4x4f[] nodeTransforms) const
     {
         Matrix4x4f[] jointMatrices;
         jointMatrices.length = nodesIndices.length;
@@ -875,7 +875,7 @@ struct Skin
         Matrix4x4f skinRootInverse = Matrix4x4f.identity;
         if(skinRootNodeIdx >= 0)
         {
-            Matrix4x4f skinRootGlobal = fromSkinRootNodeTranslations[skinRootNodeIdx];
+            Matrix4x4f skinRootGlobal = nodeTransforms[skinRootNodeIdx];
             skinRootInverse = skinRootGlobal.inverse;
         }
 
@@ -892,9 +892,9 @@ struct Skin
             // Speed up processing if skinRootInverse is the identity matrix
             //TODO: It is sufficient to check this once before entering the loop
             if(skinRootNodeIdx >= 0)
-                jointMatrices[i] = skinRootInverse * fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
+                jointMatrices[i] = skinRootInverse * nodeTransforms[jointIdx] * inverseBindMatrices[i];
             else
-                jointMatrices[i] = fromSkinRootNodeTranslations[jointIdx] * inverseBindMatrices[i];
+                jointMatrices[i] = nodeTransforms[jointIdx] * inverseBindMatrices[i];
         }
 
         return jointMatrices;

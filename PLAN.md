@@ -100,11 +100,9 @@ Because the goal is vague here, the questions below decide the scope:
 
 The shared `Material` covers unlit/lit shading, glTF metallic-roughness and the
 `KHR_materials_*` extensions. A material that uses no extension takes a smaller
-core PBR shader, and only the extended ones pay for the full shader. Still
-missing:
+core PBR shader, and only the extended ones pay for the full shader. Skins bind
+per node, so a file may use several. Still missing:
 
-- [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin
-      per node and primitive.
 - [ ] Texture compression. KTX2/BasisU and other compressed formats with a
       fallback path.
 

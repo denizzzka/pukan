@@ -65,6 +65,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
+    private VkDescriptorBufferInfo jointsUboInfo;
     private VkDescriptorImageInfo[MATERIAL_VOLUME_THICKNESS + 1] materialTextures;
     private VkBuffer fallbackVertex;
 
@@ -93,7 +94,9 @@ final class GltfMesh : Mesh
         material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
         writeMaterial();
 
-        jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, MATERIAL_JOINTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
+        // The write descriptor keeps a pointer to this copy, so it lives here
+        this.jointsUboInfo = jointsUboInfo;
+        jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, MATERIAL_JOINTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, this.jointsUboInfo);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
