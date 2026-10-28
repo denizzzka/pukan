@@ -79,6 +79,18 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
+/// Narkowicz 2015 ACES fit
+vec3 toneMap(vec3 color)
+{
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+
+    return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
+}
+
 struct Surface
 {
     vec3 albedo;
@@ -249,7 +261,8 @@ vec3 shadePbr(Surface s)
     const vec3 reflection = mix(environment(R), vec3(0.1), roughness);
     const vec3 Fenv = fresnelSchlickRoughness(NdotV, F0, roughness);
     const vec3 kDEnv = (1.0 - Fenv) * (1.0 - metallic);
-    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao;
+    const float iblIntensity = frameUbo.frame.exposureParams.y;
+    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao * iblIntensity;
 
     const float coating = 1.0 - clearcoat * coatFresnel;
 

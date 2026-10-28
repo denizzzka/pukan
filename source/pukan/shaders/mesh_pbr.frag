@@ -234,6 +234,7 @@ void main()
         surface.anisotropy = anisotropy;
 
         color = shadePbr(surface);
+        color = toneMap(color * frameUbo.frame.exposureParams.x);
     }
 #endif
 

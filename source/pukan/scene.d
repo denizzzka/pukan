@@ -37,6 +37,9 @@ class Scene
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
 
+    float exposure = 1.0f;
+    float iblIntensity = 1.0f;
+
     this(
         LogicalDevice dev,
         VkSurfaceKHR surf,
@@ -106,6 +109,7 @@ class Scene
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
         data.lightDirection = Vector4f(light.x, light.y, light.z, 0);
         data.lightColor = Vector4f(1, 1, 1, 1);
+        data.exposureParams = Vector4f(exposure, iblIntensity, 0, 0);
 
         frame.frameSets[eye].update(data);
     }
@@ -234,6 +238,7 @@ struct FrameUniforms
     Vector4f cameraPosition;
     Vector4f lightDirection;
     Vector4f lightColor;
+    Vector4f exposureParams; // x = exposure, y = IBL intensity
 }
 
 ///
