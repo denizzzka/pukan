@@ -51,7 +51,8 @@ void placeOnIcosahedron(Node)(ref Node node, GlTF[] objects, float targetSize = 
 
     foreach(i, item; items)
     {
-        const direction = nodes[i];
+        // A lone object faces the camera instead of the first icosahedron node
+        const direction = items.length == 1 ? Vector3f(0, 0, -1) : nodes[i];
         const position = direction * arenaRadius;
 
         // The glTF front is +Z, which the loader mirrors to -Z

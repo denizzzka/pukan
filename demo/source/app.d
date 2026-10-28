@@ -65,6 +65,7 @@ void main(string[] args) {
     uint frames;
     bool core;
     string materialMode = "authored";
+    string[] sampleNames;
     auto getoptResult = getopt(
         args,
         "stereo", "render side-by-side stereo", &stereo,
@@ -73,6 +74,7 @@ void main(string[] args) {
         "bench", "run the fixed benchmark scene and print metrics", &bench,
         "core", "ignore the KHR material extensions", &core,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
+        "sample", "show only this sample, repeatable", &sampleNames,
     );
 
     if(getoptResult.helpWanted)
@@ -296,7 +298,8 @@ void main(string[] args) {
     {
         auto trans = Vector3f(0, 0, 0).translationMatrix;
         auto arenaNode = tree.addChild(Bone(mat: trans));
-        arenaGltfs = createArena(scene, arenaNode, benchMode ? benchSampleNames : null);
+        auto samples = benchMode ? benchSampleNames : (sampleNames.length ? sampleNames : null);
+        arenaGltfs = createArena(scene, arenaNode, samples, samples.length == 1 ? 0.8f : 0.1f);
     }
 
     static if(runtimeMaterialOverride)
@@ -940,7 +943,7 @@ private string[] gltfFilesSearch(string dir, string[] only = null)
     return found;
 }
 
-GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
+GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null, float targetSize = 0.1f)
 {
     import std.parallelism: taskPool;
 
@@ -973,7 +976,7 @@ GlTF[] createArena(T)(Scene scene, ref T node, string[] sampleNames = null)
         obj.uploadToGPUImmediate(scene.device, commandPools[i], commandBuffers[0]);
     }
 
-    placeOnIcosahedron(node, loaded);
+    placeOnIcosahedron(node, loaded, targetSize);
 
     return loaded;
 }
