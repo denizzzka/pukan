@@ -23,6 +23,7 @@ layout(binding = MATERIAL_SHEEN_ROUGHNESS) uniform sampler2D sheenRoughnessTextu
 layout(binding = MATERIAL_ANISOTROPY) uniform sampler2D anisotropyTexture;
 layout(binding = MATERIAL_IRIDESCENCE) uniform sampler2D iridescenceTexture;
 layout(binding = MATERIAL_IRIDESCENCE_THICKNESS) uniform sampler2D iridescenceThicknessTexture;
+layout(binding = MATERIAL_TRANSMISSION) uniform sampler2D transmissionTexture;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTextureCoord;
@@ -230,6 +231,10 @@ void main()
         if(iridescenceThickness <= 0.0)
             iridescenceFactor = 0.0;
 
+        float transmission = material.transmission.x;
+        if((flags & MATERIAL_FLAG_TRANSMISSION_TEXTURE) != 0u)
+            transmission *= texture(transmissionTexture, fragTextureCoord).r;
+
         Surface surface;
         surface.albedo = base.rgb;
         surface.normal = normal;
@@ -252,6 +257,8 @@ void main()
         surface.iridescenceFactor = iridescenceFactor;
         surface.iridescenceIor = material.iridescence.y;
         surface.iridescenceThickness = iridescenceThickness;
+        surface.transmission = transmission;
+        surface.ior = material.iorParams.x;
 
         color = shadePbr(surface);
         color = toneMap(color * frameUbo.frame.exposureParams.x);

@@ -35,6 +35,7 @@ enum MaterialFlag: uint
     anisotropyTexture = 1u << 15,
     iridescenceTexture = 1u << 16,
     iridescenceThicknessTexture = 1u << 17,
+    transmissionTexture = 1u << 18,
 }
 
 alias MaterialFlags = BitFlags!MaterialFlag;
@@ -61,6 +62,7 @@ struct Material
     Vector4f sheen = Vector4f(0, 0, 0, 0);             // rgb = color, a = roughness
     Vector4f anisotropy = Vector4f(0, 0, 0, 0);        // x = strength, y = rotation
     Vector4f iridescence = Vector4f(0, 1.3f, 100, 400); // x = factor, y = ior, z = min thickness, w = max thickness
+    Vector4f transmission = Vector4f(0, 0, 0, 0);       // x = factor
 
     this(Vector3f color, MaterialMode mode = MaterialMode.lit, MaterialFlags flags = MaterialFlags.init)
     {
@@ -149,7 +151,7 @@ struct Material
     }
 }
 
-static assert(Material.sizeof == 176);
+static assert(Material.sizeof == 192);
 
 struct MaterialBlock
 {

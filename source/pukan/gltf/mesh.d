@@ -65,7 +65,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[MATERIAL_IRIDESCENCE_THICKNESS + 1] materialTextures;
+    private VkDescriptorImageInfo[MATERIAL_TRANSMISSION + 1] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -341,6 +341,15 @@ final class GltfMesh : Mesh
                         if(auto texture = "iridescenceThicknessTexture" in *iridescence)
                             bindTexture(*texture, MATERIAL_IRIDESCENCE_THICKNESS, MaterialFlag.iridescenceThicknessTexture, images, hasTexCoords);
                     }
+
+                    if(auto transmission = "KHR_materials_transmission" in *extensions)
+                    {
+                        if(auto value = "transmissionFactor" in *transmission)
+                            material.transmission.x = readFloat(*value);
+
+                        if(auto texture = "transmissionTexture" in *transmission)
+                            bindTexture(*texture, MATERIAL_TRANSMISSION, MaterialFlag.transmissionTexture, images, hasTexCoords);
+                    }
                 }
             }
 
@@ -419,6 +428,7 @@ final class GltfMesh : Mesh
             imageWriteDescriptor(descriptorSet, MATERIAL_ANISOTROPY, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_ANISOTROPY]),
             imageWriteDescriptor(descriptorSet, MATERIAL_IRIDESCENCE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_IRIDESCENCE]),
             imageWriteDescriptor(descriptorSet, MATERIAL_IRIDESCENCE_THICKNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_IRIDESCENCE_THICKNESS]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_TRANSMISSION, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_TRANSMISSION]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

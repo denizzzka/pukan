@@ -166,6 +166,7 @@ private VkDescriptorSetLayoutBinding[] fragmentBindings()
         samplerBinding(MATERIAL_ANISOTROPY),
         samplerBinding(MATERIAL_IRIDESCENCE),
         samplerBinding(MATERIAL_IRIDESCENCE_THICKNESS),
+        samplerBinding(MATERIAL_TRANSMISSION),
     ];
 }
 

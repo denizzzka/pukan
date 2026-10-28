@@ -13,6 +13,7 @@ struct Material
     vec4 sheen; // rgb = color, a = roughness
     vec4 anisotropy; // x = strength, y = rotation
     vec4 iridescence; // x = factor, y = ior, z = min thickness, w = max thickness
+    vec4 transmission; // x = factor
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -38,6 +39,7 @@ const uint MATERIAL_FLAG_SHEEN_ROUGHNESS_TEXTURE = 1u << 14;
 const uint MATERIAL_FLAG_ANISOTROPY_TEXTURE = 1u << 15;
 const uint MATERIAL_FLAG_IRIDESCENCE_TEXTURE = 1u << 16;
 const uint MATERIAL_FLAG_IRIDESCENCE_THICKNESS_TEXTURE = 1u << 17;
+const uint MATERIAL_FLAG_TRANSMISSION_TEXTURE = 1u << 18;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -99,6 +101,17 @@ vec2 equirectUv(vec3 direction)
     );
 }
 
+vec3 environmentRadiance(vec3 direction, float roughness)
+{
+#ifdef SKY_NONE
+    return vec3(0.0);
+#elif defined(SKY_ANALYTIC)
+    return environment(direction);
+#else
+    return textureLod(prefilteredMap, equirectUv(direction), roughness * PREFILTERED_MAX_LOD).rgb;
+#endif
+}
+
 /// Narkowicz 2015 ACES fit
 vec3 toneMap(vec3 color)
 {
@@ -134,6 +147,8 @@ struct Surface
     float iridescenceFactor;
     float iridescenceIor;
     float iridescenceThickness;
+    float transmission;
+    float ior;
 };
 
 // Estevez and Kulla 2017, "Production Friendly Microfacet Sheen BRDF"
@@ -417,10 +432,26 @@ vec3 shadePbr(Surface s)
         sheenAmbient = s.sheenColor * sheenEnvironmentBRDF(N, V, sheenRoughness) * reflection;
     }
 
-    return direct
+    vec3 color = direct
         + sheenDirect * lightColor * NdotL
         + (ambient + sheenAmbient) * coating
         + s.emissive * coating;
+
+    if(s.transmission > 0.0)
+    {
+        vec3 direction = refract(-V, N, 1.0 / max(s.ior, 1.0));
+
+        if(dot(direction, direction) == 0.0)
+            direction = -N;
+
+        // No colour behind the surface yet, so the environment stands in for it
+        const vec3 transmitted = environmentRadiance(direction, roughness) * s.albedo;
+        const vec3 fresnel = fresnelSchlick(s.dielectricF0, NdotV);
+
+        color = mix(color, transmitted + reflection * fresnel, s.transmission);
+    }
+
+    return color;
 }
 
 // The IOR sets the base reflectance, specular tints and scales it
@@ -468,6 +499,8 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.iridescenceFactor = material.iridescence.x;
         surface.iridescenceIor = material.iridescence.y;
         surface.iridescenceThickness = material.iridescence.w;
+        surface.transmission = material.transmission.x;
+        surface.ior = material.iorParams.x;
 
         return shadePbr(surface);
     }
