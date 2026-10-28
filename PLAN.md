@@ -27,6 +27,12 @@ only a suggested grouping.
   - [ ] #15 Add USD/USDA/USDC support.
   - [ ] #16 Add terrain support.
 
+## Content formats
+
+- [ ] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
+      an integer grid with a mesh library per cell; decide whether to import that
+      data as is or to grow the same cell-and-library model on top of #16.
+
 ## Geometric algebra: PGA and CGA
 
 - [ ] Spike: evaluate adding PGA (Projective Geometric Algebra) and CGA
