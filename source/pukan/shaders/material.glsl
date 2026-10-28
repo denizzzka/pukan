@@ -12,6 +12,7 @@ struct Material
     vec4 clearcoat; // x = factor, y = roughness, z = normal scale
     vec4 sheen; // rgb = color, a = roughness
     vec4 anisotropy; // x = strength, y = rotation
+    vec4 iridescence; // x = factor, y = ior, z = min thickness, w = max thickness
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -35,6 +36,8 @@ const uint MATERIAL_FLAG_CLEARCOAT_NORMAL_TEXTURE = 1u << 12;
 const uint MATERIAL_FLAG_SHEEN_COLOR_TEXTURE = 1u << 13;
 const uint MATERIAL_FLAG_SHEEN_ROUGHNESS_TEXTURE = 1u << 14;
 const uint MATERIAL_FLAG_ANISOTROPY_TEXTURE = 1u << 15;
+const uint MATERIAL_FLAG_IRIDESCENCE_TEXTURE = 1u << 16;
+const uint MATERIAL_FLAG_IRIDESCENCE_THICKNESS_TEXTURE = 1u << 17;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -128,6 +131,9 @@ struct Surface
     float clearcoatRoughness;
     float sheenRoughness;
     float anisotropy;
+    float iridescenceFactor;
+    float iridescenceIor;
+    float iridescenceThickness;
 };
 
 // Estevez and Kulla 2017, "Production Friendly Microfacet Sheen BRDF"
@@ -161,6 +167,103 @@ float sheenEnvironmentBRDF(vec3 N, vec3 V, float roughness)
 float maxComponent(vec3 v)
 {
     return max(max(v.r, v.g), v.b);
+}
+
+// Belcour and Barla 2017, "A Practical Extension to Microfacet Theory for the
+// Modeling of Varying Iridescence": three spectral samples in Fourier space
+vec3 iridescenceSensitivity(float opd, vec3 shift)
+{
+    const float phase = 2.0 * MATERIAL_PI * opd * 1.0e-9;
+    const vec3 val = vec3(5.4856e-13, 4.4201e-13, 5.2481e-13);
+    const vec3 pos = vec3(1.6810e+06, 1.7953e+06, 2.2084e+06);
+    const vec3 variance = vec3(4.3278e+09, 9.3046e+09, 6.6121e+09);
+
+    vec3 xyz = val * sqrt(2.0 * MATERIAL_PI * variance)
+        * cos(pos * phase + shift)
+        * exp(-(phase * phase) * variance);
+
+    xyz.x += 9.7470e-14 * sqrt(2.0 * MATERIAL_PI * 4.5282e+09)
+        * cos(2.2399e+06 * phase + shift.x)
+        * exp(-4.5282e+09 * (phase * phase));
+
+    xyz /= 1.0685e-7;
+
+    const mat3 xyzToRec709 = mat3(
+         3.2404542, -0.9692660,  0.0556434,
+        -1.5371385,  1.8760108, -0.2040259,
+        -0.4985314,  0.0415560,  1.0572252
+    );
+
+    return xyzToRec709 * xyz;
+}
+
+float fresnelSchlick(float f0, float cosTheta)
+{
+    return f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
+}
+
+vec3 fresnelSchlick(vec3 f0, float cosTheta)
+{
+    return f0 + (vec3(1.0) - f0) * pow(1.0 - cosTheta, 5.0);
+}
+
+vec3 iorFromF0(vec3 f0)
+{
+    const vec3 sqrtF0 = sqrt(clamp(f0, 0.0, 0.9999));
+    return (vec3(1.0) + sqrtF0) / (vec3(1.0) - sqrtF0);
+}
+
+float iorToF0(float transmittedIor, float incidentIor)
+{
+    const float ratio = (transmittedIor - incidentIor) / (transmittedIor + incidentIor);
+    return ratio * ratio;
+}
+
+vec3 iorToF0(vec3 transmittedIor, float incidentIor)
+{
+    const vec3 ratio = (transmittedIor - incidentIor) / (transmittedIor + incidentIor);
+    return ratio * ratio;
+}
+
+/// Reflectance of a thin film of `filmIor` and `thicknessNm` over `baseF0`
+vec3 evalIridescence(float outsideIor, float filmIor, float cosTheta, float thicknessNm, vec3 baseF0)
+{
+    filmIor = mix(outsideIor, filmIor, smoothstep(0.0, 0.03, thicknessNm));
+
+    const float sinThetaSq = (outsideIor / filmIor) * (outsideIor / filmIor) * (1.0 - cosTheta * cosTheta);
+    const float cosTheta2Sq = 1.0 - sinThetaSq;
+
+    // Total internal reflection
+    if(cosTheta2Sq < 0.0)
+        return vec3(1.0);
+
+    const float cosTheta2 = sqrt(cosTheta2Sq);
+
+    const float r12 = fresnelSchlick(iorToF0(filmIor, outsideIor), cosTheta);
+    const vec3 baseIor = iorFromF0(baseF0);
+    const vec3 r23 = fresnelSchlick(iorToF0(baseIor, filmIor), cosTheta2);
+
+    const float t121 = 1.0 - r12;
+    const vec3 r123 = clamp(r12 * r23, 1e-5, 0.9999);
+    const vec3 rs = (t121 * t121) * r23 / (vec3(1.0) - r123);
+
+    const float phi12 = filmIor < outsideIor ? MATERIAL_PI : 0.0;
+    const vec3 phi23 = mix(vec3(0.0), vec3(MATERIAL_PI), lessThan(baseIor, vec3(filmIor)));
+    const vec3 phi = vec3(MATERIAL_PI - phi12) + phi23;
+
+    const float opd = 2.0 * filmIor * thicknessNm * cosTheta2;
+    const vec3 r123Sqrt = sqrt(r123);
+
+    vec3 reflectance = r12 + rs;
+    vec3 amplitude = rs - t121;
+
+    for(int m = 1; m <= 2; ++m)
+    {
+        amplitude *= r123Sqrt;
+        reflectance += amplitude * 2.0 * iridescenceSensitivity(float(m) * opd, float(m) * phi);
+    }
+
+    return max(reflectance, vec3(0.0));
 }
 
 float D_GGX_anisotropic(float NdotH, float TdotH, float BdotH, float at, float ab)
@@ -213,7 +316,15 @@ vec3 shadePbr(Surface s)
     const float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
     const float G = (NdotL / (NdotL * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
 
-    const vec3 F0 = mix(s.dielectricF0, s.albedo, metallic);
+    vec3 F0 = mix(s.dielectricF0, s.albedo, metallic);
+
+    if(s.iridescenceFactor > 0.0)
+    {
+        const vec3 dielectric = evalIridescence(1.0, s.iridescenceIor, NdotV, s.iridescenceThickness, s.dielectricF0);
+        const vec3 metal = evalIridescence(1.0, s.iridescenceIor, NdotV, s.iridescenceThickness, s.albedo);
+        F0 = mix(F0, mix(dielectric, metal, metallic), s.iridescenceFactor);
+    }
+
     const vec3 F90 = vec3(mix(s.dielectricF90, 1.0, metallic));
     const vec3 F = F0 + (F90 - F0) * pow(1.0 - VdotH, 5.0);
 
@@ -354,6 +465,9 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.sheenColor = material.sheen.rgb;
         surface.sheenRoughness = material.sheen.a;
         surface.anisotropy = 0.0;
+        surface.iridescenceFactor = material.iridescence.x;
+        surface.iridescenceIor = material.iridescence.y;
+        surface.iridescenceThickness = material.iridescence.w;
 
         return shadePbr(surface);
     }

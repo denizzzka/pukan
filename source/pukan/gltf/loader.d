@@ -271,6 +271,15 @@ private bool[] linearImages(in Json json, bool extensions)
             if(auto anisotropy = "KHR_materials_anisotropy" in *materialExtensions)
                 if(auto texture = "anisotropyTexture" in *anisotropy)
                     usedAsData[imageOf(*texture)] = true;
+
+            if(auto iridescence = "KHR_materials_iridescence" in *materialExtensions)
+            {
+                if(auto texture = "iridescenceTexture" in *iridescence)
+                    usedAsData[imageOf(*texture)] = true;
+
+                if(auto texture = "iridescenceThicknessTexture" in *iridescence)
+                    usedAsData[imageOf(*texture)] = true;
+            }
         }
     }
 
@@ -286,12 +295,13 @@ private bool[] linearImages(in Json json, bool extensions)
 unittest
 {
     const json = parseJsonString(`{
-        "images": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}],
+        "images": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}],
         "textures": [
             {"source": 0}, {"source": 1}, {"source": 2},
             {"source": 3}, {"source": 4}, {"source": 5},
             {"source": 6}, {"source": 7}, {"source": 8},
-            {"source": 9}, {"source": 10}, {"source": 11}
+            {"source": 9}, {"source": 10}, {"source": 11},
+            {"source": 12}, {"source": 13}
         ],
         "materials": [{
             "pbrMetallicRoughness": {
@@ -331,15 +341,26 @@ unittest
                     "anisotropyTexture": {"index": 11}
                 }
             }
+        }, {
+            "extensions": {
+                "KHR_materials_iridescence": {
+                    "iridescenceTexture": {"index": 12},
+                    "iridescenceThicknessTexture": {"index": 13}
+                }
+            }
         }]
     }`);
 
     // Image 0 serves a color map too, so it keeps the sRGB decode; the specular
     // color map is color data, the specular strength map is not
-    assert(linearImages(json, true) == [false, true, true, true, false, true, true, true, true, false, true, true]);
+    assert(linearImages(json, true) == [
+        false, true, true, true, false, true, true, true, true, false, true, true, true, true,
+    ]);
 
     // Without the extensions only the core textures mark an image as data
-    assert(linearImages(json, false) == [false, true, true, true, false, false, false, false, false, false, false, false]);
+    assert(linearImages(json, false) == [
+        false, true, true, true, false, false, false, false, false, false, false, false, false, false,
+    ]);
 }
 
 ///

@@ -21,6 +21,8 @@ layout(binding = MATERIAL_CLEARCOAT_NORMAL) uniform sampler2D clearcoatNormalTex
 layout(binding = MATERIAL_SHEEN_COLOR) uniform sampler2D sheenColorTexture;
 layout(binding = MATERIAL_SHEEN_ROUGHNESS) uniform sampler2D sheenRoughnessTexture;
 layout(binding = MATERIAL_ANISOTROPY) uniform sampler2D anisotropyTexture;
+layout(binding = MATERIAL_IRIDESCENCE) uniform sampler2D iridescenceTexture;
+layout(binding = MATERIAL_IRIDESCENCE_THICKNESS) uniform sampler2D iridescenceThicknessTexture;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTextureCoord;
@@ -78,6 +80,7 @@ void main()
 {
     const Material material = ubo.material;
     const uint flags = materialFlags(material);
+
 
     const vec4 base = materialBaseColor(material, fragColor, fragTextureCoord, baseColorTexture);
 
@@ -213,6 +216,20 @@ void main()
             anisotropyBitangent = normalize(cross(normal, anisotropyTangent));
         }
 
+        float iridescenceFactor = material.iridescence.x;
+        if((flags & MATERIAL_FLAG_IRIDESCENCE_TEXTURE) != 0u)
+            iridescenceFactor *= texture(iridescenceTexture, fragTextureCoord).r;
+
+        float iridescenceThickness = material.iridescence.w;
+        if((flags & MATERIAL_FLAG_IRIDESCENCE_THICKNESS_TEXTURE) != 0u)
+        {
+            const float sampled = texture(iridescenceThicknessTexture, fragTextureCoord).g;
+            iridescenceThickness = mix(material.iridescence.z, material.iridescence.w, sampled);
+        }
+
+        if(iridescenceThickness <= 0.0)
+            iridescenceFactor = 0.0;
+
         Surface surface;
         surface.albedo = base.rgb;
         surface.normal = normal;
@@ -232,6 +249,9 @@ void main()
         surface.bitangent = anisotropyBitangent;
         surface.anisotropyDirection = anisotropyDirection;
         surface.anisotropy = anisotropy;
+        surface.iridescenceFactor = iridescenceFactor;
+        surface.iridescenceIor = material.iridescence.y;
+        surface.iridescenceThickness = iridescenceThickness;
 
         color = shadePbr(surface);
         color = toneMap(color * frameUbo.frame.exposureParams.x);

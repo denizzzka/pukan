@@ -65,7 +65,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[MATERIAL_ANISOTROPY + 1] materialTextures;
+    private VkDescriptorImageInfo[MATERIAL_IRIDESCENCE_THICKNESS + 1] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -320,6 +320,27 @@ final class GltfMesh : Mesh
                         if(auto texture = "anisotropyTexture" in *anisotropy)
                             bindTexture(*texture, MATERIAL_ANISOTROPY, MaterialFlag.anisotropyTexture, images, hasTexCoords);
                     }
+
+                    if(auto iridescence = "KHR_materials_iridescence" in *extensions)
+                    {
+                        if(auto value = "iridescenceFactor" in *iridescence)
+                            material.iridescence.x = readFloat(*value);
+
+                        if(auto value = "iridescenceIor" in *iridescence)
+                            material.iridescence.y = readFloat(*value);
+
+                        if(auto value = "iridescenceThicknessMinimum" in *iridescence)
+                            material.iridescence.z = readFloat(*value);
+
+                        if(auto value = "iridescenceThicknessMaximum" in *iridescence)
+                            material.iridescence.w = readFloat(*value);
+
+                        if(auto texture = "iridescenceTexture" in *iridescence)
+                            bindTexture(*texture, MATERIAL_IRIDESCENCE, MaterialFlag.iridescenceTexture, images, hasTexCoords);
+
+                        if(auto texture = "iridescenceThicknessTexture" in *iridescence)
+                            bindTexture(*texture, MATERIAL_IRIDESCENCE_THICKNESS, MaterialFlag.iridescenceThicknessTexture, images, hasTexCoords);
+                    }
                 }
             }
 
@@ -396,6 +417,8 @@ final class GltfMesh : Mesh
             imageWriteDescriptor(descriptorSet, MATERIAL_SHEEN_COLOR, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_SHEEN_COLOR]),
             imageWriteDescriptor(descriptorSet, MATERIAL_SHEEN_ROUGHNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_SHEEN_ROUGHNESS]),
             imageWriteDescriptor(descriptorSet, MATERIAL_ANISOTROPY, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_ANISOTROPY]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_IRIDESCENCE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_IRIDESCENCE]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_IRIDESCENCE_THICKNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_IRIDESCENCE_THICKNESS]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);
