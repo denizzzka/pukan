@@ -50,8 +50,11 @@ vec3 perturbNormalFromDerivatives(sampler2D normalMap, float scale, vec3 normal,
     const vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
 
     const mat3 TBN = mat3(normalize(T), normalize(B), normalize(normal));
+    const vec3 perturbed = TBN * mapNormal;
 
-    return normalize(TBN * mapNormal);
+    // Normal-map padding is often flat or empty; a texel blended in at an
+    // island edge leaves no direction, which used to become a white pixel
+    return dot(perturbed, perturbed) > 1e-8 ? normalize(perturbed) : normalize(normal);
 }
 
 vec3 perturbNormalFromTangent(sampler2D normalMap, float scale, vec3 normal, vec3 position, vec2 uv, vec4 tangent)
@@ -74,8 +77,10 @@ vec3 perturbNormalFromTangent(sampler2D normalMap, float scale, vec3 normal, vec
     const vec3 sampled = textureGrad(normalMap, uv, uvDx, uvDy).xyz * 2.0 - 1.0;
     const vec3 mapNormal = vec3(sampled.xy * scale, sampled.z);
     const mat3 TBN = mat3(normalize(T), normalize(B), N);
+    const vec3 perturbed = TBN * mapNormal;
 
-    return normalize(TBN * mapNormal);
+    // Same guard as above, for the frame built from the vertex tangent
+    return dot(perturbed, perturbed) > 1e-8 ? normalize(perturbed) : N;
 }
 
 void main()
