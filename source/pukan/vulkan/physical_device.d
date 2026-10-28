@@ -8,6 +8,7 @@ import pukan.vulkan.helpers;
 import pukan.vulkan.requirements;
 import pukan: toPrettyString;
 import std.meta: AliasSeq;
+import swapchain = pukan.vulkan.swapchain;
 
 ///
 class PhysicalDevice
@@ -100,6 +101,12 @@ class PhysicalDevice
     bool supportsImageFormat(in ImageFormatRequest request, out string reason)
     {
         return imageFormatSupported(physicalDevice, request, reason);
+    }
+
+    /// Picks the surface format the scene can render into, VK_FORMAT_UNDEFINED when none
+    VkSurfaceFormatKHR chooseSurfaceFormat(VkSurfaceKHR surface, out string reason)
+    {
+        return swapchain.chooseSurfaceFormat(physicalDevice, surface, reason);
     }
 
     /// Snapshots properties, supported features and extensions

@@ -8,13 +8,11 @@ import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 
-/// Swapchain color format the scene renders into
-enum swapchainFormat = VK_FORMAT_B8G8R8A8_SRGB;
-
 class Scene
 {
     LogicalDevice device;
     VkSurfaceKHR surface;
+    VkSurfaceFormatKHR surfaceFormat;
 
     alias WindowSizeChangeDetectedCallback = void delegate();
     WindowSizeChangeDetectedCallback windowSizeChanged;
@@ -43,17 +41,19 @@ class Scene
         LogicalDevice dev,
         VkSurfaceKHR surf,
         WindowSizeChangeDetectedCallback wsc,
+        VkSurfaceFormatKHR surfaceFormat,
         VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR,
     )
     {
         device = dev;
         surface = surf;
         windowSizeChanged = wsc;
+        this.surfaceFormat = surfaceFormat;
         this.presentMode = presentMode;
 
         device.physicalDevice.instance.useSurface(surface);
 
-        renderPass = device.create!DefaultRenderPass(swapchainFormat);
+        renderPass = device.create!DefaultRenderPass(surfaceFormat.format);
 
         pipelineFactory = new PipelineFactory(device);
         frameAllocator = pipelineFactory.createFrameAllocator();
@@ -62,7 +62,7 @@ class Scene
         background = new Checkerboard(device, pipelineFactory, renderPass);
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
-        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null, presentMode);
+        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null, surfaceFormat.colorSpace, presentMode);
         createFrameSets();
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
@@ -163,7 +163,7 @@ class Scene
 
     void recreateSwapChain()
     {
-        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain, presentMode);
+        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain, surfaceFormat.colorSpace, presentMode);
         createFrameSets();
     }
 

@@ -165,7 +165,11 @@ void main(string[] args) {
                 return false;
             }
 
-            return surfaceUsable(ctx.device, surface, swapchainFormat, reason);
+            const format = chooseSurfaceFormat(ctx.device, surface, reason);
+            if(format.format == VK_FORMAT_UNDEFINED)
+                return false;
+
+            return surfaceUsable(ctx.device, surface, format, reason);
         }
 
         reason = "no queue family supports " ~ queueFlags.to!string;
@@ -177,6 +181,10 @@ void main(string[] args) {
 
     auto selected = vk.findSuitablePhysicalDevice!appRequirements(filter);
     auto physDevice = selected.device();
+
+    string surfaceReason;
+    const surfaceFormat = physDevice.chooseSurfaceFormat(surface, surfaceReason);
+    enforce(surfaceFormat.format != VK_FORMAT_UNDEFINED, surfaceReason);
     //~ debug
     //~ {
         //~ writeln("");
@@ -225,6 +233,7 @@ void main(string[] args) {
         device,
         surface,
         &windowSizeChanged,
+        surfaceFormat,
         benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
     );
     scope(exit) destroy(scene);

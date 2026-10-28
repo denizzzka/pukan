@@ -6,14 +6,39 @@ import pukan.vulkan.requirements: Requirement;
 import std.exception: enforce;
 import std.meta: AliasSeq;
 
+/// Surface format pairs the scene can render into, best first
+private enum surfaceFormatPreference = [
+    VkSurfaceFormatKHR(VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
+    VkSurfaceFormatKHR(VK_FORMAT_R8G8B8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
+];
+
+/// Picks the surface format the scene can render into, VK_FORMAT_UNDEFINED when none
+VkSurfaceFormatKHR chooseSurfaceFormat(VkPhysicalDevice pd, VkSurfaceKHR surface, out string reason)
+{
+    import std.algorithm: any;
+
+    const formats = getArrayFrom!vkGetPhysicalDeviceSurfaceFormatsKHR(pd, surface);
+
+    foreach(preferred; surfaceFormatPreference)
+        if(formats.any!((available) =>
+            (available.format == VK_FORMAT_UNDEFINED || available.format == preferred.format) &&
+            available.colorSpace == preferred.colorSpace))
+            return preferred;
+
+    reason = "surface has no sRGB format";
+    return VkSurfaceFormatKHR(VK_FORMAT_UNDEFINED, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+}
+
 /// Returns false and a reason when the surface cannot back a swapchain with the given format
-bool surfaceUsable(VkPhysicalDevice pd, VkSurfaceKHR surface, VkFormat format, out string reason)
+bool surfaceUsable(VkPhysicalDevice pd, VkSurfaceKHR surface, VkSurfaceFormatKHR format, out string reason)
 {
     import std.algorithm: any, canFind;
 
     const formats = getArrayFrom!vkGetPhysicalDeviceSurfaceFormatsKHR(pd, surface);
 
-    if(!formats.any!(f => f.format == format && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR))
+    if(!formats.any!((available) =>
+        (available.format == VK_FORMAT_UNDEFINED || available.format == format.format) &&
+        available.colorSpace == format.colorSpace))
     {
         reason = "surface does not support the swapchain color format";
         return false;
@@ -57,13 +82,14 @@ class SwapChain
         VkSurfaceKHR surface,
         RenderPass renderPass,
         SwapChain old,
+        VkColorSpaceKHR imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
         VkPresentModeKHR preferredPresentMode = VK_PRESENT_MODE_FIFO_KHR,
     )
     {
         auto physDev = device.physicalDevice;
         const capab = physDev.instance.getSurfaceCapabilities(physDev.physicalDevice, surface);
 
-        this(device, fb, capab, renderPass, old, preferredPresentMode);
+        this(device, fb, capab, renderPass, old, imageColorSpace, preferredPresentMode);
     }
 
     this(
@@ -72,6 +98,7 @@ class SwapChain
         VkSurfaceCapabilitiesKHR capabilities,
         RenderPass renderPass,
         SwapChain old,
+        VkColorSpaceKHR imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
         VkPresentModeKHR preferredPresentMode = VK_PRESENT_MODE_FIFO_KHR,
     )
     {
@@ -87,7 +114,8 @@ class SwapChain
 
         auto surface = device.physicalDevice.instance.surface.handle;
         string reason;
-        enforce(surfaceUsable(device.physicalDevice.physicalDevice, surface, renderPass.imageFormat, reason),
+        enforce(surfaceUsable(device.physicalDevice.physicalDevice, surface,
+                VkSurfaceFormatKHR(renderPass.imageFormat, imageColorSpace), reason),
             new PukanVulkanException(reason));
 
         const presentModes = getArrayFrom!vkGetPhysicalDeviceSurfacePresentModesKHR(device.physicalDevice.physicalDevice, surface);
@@ -109,7 +137,7 @@ class SwapChain
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             surface: device.physicalDevice.instance.surface.handle,
             imageFormat: renderPass.imageFormat,
-            imageColorSpace: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+            imageColorSpace: imageColorSpace,
             imageExtent: capabilities.currentExtent,
             imageArrayLayers: 1, // number of views in a multiview/stereo surface. For non-stereoscopic-3D applications, this value is 1
             imageUsage: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // specifies that the image can be used to create a VkImageView suitable for use as a color or resolve attachment in a VkFramebuffer
