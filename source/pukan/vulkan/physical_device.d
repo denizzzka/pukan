@@ -94,7 +94,7 @@ class PhysicalDevice
     {
         import std.string: fromStringz;
 
-        return fromStringz(properties.deviceName.ptr).idup;
+        return fromStringz(properties.deviceName[]);
     }
 
     /// Returns false and a reason when the device cannot create the requested image
