@@ -42,6 +42,22 @@ class Scene
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
+    /// Point lights uploaded with the frame, on top of the directional sun
+    PointLight[maxPointLights] pointLights;
+    uint pointLightCount;
+
+    void addPointLight(Vector3f position, Vector3f color, float radius)
+    {
+        import std.exception: enforce;
+
+        enforce(pointLightCount < maxPointLights, "too many point lights");
+
+        pointLights[pointLightCount++] = PointLight(
+            Vector4f(position.x, position.y, position.z, radius),
+            Vector4f(color.x, color.y, color.z, 0),
+        );
+    }
+
     /// Whether transmissive meshes get a second pass after a copy of the frame.
     /// They sample that copy to show what lies behind them; with the pass off
     /// they are drawn with the rest and fall back to the environment.
@@ -371,7 +387,13 @@ class Scene
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
         data.lightDirection = Vector4f(light.x, light.y, light.z, 0);
         data.lightColor = Vector4f(1, 1, 1, 1);
-        data.exposureParams = Vector4f(exposure, iblIntensity, transmissionPassEnabled ? 1 : 0, 0);
+        data.exposureParams = Vector4f(
+            exposure,
+            iblIntensity,
+            transmissionPassEnabled ? 1 : 0,
+            cast(float) pointLightCount,
+        );
+        data.pointLights[] = pointLights[];
 
         frame.frameSets[eye].update(data);
     }
@@ -545,13 +567,23 @@ struct WorldTransformation
     Matrix4f proj; /// view to projection (to projective/homogeneous coordinates)
 }
 
+enum maxPointLights = 8;
+
+/// Uploaded with the frame; the shader adds them to the directional sun
+struct PointLight
+{
+    Vector4f positionRadius; // xyz = world position, w = radius
+    Vector4f color;          // rgb = colour, already scaled by intensity
+}
+
 struct FrameUniforms
 {
     Matrix4x4f invViewProj;
     Vector4f cameraPosition;
     Vector4f lightDirection;
     Vector4f lightColor;
-    Vector4f exposureParams; // x = exposure, y = IBL intensity
+    Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = point light count
+    PointLight[maxPointLights] pointLights;
 }
 
 ///

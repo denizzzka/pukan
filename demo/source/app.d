@@ -248,6 +248,10 @@ void main(string[] args) {
     );
     scope(exit) destroy(scene);
 
+    scene.addPointLight(Vector3f(0.9f, 0.35f, 1.1f), Vector3f(1.0f, 0.25f, 0.15f) * 6.0f, 4.0f);
+    scene.addPointLight(Vector3f(-0.8f, 0.4f, 0.8f), Vector3f(0.15f, 0.45f, 1.0f) * 6.0f, 4.0f);
+    scene.addPointLight(Vector3f(0.0f, 1.1f, 1.4f), Vector3f(0.3f, 0.9f, 0.35f) * 4.0f, 5.0f);
+
 
     {
         GltfLoadOptions loadOptions;

@@ -401,7 +401,38 @@ vec3 shadePbr(Surface s)
         brdf = mix(brdf, clearcoatBrdf, clearcoat * coatFresnel);
     }
 
-    const vec3 direct = brdf * lightColor * NdotL;
+    vec3 direct = brdf * lightColor * NdotL;
+
+    // Point lights reuse the GGX lobe of the sun; clearcoat and sheen stay on it
+    for(uint i = 0u; i < uint(frameUbo.frame.exposureParams.w); ++i)
+    {
+        const vec4 positionRadius = frameUbo.frame.pointLights[i].positionRadius;
+        const vec3 toLight = positionRadius.xyz - s.position;
+        const float distance = length(toLight);
+        const vec3 Lp = toLight / max(distance, 0.001);
+        const float NdotLp = max(dot(N, Lp), 0.0);
+
+        if(NdotLp <= 0.0)
+            continue;
+
+        const float ratio = distance / max(positionRadius.w, 0.001);
+        const float attenuation = pow(clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0), 2.0)
+            / (distance * distance + 1.0);
+
+        const vec3 Hp = normalize(V + Lp);
+        const float NdotHp = max(dot(N, Hp), 0.0);
+        const float VdotHp = max(dot(V, Hp), 0.0);
+
+        const float denominatorP = NdotHp * NdotHp * (a2 - 1.0) + 1.0;
+        const float Dp = a2 / (MATERIAL_PI * denominatorP * denominatorP);
+        const float Gp = (NdotLp / (NdotLp * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
+        const vec3 Fp = F0 + (F90 - F0) * pow(1.0 - VdotHp, 5.0);
+        const vec3 kDp = (1.0 - Fp) * (1.0 - metallic);
+        const vec3 specularP = Dp * Gp * Fp / max(4.0 * NdotLp * NdotV, 0.001);
+
+        direct += (kDp * s.albedo / MATERIAL_PI + specularP)
+            * frameUbo.frame.pointLights[i].color.rgb * NdotLp * attenuation;
+    }
 
     const vec3 R = reflect(-V, N);
     const float iblIntensity = frameUbo.frame.exposureParams.y;
