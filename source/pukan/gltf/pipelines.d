@@ -22,8 +22,8 @@ enum LightingMode
 /// Render setting, read by the drawables on every draw
 LightingMode lightingMode = LightingMode.ibl;
 
-/// Whether transmissive draws are collected into their own pass; off while the
-/// colour behind them cannot be copied, as in stereo
+/// Draw-time mirror of `Scene.transmissionPassEnabled`: transmissive draws go to
+/// their own pass only while that pass runs
 bool transmissionPass = true;
 
 struct GltfSkyPipelines

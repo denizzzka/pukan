@@ -2,6 +2,7 @@ module pukan.scene;
 
 import dlib.math: translation, Vector3f, Vector4f;
 import pukan;
+import pukan.gltf.pipelines: transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
@@ -41,8 +42,10 @@ class Scene
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
-    /// False when the frame has no scene colour copy to sample, as in stereo
-    bool sceneColorAvailable = true;
+    /// Whether transmissive meshes get a second pass after a copy of the frame.
+    /// They sample that copy to show what lies behind them; with the pass off
+    /// they are drawn with the rest and fall back to the environment.
+    bool transmissionPassEnabled = true;
 
     this(
         LogicalDevice dev,
@@ -238,6 +241,17 @@ class Scene
         vkCmdPipelineBarrier(buf, srcStage, dstStage, 0, 0, null, 0, null, 1, &barrier);
     }
 
+    /// Hands the colour to the presentation engine when nothing samples it
+    private void presentColor(ref Frame frame)
+    {
+        imageBarrier(
+            frame.commandBuffer, frame.image,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
+        );
+    }
+
     /// Copies the colour the first pass left into the frame's scene texture
     private void copySceneColor(ref Frame frame)
     {
@@ -357,7 +371,7 @@ class Scene
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
         data.lightDirection = Vector4f(light.x, light.y, light.z, 0);
         data.lightColor = Vector4f(1, 1, 1, 1);
-        data.exposureParams = Vector4f(exposure, iblIntensity, sceneColorAvailable ? 1 : 0, 0);
+        data.exposureParams = Vector4f(exposure, iblIntensity, transmissionPassEnabled ? 1 : 0, 0);
 
         frame.frameSets[eye].update(data);
     }
@@ -370,21 +384,28 @@ class Scene
     {
         auto commandBuffer = frame.commandBuffer;
 
+        transmissionPass = transmissionPassEnabled;
+
         renderPass.recordCommandBuffer(
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf); },
             drawScene,
         );
 
-        copySceneColor(frame);
+        if(transmissionPassEnabled)
+        {
+            copySceneColor(frame);
 
-        renderPass.recordTransmissionCommandBuffer(
-            commandBuffer,
-            (ref VkCommandBuffer buf) {
-                if(drawTransmission !is null)
-                    drawTransmission(buf);
-            },
-        );
+            renderPass.recordTransmissionCommandBuffer(
+                commandBuffer,
+                (ref VkCommandBuffer buf) {
+                    if(drawTransmission !is null)
+                        drawTransmission(buf);
+                },
+            );
+        }
+        else
+            presentColor(frame);
     }
 
     alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent);
@@ -431,23 +452,30 @@ class Scene
     {
         auto commandBuffer = frame.commandBuffer;
 
+        transmissionPass = transmissionPassEnabled;
+
         renderPass.recordCommandBuffer(
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf); },
             (ref VkCommandBuffer buf) { drawStereoEyes(buf, drawScene); },
         );
 
-        // One copy serves both eyes: the fragment coordinate already carries the
-        // viewport offset, so it lands in that eye's half
-        copySceneColor(frame);
+        if(transmissionPassEnabled)
+        {
+            // One copy serves both eyes: the fragment coordinate already carries
+            // the viewport offset, so it lands in that eye's half
+            copySceneColor(frame);
 
-        renderPass.recordTransmissionCommandBuffer(
-            commandBuffer,
-            (ref VkCommandBuffer buf) {
-                if(drawTransmission !is null)
-                    drawStereoEyes(buf, drawTransmission);
-            },
-        );
+            renderPass.recordTransmissionCommandBuffer(
+                commandBuffer,
+                (ref VkCommandBuffer buf) {
+                    if(drawTransmission !is null)
+                        drawStereoEyes(buf, drawTransmission);
+                },
+            );
+        }
+        else
+            presentColor(frame);
     }
 
     void recreateSwapChain()
