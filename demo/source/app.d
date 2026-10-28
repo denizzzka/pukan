@@ -1,6 +1,7 @@
 import arena: placeOnIcosahedron;
 import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
+import pukan.material: runtimeMaterialOverride;
 import pukan.gltf.pipelines: LightingMode, lightingMode;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
@@ -292,7 +293,8 @@ void main(string[] args) {
         arenaGltfs = createArena(scene, arenaNode, benchMode ? benchSampleNames : null);
     }
 
-    overrideTargets = arenaGltfs;
+    static if(runtimeMaterialOverride)
+        overrideTargets = arenaGltfs;
 
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
@@ -388,19 +390,22 @@ void main(string[] args) {
             writefln("lighting: %s", lightingMode);
         }
 
-        if(overrideChanged)
+        static if(runtimeMaterialOverride)
         {
-            overrideChanged = false;
+            if(overrideChanged)
+            {
+                overrideChanged = false;
 
-            const overrideMaterial = Material(Vector3f(0.95f, 0.45f, 0.1f), MaterialMode.unlit);
+                const overrideMaterial = Material(Vector3f(0.95f, 0.45f, 0.1f), MaterialMode.unlit);
 
-            foreach(target; overrideTargets)
-                if(materialOverridden)
-                    target.setMaterialOverride(overrideMaterial);
-                else
-                    target.clearMaterialOverride();
+                foreach(target; overrideTargets)
+                    if(materialOverridden)
+                        target.setMaterialOverride(overrideMaterial);
+                    else
+                        target.clearMaterialOverride();
 
-            writefln("material override: %s", materialOverridden);
+                writefln("material override: %s", materialOverridden);
+            }
         }
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
@@ -617,9 +622,13 @@ float cameraDistance = initialCameraDistance;
 Vector3f cameraPan = Vector3f(0, 0, 0);
 
 bool skyChanged;
-bool materialOverridden;
-bool overrideChanged;
-GlTF[] overrideTargets;
+
+static if(runtimeMaterialOverride)
+{
+    bool materialOverridden;
+    bool overrideChanged;
+    GlTF[] overrideTargets;
+}
 
 extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
 {
@@ -637,10 +646,14 @@ extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
 
         skyChanged = true;
     }
-    else if(key == GLFW_KEY_O)
+    else
     {
-        materialOverridden = !materialOverridden;
-        overrideChanged = true;
+        static if(runtimeMaterialOverride)
+            if(key == GLFW_KEY_O)
+            {
+                materialOverridden = !materialOverridden;
+                overrideChanged = true;
+            }
     }
 }
 

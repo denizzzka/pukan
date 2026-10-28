@@ -8,7 +8,7 @@ import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode;
 import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
-import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
+import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
@@ -169,7 +169,9 @@ class GlTF : DrawableByVulkan
     private GltfPipelines pipelines;
 
     private MeshClass[] meshes;
-    private Material[] authoredMaterials;
+
+    static if(runtimeMaterialOverride)
+        private Material[] authoredMaterials;
     private DescriptorAllocator allocator;
     private MaterialBuffer materialBuffer;
 
@@ -341,27 +343,30 @@ class GlTF : DrawableByVulkan
 
     bool isAnimated() const => animation.animations.length > 0;
 
-    /// Applies one material to every mesh, remembering the authored ones
-    void setMaterialOverride(Material material)
+    static if(runtimeMaterialOverride)
     {
-        if(authoredMaterials.length != meshes.length)
+        /// Applies one material to every mesh, remembering the authored ones
+        void setMaterialOverride(Material material)
         {
-            authoredMaterials.length = meshes.length;
+            if(authoredMaterials.length != meshes.length)
+            {
+                authoredMaterials.length = meshes.length;
 
-            foreach(i, mesh; meshes)
-                authoredMaterials[i] = mesh.material;
+                foreach(i, mesh; meshes)
+                    authoredMaterials[i] = mesh.material;
+            }
+
+            foreach(mesh; meshes)
+                mesh.setMaterial(material);
         }
 
-        foreach(mesh; meshes)
-            mesh.setMaterial(material);
-    }
-
-    /// Restores the materials the file declared
-    void clearMaterialOverride()
-    {
-        foreach(i, mesh; meshes)
-            if(i < authoredMaterials.length)
-                mesh.setMaterial(authoredMaterials[i]);
+        /// Restores the materials the file declared
+        void clearMaterialOverride()
+        {
+            foreach(i, mesh; meshes)
+                if(i < authoredMaterials.length)
+                    mesh.setMaterial(authoredMaterials[i]);
+        }
     }
 
     auto calcAABB() const

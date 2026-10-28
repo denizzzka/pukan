@@ -153,11 +153,25 @@ struct MaterialBlock
     Material material;
 }
 
+/// Runtime material edits; release builds enable them with MaterialOverride
+version(MaterialOverride)
+    enum runtimeMaterialOverride = true;
+else
+{
+    debug enum runtimeMaterialOverride = true;
+    else enum runtimeMaterialOverride = false;
+}
+
 /// Material uniforms of all meshes, one slot per mesh
 final class MaterialBuffer
 {
+    static if(runtimeMaterialOverride)
+        alias Chunk = MemoryBufferMappedToCPU;
+    else
+        alias Chunk = TransferBuffer;
+
     private LogicalDevice device;
-    private MemoryBufferMappedToCPU[] chunks;
+    private Chunk[] chunks;
     private size_t chunkCapacity;
     private size_t slotSize;
     private shared size_t used;
@@ -193,7 +207,7 @@ final class MaterialBuffer
         synchronized(chunkMutex)
         {
             while(chunkIndex >= chunks.length)
-                chunks ~= device.create!MemoryBufferMappedToCPU(
+                chunks ~= device.create!Chunk(
                     chunkCapacity * slotSize,
                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 );
@@ -213,21 +227,35 @@ final class MaterialBuffer
     {
         auto chunk = chunkAt(slot);
 
+        static if(runtimeMaterialOverride)
+            auto buffer = chunk.buf;
+        else
+            auto buffer = chunk.gpuBuffer;
+
         return VkDescriptorBufferInfo(
-            buffer: chunk.buf,
+            buffer: buffer,
             offset: (slot % chunkCapacity) * slotSize,
             range: MaterialBlock.sizeof,
         );
     }
 
-    /// The chunks are host visible, so writes reach the GPU without a copy
     void recordUpload(VkCommandBuffer commandBuffer)
     {
+        static if(!runtimeMaterialOverride)
+        {
+            Chunk[] snapshot;
+
+            synchronized(chunkMutex)
+                snapshot = chunks;
+
+            foreach(chunk; snapshot)
+                chunk.recordUpload(commandBuffer);
+        }
     }
 
-    private MemoryBufferMappedToCPU chunkAt(size_t slot)
+    private Chunk chunkAt(size_t slot)
     {
-        MemoryBufferMappedToCPU chunk;
+        Chunk chunk;
 
         synchronized(chunkMutex)
             chunk = chunks[slot / chunkCapacity];
