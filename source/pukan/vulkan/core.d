@@ -193,26 +193,35 @@ class Instance
 
     //TODO: remove or add heuristics
     ///
-    auto findSuitablePhysicalDevice()
+    auto findSuitablePhysicalDevice(DeviceFilter filter = DeviceFilter.init)
     {
-        return findSuitablePhysicalDevice!()();
+        return findSuitablePhysicalDevice!()(filter);
     }
 
     ///
-    SelectedDevice!Reqs findSuitablePhysicalDevice(Reqs...)()
+    SelectedDevice!Reqs findSuitablePhysicalDevice(Reqs...)(DeviceFilter filter = DeviceFilter.init)
     {
-        auto suitable = suitablePhysicalDevices!Reqs();
+        string[] rejections;
+        auto suitable = collectSuitableDevices!Reqs(filter, rejections);
 
         if(suitable.length == 0)
-            throw new PukanVulkanException("no physical device satisfies the requirements");
+            throw new RequirementsNotMetException("physical device selection",
+                rejections.length ? rejections : ["no physical devices found"]);
 
         selectedPhysicalDevice = suitable[0].device;
         return suitable[0];
     }
 
     // TODO: may be removed if GPU menu moves to SelectedDevice
-    /// Returns every physical device that satisfies the requirements
-    SelectedDevice!Reqs[] suitablePhysicalDevices(Reqs...)()
+    /// Returns every physical device that satisfies the requirements and the filter
+    SelectedDevice!Reqs[] suitablePhysicalDevices(Reqs...)(DeviceFilter filter = DeviceFilter.init)
+    {
+        string[] rejections;
+        return collectSuitableDevices!Reqs(filter, rejections);
+    }
+
+    /// Filters the physical devices, also returns the rejection reasons
+    private SelectedDevice!Reqs[] collectSuitableDevices(Reqs...)(DeviceFilter filter, out string[] rejections)
     {
         SelectedDevice!Reqs[] ret;
         alias allRequirements = AliasSeq!(
@@ -226,11 +235,13 @@ class Instance
             DeviceContext ctx;
             string reason;
 
-            if(!pd.createLogicalDeviceContext!Reqs(null, ctx, reason))
+            if(!pd.createLogicalDeviceContext!Reqs(null, ctx, reason) ||
+               !requirementsSatisfied!allRequirements(ctx, reason) ||
+               !filter.matches(ctx, reason))
+            {
+                rejections ~= pd.name ~ ": " ~ reason;
                 continue;
-
-            if(!requirementsSatisfied!allRequirements(ctx, reason))
-                continue;
+            }
 
             requestRequirements!allRequirements(ctx);
             ret ~= SelectedDevice!Reqs(pd, ctx);

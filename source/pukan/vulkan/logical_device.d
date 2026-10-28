@@ -4,7 +4,7 @@ import core.sync.mutex: Mutex;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.physical_device: PhysicalDevice;
-import pukan.vulkan.requirements: ChainMask, DeviceContext, FeatureChain, linkDeviceFeatures, requireEnabled;
+import pukan.vulkan.requirements: ChainMask, DeviceContext, FeatureChain, ImageFormatRequest, linkDeviceFeatures, requireEnabled;
 import log = std.logger;
 import std.exception: enforce;
 import std.string: toStringz;
@@ -21,6 +21,7 @@ class LogicalDevice
     private ChainMask enabledChainMask;
     private VkQueueFlags selectedQueueFlags;
     private const(char)*[] enabledExtensions;
+    private bool[ImageFormatRequest] supportedImageFormats;
     private Mutex queueMutex;
 
     package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures,
@@ -102,6 +103,19 @@ class LogicalDevice
         ctx.selectedQueueFlags = selectedQueueFlags;
         ctx.enabledExtensions = enabledExtensions.dup;
         return ctx;
+    }
+
+    /// Returns false and a reason when the device cannot create the requested image
+    bool supportsImageFormat(in ImageFormatRequest request, out string reason)
+    {
+        if(request in supportedImageFormats)
+            return true;
+
+        if(!physicalDevice.supportsImageFormat(request, reason))
+            return false;
+
+        supportedImageFormats[request] = true;
+        return true;
     }
 
     /// Throws RequirementsNotMetException if any requirement is not enabled

@@ -569,16 +569,15 @@ void linkDeviceFeatures(ref FeatureChain chain, ref VkPhysicalDeviceFeatures2 he
     }
 }
 
-/// Requirement for a format with the given optimal tiling features
-struct FormatRequirement(VkFormat format, VkFormatFeatureFlags features)
+/// Requirement interface for a format that is checked, not enabled
+private mixin template FormatRequirements()
 {
-    enum string requirementName = format.stringof ~ " " ~ features.stringof;
     enum bool isExtension = false;
     enum bool isFeature = false;
     enum bool isChainFeature = false;
     package enum VulkanVersion requiredVersion = VulkanVersion(1, 0);
 
-    /// Returns false and a reason when the format lacks the features
+    /// Returns false and a reason when the format is not supported
     static bool isSatisfied(Ctx)(ref Ctx ctx, out string reason) if(is(Ctx == DeviceContext))
     {
         return checkFormat(ctx.device, reason);
@@ -589,11 +588,19 @@ struct FormatRequirement(VkFormat format, VkFormatFeatureFlags features)
     {
     }
 
-    /// Returns false and a reason when the format lacks the features
+    /// Returns false and a reason when the format is not supported
     static bool isEnabled(ref const DeviceContext ctx, out string reason)
     {
         return checkFormat(cast(VkPhysicalDevice) ctx.device, reason);
     }
+}
+
+/// Requirement for a format with the given optimal tiling features
+struct FormatRequirement(VkFormat format, VkFormatFeatureFlags features)
+{
+    enum string requirementName = format.stringof ~ " " ~ features.stringof;
+
+    mixin FormatRequirements;
 
     private static bool checkFormat(VkPhysicalDevice device, out string reason)
     {
@@ -605,6 +612,183 @@ struct FormatRequirement(VkFormat format, VkFormatFeatureFlags features)
             reason = "format lacks features: " ~ requirementName;
             return false;
         }
+
+        return true;
+    }
+}
+
+/// Image parameters that VkImageFormatProperties depends on
+struct ImageFormatRequest
+{
+    VkFormat format;
+    VkImageType imageType;
+    VkImageTiling tiling;
+    VkImageUsageFlags usage;
+    VkImageCreateFlags flags = 0;
+    VkExtent3D extent = VkExtent3D(1, 1, 1);
+    uint mipLevels = 1;
+    uint arrayLayers = 1;
+    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+
+    /// Builds a request from an image creation info
+    static ImageFormatRequest from(in VkImageCreateInfo info)
+    {
+        ImageFormatRequest ret = {
+            format: info.format,
+            imageType: info.imageType,
+            tiling: info.tiling,
+            usage: info.usage,
+            flags: info.flags,
+            extent: info.extent,
+            mipLevels: info.mipLevels,
+            arrayLayers: info.arrayLayers,
+            samples: info.samples,
+        };
+
+        return ret;
+    }
+
+    /// Human readable form for diagnostics
+    string toString() const
+    {
+        import std.conv: to;
+
+        return format.to!string ~ " type " ~ (cast(uint) imageType).to!string ~
+            " tiling " ~ (cast(uint) tiling).to!string ~ " usage " ~ usage.to!string ~
+            " " ~ extent.width.to!string ~ "x" ~ extent.height.to!string ~ "x" ~
+            extent.depth.to!string;
+    }
+}
+
+/// Returns false and a reason when the device cannot create the requested image
+bool imageFormatSupported(VkPhysicalDevice device, in ImageFormatRequest request, out string reason)
+{
+    import pukan.vulkan.helpers: vkCheck;
+
+    if(request.usage == 0)
+    {
+        reason = "image usage is empty: " ~ request.toString;
+        return false;
+    }
+
+    VkPhysicalDeviceImageFormatInfo2 info = {
+        sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+        format: request.format,
+        type: request.imageType,
+        tiling: request.tiling,
+        usage: request.usage,
+        flags: request.flags,
+    };
+
+    VkImageFormatProperties2 properties = {
+        sType: VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
+    };
+
+    const ret = vkGetPhysicalDeviceImageFormatProperties2(device, &info, &properties);
+
+    if(ret == VK_ERROR_FORMAT_NOT_SUPPORTED)
+    {
+        reason = "image format is not supported: " ~ request.toString;
+        return false;
+    }
+
+    ret.vkCheck("vkGetPhysicalDeviceImageFormatProperties2 failed");
+
+    const limits = properties.imageFormatProperties;
+
+    if(request.extent.width > limits.maxExtent.width ||
+       request.extent.height > limits.maxExtent.height ||
+       request.extent.depth > limits.maxExtent.depth)
+    {
+        reason = "image extent exceeds the limit: " ~ request.toString;
+        return false;
+    }
+
+    if(request.mipLevels > limits.maxMipLevels)
+    {
+        reason = "image mip levels exceed the limit: " ~ request.toString;
+        return false;
+    }
+
+    if(request.arrayLayers > limits.maxArrayLayers)
+    {
+        reason = "image array layers exceed the limit: " ~ request.toString;
+        return false;
+    }
+
+    if((limits.sampleCounts & request.samples) == 0)
+    {
+        reason = "image sample count is not supported: " ~ request.toString;
+        return false;
+    }
+
+    return true;
+}
+
+/// Requirement for an image with the given parameters
+struct ImageFormatRequirement(
+    VkFormat format,
+    VkImageType imageType,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkImageCreateFlags flags = 0,
+    VkExtent3D extent = VkExtent3D(1, 1, 1),
+    uint mipLevels = 1,
+    uint arrayLayers = 1,
+    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+)
+{
+    enum string requirementName = format.stringof ~ " " ~ tiling.stringof ~ " " ~ usage.stringof;
+
+    mixin FormatRequirements;
+
+    private enum imageRequest = ImageFormatRequest(
+        format, imageType, tiling, usage, flags, extent, mipLevels, arrayLayers, samples);
+
+    private static bool checkFormat(VkPhysicalDevice device, out string reason)
+    {
+        return imageFormatSupported(device, imageRequest, reason);
+    }
+
+    static assert(usage != 0, "image usage must not be empty: " ~ requirementName);
+    static assert(extent.width > 0 && extent.height > 0 && extent.depth > 0,
+        "image extent must not be empty: " ~ requirementName);
+    static assert(mipLevels > 0 && arrayLayers > 0,
+        "image levels must not be empty: " ~ requirementName);
+    static assert(imageType != VK_IMAGE_TYPE_1D || extent.height == 1,
+        "1D image height must be 1: " ~ requirementName);
+    static assert(imageType != VK_IMAGE_TYPE_2D || extent.depth == 1,
+        "2D image depth must be 1: " ~ requirementName);
+    static assert(imageType != VK_IMAGE_TYPE_3D || arrayLayers == 1,
+        "3D image has one array layer: " ~ requirementName);
+}
+
+/// Named runtime check; the name prefixes the rejection reason
+struct DeviceCheck
+{
+    string name;
+    bool delegate(ref DeviceContext ctx, out string reason) run;
+}
+
+/// Runtime part of the device selection, checked after the static requirements
+struct DeviceFilter
+{
+    ImageFormatRequest[] images;
+    DeviceCheck[] checks;
+
+    /// Returns false and a reason when the device does not satisfy the filter
+    bool matches(ref DeviceContext ctx, out string reason)
+    {
+        foreach(image; images)
+            if(!imageFormatSupported(ctx.device, image, reason))
+                return false;
+
+        foreach(check; checks)
+            if(!check.run(ctx, reason))
+            {
+                reason = check.name ~ ": " ~ reason;
+                return false;
+            }
 
         return true;
     }
@@ -998,6 +1182,31 @@ unittest
     static assert(!depth.isExtension && !depth.isFeature && !depth.isChainFeature);
     static assert(RequirementsVersion!depth == VulkanVersion(1, 0));
     static assert(QueueFlagsFor!depth == 0);
+
+    alias depthImage = ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    static assert(!depthImage.isExtension && !depthImage.isFeature && !depthImage.isChainFeature);
+    static assert(RequirementsVersion!depthImage == VulkanVersion(1, 0));
+    static assert(QueueFlagsFor!depthImage == 0);
+    static assert(__traits(compiles, getOptionalRequirements!depthImage));
+    static assert(!__traits(compiles, ImageFormatRequirement!(VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, 0)));
+
+    DeviceFilter noFilter;
+    DeviceContext noFilterCtx;
+    assert(noFilter.matches(noFilterCtx, reason));
+
+    VkImageCreateInfo imageInfo;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.extent = VkExtent3D(4, 2, 1);
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    const request = ImageFormatRequest.from(imageInfo);
+    assert(request.format == VK_FORMAT_R8G8B8A8_SRGB);
+    assert(request.extent.width == 4 && request.extent.height == 2 && request.extent.depth == 1);
 
     static struct A { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }
     static struct B { private alias requirements = AliasSeq!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy)); }

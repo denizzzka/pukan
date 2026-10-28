@@ -2,6 +2,7 @@ import pukan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirements;
 import std.algorithm: max;
+import std.exception: enforce;
 import std.math: abs;
 import std.meta: AliasSeq;
 import std.random;
@@ -47,11 +48,29 @@ void main()
     auto vk = Instance.createWith!DebugEntities("compute demo", 1, extension_list);
     scope(exit) destroy(vk);
 
-    auto selected = vk.findSuitablePhysicalDevice!appRequirements();
+    ImageFormatRequest sampled;
+    sampled.format = VK_FORMAT_R8G8B8A8_UNORM;
+    sampled.imageType = VK_IMAGE_TYPE_2D;
+    sampled.tiling = VK_IMAGE_TILING_OPTIMAL;
+    sampled.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    sampled.extent = VkExtent3D(640u, 480u, 1u);
+
+    DeviceFilter filter;
+    filter.images = [sampled];
+
+    auto selected = vk.findSuitablePhysicalDevice!appRequirements(filter);
     auto physDevice = selected.device();
 
     auto device = selected.createLogicalDevice();
     scope(exit) destroy(device);
+
+    string formatReason;
+    enforce(device.supportsImageFormat(sampled, formatReason),
+        "sampled image format is not supported: " ~ formatReason);
+
+    sampled.extent = VkExtent3D(1u << 20, 1u, 1u);
+    enforce(!device.supportsImageFormat(sampled, formatReason),
+        "oversized image extent was accepted");
 
     auto gemm = Gemm.create(device, M, N, K);
     scope(exit) destroy(gemm);
@@ -72,10 +91,8 @@ void main()
 
     enum maxAllowedError = 1e-4;
 
-    if(maxErr < maxAllowedError)
-        writeln("PASS");
-    else
-        writeln("FAIL");
+    enforce(maxErr < maxAllowedError, "GEMM error exceeds the limit");
+    writeln("PASS");
 
     enum beta = 2.0f;
     enum alpha = 1.5f;
@@ -98,10 +115,8 @@ void main()
 
     writeln("C = alpha*A*B + beta*C: max abs error = ", maxErrAB);
 
-    if(maxErrAB < maxAllowedError)
-        writeln("PASS");
-    else
-        writeln("FAIL");
+    enforce(maxErrAB < maxAllowedError, "GEMM error with alpha and beta exceeds the limit");
+    writeln("PASS");
 
     stdout.flush();
 }

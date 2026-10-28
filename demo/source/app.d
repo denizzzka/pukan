@@ -135,28 +135,6 @@ void main(string[] args) {
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
-    auto selected = vk.findSuitablePhysicalDevice!appRequirements();
-    auto physDevice = selected.device();
-    //~ debug
-    //~ {
-        //~ writeln("");
-        //~ writeln("Device supported extensions:");
-        //~ foreach(s; physDevice.extensions)
-            //~ s.extensionName.to!string.writeln;
-    //~ }
-
-    auto device = selected.createLogicalDevice!(Texture)();
-    scope(success)
-    {
-        import core.memory: GC;
-
-        GC.collect();
-        destroy(device);
-    }
-
-    debug auto dbg = vk.attachFlightRecorder(device);
-    debug scope(exit) destroy(dbg);
-
     static import glfw3.internal;
 
     VkSurfaceKHR surface;
@@ -166,6 +144,66 @@ void main(string[] args) {
         cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
         cast(ulong*) &surface
     );
+
+    bool surfaceCheck(ref DeviceContext ctx, out string reason)
+    {
+        import std.conv: to;
+
+        enum queueFlags = QueueFlagsFor!appRequirements;
+
+        foreach(i, family; ctx.queueFamilies)
+        {
+            if((family.queueFlags & queueFlags) != queueFlags)
+                continue;
+
+            VkBool32 supported;
+            vkGetPhysicalDeviceSurfaceSupportKHR(ctx.device, cast(uint) i, surface, &supported).vkCheck;
+
+            if(supported != VK_TRUE)
+            {
+                reason = "queue family " ~ i.to!string ~ " does not support presentation";
+                return false;
+            }
+
+            const format = chooseSurfaceFormat(ctx.device, surface, reason);
+            if(format.format == VK_FORMAT_UNDEFINED)
+                return false;
+
+            return surfaceUsable(ctx.device, surface, format, reason);
+        }
+
+        reason = "no queue family supports " ~ queueFlags.to!string;
+        return false;
+    }
+
+    DeviceFilter filter;
+    filter.checks ~= DeviceCheck("surface", &surfaceCheck);
+
+    auto selected = vk.findSuitablePhysicalDevice!appRequirements(filter);
+    auto physDevice = selected.device();
+
+    string surfaceReason;
+    const surfaceFormat = physDevice.chooseSurfaceFormat(surface, surfaceReason);
+    enforce(surfaceFormat.format != VK_FORMAT_UNDEFINED, surfaceReason);
+    //~ debug
+    //~ {
+        //~ writeln("");
+        //~ writeln("Device supported extensions:");
+        //~ foreach(s; physDevice.extensions)
+            //~ s.extensionName.to!string.writeln;
+    //~ }
+
+    auto device = selected.createLogicalDevice!(Texture)();
+    scope(exit)
+    {
+        import core.memory: GC;
+
+        GC.collect();
+        destroy(device);
+    }
+
+    debug auto dbg = vk.attachFlightRecorder(device);
+    debug scope(exit) destroy(dbg);
 
     //~ vk.printSurfaceFormats(vk.devices[vk.deviceIdx], surface);
     //~ vk.printPresentModes(vk.devices[vk.deviceIdx], surface);
@@ -195,6 +233,7 @@ void main(string[] args) {
         device,
         surface,
         &windowSizeChanged,
+        surfaceFormat,
         benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
     );
     scope(exit) destroy(scene);
@@ -408,10 +447,10 @@ void main(string[] args) {
         }
     }
 
+    vkDeviceWaitIdle(device.device);
+
     if(benchMode)
         printBench(device, scene, benchFrameNs, benchUpdateNs, startupStats, startupWallNs);
-
-    vkDeviceWaitIdle(device.device);
 }
 
 private string presentModeName(VkPresentModeKHR mode)
@@ -428,11 +467,7 @@ private string presentModeName(VkPresentModeKHR mode)
 
 private void printBench(LogicalDevice device, Scene scene, ulong[] frameNs, ulong[] updateNs, LoadStats startStats, ulong startWallNs)
 {
-    if(frameNs.length == 0)
-    {
-        writeln("BENCH no measured frames");
-        return;
-    }
+    enforce(frameNs.length > 0, "BENCH no measured frames");
 
     double averageMs(ulong[] values)
     {
