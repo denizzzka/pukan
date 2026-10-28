@@ -113,6 +113,21 @@ The following pieces are still missing:
 - [ ] Texture compression. KTX2/BasisU and other compressed formats with a
       fallback path.
 
+### Transparency
+
+Opaque, mask and blend are covered, but blended draws are sorted back to front
+by the depth of their node origin, so overlapping and self-intersecting
+transparent meshes come out in the wrong order. Missing:
+
+- [ ] Order-independent transparency for the blended queue: keep the fragments
+      of each pixel, as a per-pixel linked list or an A-buffer, and resolve them
+      in depth order after the pass. Removes the per-draw sort, so a transparent
+      mesh that crosses itself or another one stops flickering as the camera
+      moves.
+- [ ] Screen-space scene colour for transmission: sample the colour behind the
+      surface instead of the environment, which needs the colour copy and the
+      separate transmission pass that the extension asks for.
+
 ### Material seams and white dots
 
 Isolated white pixels appear at texture or mesh seams with MSAA disabled. The
