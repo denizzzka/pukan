@@ -64,7 +64,14 @@ final class FrameSet
     private MemoryBufferMappedToCPU buffer;
     VkDescriptorSet descriptorSet;
 
-    this(LogicalDevice device, DescriptorAllocator allocator, size_t size)
+    this(
+        LogicalDevice device,
+        DescriptorAllocator allocator,
+        size_t size,
+        VkDescriptorImageInfo irradiance,
+        VkDescriptorImageInfo prefiltered,
+        VkDescriptorImageInfo brdfLut,
+    )
     {
         buffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
         descriptorSet = allocator.allocate();
@@ -72,6 +79,9 @@ final class FrameSet
         VkDescriptorBufferInfo info = { buffer: buffer.buf, offset: 0, range: size };
         VkWriteDescriptorSet[] writes = [
             bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, info),
+            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, irradiance),
+            imageWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, prefiltered),
+            imageWriteDescriptor(descriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, brdfLut),
         ];
         device.updateDescriptorSets(writes);
     }

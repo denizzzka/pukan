@@ -6,7 +6,7 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.pipelines: GltfPipelines;
+import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, SkyMode, skyMode;
 import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
 import pukan.material: AlphaMode, MaterialBuffer, MaterialMode;
 import pukan.misc: Boxf;
@@ -723,10 +723,22 @@ class GlTF : DrawableByVulkan
     private GraphicsPipelineCfg selectPipeline(const MeshClass mesh)
     {
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
-        auto variants = mesh.material.mode == MaterialMode.unlit ? modes.unlit
-            : mesh.material.mode == MaterialMode.lit ? modes.lit
-            : modes.pbr;
 
+        if(mesh.material.mode == MaterialMode.unlit)
+            return selectVariant(modes.unlit, mesh);
+
+        if(mesh.material.mode == MaterialMode.lit)
+            return selectVariant(modes.lit, mesh);
+
+        auto pbr = skyMode == SkyMode.analytic ? modes.pbr.analytic
+            : skyMode == SkyMode.none ? modes.pbr.none
+            : modes.pbr.ibl;
+
+        return selectVariant(pbr, mesh);
+    }
+
+    private static GraphicsPipelineCfg selectVariant(GltfPipelineVariants variants, const MeshClass mesh)
+    {
         if(mesh.doubleSided)
             return mesh.alphaMode == AlphaMode.blend ? variants.doubleSidedBlend : variants.doubleSided;
 

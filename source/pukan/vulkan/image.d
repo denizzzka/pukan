@@ -170,6 +170,39 @@ class ImageMemory : DeviceMemory
         );
     }
 
+    /// Copies one mip level from the source buffer at `bufferOffset`
+    void recordCopyLevel(
+        VkCommandBuffer buf,
+        VkBuffer srcBuffer,
+        VkDeviceSize bufferOffset,
+        uint level,
+        uint width,
+        uint height,
+    )
+    {
+        VkBufferImageCopy region;
+        region.bufferOffset = bufferOffset;
+        region.bufferImageHeight = 0;
+        region.bufferRowLength = 0;
+
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = level;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+
+        region.imageOffset = VkOffset3D(0, 0, 0);
+        region.imageExtent = VkExtent3D(width, height, 1);
+
+        vkCmdCopyBufferToImage(
+            buf,
+            srcBuffer,
+            image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &region,
+        );
+    }
+
     /// Halves the previous level into each following one, leaving them as blit sources
     private void generateMipmaps(VkCommandBuffer buf)
     {
@@ -286,6 +319,101 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, CommandPool commandPool
 
     foreach(buf; staging)
         destroy(buf);
+
+    return ret;
+}
+
+/// Records and submits an upload of explicit mip levels.
+ImageMemory loadImageWithMips(
+    LogicalDevice device,
+    CommandPool commandPool,
+    VkCommandBuffer commandBuf,
+    uint width,
+    uint height,
+    ubyte[][] levels,
+    in VkFormat format,
+)
+{
+    ImageMemory ret;
+    MemoryBufferMappedToCPU[] staging;
+
+    commandPool.recordOneTimeAndSubmit(commandBuf, (buf) {
+        ret = loadImageWithMips(device, buf, width, height, levels, format, staging);
+    });
+
+    foreach(buf; staging)
+        destroy(buf);
+
+    return ret;
+}
+
+/// Records an upload of explicit mip levels; keeps the staging buffer alive.
+ImageMemory loadImageWithMips(
+    LogicalDevice device,
+    VkCommandBuffer buf,
+    uint width,
+    uint height,
+    ubyte[][] levels,
+    in VkFormat format,
+    ref MemoryBufferMappedToCPU[] staging,
+)
+{
+    size_t totalSize;
+    foreach(level; levels)
+        totalSize += level.length;
+
+    auto stagingBuffer = device.create!MemoryBufferMappedToCPU(totalSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    staging ~= stagingBuffer;
+
+    auto cpuBuf = cast(ubyte[]) stagingBuffer.cpuBuf;
+    size_t offset;
+
+    foreach(level; levels)
+    {
+        cpuBuf[offset .. offset + level.length] = level;
+        offset += level.length;
+    }
+
+    VkImageCreateInfo imageInfo = {
+        imageType: VK_IMAGE_TYPE_2D,
+        format: format,
+        tiling: VK_IMAGE_TILING_OPTIMAL,
+        extent: VkExtent3D(width, height, 1),
+        mipLevels: cast(uint) levels.length,
+        arrayLayers: 1,
+        initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
+        usage: VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        sharingMode: VK_SHARING_MODE_EXCLUSIVE,
+        samples: VK_SAMPLE_COUNT_1_BIT,
+    };
+
+    auto ret = device.create!ImageMemory(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    ret.addPipelineBarrier(
+        buf,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        0,
+        cast(uint) levels.length,
+    );
+
+    offset = 0;
+    foreach(i, level; levels)
+    {
+        const levelWidth = width >> i > 0 ? width >> i : 1;
+        const levelHeight = height >> i > 0 ? height >> i : 1;
+
+        ret.recordCopyLevel(buf, stagingBuffer.buf, offset, cast(uint) i, levelWidth, levelHeight);
+        offset += level.length;
+    }
+
+    ret.addPipelineBarrier(
+        buf,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        0,
+        cast(uint) levels.length,
+    );
 
     return ret;
 }

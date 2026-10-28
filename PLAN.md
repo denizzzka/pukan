@@ -109,8 +109,6 @@ The following pieces are still missing:
       the gain has to be measured before the pipelines multiply.
 - [ ] Alpha handling. Sort blended primitives back to front and offer
       alpha-to-coverage for masked materials.
-- [ ] Real IBL. Replace the analytic sky with irradiance and prefiltered
-      environment maps plus a BRDF LUT.
 - [ ] Shared materials. A material table so meshes and primitives can reference
       the same material instead of taking one slot per mesh.
 - [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin

@@ -2,6 +2,7 @@ module pukan.scene;
 
 import dlib.math: translation, Vector3f, Vector4f;
 import pukan;
+import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
@@ -36,6 +37,7 @@ class Scene
     GltfFactory gltfFactory;
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
+    IblTextures ibl;
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
@@ -61,6 +63,7 @@ class Scene
         pipelineFactory = new PipelineFactory(device);
         frameAllocator = pipelineFactory.createFrameAllocator();
         meshResources = new MeshResources(device);
+        ibl = createIblTextures(device);
 
         background = new Checkerboard(device, pipelineFactory, renderPass);
 
@@ -87,15 +90,44 @@ class Scene
         if(gltfFactory)
             destroy(gltfFactory);
 
+        if(ibl.brdfLut)
+            destroy(ibl.brdfLut);
+
+        if(ibl.prefiltered)
+            destroy(ibl.prefiltered);
+
+        if(ibl.irradiance)
+            destroy(ibl.irradiance);
+
         if(meshResources)
             destroy(meshResources);
     }
 
     private void createFrameSets()
     {
+        VkDescriptorImageInfo imageInfo(Texture texture)
+        {
+            return VkDescriptorImageInfo(
+                imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                imageView: texture.imageView,
+                sampler: texture.sampler,
+            );
+        }
+
+        auto irradiance = imageInfo(ibl.irradiance);
+        auto prefiltered = imageInfo(ibl.prefiltered);
+        auto brdfLut = imageInfo(ibl.brdfLut);
+
         foreach(ref frame; swapChain.frames)
             foreach(eye; 0 .. 2)
-                frame.frameSets[eye] = new FrameSet(device, frameAllocator, FrameUniforms.sizeof);
+                frame.frameSets[eye] = new FrameSet(
+                    device,
+                    frameAllocator,
+                    FrameUniforms.sizeof,
+                    irradiance,
+                    prefiltered,
+                    brdfLut,
+                );
     }
 
     void updateFrameUniforms(ref Frame frame, size_t eye, in WorldTransformation wtb)

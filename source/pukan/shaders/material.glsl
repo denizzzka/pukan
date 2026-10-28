@@ -65,6 +65,11 @@ vec3 materialAlbedo(Material material, vec3 tint, vec2 uv, sampler2D baseColorTe
     return materialBaseColor(material, tint, uv, baseColorTexture).rgb;
 }
 
+layout(set = 1, binding = 1) uniform sampler2D irradianceMap;
+layout(set = 1, binding = 2) uniform sampler2D prefilteredMap;
+layout(set = 1, binding = 3) uniform sampler2D brdfLut;
+
+#ifdef SKY_ANALYTIC
 vec3 environment(vec3 direction)
 {
     const vec3 ground = vec3(0.04, 0.035, 0.03);
@@ -77,6 +82,18 @@ vec3 environment(vec3 direction)
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 {
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+#endif
+
+/// Last mip of the prefiltered chain
+const float PREFILTERED_MAX_LOD = 5.0;
+
+vec2 equirectUv(vec3 direction)
+{
+    return vec2(
+        atan(direction.x, -direction.z) / (2.0 * MATERIAL_PI) + 0.5,
+        acos(clamp(direction.y, -1.0, 1.0)) / MATERIAL_PI
+    );
 }
 
 /// Narkowicz 2015 ACES fit
@@ -257,12 +274,25 @@ vec3 shadePbr(Surface s)
     const vec3 direct = brdf * lightColor * NdotL;
 
     const vec3 R = reflect(-V, N);
+    const float iblIntensity = frameUbo.frame.exposureParams.y;
+
+#ifdef SKY_NONE
+    const vec3 reflection = vec3(0.0);
+    const vec3 ambient = vec3(0.0);
+#elif defined(SKY_ANALYTIC)
     const vec3 irradiance = environment(N);
     const vec3 reflection = mix(environment(R), vec3(0.1), roughness);
     const vec3 Fenv = fresnelSchlickRoughness(NdotV, F0, roughness);
     const vec3 kDEnv = (1.0 - Fenv) * (1.0 - metallic);
-    const float iblIntensity = frameUbo.frame.exposureParams.y;
     const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao * iblIntensity;
+#else
+    const vec3 irradiance = texture(irradianceMap, equirectUv(N)).rgb;
+    const vec3 reflection = textureLod(prefilteredMap, equirectUv(R), roughness * PREFILTERED_MAX_LOD).rgb;
+    const vec2 environmentBrdf = texture(brdfLut, vec2(NdotV, roughness)).rg;
+    const vec3 Fenv = F0 * environmentBrdf.x + environmentBrdf.y;
+    const vec3 kDEnv = (1.0 - Fenv) * (1.0 - metallic);
+    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao * iblIntensity;
+#endif
 
     const float coating = 1.0 - clearcoat * coatFresnel;
 
@@ -273,7 +303,7 @@ vec3 shadePbr(Surface s)
     {
         const float sheenRoughness = clamp(s.sheenRoughness, 0.0001, 1.0);
         sheenDirect = s.sheenColor * D_Charlie(sheenRoughness, NdotH) * V_Neubelt(NdotV, NdotL);
-        sheenAmbient = s.sheenColor * sheenEnvironmentBRDF(N, V, sheenRoughness) * environment(R);
+        sheenAmbient = s.sheenColor * sheenEnvironmentBRDF(N, V, sheenRoughness) * reflection;
     }
 
     return direct

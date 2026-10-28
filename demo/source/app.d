@@ -1,6 +1,7 @@
 import arena: placeOnIcosahedron;
 import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
+import pukan.gltf.pipelines: SkyMode, skyMode;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.mesh: LitVertex;
@@ -120,6 +121,7 @@ void main(string[] args) {
     enforce(window, "Cannot create a window");
     glfwSetScrollCallback(window, &onScroll);
     glfwSetMouseButtonCallback(window, &onMouseButton);
+    glfwSetKeyCallback(window, &onKey);
     glfwSetCursorPosCallback(window, &onCursorPos);
     glfwGetCursorPos(window, &cursorX, &cursorY);
 
@@ -378,6 +380,12 @@ void main(string[] args) {
         if(!stereo)
             tree.root.payload = Bone(transl);
 
+        if(skyChanged)
+        {
+            skyChanged = false;
+            writefln("sky: %s", skyMode);
+        }
+
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
 
             {
@@ -590,6 +598,20 @@ private string[] benchSampleNames = [
 
 float cameraDistance = initialCameraDistance;
 Vector3f cameraPan = Vector3f(0, 0, 0);
+
+bool skyChanged;
+
+extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
+{
+    if(benchMode || action != GLFW_PRESS || key != GLFW_KEY_S)
+        return;
+
+    skyMode = skyMode == SkyMode.ibl ? SkyMode.analytic
+        : skyMode == SkyMode.analytic ? SkyMode.none
+        : SkyMode.ibl;
+
+    skyChanged = true;
+}
 
 extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
 {
