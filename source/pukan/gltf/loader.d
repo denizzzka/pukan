@@ -224,6 +224,16 @@ private bool[] linearImages(in Json json)
 
         if(auto texture = "emissiveTexture" in material)
             usedAsColor[imageOf(*texture)] = true;
+
+        if(auto extensions = "extensions" in material)
+            if(auto specular = "KHR_materials_specular" in *extensions)
+            {
+                if(auto texture = "specularTexture" in *specular)
+                    usedAsData[imageOf(*texture)] = true;
+
+                if(auto texture = "specularColorTexture" in *specular)
+                    usedAsColor[imageOf(*texture)] = true;
+            }
     }
 
     bool[] result;
@@ -238,8 +248,11 @@ private bool[] linearImages(in Json json)
 unittest
 {
     const json = parseJsonString(`{
-        "images": [{}, {}, {}, {}],
-        "textures": [{"source": 0}, {"source": 1}, {"source": 2}, {"source": 3}],
+        "images": [{}, {}, {}, {}, {}, {}],
+        "textures": [
+            {"source": 0}, {"source": 1}, {"source": 2},
+            {"source": 3}, {"source": 4}, {"source": 5}
+        ],
         "materials": [{
             "pbrMetallicRoughness": {
                 "baseColorTexture": {"index": 0},
@@ -250,11 +263,19 @@ unittest
             "emissiveTexture": {"index": 0}
         }, {
             "normalTexture": {"index": 0}
+        }, {
+            "extensions": {
+                "KHR_materials_specular": {
+                    "specularTexture": {"index": 5},
+                    "specularColorTexture": {"index": 4}
+                }
+            }
         }]
     }`);
 
-    // Image 0 serves a color map too, so it keeps the sRGB decode
-    assert(linearImages(json) == [false, true, true, true]);
+    // Image 0 serves a color map too, so it keeps the sRGB decode; the specular
+    // color map is color data, the specular strength map is not
+    assert(linearImages(json) == [false, true, true, true, false, true]);
 }
 
 ///

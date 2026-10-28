@@ -12,6 +12,8 @@ layout(binding = 3) uniform sampler2D metallicRoughnessTexture;
 layout(binding = 4) uniform sampler2D normalTexture;
 layout(binding = 5) uniform sampler2D occlusionTexture;
 layout(binding = 6) uniform sampler2D emissiveTexture;
+layout(binding = 7) uniform sampler2D specularTexture;
+layout(binding = 8) uniform sampler2D specularColorTexture;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTextureCoord;
@@ -109,6 +111,16 @@ void main()
             ao = mix(1.0, occlusion, material.metallicRoughness.w);
         }
 
+        vec3 specularColor = material.specular.rgb;
+        float specularWeight = material.specular.a;
+        if((flags & MATERIAL_FLAG_SPECULAR_TEXTURE) != 0u)
+            specularWeight *= texture(specularTexture, fragTextureCoord).a;
+        if((flags & MATERIAL_FLAG_SPECULAR_COLOR_TEXTURE) != 0u)
+            specularColor *= texture(specularColorTexture, fragTextureCoord).rgb;
+
+        // The IOR sets the base reflectance, specular tints and scales it
+        const vec3 specularF0 = dielectricF0(material, specularColor, specularWeight);
+
         vec3 emissive = material.emissiveFactor.rgb;
         if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
             emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
@@ -120,7 +132,9 @@ void main()
             metallicRoughness.x,
             metallicRoughness.y,
             ao,
-            emissive
+            emissive,
+            specularF0,
+            specularWeight
         );
     }
 

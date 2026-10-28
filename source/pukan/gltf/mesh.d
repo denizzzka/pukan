@@ -63,6 +63,8 @@ final class GltfMesh : Mesh
     private enum normalSlot = 2;
     private enum occlusionSlot = 3;
     private enum emissiveSlot = 4;
+    private enum specularSlot = 5;
+    private enum specularColorSlot = 6;
 
     package UploadedVertices vert;
     package AlphaMode alphaMode;
@@ -70,7 +72,7 @@ final class GltfMesh : Mesh
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[5] materialTextures;
+    private VkDescriptorImageInfo[7] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -234,9 +236,35 @@ final class GltfMesh : Mesh
                 }
 
                 if(auto extensions = "extensions" in json)
+                {
                     if(auto emissive = "KHR_materials_emissive_strength" in *extensions)
                         if(auto strength = "emissiveStrength" in *emissive)
                             material.emissiveFactor = material.emissiveFactor * readFloat(*strength);
+
+                    if(auto ior = "KHR_materials_ior" in *extensions)
+                        if(auto value = "ior" in *ior)
+                            material.iorParams.x = readFloat(*value);
+
+                    if(auto specular = "KHR_materials_specular" in *extensions)
+                    {
+                        if(auto value = "specularFactor" in *specular)
+                            material.specular.w = readFloat(*value);
+
+                        if(auto value = "specularColorFactor" in *specular)
+                        {
+                            const c = (*value).deserializeJson!(float[3]);
+                            material.specular.x = c[0];
+                            material.specular.y = c[1];
+                            material.specular.z = c[2];
+                        }
+
+                        if(auto texture = "specularTexture" in *specular)
+                            bindTexture(*texture, specularSlot, MaterialFlag.specularTexture, images, hasTexCoords);
+
+                        if(auto texture = "specularColorTexture" in *specular)
+                            bindTexture(*texture, specularColorSlot, MaterialFlag.specularColorTexture, images, hasTexCoords);
+                    }
+                }
             }
 
             if(auto mode = "alphaMode" in json)
@@ -304,6 +332,8 @@ final class GltfMesh : Mesh
             imageWriteDescriptor(descriptorSet, 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[normalSlot]),
             imageWriteDescriptor(descriptorSet, 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[occlusionSlot]),
             imageWriteDescriptor(descriptorSet, 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[emissiveSlot]),
+            imageWriteDescriptor(descriptorSet, 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[specularSlot]),
+            imageWriteDescriptor(descriptorSet, 8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[specularColorSlot]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

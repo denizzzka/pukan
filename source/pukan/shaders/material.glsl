@@ -7,6 +7,8 @@ struct Material
     vec4 metallicRoughness;
     vec4 alphaParams;
     ivec4 params; // x = mode, y = flags, z = alpha mode
+    vec4 specular; // rgb = F0 color, a = strength
+    vec4 iorParams; // x = index of refraction
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -22,6 +24,8 @@ const uint MATERIAL_FLAG_OCCLUSION_TEXTURE = 1u << 4;
 const uint MATERIAL_FLAG_EMISSIVE_TEXTURE = 1u << 5;
 const uint MATERIAL_FLAG_DERIVED_NORMALS = 1u << 6;
 const uint MATERIAL_FLAG_VERTEX_TANGENT = 1u << 7;
+const uint MATERIAL_FLAG_SPECULAR_TEXTURE = 1u << 8;
+const uint MATERIAL_FLAG_SPECULAR_COLOR_TEXTURE = 1u << 9;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -73,7 +77,9 @@ vec3 shadePbr(
     float metallic,
     float roughness,
     float ao,
-    vec3 emissive
+    vec3 emissive,
+    vec3 dielectricF0,
+    float dielectricF90
 )
 {
     const vec3 N = normalize(normal);
@@ -98,8 +104,9 @@ vec3 shadePbr(
     const float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
     const float G = (NdotL / (NdotL * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
 
-    const vec3 F0 = mix(vec3(0.04), albedo, metallic);
-    const vec3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+    const vec3 F0 = mix(dielectricF0, albedo, metallic);
+    const vec3 F90 = vec3(mix(dielectricF90, 1.0, metallic));
+    const vec3 F = F0 + (F90 - F0) * pow(1.0 - VdotH, 5.0);
     const vec3 specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
     const vec3 kD = (1.0 - F) * (1.0 - metallic);
     const vec3 direct = (kD * albedo / MATERIAL_PI + specular) * lightColor * NdotL;
@@ -112,6 +119,15 @@ vec3 shadePbr(
     const vec3 ambient = (kDEnv * albedo * irradiance + reflection * Fenv) * ao;
 
     return direct + ambient + emissive;
+}
+
+// The IOR sets the base reflectance, specular tints and scales it
+vec3 dielectricF0(Material material, vec3 specularColor, float specularWeight)
+{
+    const float ior = material.iorParams.x;
+    const float f0Ior = pow((ior - 1.0) / (ior + 1.0), 2.0);
+
+    return min(vec3(f0Ior) * specularColor, vec3(1.0)) * specularWeight;
 }
 
 vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPosition)
@@ -137,7 +153,9 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
             material.metallicRoughness.x,
             material.metallicRoughness.y,
             1.0,
-            emissive
+            emissive,
+            dielectricF0(material, material.specular.rgb, material.specular.a),
+            material.specular.a
         );
 
     return albedo;
