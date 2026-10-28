@@ -247,10 +247,14 @@ class GltfFactory
             ), 20);
         }
 
-        const opaque = declare("", FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE));
+        const opaque = declare("", FixedState(
+            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            alphaToCoverage: VK_TRUE,
+        ));
         const doubleSided = declare(" double sided", FixedState(
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
             cullMode: VK_CULL_MODE_NONE,
+            alphaToCoverage: VK_TRUE,
         ));
         const blend = declare(" blend", FixedState(
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,

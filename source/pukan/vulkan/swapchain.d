@@ -183,7 +183,7 @@ class SwapChain
         frames.length = images.length;
 
         foreach(i, ref frame; frames)
-            frame = new Frame(frameBuilder, images[i], imageExtent, imageFormat, renderPass);
+            frame = new Frame(frameBuilder, images[i], imageExtent, imageFormat, renderPass, renderPass.samples);
     }
 
     ~this()

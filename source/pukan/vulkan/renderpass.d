@@ -10,6 +10,8 @@ abstract class RenderPass
     alias this = vkRenderPass;
 
     VkFormat imageFormat;
+    /// Samples every pipeline of this pass must be created with
+    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 }
 
 class DefaultRenderPass : RenderPass
@@ -27,8 +29,11 @@ class DefaultRenderPass : RenderPass
         device = dev;
         this.imageFormat = imageFormat;
 
+        samples = VK_SAMPLE_COUNT_4_BIT;
+
         VkAttachmentDescription colorAttachment = defaultColorAttachment;
         colorAttachment.format = imageFormat;
+        colorAttachment.samples = samples;
 
         VkAttachmentReference colorAttachmentRef = {
             attachment: 0,
@@ -37,15 +42,25 @@ class DefaultRenderPass : RenderPass
 
         VkAttachmentDescription depthAttachment = defaultDepthAttachment;
         depthAttachment.format = depthFormat;
+        depthAttachment.samples = samples;
 
         VkAttachmentReference depthAttachmentRef = {
             layout: VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             attachment: 1,
         };
 
+        VkAttachmentDescription resolveAttachment = defaultResolveAttachment;
+        resolveAttachment.format = imageFormat;
+
+        VkAttachmentReference resolveAttachmentRef = {
+            attachment: 2,
+            layout: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        };
+
         auto attachments = [
             colorAttachment,
             depthAttachment,
+            resolveAttachment,
         ];
 
         VkSubpassDescription[] subpasses = [
@@ -58,6 +73,7 @@ class DefaultRenderPass : RenderPass
                 pipelineBindPoint: VK_PIPELINE_BIND_POINT_GRAPHICS,
                 colorAttachmentCount: 1,
                 pColorAttachments: &colorAttachmentRef,
+                pResolveAttachments: &resolveAttachmentRef,
                 pDepthStencilAttachment: &depthAttachmentRef,
             },
         ];
@@ -106,13 +122,16 @@ class DefaultRenderPass : RenderPass
             VkAttachmentDescription color = colorAttachment;
             color.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
             color.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
             VkAttachmentDescription depth = depthAttachment;
             depth.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
             depth.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-            auto secondAttachments = [color, depth];
+            VkAttachmentDescription resolve = resolveAttachment;
+            resolve.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            resolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            auto secondAttachments = [color, depth, resolve];
 
             VkSubpassDescription[] secondSubpasses = [
                 {
@@ -124,6 +143,7 @@ class DefaultRenderPass : RenderPass
                     pipelineBindPoint: VK_PIPELINE_BIND_POINT_GRAPHICS,
                     colorAttachmentCount: 1,
                     pColorAttachments: &colorAttachmentRef,
+                    pResolveAttachments: &resolveAttachmentRef,
                     pDepthStencilAttachment: &depthAttachmentRef,
                 },
             ];
@@ -172,6 +192,17 @@ class DefaultRenderPass : RenderPass
         stencilStoreOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
         initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
         finalLayout: VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
+
+    /// Single-sample image the multisampled colour resolves into
+    enum VkAttachmentDescription defaultResolveAttachment = {
+        samples: VK_SAMPLE_COUNT_1_BIT,
+        loadOp: VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        storeOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        stencilLoadOp: VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        stencilStoreOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
+        finalLayout: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     };
 
     static struct CommonData

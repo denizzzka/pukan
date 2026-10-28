@@ -128,6 +128,8 @@ struct FixedState
     VkBool32 depthWriteEnable = VK_TRUE;
     VkCompareOp depthCompareOp = VK_COMPARE_OP_LESS;
     VkBool32 blendEnable = VK_FALSE;
+    /// Turns the fragment alpha into sample coverage, needs a multisampled pass
+    VkBool32 alphaToCoverage = VK_FALSE;
 }
 
 struct RenderTechnique
@@ -469,6 +471,10 @@ final class PipelineFactory
                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
         };
 
+        VkPipelineMultisampleStateCreateInfo multisampleState = multisampling;
+        multisampleState.rasterizationSamples = renderPass.samples;
+        multisampleState.alphaToCoverageEnable = state.alphaToCoverage;
+
         VkPipelineColorBlendStateCreateInfo colorBlending = {
             sType: VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
             logicOpEnable: VK_FALSE,
@@ -486,7 +492,7 @@ final class PipelineFactory
             pInputAssemblyState: &inputAssembly,
             pViewportState: &viewportState,
             pRasterizationState: &rasterizerInfo,
-            pMultisampleState: &multisampling,
+            pMultisampleState: &multisampleState,
             pDepthStencilState: &depthStencil,
             pColorBlendState: &colorBlending,
             pDynamicState: &dynamicStateInfo,

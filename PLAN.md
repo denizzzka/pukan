@@ -105,8 +105,6 @@ The following pieces are still missing:
       extended (specular/IOR, clearcoat, sheen) variants once the benchmark shows
       register or instruction cache pressure; the branches are uniform today, so
       the gain has to be measured before the pipelines multiply.
-- [ ] Alpha-to-coverage for masked materials, once the render pass is
-      multisampled.
 - [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin
       per node and primitive.
 - [ ] Texture compression. KTX2/BasisU and other compressed formats with a

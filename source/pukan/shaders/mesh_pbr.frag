@@ -87,7 +87,8 @@ void main()
     const vec4 base = materialBaseColor(material, fragColor, fragTextureCoord, baseColorTexture);
 
     const uint alphaMode = uint(material.params.z);
-    if(alphaMode == MATERIAL_ALPHA_MASK && base.a < material.alphaParams.x)
+    const bool masked = alphaMode == MATERIAL_ALPHA_MASK;
+    if(masked && base.a < material.alphaParams.x)
         discard;
 
     vec3 color;
@@ -274,5 +275,8 @@ void main()
     }
 #endif
 
-    outColor = vec4(color, alphaMode == MATERIAL_ALPHA_BLEND ? base.a : 1.0);
+    // Masked fragments keep their alpha, which the multisample pass turns into
+    // coverage; opaque ones cover every sample
+    const float outAlpha = (alphaMode == MATERIAL_ALPHA_BLEND || masked) ? base.a : 1.0;
+    outColor = vec4(color, outAlpha);
 }

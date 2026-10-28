@@ -16,6 +16,15 @@ class FrameBuilder
     private alias requirements = AliasSeq!(
         ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT),
+        ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            0, VkExtent3D(1, 1, 1), 1, 1, VK_SAMPLE_COUNT_4_BIT),
+        ImageFormatRequirement!(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            0, VkExtent3D(1, 1, 1), 1, 1, VK_SAMPLE_COUNT_4_BIT),
+        ImageFormatRequirement!(VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            0, VkExtent3D(1, 1, 1), 1, 1, VK_SAMPLE_COUNT_4_BIT),
     );
 
     LogicalDevice device;
@@ -109,6 +118,8 @@ class Frame
     FrameBuilder fb;
     VkImage image;
     VkImageView imageView;
+    ImageMemory multisampledColor;
+    VkImageView multisampledView;
     Texture sceneColor;
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
@@ -118,7 +129,14 @@ class Frame
 
     ref VkCommandBuffer commandBuffer() => _commandBuffer[0];
 
-    this(FrameBuilder fb, VkImage image, VkExtent2D imageExtent, VkFormat imageFormat, VkRenderPass renderPass)
+    this(
+        FrameBuilder fb,
+        VkImage image,
+        VkExtent2D imageExtent,
+        VkFormat imageFormat,
+        VkRenderPass renderPass,
+        VkSampleCountFlagBits samples,
+    )
     {
         this.fb = fb;
         this.image = image;
@@ -129,13 +147,31 @@ class Frame
         );
 
         createImageView(imageView, fb.device, imageFormat, image);
-        depthBuf = DepthBuf(fb.device, imageExtent);
+        depthBuf = DepthBuf(fb.device, imageExtent, samples);
+
+        if(samples != VK_SAMPLE_COUNT_1_BIT)
+        {
+            VkImageCreateInfo cinf = {
+                imageType: VK_IMAGE_TYPE_2D,
+                format: imageFormat,
+                tiling: VK_IMAGE_TILING_OPTIMAL,
+                extent: VkExtent3D(imageExtent.width, imageExtent.height, 1),
+                mipLevels: 1,
+                arrayLayers: 1,
+                initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
+                usage: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                sharingMode: VK_SHARING_MODE_EXCLUSIVE,
+                samples: samples,
+            };
+
+            multisampledColor = fb.device.create!ImageMemory(cinf, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            createImageView(multisampledView, fb.device, imageFormat, multisampledColor.image);
+        }
 
         {
-            VkImageView[2] attachments = [
-                imageView,
-                depthBuf.depthView,
-            ];
+            VkImageView[] attachments = samples != VK_SAMPLE_COUNT_1_BIT
+                ? [multisampledView, depthBuf.depthView, imageView]
+                : [imageView, depthBuf.depthView];
 
             VkFramebufferCreateInfo frameBufferInfo = {
                 sType: VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -165,6 +201,12 @@ class Frame
 
         if(frameBuffer)
             vkDestroyFramebuffer(fb.device, frameBuffer, fb.device.alloc);
+
+        if(multisampledView)
+            vkDestroyImageView(fb.device, multisampledView, fb.device.alloc);
+
+        if(multisampledColor)
+            destroy(multisampledColor);
 
         if(imageView)
             vkDestroyImageView(fb.device, imageView, fb.device.alloc);
@@ -223,7 +265,7 @@ struct DepthBuf
     //TODO: autodetection need
     enum format = VK_FORMAT_D24_UNORM_S8_UINT;
 
-    this(LogicalDevice dev, VkExtent2D imageExtent)
+    this(LogicalDevice dev, VkExtent2D imageExtent, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT)
     {
         device = dev;
 
@@ -237,7 +279,7 @@ struct DepthBuf
             initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
             usage: VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             sharingMode: VK_SHARING_MODE_EXCLUSIVE,
-            samples: VK_SAMPLE_COUNT_1_BIT,
+            samples: samples,
         };
 
         depthImage = device.create!ImageMemory(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
