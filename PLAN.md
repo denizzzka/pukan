@@ -306,3 +306,14 @@ against the plain version it replaces.
 
 Not parallelized: present, event polling, swapchain maintenance, pipeline and
 shader creation.
+
+## OpenXR
+
+The most distant item: VR owns the frame shape, so it waits until the renderer
+and the scene are settled. The stereo path and `Scene.surfaces` (#5) are the
+groundwork.
+
+- [ ] Session on the existing Vulkan device, an eye swapchain the compositor
+      owns with the window as a mirror, and the per-eye pose and projection from
+      `XrView` instead of the demo's fixed stereo views.
+- [ ] Fall back to the window path when no runtime is installed.
