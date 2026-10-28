@@ -29,6 +29,7 @@ class ImageMemory : DeviceMemory
     alias this = image;
     VkExtent3D imageExtent;
     VkFormat format;
+    uint mipLevels;
 
     this(LogicalDevice device, ref VkImageCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
     {
@@ -44,6 +45,7 @@ class ImageMemory : DeviceMemory
 
         imageExtent = createInfo.extent;
         format = createInfo.format;
+        mipLevels = createInfo.mipLevels;
 
         VkMemoryRequirements memRequirements;
         vkGetImageMemoryRequirements(device, image, &memRequirements);
@@ -53,7 +55,13 @@ class ImageMemory : DeviceMemory
         vkBindImageMemory(device, image, super.deviceMemory, 0 /* memoryOffset */).vkCheck;
     }
 
-    void addPipelineBarrier(VkCommandBuffer buf, VkImageLayout oldLayout, VkImageLayout newLayout)
+    void addPipelineBarrier(
+        VkCommandBuffer buf,
+        VkImageLayout oldLayout,
+        VkImageLayout newLayout,
+        uint baseMipLevel = 0,
+        uint levelCount = 1,
+    )
     {
         VkImageMemoryBarrier barrier;
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -63,8 +71,8 @@ class ImageMemory : DeviceMemory
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; // ditto
         barrier.image = image;
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseMipLevel = baseMipLevel;
+        barrier.subresourceRange.levelCount = levelCount;
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.layerCount = 1;
 
@@ -78,6 +86,22 @@ class ImageMemory : DeviceMemory
 
             sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
             destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if(oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+            sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if(oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         }
         else if(oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         {
@@ -129,7 +153,62 @@ class ImageMemory : DeviceMemory
             &region
         );
 
-        addPipelineBarrier(buf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        if(mipLevels < 2)
+        {
+            addPipelineBarrier(buf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            return;
+        }
+
+        addPipelineBarrier(buf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        generateMipmaps(buf);
+        addPipelineBarrier(
+            buf,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            0,
+            mipLevels,
+        );
+    }
+
+    /// Halves the previous level into each following one, leaving them as blit sources
+    private void generateMipmaps(VkCommandBuffer buf)
+    {
+        int width = cast(int) imageExtent.width;
+        int height = cast(int) imageExtent.height;
+
+        foreach(level; 1 .. mipLevels)
+        {
+            addPipelineBarrier(buf, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, level);
+
+            const int nextWidth = width > 1 ? width / 2 : 1;
+            const int nextHeight = height > 1 ? height / 2 : 1;
+
+            VkImageBlit blit;
+            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.srcSubresource.mipLevel = level - 1;
+            blit.srcSubresource.layerCount = 1;
+            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.dstSubresource.mipLevel = level;
+            blit.dstSubresource.layerCount = 1;
+            blit.srcOffsets[1] = VkOffset3D(width, height, 1);
+            blit.dstOffsets[1] = VkOffset3D(nextWidth, nextHeight, 1);
+
+            vkCmdBlitImage(
+                buf,
+                image,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1,
+                &blit,
+                VK_FILTER_LINEAR,
+            );
+
+            addPipelineBarrier(buf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, level);
+
+            width = nextWidth;
+            height = nextHeight;
+        }
     }
 }
 
@@ -164,6 +243,10 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, VkCommandBuffer command
 
     buf.cpuBuf[0 .. $] = cast(void[]) image.allPixelsAtOnce;
 
+    uint mipLevels = 1;
+    for(uint extent = image.width > image.height ? image.width : image.height; extent > 1; extent >>= 1)
+        ++mipLevels;
+
     VkImageCreateInfo imageInfo = {
         imageType: VK_IMAGE_TYPE_2D,
         format: pixelFormat,
@@ -173,10 +256,10 @@ ImageMemory loadImageToMemory(Img)(LogicalDevice device, VkCommandBuffer command
             height: image.height,
             depth: 1,
         ),
-        mipLevels: 1,
+        mipLevels: mipLevels,
         arrayLayers: 1,
         initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
-        usage: VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        usage: VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         sharingMode: VK_SHARING_MODE_EXCLUSIVE,
         samples: VK_SAMPLE_COUNT_1_BIT,
     };

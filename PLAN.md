@@ -92,8 +92,6 @@ Because the goal is vague here, the questions below decide the scope:
 The shared `Material` covers simple unlit/lit shading and glTF metallic-roughness.
 The following pieces are still missing:
 
-- [ ] Mipmaps and glTF samplers. Generate mip chains and honour each sampler's
-      wrap and filter modes instead of forcing MIRRORED_REPEAT.
 - [ ] glTF material extensions: `KHR_materials_unlit` first, then emissive
       strength, specular, clearcoat, sheen, transmission, iridescence, volume,
       IOR, anisotropy and dispersion.

@@ -105,6 +105,86 @@ private struct ChunkHeader
     }
 }
 
+private enum GltfFilter: uint
+{
+    nearest = 9728,
+    linear = 9729,
+    nearestMipmapNearest = 9984,
+    linearMipmapNearest = 9985,
+    nearestMipmapLinear = 9986,
+    linearMipmapLinear = 9987,
+}
+
+private enum GltfWrap: uint
+{
+    clampToEdge = 33071,
+    mirroredRepeat = 33648,
+    repeat = 10497,
+}
+
+/// Unspecified glTF sampler fields fall back to REPEAT and LINEAR
+private VkSamplerCreateInfo gltfSampler(const Json sampler)
+{
+    VkSamplerCreateInfo info = {
+        sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        magFilter: VK_FILTER_LINEAR,
+        minFilter: VK_FILTER_LINEAR,
+        mipmapMode: VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        addressModeU: VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        addressModeV: VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        addressModeW: VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        anisotropyEnable: VK_TRUE,
+        maxAnisotropy: requiredAnisotropy,
+        borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        unnormalizedCoordinates: VK_FALSE,
+        compareEnable: VK_FALSE,
+        compareOp: VK_COMPARE_OP_ALWAYS,
+        minLod: 0,
+        maxLod: VK_LOD_CLAMP_NONE,
+    };
+
+    if(sampler.type == Json.Type.undefined)
+        return info;
+
+    VkFilter filter(GltfFilter value)
+    {
+        return value == GltfFilter.nearest ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
+    }
+
+    if(auto value = "magFilter" in sampler)
+        info.magFilter = filter(cast(GltfFilter) value.get!uint);
+
+    if(auto value = "minFilter" in sampler)
+    {
+        const minFilter = cast(GltfFilter) value.get!uint;
+        info.minFilter = filter(minFilter);
+        info.mipmapMode = minFilter == GltfFilter.nearestMipmapNearest
+            || minFilter == GltfFilter.linearMipmapNearest
+            ? VK_SAMPLER_MIPMAP_MODE_NEAREST
+            : VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    }
+
+    if(auto value = "wrapS" in sampler)
+        info.addressModeU = wrapMode(cast(GltfWrap) value.get!uint);
+
+    if(auto value = "wrapT" in sampler)
+        info.addressModeV = wrapMode(cast(GltfWrap) value.get!uint);
+
+    info.addressModeW = info.addressModeV;
+
+    return info;
+}
+
+private VkSamplerAddressMode wrapMode(GltfWrap value)
+{
+    final switch(value)
+    {
+        case GltfWrap.clampToEdge: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        case GltfWrap.mirroredRepeat: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        case GltfWrap.repeat: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }
+}
+
 /// Images sampled by data maps skip the sRGB decode; shared color images keep it
 private bool[] linearImages(in Json json)
 {
@@ -371,32 +451,22 @@ package GlTF loadGlTF2(
         stats.uploadNs += cast(ulong) (MonoTime.currTime - submitStart).total!"nsecs";
     }
 
-    //FIXME: implement samplers reading
-
     auto postStart = MonoTime.currTime;
 
+    auto samplers = "samplers" in json;
     auto textures = "textures" in json;
     if(textures) foreach(tx; *textures)
     {
-        VkSamplerCreateInfo defaultSampler = {
-            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-            magFilter: VK_FILTER_LINEAR,
-            minFilter: VK_FILTER_LINEAR,
-            addressModeU: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-            addressModeV: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-            addressModeW: VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-            anisotropyEnable: VK_TRUE,
-            maxAnisotropy: requiredAnisotropy,
-            borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-            unnormalizedCoordinates: VK_FALSE,
-            compareEnable: VK_FALSE,
-            compareOp: VK_COMPARE_OP_ALWAYS,
-            mipmapMode: VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        };
+        VkSamplerCreateInfo samplerInfo = gltfSampler(Json.init);
+
+        if(auto samplerIndex = "sampler" in tx)
+        {
+            enforce(samplers !is null, "glTF texture references a missing sampler");
+            samplerInfo = gltfSampler((*samplers)[samplerIndex.get!size_t]);
+        }
 
         auto image = ret.images[ tx["source"].get!ushort ];
-        //FIXME: use samplers[]
-        ret.textures ~= device.create!Texture(image, defaultSampler);
+        ret.textures ~= device.create!Texture(image, samplerInfo);
     }
 
     // Load animations

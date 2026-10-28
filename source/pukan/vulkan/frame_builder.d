@@ -170,7 +170,7 @@ class SyncFramesInFlight
     }
 }
 
-void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat imageFormat, VkImage image)
+void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat imageFormat, VkImage image, uint levelCount = 1)
 {
     VkImageViewCreateInfo cinf = {
         sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -185,7 +185,7 @@ void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat ima
         subresourceRange: VkImageSubresourceRange(
             aspectMask: VK_IMAGE_ASPECT_COLOR_BIT,
             baseMipLevel: 0,
-            levelCount: 1,
+            levelCount: levelCount,
             baseArrayLayer: 0,
             layerCount: 1,
         ),
