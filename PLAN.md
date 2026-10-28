@@ -89,7 +89,7 @@ Because the goal is vague here, the questions below decide the scope:
   sorting of draw calls into passes?
 - Which targets are needed: swapchain only, or offscreen (shadow maps, HDR,
   post-processing)?
-- Is MSAA needed? A depth prepass? A separate transparent pass?
+- Is a depth prepass needed?
 - Can the project require Vulkan 1.3 with dynamic rendering, or must it keep
   `VkRenderPass`?
 - Should the 2D overlay be a separate pass after the 3D pass, or a subpass of
@@ -98,8 +98,8 @@ Because the goal is vague here, the questions below decide the scope:
 
 ## Materials
 
-The shared `Material` covers simple unlit/lit shading and glTF metallic-roughness.
-The following pieces are still missing:
+The shared `Material` covers unlit/lit shading, glTF metallic-roughness and the
+`KHR_materials_*` extensions. The following pieces are still missing:
 
 - [ ] Shader tiers for glTF materials. Split the uber shader into core PBR and
       extended (specular/IOR, clearcoat, sheen) variants once the benchmark shows
@@ -112,9 +112,10 @@ The following pieces are still missing:
 
 ### Transparency
 
-Opaque, mask and blend are covered, but blended draws are sorted back to front
-by the depth of their node origin, so overlapping and self-intersecting
-transparent meshes come out in the wrong order. Missing:
+Opaque, mask (through alpha-to-coverage) and blend are covered, but blended
+draws are sorted back to front by the depth of their node origin, so
+overlapping and self-intersecting transparent meshes come out in the wrong
+order. Missing:
 
 - [ ] Order-independent transparency for the blended queue: keep the fragments
       of each pixel, as a per-pixel linked list or an A-buffer, and resolve them
@@ -128,37 +129,31 @@ transparent meshes come out in the wrong order. Missing:
 
 ### Material seams and white dots
 
-Isolated white pixels appear at texture or mesh seams with MSAA disabled. The
-method:
+The dots on the helmet and the orange had two causes, both fixed: specular
+aliasing where the normal map changes faster than a pixel, and a degenerate
+normal-map texel at an island edge turning into a NaN normal. What is left on
+the black helmet's ridges is the Fresnel rim, which only temporal
+antialiasing smooths.
 
-- [ ] Reproduce on a fixed sample, camera and distance; record the sample,
-      primitive and screen area.
-- [ ] Set the clear/background to a distinct colour. Dots that take that colour
-      are geometry gaps; dots that stay white are texture or shading.
-- [ ] Disable normal maps. Dots that disappear point at the derivative TBN on UV
-      seams or a missing tangent attribute.
+If dots show up elsewhere, in this order:
+
 - [ ] Compare sampler states: CLAMP_TO_EDGE vs MIRRORED_REPEAT, nearest vs
       linear, with and without mipmaps.
 - [ ] Check UV islands and texture borders: sampling across an island edge can
       pull the opposite or border texel; use clamped samplers or gutters.
 - [ ] Compare culling: back-face culling vs none, and check the front-face
       winding. Holes that vanish indicate reversed or missing triangles.
-- [ ] Compare MSAA 1x and 4x. If the dots only blur, they are subpixel coverage
-      gaps, not an MSAA defect.
 - [ ] Inspect shared edges between primitives for duplicated vertices,
       T-junctions and floating-point differences; overlap or weld them.
 - [ ] Check depth precision and z-fighting at coplanar seams.
-- [ ] Keep the smallest fix that removes the dots without changing the rest of
-      the material path.
 
 ## Lighting
 
-The frame carries one directional light, `lightDirection` and `lightColor`;
-there are no shadows, and point and spot lights do not exist. Missing:
+The frame carries one directional light and up to eight point lights; there are
+no shadows and no spot lights. Missing:
 
-- [ ] A light list. Upload directional, point and spot lights into a storage
-      buffer and loop over them in the PBR shader; the sun becomes one entry
-      instead of a fixed uniform.
+- [ ] Move the light list into a storage buffer, add spot lights and make the
+      sun one entry of it instead of a fixed uniform.
 - [ ] Shadow maps. A cascaded directional map first, then an atlas for the
       local lights; both need a depth-only pass, so they follow the pass
       composition above.
