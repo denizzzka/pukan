@@ -1,25 +1,26 @@
 #version 460
 
 #include "material.glsl"
+#include "material_bindings.h"
 
-layout(binding = 0) uniform MaterialBlock
+layout(binding = MATERIAL_UNIFORM) uniform MaterialBlock
 {
     Material material;
 } ubo;
 
-layout(binding = 1) uniform sampler2D baseColorTexture;
-layout(binding = 3) uniform sampler2D metallicRoughnessTexture;
-layout(binding = 4) uniform sampler2D normalTexture;
-layout(binding = 5) uniform sampler2D occlusionTexture;
-layout(binding = 6) uniform sampler2D emissiveTexture;
-layout(binding = 7) uniform sampler2D specularTexture;
-layout(binding = 8) uniform sampler2D specularColorTexture;
-layout(binding = 9) uniform sampler2D clearcoatTexture;
-layout(binding = 10) uniform sampler2D clearcoatRoughnessTexture;
-layout(binding = 11) uniform sampler2D clearcoatNormalTexture;
-layout(binding = 12) uniform sampler2D sheenColorTexture;
-layout(binding = 13) uniform sampler2D sheenRoughnessTexture;
-layout(binding = 14) uniform sampler2D anisotropyTexture;
+layout(binding = MATERIAL_BASE_COLOR) uniform sampler2D baseColorTexture;
+layout(binding = MATERIAL_METALLIC_ROUGHNESS) uniform sampler2D metallicRoughnessTexture;
+layout(binding = MATERIAL_NORMAL) uniform sampler2D normalTexture;
+layout(binding = MATERIAL_OCCLUSION) uniform sampler2D occlusionTexture;
+layout(binding = MATERIAL_EMISSIVE) uniform sampler2D emissiveTexture;
+layout(binding = MATERIAL_SPECULAR) uniform sampler2D specularTexture;
+layout(binding = MATERIAL_SPECULAR_COLOR) uniform sampler2D specularColorTexture;
+layout(binding = MATERIAL_CLEARCOAT) uniform sampler2D clearcoatTexture;
+layout(binding = MATERIAL_CLEARCOAT_ROUGHNESS) uniform sampler2D clearcoatRoughnessTexture;
+layout(binding = MATERIAL_CLEARCOAT_NORMAL) uniform sampler2D clearcoatNormalTexture;
+layout(binding = MATERIAL_SHEEN_COLOR) uniform sampler2D sheenColorTexture;
+layout(binding = MATERIAL_SHEEN_ROUGHNESS) uniform sampler2D sheenRoughnessTexture;
+layout(binding = MATERIAL_ANISOTROPY) uniform sampler2D anisotropyTexture;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTextureCoord;

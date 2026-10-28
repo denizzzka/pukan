@@ -1,6 +1,7 @@
 module pukan.gltf.factory;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
+import material_bindings;
 import pukan.gltf;
 import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines;
 import pukan.material: MaterialBuffer;
@@ -128,93 +129,40 @@ private ShaderVertexInput staticVertexInput()
     );
 }
 
+//TODO: derive the bindings from the shader modules instead of this list and
+// material_bindings.h, once SPIR-V reflection is in place.
 private VkDescriptorSetLayoutBinding[] fragmentBindings()
 {
+    VkDescriptorSetLayoutBinding samplerBinding(uint binding)
+    {
+        return VkDescriptorSetLayoutBinding(
+            binding: binding,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        );
+    }
+
     return [
         VkDescriptorSetLayoutBinding(
-            binding: 0,
+            binding: MATERIAL_UNIFORM,
             descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             descriptorCount: 1,
             stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
         ),
-        VkDescriptorSetLayoutBinding(
-            binding: 1,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 3,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 4,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 5,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 6,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 7,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 8,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 9,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 10,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 11,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 12,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 13,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
-        VkDescriptorSetLayoutBinding(
-            binding: 14,
-            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            descriptorCount: 1,
-            stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-        ),
+        samplerBinding(MATERIAL_BASE_COLOR),
+        samplerBinding(MATERIAL_METALLIC_ROUGHNESS),
+        samplerBinding(MATERIAL_NORMAL),
+        samplerBinding(MATERIAL_OCCLUSION),
+        samplerBinding(MATERIAL_EMISSIVE),
+        samplerBinding(MATERIAL_SPECULAR),
+        samplerBinding(MATERIAL_SPECULAR_COLOR),
+        samplerBinding(MATERIAL_CLEARCOAT),
+        samplerBinding(MATERIAL_CLEARCOAT_ROUGHNESS),
+        samplerBinding(MATERIAL_CLEARCOAT_NORMAL),
+        samplerBinding(MATERIAL_SHEEN_COLOR),
+        samplerBinding(MATERIAL_SHEEN_ROUGHNESS),
+        samplerBinding(MATERIAL_ANISOTROPY),
     ];
 }
 
@@ -318,7 +266,7 @@ class GltfFactory
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
-                        binding: 2,
+                        binding: MATERIAL_JOINTS,
                         descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                         descriptorCount: 1,
                         stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
@@ -343,7 +291,7 @@ class GltfFactory
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
-                        binding: 2,
+                        binding: MATERIAL_JOINTS,
                         descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                         descriptorCount: 1,
                         stageFlags: VK_SHADER_STAGE_VERTEX_BIT,

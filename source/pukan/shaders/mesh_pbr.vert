@@ -1,13 +1,14 @@
 #version 460
 
 #include "frame.glsl"
+#include "material_bindings.h"
 
 layout(push_constant) uniform PushConsts
 {
     mat4 trans;
 };
 
-layout(binding = 2) readonly buffer JointMatrices
+layout(binding = MATERIAL_JOINTS) readonly buffer JointMatrices
 {
     mat4 jointMatrices[];
 };

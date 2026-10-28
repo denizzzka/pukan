@@ -1,6 +1,7 @@
 module pukan.gltf.mesh;
 
 import dlib.math;
+import material_bindings;
 import pukan.gltf.accessor;
 public import pukan.gltf.loader: ComponentType;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
@@ -58,27 +59,13 @@ package struct UploadedVertices
 
 final class GltfMesh : Mesh
 {
-    private enum baseColorSlot = 0;
-    private enum metallicRoughnessSlot = 1;
-    private enum normalSlot = 2;
-    private enum occlusionSlot = 3;
-    private enum emissiveSlot = 4;
-    private enum specularSlot = 5;
-    private enum specularColorSlot = 6;
-    private enum clearcoatSlot = 7;
-    private enum clearcoatRoughnessSlot = 8;
-    private enum clearcoatNormalSlot = 9;
-    private enum sheenColorSlot = 10;
-    private enum sheenRoughnessSlot = 11;
-    private enum anisotropySlot = 12;
-
     package UploadedVertices vert;
     package AlphaMode alphaMode;
     package bool doubleSided;
     package bool hasSkin;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorImageInfo[13] materialTextures;
+    private VkDescriptorImageInfo[MATERIAL_ANISOTROPY + 1] materialTextures;
     private VkBuffer fallbackVertex;
 
     package this(
@@ -106,7 +93,7 @@ final class GltfMesh : Mesh
         material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
         writeMaterial();
 
-        jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
+        jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, MATERIAL_JOINTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, jointsUboInfo);
     }
 
     package auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
@@ -207,18 +194,18 @@ final class GltfMesh : Mesh
                     material.roughness = readFloat(*factor);
 
                 if(auto texture = "baseColorTexture" in *pbr)
-                    bindTexture(*texture, baseColorSlot, MaterialFlag.baseColorTexture, images, hasTexCoords);
+                    bindTexture(*texture, MATERIAL_BASE_COLOR, MaterialFlag.baseColorTexture, images, hasTexCoords);
 
                 if(lit)
                     if(auto texture = "metallicRoughnessTexture" in *pbr)
-                        bindTexture(*texture, metallicRoughnessSlot, MaterialFlag.metallicRoughnessTexture, images, hasTexCoords);
+                        bindTexture(*texture, MATERIAL_METALLIC_ROUGHNESS, MaterialFlag.metallicRoughnessTexture, images, hasTexCoords);
             }
 
             if(lit)
             {
                 if(auto texture = "normalTexture" in json)
                 {
-                    bindTexture(*texture, normalSlot, MaterialFlag.normalTexture, images, hasTexCoords);
+                    bindTexture(*texture, MATERIAL_NORMAL, MaterialFlag.normalTexture, images, hasTexCoords);
 
                     if(auto scale = "scale" in *texture)
                         material.normalScale = readFloat(*scale);
@@ -226,14 +213,14 @@ final class GltfMesh : Mesh
 
                 if(auto texture = "occlusionTexture" in json)
                 {
-                    bindTexture(*texture, occlusionSlot, MaterialFlag.occlusionTexture, images, hasTexCoords);
+                    bindTexture(*texture, MATERIAL_OCCLUSION, MaterialFlag.occlusionTexture, images, hasTexCoords);
 
                     if(auto strength = "strength" in *texture)
                         material.occlusionStrength = readFloat(*strength);
                 }
 
                 if(auto texture = "emissiveTexture" in json)
-                    bindTexture(*texture, emissiveSlot, MaterialFlag.emissiveTexture, images, hasTexCoords);
+                    bindTexture(*texture, MATERIAL_EMISSIVE, MaterialFlag.emissiveTexture, images, hasTexCoords);
 
                 if(auto factor = "emissiveFactor" in json)
                 {
@@ -265,10 +252,10 @@ final class GltfMesh : Mesh
                         }
 
                         if(auto texture = "specularTexture" in *specular)
-                            bindTexture(*texture, specularSlot, MaterialFlag.specularTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_SPECULAR, MaterialFlag.specularTexture, images, hasTexCoords);
 
                         if(auto texture = "specularColorTexture" in *specular)
-                            bindTexture(*texture, specularColorSlot, MaterialFlag.specularColorTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_SPECULAR_COLOR, MaterialFlag.specularColorTexture, images, hasTexCoords);
                     }
 
                     if(auto clearcoat = "KHR_materials_clearcoat" in *extensions)
@@ -280,14 +267,14 @@ final class GltfMesh : Mesh
                             material.clearcoat.y = readFloat(*value);
 
                         if(auto texture = "clearcoatTexture" in *clearcoat)
-                            bindTexture(*texture, clearcoatSlot, MaterialFlag.clearcoatTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_CLEARCOAT, MaterialFlag.clearcoatTexture, images, hasTexCoords);
 
                         if(auto texture = "clearcoatRoughnessTexture" in *clearcoat)
-                            bindTexture(*texture, clearcoatRoughnessSlot, MaterialFlag.clearcoatRoughnessTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_CLEARCOAT_ROUGHNESS, MaterialFlag.clearcoatRoughnessTexture, images, hasTexCoords);
 
                         if(auto texture = "clearcoatNormalTexture" in *clearcoat)
                         {
-                            bindTexture(*texture, clearcoatNormalSlot, MaterialFlag.clearcoatNormalTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_CLEARCOAT_NORMAL, MaterialFlag.clearcoatNormalTexture, images, hasTexCoords);
 
                             if(auto scale = "scale" in *texture)
                                 material.clearcoat.z = readFloat(*scale);
@@ -308,10 +295,10 @@ final class GltfMesh : Mesh
                             material.sheen.w = readFloat(*value);
 
                         if(auto texture = "sheenColorTexture" in *sheen)
-                            bindTexture(*texture, sheenColorSlot, MaterialFlag.sheenColorTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_SHEEN_COLOR, MaterialFlag.sheenColorTexture, images, hasTexCoords);
 
                         if(auto texture = "sheenRoughnessTexture" in *sheen)
-                            bindTexture(*texture, sheenRoughnessSlot, MaterialFlag.sheenRoughnessTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_SHEEN_ROUGHNESS, MaterialFlag.sheenRoughnessTexture, images, hasTexCoords);
                     }
 
                     if(auto anisotropy = "KHR_materials_anisotropy" in *extensions)
@@ -323,7 +310,7 @@ final class GltfMesh : Mesh
                             material.anisotropy.y = readFloat(*value);
 
                         if(auto texture = "anisotropyTexture" in *anisotropy)
-                            bindTexture(*texture, anisotropySlot, MaterialFlag.anisotropyTexture, images, hasTexCoords);
+                            bindTexture(*texture, MATERIAL_ANISOTROPY, MaterialFlag.anisotropyTexture, images, hasTexCoords);
                     }
                 }
             }
@@ -365,7 +352,7 @@ final class GltfMesh : Mesh
 
     private void bindTexture(
         in Json texture,
-        size_t slot,
+        size_t binding,
         MaterialFlag flag,
         VkDescriptorImageInfo[] images,
         bool hasTexCoords,
@@ -377,7 +364,7 @@ final class GltfMesh : Mesh
         const index = texture["index"].get!size_t;
         enforce(index < images.length, "glTF material references a missing texture");
 
-        materialTextures[slot] = images[index];
+        materialTextures[binding] = images[index];
         material.flags = material.flags | MaterialFlags(flag);
     }
 
@@ -387,20 +374,20 @@ final class GltfMesh : Mesh
 
         VkWriteDescriptorSet[] descriptorWrites = [
             jointsUboWriteDescr,
-            bufferWriteDescriptor(descriptorSet, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
-            imageWriteDescriptor(descriptorSet, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[baseColorSlot]),
-            imageWriteDescriptor(descriptorSet, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[metallicRoughnessSlot]),
-            imageWriteDescriptor(descriptorSet, 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[normalSlot]),
-            imageWriteDescriptor(descriptorSet, 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[occlusionSlot]),
-            imageWriteDescriptor(descriptorSet, 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[emissiveSlot]),
-            imageWriteDescriptor(descriptorSet, 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[specularSlot]),
-            imageWriteDescriptor(descriptorSet, 8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[specularColorSlot]),
-            imageWriteDescriptor(descriptorSet, 9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatSlot]),
-            imageWriteDescriptor(descriptorSet, 10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatRoughnessSlot]),
-            imageWriteDescriptor(descriptorSet, 11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[clearcoatNormalSlot]),
-            imageWriteDescriptor(descriptorSet, 12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[sheenColorSlot]),
-            imageWriteDescriptor(descriptorSet, 13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[sheenRoughnessSlot]),
-            imageWriteDescriptor(descriptorSet, 14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[anisotropySlot]),
+            bufferWriteDescriptor(descriptorSet, MATERIAL_UNIFORM, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uboInfo),
+            imageWriteDescriptor(descriptorSet, MATERIAL_BASE_COLOR, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_BASE_COLOR]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_METALLIC_ROUGHNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_METALLIC_ROUGHNESS]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_NORMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_NORMAL]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_OCCLUSION, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_OCCLUSION]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_EMISSIVE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_EMISSIVE]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_SPECULAR, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_SPECULAR]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_SPECULAR_COLOR, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_SPECULAR_COLOR]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_CLEARCOAT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_CLEARCOAT]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_CLEARCOAT_ROUGHNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_CLEARCOAT_ROUGHNESS]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_CLEARCOAT_NORMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_CLEARCOAT_NORMAL]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_SHEEN_COLOR, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_SHEEN_COLOR]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_SHEEN_ROUGHNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_SHEEN_ROUGHNESS]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_ANISOTROPY, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_ANISOTROPY]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);
