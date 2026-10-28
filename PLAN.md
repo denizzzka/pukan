@@ -101,7 +101,7 @@ Because the goal is vague here, the questions below decide the scope:
 The shared `Material` covers simple unlit/lit shading and glTF metallic-roughness.
 The following pieces are still missing:
 
-- [ ] glTF material extensions: transmission, volume and dispersion.
+- [ ] glTF material extensions: volume and dispersion.
 - [ ] Shader tiers for glTF materials. Split the uber shader into core PBR and
       extended (specular/IOR, clearcoat, sheen) variants once the benchmark shows
       register or instruction cache pressure; the branches are uniform today, so
@@ -124,9 +124,9 @@ transparent meshes come out in the wrong order. Missing:
       in depth order after the pass. Removes the per-draw sort, so a transparent
       mesh that crosses itself or another one stops flickering as the camera
       moves.
-- [ ] Screen-space scene colour for transmission: sample the colour behind the
-      surface instead of the environment, which needs the colour copy and the
-      separate transmission pass that the extension asks for.
+- [ ] Transmission misses the refraction offset and the second bounce: it copies
+      the colour once per frame and samples it at the same screen position, so
+      glass behind glass shows the scene without the first pane.
 
 ### Material seams and white dots
 

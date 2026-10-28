@@ -73,6 +73,7 @@ vec3 materialAlbedo(Material material, vec3 tint, vec2 uv, sampler2D baseColorTe
 layout(set = 1, binding = FRAME_IRRADIANCE) uniform sampler2D irradianceMap;
 layout(set = 1, binding = FRAME_PREFILTERED) uniform sampler2D prefilteredMap;
 layout(set = 1, binding = FRAME_BRDF_LUT) uniform sampler2D brdfLut;
+layout(set = 1, binding = FRAME_SCENE_COLOR) uniform sampler2D sceneColorMap;
 
 #ifdef SKY_ANALYTIC
 vec3 environment(vec3 direction)
@@ -92,6 +93,9 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 
 /// Last mip of the prefiltered chain
 const float PREFILTERED_MAX_LOD = 5.0;
+
+/// Last mip of the scene colour copy, see createSceneColorTexture
+const float SCENE_COLOR_MAX_LOD = 3.0;
 
 vec2 equirectUv(vec3 direction)
 {
@@ -439,13 +443,26 @@ vec3 shadePbr(Surface s)
 
     if(s.transmission > 0.0)
     {
-        vec3 direction = refract(-V, N, 1.0 / max(s.ior, 1.0));
+        vec3 transmitted;
 
-        if(dot(direction, direction) == 0.0)
-            direction = -N;
+        if(frameUbo.frame.exposureParams.z > 0.5)
+        {
+            // A thin surface shows what lies behind at the same screen position
+            const vec2 uv = gl_FragCoord.xy / vec2(textureSize(sceneColorMap, 0));
+            transmitted = textureLod(sceneColorMap, uv, roughness * SCENE_COLOR_MAX_LOD).rgb;
+        }
+        else
+        {
+            vec3 direction = refract(-V, N, 1.0 / max(s.ior, 1.0));
 
-        // No colour behind the surface yet, so the environment stands in for it
-        const vec3 transmitted = environmentRadiance(direction, roughness) * s.albedo;
+            if(dot(direction, direction) == 0.0)
+                direction = -N;
+
+            transmitted = environmentRadiance(direction, roughness);
+        }
+
+        transmitted *= s.albedo;
+
         const vec3 fresnel = fresnelSchlick(s.dielectricF0, NdotV);
 
         color = mix(color, transmitted + reflection * fresnel, s.transmission);

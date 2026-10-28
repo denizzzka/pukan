@@ -133,6 +133,9 @@ class SwapChain
                 break;
             }
 
+        enforce(cap.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            "swapchain images cannot be copied from");
+
         VkSwapchainCreateInfoKHR cinf = {
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             surface: device.physicalDevice.instance.surface.handle,
@@ -140,7 +143,7 @@ class SwapChain
             imageColorSpace: imageColorSpace,
             imageExtent: capabilities.currentExtent,
             imageArrayLayers: 1, // number of views in a multiview/stereo surface. For non-stereoscopic-3D applications, this value is 1
-            imageUsage: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // specifies that the image can be used to create a VkImageView suitable for use as a color or resolve attachment in a VkFramebuffer
+            imageUsage: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             imageSharingMode: VK_SHARING_MODE_EXCLUSIVE,
             presentMode: selectedPresentMode,
             minImageCount: 3, // triple buffering will be used

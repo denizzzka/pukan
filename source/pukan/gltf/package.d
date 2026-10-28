@@ -6,7 +6,7 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode;
+import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode, transmissionPass;
 import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.misc: Boxf;
@@ -745,7 +745,12 @@ class GlTF : DrawableByVulkan
         return false;
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet)
+    void drawingBufferFilling(
+        VkCommandBuffer buf,
+        Matrix4x4f trans,
+        VkDescriptorSet frameSet,
+        DrawPhase phase = DrawPhase.surface,
+    )
     {
         static struct MeshDraw
         {
@@ -778,14 +783,24 @@ class GlTF : DrawableByVulkan
         collectDraws(trans, rootSceneNode, draws);
 
         foreach(draw; draws)
-            if(draw.mesh.alphaMode != AlphaMode.blend)
+            if(draw.mesh.alphaMode != AlphaMode.blend && matchesPhase(draw.mesh, phase))
                 draw.mesh.draw(buf, selectPipeline(draw.mesh), draw.trans, frameSet);
 
         draws.sort!((a, b) => a.depth > b.depth);
 
         foreach(draw; draws)
-            if(draw.mesh.alphaMode == AlphaMode.blend)
+            if(draw.mesh.alphaMode == AlphaMode.blend && matchesPhase(draw.mesh, phase))
                 draw.mesh.draw(buf, selectPipeline(draw.mesh), draw.trans, frameSet);
+    }
+
+    private static bool matchesPhase(const MeshClass mesh, DrawPhase phase)
+    {
+        const transmissive = mesh.material.transmission.x > 0.0f;
+
+        if(phase == DrawPhase.transmission)
+            return transmissive;
+
+        return !transmissive || !transmissionPass;
     }
 
 

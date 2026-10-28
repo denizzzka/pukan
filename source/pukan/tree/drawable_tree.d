@@ -7,7 +7,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.primitives_tree: Bone;
-import pukan.vulkan.renderpass: Blended, DrawableByVulkan;
+import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase;
 
 class DrawableTree(Payload) : DrawableByVulkan
 {
@@ -72,15 +72,20 @@ class DrawableTree(Payload) : DrawableByVulkan
         float depth;
     }
 
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans, VkDescriptorSet frameSet)
+    void drawingBufferFilling(
+        VkCommandBuffer buf,
+        Matrix4f trans,
+        VkDescriptorSet frameSet,
+        DrawPhase phase = DrawPhase.surface,
+    )
     {
         Pending[] blended;
-        drawingBufferFillingRecursive(buf, trans, frameSet, root, blended);
+        drawingBufferFillingRecursive(buf, trans, frameSet, root, blended, phase);
 
         blended.sort!((a, b) => a.depth > b.depth);
 
         foreach(pending; blended)
-            pending.drawable.drawingBufferFilling(buf, pending.trans, frameSet);
+            pending.drawable.drawingBufferFilling(buf, pending.trans, frameSet, phase);
     }
 
     private void drawingBufferFillingRecursive(
@@ -89,6 +94,7 @@ class DrawableTree(Payload) : DrawableByVulkan
         VkDescriptorSet frameSet,
         Node curr,
         ref Pending[] blended,
+        DrawPhase phase,
     )
     {
         if(curr.payload.type == typeid(DrawableByVulkan))
@@ -103,7 +109,7 @@ class DrawableTree(Payload) : DrawableByVulkan
                 blended ~= Pending(dr, trans, clip.w);
             }
             else
-                dr.drawingBufferFilling(buf, trans, frameSet);
+                dr.drawingBufferFilling(buf, trans, frameSet, phase);
         }
         else if(curr.payload.type == typeid(Bone))
         {
@@ -111,6 +117,6 @@ class DrawableTree(Payload) : DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c, blended);
+            drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c, blended, phase);
     }
 }

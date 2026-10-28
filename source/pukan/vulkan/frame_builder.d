@@ -73,6 +73,7 @@ final class FrameSet
         VkDescriptorImageInfo irradiance,
         VkDescriptorImageInfo prefiltered,
         VkDescriptorImageInfo brdfLut,
+        VkDescriptorImageInfo sceneColor,
     )
     {
         buffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -84,6 +85,7 @@ final class FrameSet
             imageWriteDescriptor(descriptorSet, FRAME_IRRADIANCE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, irradiance),
             imageWriteDescriptor(descriptorSet, FRAME_PREFILTERED, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, prefiltered),
             imageWriteDescriptor(descriptorSet, FRAME_BRDF_LUT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, brdfLut),
+            imageWriteDescriptor(descriptorSet, FRAME_SCENE_COLOR, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneColor),
         ];
         device.updateDescriptorSets(writes);
     }
@@ -105,7 +107,9 @@ final class FrameSet
 class Frame
 {
     FrameBuilder fb;
+    VkImage image;
     VkImageView imageView;
+    Texture sceneColor;
     DepthBuf depthBuf;
     VkFramebuffer frameBuffer;
     FrameSet[2] frameSets;
@@ -117,6 +121,7 @@ class Frame
     this(FrameBuilder fb, VkImage image, VkExtent2D imageExtent, VkFormat imageFormat, VkRenderPass renderPass)
     {
         this.fb = fb;
+        this.image = image;
         syncPrimitives = new SyncFramesInFlight(fb);
         _commandBuffer = OwnedHandles!VkCommandBuffer(
             fb.commandPool.allocateBuffers(1),
@@ -154,6 +159,9 @@ class Frame
 
         if(syncPrimitives)
             destroy(syncPrimitives);
+
+        if(sceneColor)
+            destroy(sceneColor);
 
         if(frameBuffer)
             vkDestroyFramebuffer(fb.device, frameBuffer, fb.device.alloc);

@@ -6,7 +6,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
-import pukan.vulkan.renderpass: DrawableByVulkan;
+import pukan.vulkan.renderpass: DrawableByVulkan, DrawPhase;
 
 /// This is a very unusual type of drawable object, added during engine
 /// development for variety. You're unlikely to need it.
@@ -20,9 +20,18 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         forEachDrawablePayload((d) => d.destroy);
     }
 
-    override void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet)
+    override void drawingBufferFilling(
+        VkCommandBuffer buf,
+        Matrix4x4f trans,
+        VkDescriptorSet frameSet,
+        DrawPhase phase = DrawPhase.surface,
+    )
     {
-        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, frameSet, root);
+        // Primitives have no transmission materials
+        if(phase == DrawPhase.transmission)
+            return;
+
+        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, frameSet, root, phase);
     }
 
     private void drawingBufferFillingRecursive(
@@ -31,6 +40,7 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         Matrix4x4f trans,
         VkDescriptorSet frameSet,
         Node curr,
+        DrawPhase phase,
     )
     {
         // TODO: deduplicate code with DrawableTree.drawingBufferFillingRecursive ?
@@ -45,7 +55,7 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         {
             auto dr = curr.payload.peek!DrawableByVulkan;
 
-            dr.drawingBufferFilling(buf, trans, frameSet);
+            dr.drawingBufferFilling(buf, trans, frameSet, phase);
         }
         else if(curr.payload.type == typeid(Bone))
         {
@@ -57,7 +67,7 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFillingRecursive(buf, pipelineCfg, trans, frameSet, cast(Node) c);
+            drawingBufferFillingRecursive(buf, pipelineCfg, trans, frameSet, cast(Node) c, phase);
     }
 
     private void forEachPrimitive(void delegate(DrawablePrimitive) dg)

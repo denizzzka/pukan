@@ -16,6 +16,9 @@ class DefaultRenderPass : RenderPass
 {
     LogicalDevice device;
     enum VkFormat depthFormat = DepthBuf.format;
+    /// Second pass over the same attachments, loading the colour the first one
+    /// left, for draws that sample that colour
+    VkRenderPass transmissionPass;
     VariableData data;
     alias this = data;
 
@@ -64,9 +67,9 @@ class DefaultRenderPass : RenderPass
                 srcSubpass: VK_SUBPASS_EXTERNAL,
                 dstSubpass: 0,
                 srcStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                srcAccessMask: 0,
+                srcAccessMask: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                 dstStageMask: VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                dstAccessMask: VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                dstAccessMask: VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             },
             {
                 srcSubpass: 0,
@@ -80,9 +83,9 @@ class DefaultRenderPass : RenderPass
                 srcSubpass: VK_SUBPASS_EXTERNAL,
                 dstSubpass: 1,
                 srcStageMask: VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                srcAccessMask: 0,
+                srcAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                 dstStageMask: VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                dstAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                dstAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             },
         ];
 
@@ -96,12 +99,59 @@ class DefaultRenderPass : RenderPass
         };
 
         vkCall(device, &renderPassInfo, device.alloc, &vkRenderPass);
+
+        {
+            // The colour leaves the first pass as a copy source and comes back
+            // for the second, which loads instead of clearing
+            VkAttachmentDescription color = colorAttachment;
+            color.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            color.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            VkAttachmentDescription depth = depthAttachment;
+            depth.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            depth.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+            auto secondAttachments = [color, depth];
+
+            VkSubpassDescription[] secondSubpasses = [
+                {
+                    pipelineBindPoint: VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    colorAttachmentCount: 1,
+                    pColorAttachments: &colorAttachmentRef,
+                },
+                {
+                    pipelineBindPoint: VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    colorAttachmentCount: 1,
+                    pColorAttachments: &colorAttachmentRef,
+                    pDepthStencilAttachment: &depthAttachmentRef,
+                },
+            ];
+
+            // Render pass compatibility covers the dependencies, so they match
+            // the first pass exactly
+            VkSubpassDependency[] secondDependencies = dependencies;
+
+            VkRenderPassCreateInfo secondInfo = {
+                attachmentCount: cast(uint) secondAttachments.length,
+                pAttachments: secondAttachments.ptr,
+                subpassCount: cast(uint) secondSubpasses.length,
+                pSubpasses: secondSubpasses.ptr,
+                dependencyCount: cast(uint) secondDependencies.length,
+                pDependencies: secondDependencies.ptr,
+            };
+
+            vkCall(device, &secondInfo, device.alloc, &transmissionPass);
+        }
     }
 
     ~this()
     {
         if(vkRenderPass)
             vkDestroyRenderPass(device, vkRenderPass, device.alloc);
+
+        if(transmissionPass)
+            vkDestroyRenderPass(device, transmissionPass, device.alloc);
     }
 
     enum VkAttachmentDescription defaultColorAttachment = {
@@ -111,7 +161,7 @@ class DefaultRenderPass : RenderPass
         stencilLoadOp: VK_ATTACHMENT_LOAD_OP_DONT_CARE,
         stencilStoreOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
         initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
-        finalLayout: VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        finalLayout: VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
     };
 
     enum VkAttachmentDescription defaultDepthAttachment = {
@@ -197,6 +247,40 @@ class DefaultRenderPass : RenderPass
 
         vkCmdEndRenderPass(commandBuffer);
     }
+
+    /// Second pass over the same framebuffer, drawing what samples the copy
+    void recordTransmissionCommandBuffer(
+        VkCommandBuffer commandBuffer,
+        void delegate(ref VkCommandBuffer) draw,
+    )
+    {
+        VkRenderPassBeginInfo renderPassInfo;
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = transmissionPass;
+        renderPassInfo.framebuffer = frameBuffer;
+        renderPassInfo.renderArea.offset = VkOffset2D(0, 0);
+        renderPassInfo.renderArea.extent = imageExtent;
+
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        draw(commandBuffer);
+
+        vkCmdEndRenderPass(commandBuffer);
+    }
+}
+
+/// Which of the two 3D passes a draw belongs to
+enum DrawPhase : uint
+{
+    /// Opaque and blended draws, before the colour copy
+    surface,
+    /// Draws that sample the copy of the colour the surface phase left
+    transmission,
 }
 
 ///
@@ -206,7 +290,12 @@ interface DrawableByVulkan
 
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer);
     void refreshBuffers(VkCommandBuffer buf);
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet);
+    void drawingBufferFilling(
+        VkCommandBuffer buf,
+        Matrix4x4f trans,
+        VkDescriptorSet frameSet,
+        DrawPhase phase = DrawPhase.surface,
+    );
 }
 
 /// Drawables that must be ordered back to front implement this

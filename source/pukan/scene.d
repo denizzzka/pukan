@@ -41,6 +41,8 @@ class Scene
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
+    /// False when the frame has no scene colour copy to sample, as in stereo
+    bool sceneColorAvailable = true;
 
     this(
         LogicalDevice dev,
@@ -119,6 +121,12 @@ class Scene
         auto brdfLut = imageInfo(ibl.brdfLut);
 
         foreach(ref frame; swapChain.frames)
+            frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
+
+        foreach(ref frame; swapChain.frames)
+        {
+            auto sceneColor = imageInfo(frame.sceneColor);
+
             foreach(eye; 0 .. 2)
                 frame.frameSets[eye] = new FrameSet(
                     device,
@@ -127,7 +135,216 @@ class Scene
                     irradiance,
                     prefiltered,
                     brdfLut,
+                    sceneColor,
                 );
+        }
+    }
+
+    /// Copy of the colour the first pass leaves, sampled by transmissive draws
+    private Texture createSceneColorTexture(VkExtent2D extent)
+    {
+        import std.algorithm: max;
+
+        uint mipLevels = 1;
+        for(uint size = max(extent.width, extent.height); size > 1 && mipLevels < 4; size >>= 1)
+            ++mipLevels;
+
+        VkImageCreateInfo cinf = {
+            imageType: VK_IMAGE_TYPE_2D,
+            format: surfaceFormat.format,
+            tiling: VK_IMAGE_TILING_OPTIMAL,
+            extent: VkExtent3D(extent.width, extent.height, 1),
+            mipLevels: mipLevels,
+            arrayLayers: 1,
+            initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
+            usage: VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            sharingMode: VK_SHARING_MODE_EXCLUSIVE,
+            samples: VK_SAMPLE_COUNT_1_BIT,
+        };
+
+        auto image = device.create!ImageMemory(cinf, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        auto pool = device.createCommandPool();
+        auto bufs = pool.allocateBuffers(1);
+
+        pool.recordOneTimeAndSubmit(bufs[0], (VkCommandBuffer buf) {
+            imageBarrier(
+                buf, image.image,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                0, mipLevels,
+            );
+
+            imageBarrier(
+                buf, image.image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+                0, mipLevels,
+            );
+        });
+
+        pool.freeBuffers(bufs);
+        destroy(pool);
+
+        VkSamplerCreateInfo samplerInfo = {
+            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            magFilter: VK_FILTER_LINEAR,
+            minFilter: VK_FILTER_LINEAR,
+            mipmapMode: VK_SAMPLER_MIPMAP_MODE_LINEAR,
+            addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+            unnormalizedCoordinates: VK_FALSE,
+            compareEnable: VK_FALSE,
+            compareOp: VK_COMPARE_OP_ALWAYS,
+            minLod: 0,
+            maxLod: VK_LOD_CLAMP_NONE,
+        };
+
+        return device.create!Texture(image, samplerInfo);
+    }
+
+    private static void imageBarrier(
+        VkCommandBuffer buf,
+        VkImage image,
+        VkImageLayout oldLayout,
+        VkImageLayout newLayout,
+        VkPipelineStageFlags srcStage,
+        VkAccessFlags srcAccess,
+        VkPipelineStageFlags dstStage,
+        VkAccessFlags dstAccess,
+        uint baseMip = 0,
+        uint mipCount = 1,
+    )
+    {
+        VkImageMemoryBarrier barrier;
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = oldLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.srcAccessMask = srcAccess;
+        barrier.dstAccessMask = dstAccess;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = baseMip;
+        barrier.subresourceRange.levelCount = mipCount;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        vkCmdPipelineBarrier(buf, srcStage, dstStage, 0, 0, null, 0, null, 1, &barrier);
+    }
+
+    /// Copies the colour the first pass left into the frame's scene texture
+    private void copySceneColor(ref Frame frame)
+    {
+        import std.algorithm: max;
+
+        auto cb = frame.commandBuffer;
+        auto color = frame.sceneColor.textureImageMemory;
+        const extent = swapChain.imageExtent;
+
+        // The first pass left the colour as a copy source
+        imageBarrier(
+            cb, frame.image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+        );
+
+        imageBarrier(
+            cb, color.image,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+        );
+
+        VkImageCopy region;
+        region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.srcSubresource.mipLevel = 0;
+        region.srcSubresource.layerCount = 1;
+        region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.dstSubresource.mipLevel = 0;
+        region.dstSubresource.layerCount = 1;
+        region.extent = VkExtent3D(extent.width, extent.height, 1);
+
+        vkCmdCopyImage(
+            cb,
+            frame.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            color.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1, &region,
+        );
+
+        imageBarrier(
+            cb, color.image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+        );
+
+        int width = cast(int) extent.width;
+        int height = cast(int) extent.height;
+
+        foreach(level; 1 .. color.mipLevels)
+        {
+            imageBarrier(
+                cb, color.image,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                level, 1,
+            );
+
+            const int nextWidth = max(width / 2, 1);
+            const int nextHeight = max(height / 2, 1);
+
+            VkImageBlit blit;
+            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.srcSubresource.mipLevel = level - 1;
+            blit.srcSubresource.layerCount = 1;
+            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.dstSubresource.mipLevel = level;
+            blit.dstSubresource.layerCount = 1;
+            blit.srcOffsets[1] = VkOffset3D(width, height, 1);
+            blit.dstOffsets[1] = VkOffset3D(nextWidth, nextHeight, 1);
+
+            vkCmdBlitImage(
+                cb,
+                color.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                color.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1, &blit, VK_FILTER_LINEAR,
+            );
+
+            imageBarrier(
+                cb, color.image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                level, 1,
+            );
+
+            width = nextWidth;
+            height = nextHeight;
+        }
+
+        imageBarrier(
+            cb, color.image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+            0, color.mipLevels,
+        );
+
+        imageBarrier(
+            cb, frame.image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        );
     }
 
     void updateFrameUniforms(ref Frame frame, size_t eye, in WorldTransformation wtb)
@@ -141,17 +358,33 @@ class Scene
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
         data.lightDirection = Vector4f(light.x, light.y, light.z, 0);
         data.lightColor = Vector4f(1, 1, 1, 1);
-        data.exposureParams = Vector4f(exposure, iblIntensity, 0, 0);
+        data.exposureParams = Vector4f(exposure, iblIntensity, sceneColorAvailable ? 1 : 0, 0);
 
         frame.frameSets[eye].update(data);
     }
 
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, void delegate(ref VkCommandBuffer) drawScene)
+    void recordCommandBuffer(
+        ref Frame frame,
+        void delegate(ref VkCommandBuffer) drawScene,
+        void delegate(ref VkCommandBuffer) drawTransmission = null,
+    )
     {
+        auto commandBuffer = frame.commandBuffer;
+
         renderPass.recordCommandBuffer(
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf); },
             drawScene,
+        );
+
+        copySceneColor(frame);
+
+        renderPass.recordTransmissionCommandBuffer(
+            commandBuffer,
+            (ref VkCommandBuffer buf) {
+                if(drawTransmission !is null)
+                    drawTransmission(buf);
+            },
         );
     }
 
@@ -159,8 +392,10 @@ class Scene
 
     /// Parallel stereo: left eye in the left half, right eye in the right half.
     /// Cross-eyed viewing needs the halves swapped.
-    void recordStereoCommandBuffer(VkCommandBuffer commandBuffer, StereoDrawCallback drawScene)
+    void recordStereoCommandBuffer(ref Frame frame, StereoDrawCallback drawScene)
     {
+        auto commandBuffer = frame.commandBuffer;
+
         renderPass.recordCommandBuffer(
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf); },
@@ -195,6 +430,17 @@ class Scene
                 }
             },
         );
+
+        // Each eye would need its own copy, so stereo keeps the environment
+        imageBarrier(
+            commandBuffer, frame.image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        );
+
+        renderPass.recordTransmissionCommandBuffer(commandBuffer, (ref VkCommandBuffer) {});
     }
 
     void recreateSwapChain()

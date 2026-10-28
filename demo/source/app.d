@@ -1,8 +1,9 @@
 import arena: placeOnIcosahedron;
 import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
+import pukan.vulkan.renderpass: DrawPhase;
 import pukan.material: runtimeMaterialOverride;
-import pukan.gltf.pipelines: LightingMode, lightingMode;
+import pukan.gltf.pipelines: LightingMode, lightingMode, transmissionPass;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.mesh: LitVertex;
@@ -247,6 +248,9 @@ void main(string[] args) {
     );
     scope(exit) destroy(scene);
 
+    scene.sceneColorAvailable = !stereo;
+    transmissionPass = !stereo;
+
     {
         GltfLoadOptions loadOptions;
         loadOptions.extensions = !core;
@@ -431,7 +435,7 @@ void main(string[] args) {
 
             if(stereo)
             {
-                scene.recordStereoCommandBuffer(cb, (buf, eye, eyeExtent) {
+                scene.recordStereoCommandBuffer(frame, (buf, eye, eyeExtent) {
                     const view = crossEyed ? 1 - eye : eye;
                     auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
                     tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
@@ -443,9 +447,20 @@ void main(string[] args) {
             {
                 scene.updateFrameUniforms(frame, 0, wtb);
 
-                scene.recordCommandBuffer(cb, (buf){
-                    tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet);
-                });
+                scene.recordCommandBuffer(
+                    frame,
+                    (buf) {
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet);
+                    },
+                    (buf) {
+                        tree.drawingBufferFilling(
+                            buf,
+                            Matrix4x4f.identity,
+                            frame.frameSets[0].descriptorSet,
+                            DrawPhase.transmission,
+                        );
+                    },
+                );
             }
         });
 
