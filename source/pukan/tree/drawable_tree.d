@@ -1,12 +1,13 @@
 module pukan.tree.drawable_tree;
 
 import dlib.math;
+import std.algorithm: sort;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.primitives_tree: Bone;
-import pukan.vulkan.renderpass: DrawableByVulkan;
+import pukan.vulkan.renderpass: Blended, DrawableByVulkan;
 
 class DrawableTree(Payload) : DrawableByVulkan
 {
@@ -63,18 +64,46 @@ class DrawableTree(Payload) : DrawableByVulkan
     }
 
     import pukan.vulkan.pipelines: GraphicsPipelineCfg;
-    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans, VkDescriptorSet frameSet)
+
+    private struct Pending
     {
-        drawingBufferFillingRecursive(buf, trans, frameSet, root);
+        DrawableByVulkan drawable;
+        Matrix4x4f trans;
+        float depth;
     }
 
-    private void drawingBufferFillingRecursive(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet, Node curr)
+    void drawingBufferFilling(VkCommandBuffer buf, Matrix4f trans, VkDescriptorSet frameSet)
+    {
+        Pending[] blended;
+        drawingBufferFillingRecursive(buf, trans, frameSet, root, blended);
+
+        blended.sort!((a, b) => a.depth > b.depth);
+
+        foreach(pending; blended)
+            pending.drawable.drawingBufferFilling(buf, pending.trans, frameSet);
+    }
+
+    private void drawingBufferFillingRecursive(
+        VkCommandBuffer buf,
+        Matrix4x4f trans,
+        VkDescriptorSet frameSet,
+        Node curr,
+        ref Pending[] blended,
+    )
     {
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
-            auto dr = curr.payload.peek!DrawableByVulkan;
+            auto dr = *curr.payload.peek!DrawableByVulkan;
 
-            dr.drawingBufferFilling(buf, trans, frameSet);
+            auto blendedDrawable = cast(Blended) dr;
+
+            if(blendedDrawable !is null && blendedDrawable.isBlended)
+            {
+                const clip = Vector4f(0, 0, 0, 1) * trans;
+                blended ~= Pending(dr, trans, clip.w);
+            }
+            else
+                dr.drawingBufferFilling(buf, trans, frameSet);
         }
         else if(curr.payload.type == typeid(Bone))
         {
@@ -82,6 +111,6 @@ class DrawableTree(Payload) : DrawableByVulkan
         }
 
         foreach(ref c; curr.children)
-            drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c);
+            drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c, blended);
     }
 }

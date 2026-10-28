@@ -107,8 +107,8 @@ The following pieces are still missing:
       extended (specular/IOR, clearcoat, sheen) variants once the benchmark shows
       register or instruction cache pressure; the branches are uniform today, so
       the gain has to be measured before the pipelines multiply.
-- [ ] Alpha handling. Sort blended primitives back to front and offer
-      alpha-to-coverage for masked materials.
+- [ ] Alpha-to-coverage for masked materials, once the render pass is
+      multisampled.
 - [ ] Shared materials. A material table so meshes and primitives can reference
       the same material instead of taking one slot per mesh.
 - [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin

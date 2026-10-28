@@ -479,10 +479,25 @@ class GlTF : DrawableByVulkan
 
             debug enforce(indices.type == Type.SCALAR, indices.type);
 
-            const indicesAccessor = content.getAccess(indices);
-            createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+            if(indices.componentType == ComponentType.UNSIGNED_BYTE)
+            {
+                const byteAccess = content.getAccess(indices);
+                auto range = AccessRange!(ubyte, false)(content.bufferViews[byteAccess.viewIdx].buf, byteAccess);
+                ushort[] widened;
 
-            uplVert.indices = IndicesDescr(device, indicesAccessor, indices.componentType);
+                foreach(value; range)
+                    widened ~= value;
+
+                const widenedAccess = createVertexBuffer(device, widened, gpuBuffs, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                uplVert.indices = IndicesDescr(device, widenedAccess, ComponentType.UNSIGNED_SHORT);
+            }
+            else
+            {
+                const indicesAccessor = content.getAccess(indices);
+                createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+                uplVert.indices = IndicesDescr(device, indicesAccessor, indices.componentType);
+            }
         }
 
         enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
@@ -682,10 +697,11 @@ class GlTF : DrawableByVulkan
         LogicalDevice device,
         T[] data,
         ref BufferPieceOnGPU[] gpuBuffs,
+        VkBufferUsageFlags usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     )
     {
         auto piece = new BufferPieceOnGPU;
-        piece.buffer = new TransferBuffer(device, T.sizeof * data.length, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        piece.buffer = new TransferBuffer(device, T.sizeof * data.length, usage);
         (cast(T[]) piece.buffer.cpuBuf)[] = data;
         gpuBuffs ~= piece;
 
@@ -720,34 +736,58 @@ class GlTF : DrawableByVulkan
         animation.setPose(&animations[$-1], baseNodeTranslations);
     }
 
+    bool isBlended() const
+    {
+        foreach(mesh; meshes)
+            if(mesh.alphaMode == AlphaMode.blend)
+                return true;
+
+        return false;
+    }
+
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet)
     {
+        static struct MeshDraw
+        {
+            MeshClass mesh;
+            Matrix4x4f trans;
+            float depth;
+        }
+
+        //TODO: not need to call this recursive - just call it in row and use fromSkinRootNodeTranslations to get coords
+        void collectDraws(Matrix4x4f trans, Node node, ref MeshDraw[] draws)
+        {
+            assert(node.trans !is null);
+
+            trans *= node.trans.calcMatrix;
+
+            foreach(mesh; node.meshes)
+            {
+                const clip = Vector4f(0, 0, 0, 1) * trans;
+                draws ~= MeshDraw(mesh, trans, clip.w);
+            }
+
+            foreach(c; node.children)
+                collectDraws(trans, cast(Node) c, draws);
+        }
+
         // To avoid mirroring if loaded OpenGL mesh into Vulkan
         trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
-        drawingBufferFillingRecursive(buf, trans, frameSet, rootSceneNode);
+        MeshDraw[] draws;
+        collectDraws(trans, rootSceneNode, draws);
+
+        foreach(draw; draws)
+            if(draw.mesh.alphaMode != AlphaMode.blend)
+                draw.mesh.draw(buf, selectPipeline(draw.mesh), draw.trans, frameSet);
+
+        draws.sort!((a, b) => a.depth > b.depth);
+
+        foreach(draw; draws)
+            if(draw.mesh.alphaMode == AlphaMode.blend)
+                draw.mesh.draw(buf, selectPipeline(draw.mesh), draw.trans, frameSet);
     }
 
-    //TODO: not need to call this recursive - just call it in row and use fromSkinRootNodeTranslations to get coords
-    private void drawingBufferFillingRecursive(
-        VkCommandBuffer buf,
-        Matrix4x4f trans,
-        VkDescriptorSet frameSet,
-        Node node,
-    )
-    {
-        import std.math;
-
-        assert(node.trans !is null);
-
-        trans *= node.trans.calcMatrix;
-
-        foreach(mesh; node.meshes)
-            mesh.draw(buf, selectPipeline(mesh), trans, frameSet);
-
-        foreach(c; node.children)
-            drawingBufferFillingRecursive(buf, trans, frameSet, cast(Node) c);
-    }
 
     private GraphicsPipelineCfg selectPipeline(const MeshClass mesh)
     {

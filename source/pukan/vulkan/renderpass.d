@@ -208,3 +208,9 @@ interface DrawableByVulkan
     void refreshBuffers(VkCommandBuffer buf);
     void drawingBufferFilling(VkCommandBuffer buf, Matrix4x4f trans, VkDescriptorSet frameSet);
 }
+
+/// Drawables that must be ordered back to front implement this
+interface Blended
+{
+    bool isBlended() const;
+}
