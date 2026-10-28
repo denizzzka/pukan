@@ -10,8 +10,16 @@ struct GltfPipelineVariants
     GraphicsPipelineCfg doubleSidedBlend;
 }
 
+/// One shader per material mode; the mode is fixed when the file is loaded
+struct GltfModePipelines
+{
+    GltfPipelineVariants pbr;
+    GltfPipelineVariants lit;
+    GltfPipelineVariants unlit;
+}
+
 struct GltfPipelines
 {
-    GltfPipelineVariants skinned;
-    GltfPipelineVariants unskinned;
+    GltfModePipelines skinned;
+    GltfModePipelines unskinned;
 }

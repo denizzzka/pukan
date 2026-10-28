@@ -17,6 +17,15 @@ static import std.file;
 static import std.path;
 import vibe.data.json;
 
+/// Options for loading glTF materials
+struct GltfLoadOptions
+{
+    /// Parse the KHR_materials_* extensions
+    bool extensions = true;
+    /// Forces this mode on every material; negative keeps the authored one
+    int modeOverride = -1;
+}
+
 /// Time spent loading one file, in nanoseconds.
 struct LoadStats
 {
@@ -186,7 +195,7 @@ private VkSamplerAddressMode wrapMode(GltfWrap value)
 }
 
 /// Images sampled by data maps skip the sRGB decode; shared color images keep it
-private bool[] linearImages(in Json json)
+private bool[] linearImages(in Json json, bool extensions)
 {
     auto images = "images" in json;
     auto textures = "textures" in json;
@@ -225,9 +234,11 @@ private bool[] linearImages(in Json json)
         if(auto texture = "emissiveTexture" in material)
             usedAsColor[imageOf(*texture)] = true;
 
-        if(auto extensions = "extensions" in material)
+        const materialExtensions = extensions ? "extensions" in material : null;
+
+        if(materialExtensions !is null)
         {
-            if(auto specular = "KHR_materials_specular" in *extensions)
+            if(auto specular = "KHR_materials_specular" in *materialExtensions)
             {
                 if(auto texture = "specularTexture" in *specular)
                     usedAsData[imageOf(*texture)] = true;
@@ -236,7 +247,7 @@ private bool[] linearImages(in Json json)
                     usedAsColor[imageOf(*texture)] = true;
             }
 
-            if(auto clearcoat = "KHR_materials_clearcoat" in *extensions)
+            if(auto clearcoat = "KHR_materials_clearcoat" in *materialExtensions)
             {
                 if(auto texture = "clearcoatTexture" in *clearcoat)
                     usedAsData[imageOf(*texture)] = true;
@@ -248,7 +259,7 @@ private bool[] linearImages(in Json json)
                     usedAsData[imageOf(*texture)] = true;
             }
 
-            if(auto sheen = "KHR_materials_sheen" in *extensions)
+            if(auto sheen = "KHR_materials_sheen" in *materialExtensions)
             {
                 if(auto texture = "sheenColorTexture" in *sheen)
                     usedAsColor[imageOf(*texture)] = true;
@@ -257,7 +268,7 @@ private bool[] linearImages(in Json json)
                     usedAsData[imageOf(*texture)] = true;
             }
 
-            if(auto anisotropy = "KHR_materials_anisotropy" in *extensions)
+            if(auto anisotropy = "KHR_materials_anisotropy" in *materialExtensions)
                 if(auto texture = "anisotropyTexture" in *anisotropy)
                     usedAsData[imageOf(*texture)] = true;
         }
@@ -325,7 +336,10 @@ unittest
 
     // Image 0 serves a color map too, so it keeps the sRGB decode; the specular
     // color map is color data, the specular strength map is not
-    assert(linearImages(json) == [false, true, true, true, false, true, true, true, true, false, true, true]);
+    assert(linearImages(json, true) == [false, true, true, true, false, true, true, true, true, false, true, true]);
+
+    // Without the extensions only the core textures mark an image as data
+    assert(linearImages(json, false) == [false, true, true, true, false, false, false, false, false, false, false, false]);
 }
 
 ///
@@ -338,6 +352,7 @@ package GlTF loadGlTF2(
     Texture fakeTexture,
     VkBuffer vertexFallback,
     bool computeJointsOnGPU,
+    GltfLoadOptions options,
 )
 {
     import core.time: MonoTime;
@@ -472,7 +487,7 @@ package GlTF loadGlTF2(
     auto images = "images" in json;
     if(images)
     {
-        const linear = linearImages(json);
+        const linear = linearImages(json, options.extensions);
         MemoryBufferMappedToCPU[] staging;
 
         auto decodeStart = MonoTime.currTime;
@@ -580,12 +595,12 @@ package GlTF loadGlTF2(
     if(ret.skins.length > 0)
     {
         if(computeJointsOnGPU)
-            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback);
+            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
         else
-            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback);
+            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
     }
     else
-        result = new GlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback);
+        result = new GlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
 
     stats.decodeNs += cast(ulong) (MonoTime.currTime - ctorStart).total!"nsecs";
     result.loadStats = stats;

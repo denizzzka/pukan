@@ -10,6 +10,8 @@ glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/mesh_pbr.ver
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/mesh_pbr_static.vert -o compiled_shaders/mesh_pbr_static_vert.spv
 
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag.spv
+glslc ${TGT} ${INCLUDES} -DUNLIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_unlit.spv
+glslc ${TGT} ${INCLUDES} -DLIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_lit.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_fragment.glsl -o compiled_shaders/mesh_frag.spv
 glslc ${TGT} ${INCLUDES} -DHAS_NORMAL -fshader-stage=frag source/pukan/shaders/mesh_fragment.glsl -o compiled_shaders/mesh_lit_frag.spv
 glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/line.vert -o compiled_shaders/line_vert.spv

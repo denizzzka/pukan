@@ -3,6 +3,7 @@ module pukan.gltf.factory;
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import material_bindings;
 import pukan.gltf;
+import pukan.gltf.loader: GltfLoadOptions;
 import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines;
 import pukan.material: MaterialBuffer;
 import pukan.mesh: MeshResources;
@@ -191,6 +192,7 @@ class GltfFactory
     private TechniqueId technique;
     private MeshResources resources;
     GltfPipelines pipelineCfgs;
+    GltfLoadOptions loadOptions;
 
     this(
         LogicalDevice device,
@@ -205,17 +207,22 @@ class GltfFactory
         this.pipelines = pipelines;
         this.resources = resources;
 
-        auto skinnedStages = shaderStages(device);
-        auto staticStages = staticShaderStages(device);
+        auto skinnedPbr = shaderStages!"mesh_pbr_frag.spv"(device);
+        auto staticPbr = staticShaderStages!"mesh_pbr_frag.spv"(device);
 
         // A descriptor allocator needs a technique, but none of its pipelines.
         technique = pipelines.declare(RenderTechnique(
             name: "glTF descriptor layout",
-            stages: skinnedStages,
+            stages: skinnedPbr,
         ), 20);
 
-        pipelineCfgs.skinned = createVariants("glTF", skinnedStages, renderPass);
-        pipelineCfgs.unskinned = createVariants("glTF static", staticStages, renderPass);
+        pipelineCfgs.skinned.pbr = createVariants("glTF", skinnedPbr, renderPass);
+        pipelineCfgs.skinned.lit = createVariants("glTF lit", shaderStages!"mesh_pbr_frag_lit.spv"(device), renderPass);
+        pipelineCfgs.skinned.unlit = createVariants("glTF unlit", shaderStages!"mesh_pbr_frag_unlit.spv"(device), renderPass);
+
+        pipelineCfgs.unskinned.pbr = createVariants("glTF static", staticPbr, renderPass);
+        pipelineCfgs.unskinned.lit = createVariants("glTF static lit", staticShaderStages!"mesh_pbr_frag_lit.spv"(device), renderPass);
+        pipelineCfgs.unskinned.unlit = createVariants("glTF static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(device), renderPass);
     }
 
     private GltfPipelineVariants createVariants(string prefix, ShaderInfo[] stages, RenderPass renderPass)
@@ -258,7 +265,7 @@ class GltfFactory
         return result;
     }
 
-    private static ShaderInfo[] shaderStages(LogicalDevice device)
+    private static ShaderInfo[] shaderStages(string fragmentSpv)(LogicalDevice device)
     {
         return [
             device.uploadShaderToGPU(
@@ -279,11 +286,11 @@ class GltfFactory
                 ),
                 vertexInput(),
             ),
-            fragmentStage(device),
+            fragmentStage!fragmentSpv(device),
         ];
     }
 
-    private static ShaderInfo[] staticShaderStages(LogicalDevice device)
+    private static ShaderInfo[] staticShaderStages(string fragmentSpv)(LogicalDevice device)
     {
         return [
             device.uploadShaderToGPU(
@@ -304,14 +311,14 @@ class GltfFactory
                 ),
                 staticVertexInput(),
             ),
-            fragmentStage(device),
+            fragmentStage!fragmentSpv(device),
         ];
     }
 
-    private static ShaderInfo fragmentStage(LogicalDevice device)
+    private static ShaderInfo fragmentStage(string fragmentSpv)(LogicalDevice device)
     {
         return device.uploadShaderToGPU(
-            cast(ubyte[]) import("mesh_pbr_frag.spv"),
+            cast(ubyte[]) import(fragmentSpv),
             VK_SHADER_STAGE_FRAGMENT_BIT,
             fragmentBindings(),
         );
@@ -334,6 +341,7 @@ class GltfFactory
                 resources.fakeTexture,
                 resources.fallbackVertex.buf,
                 computeJointsOnGPU,
+                loadOptions,
             );
         catch(Exception e)
         {

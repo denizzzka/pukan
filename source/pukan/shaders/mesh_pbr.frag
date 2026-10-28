@@ -87,10 +87,22 @@ void main()
 
     vec3 color;
 
-    // Unlit output is the base color alone; no basis, maps or light
-    if(uint(material.params.x) == MATERIAL_MODE_UNLIT)
-        color = base.rgb;
-    else
+#ifdef UNLIT
+    // Base color alone; no basis, maps or light
+    color = base.rgb;
+#elif defined(LIT)
+    vec3 normal = normalize(fragNormal);
+    if((flags & MATERIAL_FLAG_DERIVED_NORMALS) != 0u)
+        normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));
+
+    vec3 emissive = material.emissiveFactor.rgb;
+    if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
+        emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
+
+    const vec3 lightDirection = normalize(frameUbo.frame.lightDirection.xyz);
+
+    color = base.rgb * (0.6 + 0.6 * max(dot(normal, lightDirection), 0.0)) + emissive;
+#else
     {
         vec3 normal = normalize(fragNormal);
         if((flags & MATERIAL_FLAG_DERIVED_NORMALS) != 0u)
@@ -223,6 +235,7 @@ void main()
 
         color = shadePbr(surface);
     }
+#endif
 
     outColor = vec4(color, alphaMode == MATERIAL_ALPHA_BLEND ? base.a : 1.0);
 }

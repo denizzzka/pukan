@@ -8,7 +8,7 @@ import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.gltf.pipelines: GltfPipelines;
 import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
-import pukan.material: AlphaMode, MaterialBuffer;
+import pukan.material: AlphaMode, MaterialBuffer, MaterialMode;
 import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
@@ -165,6 +165,7 @@ class GlTF : DrawableByVulkan
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private VkDescriptorImageInfo fakeTextureInfo;
     private VkBuffer vertexFallback;
+    private GltfLoadOptions loadOptions;
     private GltfPipelines pipelines;
 
     private MeshClass[] meshes;
@@ -193,8 +194,10 @@ class GlTF : DrawableByVulkan
         LoaderNode rootSceneNode,
         Texture fakeTexture,
         VkBuffer vertexFallback,
+        GltfLoadOptions loadOptions,
     )
     {
+        this.loadOptions = loadOptions;
         this.pipelines = pipelines;
         this.allocator = allocator;
         this.materialBuffer = materialBuffer;
@@ -622,7 +625,7 @@ class GlTF : DrawableByVulkan
             jointsUboInfo,
         );
 
-        m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents);
+        m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents, loadOptions);
         m.buildGeometry(gpuBuffs);
         return m;
     }
@@ -719,7 +722,10 @@ class GlTF : DrawableByVulkan
 
     private GraphicsPipelineCfg selectPipeline(const MeshClass mesh)
     {
-        auto variants = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
+        auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
+        auto variants = mesh.material.mode == MaterialMode.unlit ? modes.unlit
+            : mesh.material.mode == MaterialMode.lit ? modes.lit
+            : modes.pbr;
 
         if(mesh.doubleSided)
             return mesh.alphaMode == AlphaMode.blend ? variants.doubleSidedBlend : variants.doubleSided;
@@ -749,9 +755,10 @@ class SkinnedGlTF : GlTF
         LoaderNode rootSceneNode,
         Texture fakeTexture,
         VkBuffer vertexFallback,
+        GltfLoadOptions loadOptions,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback);
+        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback, loadOptions);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -819,9 +826,10 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
         LoaderNode rootSceneNode,
         Texture fakeTexture,
         VkBuffer vertexFallback,
+        GltfLoadOptions loadOptions,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback);
+        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback, loadOptions);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)

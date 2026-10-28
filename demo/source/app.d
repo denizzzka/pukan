@@ -1,5 +1,6 @@
 import arena: placeOnIcosahedron;
 import pukan;
+import pukan.gltf.loader: GltfLoadOptions;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.mesh: LitVertex;
@@ -59,12 +60,16 @@ void main(string[] args) {
     bool crossEyed;
     bool bench;
     uint frames;
+    bool core;
+    string materialMode = "authored";
     auto getoptResult = getopt(
         args,
         "stereo", "render side-by-side stereo", &stereo,
         "cross-eyed", "swap stereo halves for cross-eyed viewing", &crossEyed,
         "frames", "exit after N frames (0 = run forever)", &frames,
         "bench", "run the fixed benchmark scene and print metrics", &bench,
+        "core", "ignore the KHR material extensions", &core,
+        "material-mode", "authored, pbr, lit or unlit", &materialMode,
     );
 
     if(getoptResult.helpWanted)
@@ -238,6 +243,30 @@ void main(string[] args) {
         benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
     );
     scope(exit) destroy(scene);
+
+    {
+        GltfLoadOptions loadOptions;
+        loadOptions.extensions = !core;
+
+        switch(materialMode)
+        {
+            case "authored":
+                break;
+            case "pbr":
+                loadOptions.modeOverride = cast(int) MaterialMode.pbr;
+                break;
+            case "lit":
+                loadOptions.modeOverride = cast(int) MaterialMode.lit;
+                break;
+            case "unlit":
+                loadOptions.modeOverride = cast(int) MaterialMode.unlit;
+                break;
+            default:
+                enforce(false, "unknown material mode: " ~ materialMode);
+        }
+
+        scene.gltfFactory.loadOptions = loadOptions;
+    }
 
     //TODO: remove
     auto frameBuilder = &scene.frameBuilder;

@@ -3,7 +3,7 @@ module pukan.gltf.mesh;
 import dlib.math;
 import material_bindings;
 import pukan.gltf.accessor;
-public import pukan.gltf.loader: ComponentType;
+public import pukan.gltf.loader: ComponentType, GltfLoadOptions;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.mesh: Mesh, VertexStream, fallbackVertexSize;
 import pukan.misc: Boxf, expandAABB;
@@ -164,17 +164,23 @@ final class GltfMesh : Mesh
         bool hasTexCoords,
         bool hasNormals,
         bool hasTangents,
+        GltfLoadOptions options,
     )
     {
         material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
         alphaMode = AlphaMode.opaque;
         doubleSided = false;
 
+        if(options.modeOverride >= 0)
+            material.mode = cast(MaterialMode) options.modeOverride;
+
         if(json.type == Json.Type.object)
         {
-            if(auto extensions = "extensions" in json)
-                if("KHR_materials_unlit" in *extensions)
-                    material.mode = MaterialMode.unlit;
+            if(options.extensions)
+                if(auto extensions = "extensions" in json)
+                    if("KHR_materials_unlit" in *extensions)
+                        if(options.modeOverride < 0)
+                            material.mode = MaterialMode.unlit;
 
             // Unlit keeps base color and alpha only
             const bool lit = material.mode != MaterialMode.unlit;
@@ -228,7 +234,9 @@ final class GltfMesh : Mesh
                     material.emissiveFactor = Vector4f(e[0], e[1], e[2], 0);
                 }
 
-                if(auto extensions = "extensions" in json)
+                const extensions = options.extensions ? "extensions" in json : null;
+
+                if(extensions !is null)
                 {
                     if(auto emissive = "KHR_materials_emissive_strength" in *extensions)
                         if(auto strength = "emissiveStrength" in *emissive)
