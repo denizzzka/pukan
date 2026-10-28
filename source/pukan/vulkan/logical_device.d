@@ -95,6 +95,7 @@ class LogicalDevice
     DeviceContext deviceContext()
     {
         DeviceContext ctx;
+        ctx.device = physicalDevice.physicalDevice;
         ctx.properties = physicalDevice.properties;
         ctx.enabled = enabledFeatures;
         ctx.enabledChainMask = enabledChainMask;
