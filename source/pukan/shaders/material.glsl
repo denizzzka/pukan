@@ -368,6 +368,10 @@ vec3 shadePbr(Surface s)
     const float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
     const float G = (NdotL / (NdotL * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
 
+#ifdef CORE
+    const vec3 F0 = mix(s.dielectricF0, s.albedo, metallic);
+    const vec3 F90 = vec3(mix(s.dielectricF90, 1.0, metallic));
+#else
     vec3 F0 = mix(s.dielectricF0, s.albedo, metallic);
 
     if(s.iridescenceFactor > 0.0)
@@ -378,8 +382,12 @@ vec3 shadePbr(Surface s)
     }
 
     const vec3 F90 = vec3(mix(s.dielectricF90, 1.0, metallic));
+#endif
     const vec3 F = F0 + (F90 - F0) * pow(1.0 - VdotH, 5.0);
 
+#ifdef CORE
+    const vec3 specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
+#else
     vec3 specular;
 
     if(s.anisotropy > 0.0)
@@ -404,11 +412,16 @@ vec3 shadePbr(Surface s)
     }
     else
         specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
+#endif
 
     const vec3 kD = (1.0 - F) * (1.0 - metallic);
 
     vec3 brdf = kD * s.albedo / MATERIAL_PI + specular;
 
+#ifdef CORE
+    const float clearcoat = 0.0;
+    const float coatFresnel = 0.0;
+#else
     const float clearcoat = clamp(s.clearcoat, 0.0, 1.0);
     const float clearcoatRoughness = clamp(s.clearcoatRoughness, 0.04, 1.0);
     float coatFresnel = 0.0;
@@ -433,6 +446,7 @@ vec3 shadePbr(Surface s)
         const vec3 clearcoatBrdf = vec3(Dc * Gc / max(4.0 * NdotLc * NdotVc, 0.001));
         brdf = mix(brdf, clearcoatBrdf, clearcoat * coatFresnel);
     }
+#endif
 
     vec3 direct = brdf * lightColor * NdotL;
 
@@ -493,18 +507,21 @@ vec3 shadePbr(Surface s)
     vec3 sheenDirect = vec3(0.0);
     vec3 sheenAmbient = vec3(0.0);
 
+#ifndef CORE
     if(maxComponent(s.sheenColor) > 0.0)
     {
         const float sheenRoughness = clamp(s.sheenRoughness, 0.0001, 1.0);
         sheenDirect = s.sheenColor * D_Charlie(sheenRoughness, NdotH) * V_Neubelt(NdotV, NdotL);
         sheenAmbient = s.sheenColor * sheenEnvironmentBRDF(N, V, sheenRoughness) * reflection;
     }
+#endif
 
     vec3 color = direct
         + sheenDirect * lightColor * NdotL
         + (ambient + sheenAmbient) * coating
         + s.emissive * coating;
 
+#ifndef CORE
     if(s.transmission > 0.0)
     {
         vec3 transmitted;
@@ -544,6 +561,7 @@ vec3 shadePbr(Surface s)
 
         color = mix(color, transmitted + reflection * fresnel, s.transmission);
     }
+#endif
 
     return color;
 }

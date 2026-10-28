@@ -37,6 +37,7 @@ struct GltfSkyPipelines
 struct GltfModePipelines
 {
     GltfSkyPipelines pbr;
+    GltfSkyPipelines pbrCore;
     GltfPipelineVariants lit;
     GltfPipelineVariants unlit;
 }

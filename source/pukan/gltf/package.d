@@ -814,11 +814,13 @@ class GlTF : DrawableByVulkan
         if(mesh.material.mode == MaterialMode.lit)
             return selectVariant(modes.lit, mesh);
 
-        auto pbr = lightingMode == LightingMode.analytic ? modes.pbr.analytic
-            : lightingMode == LightingMode.none ? modes.pbr.none
-            : modes.pbr.ibl;
+        auto pbr = mesh.material.needsExtendedShading ? modes.pbr : modes.pbrCore;
 
-        return selectVariant(pbr, mesh);
+        auto variants = lightingMode == LightingMode.analytic ? pbr.analytic
+            : lightingMode == LightingMode.none ? pbr.none
+            : pbr.ibl;
+
+        return selectVariant(variants, mesh);
     }
 
     private static GraphicsPipelineCfg selectVariant(GltfPipelineVariants variants, const MeshClass mesh)

@@ -163,6 +163,22 @@ void main()
             ao = mix(1.0, occlusion, material.metallicRoughness.w);
         }
 
+        vec3 emissive = material.emissiveFactor.rgb;
+        if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
+            emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
+
+        Surface surface;
+        surface.albedo = base.rgb;
+        surface.normal = normal;
+        surface.clearcoatNormal = normal;
+        surface.position = fragPosition;
+        surface.emissive = emissive;
+        surface.metallic = metallicRoughness.x;
+        surface.roughness = metallicRoughness.y;
+        surface.ao = ao;
+        surface.roughnessVariance = roughnessVariance;
+
+#ifndef CORE
         vec3 specularColor = material.specular.rgb;
         float specularWeight = material.specular.a;
         if((flags & MATERIAL_FLAG_SPECULAR_TEXTURE) != 0u)
@@ -189,10 +205,6 @@ void main()
             else
                 clearcoatNormal = perturbNormalFromDerivatives(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, fragTextureCoord);
         }
-
-        vec3 emissive = material.emissiveFactor.rgb;
-        if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
-            emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
 
         vec3 sheenColor = material.sheen.rgb;
         if((flags & MATERIAL_FLAG_SHEEN_COLOR_TEXTURE) != 0u)
@@ -268,19 +280,11 @@ void main()
         if((flags & MATERIAL_FLAG_VOLUME_THICKNESS_TEXTURE) != 0u)
             volumeThickness *= texture(volumeThicknessTexture, fragTextureCoord).g;
 
-        Surface surface;
-        surface.albedo = base.rgb;
-        surface.normal = normal;
-        surface.clearcoatNormal = clearcoatNormal;
-        surface.position = fragPosition;
-        surface.emissive = emissive;
         surface.dielectricF0 = specularF0;
         surface.dielectricF90 = specularWeight;
-        surface.metallic = metallicRoughness.x;
-        surface.roughness = metallicRoughness.y;
-        surface.ao = ao;
         surface.clearcoat = clearcoat;
         surface.clearcoatRoughness = clearcoatRoughness;
+        surface.clearcoatNormal = clearcoatNormal;
         surface.sheenColor = sheenColor;
         surface.sheenRoughness = sheenRoughness;
         surface.tangent = anisotropyTangent;
@@ -292,11 +296,32 @@ void main()
         surface.iridescenceThickness = iridescenceThickness;
         surface.transmission = transmission;
         surface.ior = material.iorParams.x;
-        surface.roughnessVariance = roughnessVariance;
         surface.volumeThickness = volumeThickness;
         surface.attenuationDistance = material.volume.y;
         surface.dispersion = material.volume.z;
         surface.attenuationColor = material.attenuationColor.rgb;
+#else
+        // Defaults that make the core path match glTF's own material defaults
+        surface.dielectricF0 = dielectricF0(material, material.specular.rgb, material.specular.a);
+        surface.dielectricF90 = material.specular.a;
+        surface.clearcoat = 0.0;
+        surface.clearcoatRoughness = 0.0;
+        surface.sheenColor = vec3(0.0);
+        surface.sheenRoughness = 0.0;
+        surface.tangent = vec3(1.0, 0.0, 0.0);
+        surface.bitangent = vec3(0.0, 1.0, 0.0);
+        surface.anisotropyDirection = vec2(1.0, 0.0);
+        surface.anisotropy = 0.0;
+        surface.iridescenceFactor = 0.0;
+        surface.iridescenceIor = 1.3;
+        surface.iridescenceThickness = 0.0;
+        surface.transmission = 0.0;
+        surface.ior = 1.5;
+        surface.volumeThickness = 0.0;
+        surface.attenuationDistance = 0.0;
+        surface.dispersion = 0.0;
+        surface.attenuationColor = vec3(1.0);
+#endif
 
         color = shadePbr(surface);
         color = toneMap(color * frameUbo.frame.exposureParams.x);

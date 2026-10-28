@@ -152,9 +152,43 @@ struct Material
     {
         metallicRoughness.w = value;
     }
+
+    /// False when the core PBR shader draws this material exactly
+    @property bool needsExtendedShading() const
+    {
+        const flags = this.flags;
+
+        return iorParams.x != 1.5f
+            || specular.x != 1.0f || specular.y != 1.0f || specular.z != 1.0f || specular.w != 1.0f
+            || clearcoat.x != 0.0f
+            || sheen.x != 0.0f || sheen.y != 0.0f || sheen.z != 0.0f
+            || anisotropy.x != 0.0f
+            || iridescence.x != 0.0f
+            || transmission.x != 0.0f
+            || volume.x != 0.0f || volume.y != 0.0f || volume.z != 0.0f
+            || flags.specularTexture || flags.specularColorTexture
+            || flags.clearcoatTexture || flags.clearcoatRoughnessTexture || flags.clearcoatNormalTexture
+            || flags.sheenColorTexture || flags.sheenRoughnessTexture
+            || flags.anisotropyTexture
+            || flags.iridescenceTexture || flags.iridescenceThicknessTexture
+            || flags.transmissionTexture || flags.volumeThicknessTexture;
+    }
 }
 
 static assert(Material.sizeof == 224);
+
+unittest
+{
+    assert(!Material(Vector3f(0, 0, 0), MaterialMode.pbr).needsExtendedShading);
+
+    auto clearcoated = Material(Vector3f(0, 0, 0), MaterialMode.pbr);
+    clearcoated.clearcoat.x = 1.0f;
+    assert(clearcoated.needsExtendedShading);
+
+    auto sheen = Material(Vector3f(0, 0, 0), MaterialMode.pbr);
+    sheen.flags = sheen.flags | MaterialFlags(MaterialFlag.sheenColorTexture);
+    assert(sheen.needsExtendedShading);
+}
 
 struct MaterialBlock
 {

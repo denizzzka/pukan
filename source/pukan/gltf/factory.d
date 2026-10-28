@@ -223,12 +223,18 @@ class GltfFactory
         pipelineCfgs.skinned.pbr.ibl = createVariants("glTF", skinnedPbr, renderPass);
         pipelineCfgs.skinned.pbr.analytic = createVariants("glTF analytic sky", shaderStages!"mesh_pbr_frag_analytic.spv"(device), renderPass);
         pipelineCfgs.skinned.pbr.none = createVariants("glTF no sky", shaderStages!"mesh_pbr_frag_nosky.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbrCore.ibl = createVariants("glTF core", shaderStages!"mesh_pbr_frag_core.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbrCore.analytic = createVariants("glTF core analytic sky", shaderStages!"mesh_pbr_frag_core_analytic.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbrCore.none = createVariants("glTF core no sky", shaderStages!"mesh_pbr_frag_core_nosky.spv"(device), renderPass);
         pipelineCfgs.skinned.lit = createVariants("glTF lit", shaderStages!"mesh_pbr_frag_lit.spv"(device), renderPass);
         pipelineCfgs.skinned.unlit = createVariants("glTF unlit", shaderStages!"mesh_pbr_frag_unlit.spv"(device), renderPass);
 
         pipelineCfgs.unskinned.pbr.ibl = createVariants("glTF static", staticPbr, renderPass);
         pipelineCfgs.unskinned.pbr.analytic = createVariants("glTF static analytic sky", staticShaderStages!"mesh_pbr_frag_analytic.spv"(device), renderPass);
         pipelineCfgs.unskinned.pbr.none = createVariants("glTF static no sky", staticShaderStages!"mesh_pbr_frag_nosky.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbrCore.ibl = createVariants("glTF static core", staticShaderStages!"mesh_pbr_frag_core.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbrCore.analytic = createVariants("glTF static core analytic sky", staticShaderStages!"mesh_pbr_frag_core_analytic.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbrCore.none = createVariants("glTF static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky.spv"(device), renderPass);
         pipelineCfgs.unskinned.lit = createVariants("glTF static lit", staticShaderStages!"mesh_pbr_frag_lit.spv"(device), renderPass);
         pipelineCfgs.unskinned.unlit = createVariants("glTF static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(device), renderPass);
     }
