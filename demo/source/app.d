@@ -354,6 +354,9 @@ void main(string[] args) {
             litCubeRotator,
         );
         entityUpdateNs += cast(ulong) (sw.peek - updateStart).total!"nsecs";
+        updateCursorRay(wtb, scene.swapChain.imageExtent);
+
+
         const transl = wtb.proj * wtb.view * wtb.model;
 
         const sphereViewModel = wtb.view * wtb.model * Vector3f(0, 0, sceneDepth).translationMatrix;
@@ -620,6 +623,8 @@ private string[] benchSampleNames = [
 
 float cameraDistance = initialCameraDistance;
 Vector3f cameraPan = Vector3f(0, 0, 0);
+/// World direction from the camera through the cursor, refreshed every frame
+Vector3f cursorRay = Vector3f(0, 0, 1);
 
 bool skyChanged;
 
@@ -662,14 +667,11 @@ extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
     if(benchMode)
         return;
 
-    auto pan = cameraPan.z + cast(float) yoffset * cameraWheelPanStep;
+    const step = cast(float) yoffset * cameraWheelPanStep;
 
-    if(pan < -cameraPanLimit)
-        pan = -cameraPanLimit;
-    if(pan > cameraPanLimit)
-        pan = cameraPanLimit;
-
-    cameraPan.z = pan;
+    cameraPan.x = clampPan(cameraPan.x + cursorRay.x * step);
+    cameraPan.y = clampPan(cameraPan.y + cursorRay.y * step);
+    cameraPan.z = clampPan(cameraPan.z + cursorRay.z * step);
 
     interactionTimer.touch(frameTime);
 }
@@ -750,6 +752,26 @@ extern(C) void onCursorPos(GLFWwindow*, double xpos, double ypos) nothrow @nogc
         scenePitch = maxScenePitch;
     if(scenePitch < -maxScenePitch)
         scenePitch = -maxScenePitch;
+}
+
+private void updateCursorRay(in WorldTransformation wtb, VkExtent2D extent) nothrow @nogc
+{
+    const viewProj = wtb.proj * wtb.view;
+    const invViewProj = viewProj.inverse;
+
+    const ndcX = cast(float) (2.0 * cursorX / extent.width - 1.0);
+    const ndcY = cast(float) (2.0 * cursorY / extent.height - 1.0);
+
+    const nearPoint = Vector4f(ndcX, ndcY, 0, 1) * invViewProj;
+    const farPoint = Vector4f(ndcX, ndcY, 1, 1) * invViewProj;
+
+    const direction = Vector3f(
+        farPoint.x / farPoint.w - nearPoint.x / nearPoint.w,
+        farPoint.y / farPoint.w - nearPoint.y / nearPoint.w,
+        farPoint.z / farPoint.w - nearPoint.z / nearPoint.w,
+    );
+
+    cursorRay = direction.normalized;
 }
 
 private float clampPan(float value) nothrow @nogc
