@@ -8,7 +8,7 @@ import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, SkyMode, skyMode;
 import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
-import pukan.material: AlphaMode, MaterialBuffer, MaterialMode;
+import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
@@ -169,6 +169,7 @@ class GlTF : DrawableByVulkan
     private GltfPipelines pipelines;
 
     private MeshClass[] meshes;
+    private Material[] authoredMaterials;
     private DescriptorAllocator allocator;
     private MaterialBuffer materialBuffer;
 
@@ -339,6 +340,29 @@ class GlTF : DrawableByVulkan
     }
 
     bool isAnimated() const => animation.animations.length > 0;
+
+    /// Applies one material to every mesh, remembering the authored ones
+    void setMaterialOverride(Material material)
+    {
+        if(authoredMaterials.length != meshes.length)
+        {
+            authoredMaterials.length = meshes.length;
+
+            foreach(i, mesh; meshes)
+                authoredMaterials[i] = mesh.material;
+        }
+
+        foreach(mesh; meshes)
+            mesh.setMaterial(material);
+    }
+
+    /// Restores the materials the file declared
+    void clearMaterialOverride()
+    {
+        foreach(i, mesh; meshes)
+            if(i < authoredMaterials.length)
+                mesh.setMaterial(authoredMaterials[i]);
+    }
 
     auto calcAABB() const
     {

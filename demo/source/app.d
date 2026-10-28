@@ -292,6 +292,8 @@ void main(string[] args) {
         arenaGltfs = createArena(scene, arenaNode, benchMode ? benchSampleNames : null);
     }
 
+    overrideTargets = arenaGltfs;
+
     tree.uploadToGPUImmediate(device, frameBuilder.commandPool, *initBuf);
 
     const startupWallNs = cast(ulong) (MonoTime.currTime - startupStart).total!"nsecs";
@@ -384,6 +386,21 @@ void main(string[] args) {
         {
             skyChanged = false;
             writefln("sky: %s", skyMode);
+        }
+
+        if(overrideChanged)
+        {
+            overrideChanged = false;
+
+            const overrideMaterial = Material(Vector3f(0.95f, 0.45f, 0.1f), MaterialMode.unlit);
+
+            foreach(target; overrideTargets)
+                if(materialOverridden)
+                    target.setMaterialOverride(overrideMaterial);
+                else
+                    target.clearMaterialOverride();
+
+            writefln("material override: %s", materialOverridden);
         }
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
@@ -600,17 +617,28 @@ float cameraDistance = initialCameraDistance;
 Vector3f cameraPan = Vector3f(0, 0, 0);
 
 bool skyChanged;
+bool materialOverridden;
+bool overrideChanged;
+GlTF[] overrideTargets;
 
 extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
 {
-    if(benchMode || action != GLFW_PRESS || key != GLFW_KEY_S)
+    if(benchMode || action != GLFW_PRESS)
         return;
 
-    skyMode = skyMode == SkyMode.ibl ? SkyMode.analytic
-        : skyMode == SkyMode.analytic ? SkyMode.none
-        : SkyMode.ibl;
+    if(key == GLFW_KEY_S)
+    {
+        skyMode = skyMode == SkyMode.ibl ? SkyMode.analytic
+            : skyMode == SkyMode.analytic ? SkyMode.none
+            : SkyMode.ibl;
 
-    skyChanged = true;
+        skyChanged = true;
+    }
+    else if(key == GLFW_KEY_O)
+    {
+        materialOverridden = !materialOverridden;
+        overrideChanged = true;
+    }
 }
 
 extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc

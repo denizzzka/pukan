@@ -113,8 +113,6 @@ The following pieces are still missing:
       the same material instead of taking one slot per mesh.
 - [ ] Multiple skins per glTF file. Stop hardcoding `skins[0]` and bind the skin
       per node and primitive.
-- [ ] Simple material override for glTF. Allow an unlit/lit `Material` on a
-      loaded mesh and map `KHR_materials_unlit` to it.
 - [ ] Texture compression. KTX2/BasisU and other compressed formats with a
       fallback path.
 

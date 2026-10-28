@@ -157,7 +157,7 @@ struct MaterialBlock
 final class MaterialBuffer
 {
     private LogicalDevice device;
-    private TransferBuffer[] chunks;
+    private MemoryBufferMappedToCPU[] chunks;
     private size_t chunkCapacity;
     private size_t slotSize;
     private shared size_t used;
@@ -193,7 +193,7 @@ final class MaterialBuffer
         synchronized(chunkMutex)
         {
             while(chunkIndex >= chunks.length)
-                chunks ~= device.create!TransferBuffer(
+                chunks ~= device.create!MemoryBufferMappedToCPU(
                     chunkCapacity * slotSize,
                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 );
@@ -214,26 +214,20 @@ final class MaterialBuffer
         auto chunk = chunkAt(slot);
 
         return VkDescriptorBufferInfo(
-            buffer: chunk.gpuBuffer,
+            buffer: chunk.buf,
             offset: (slot % chunkCapacity) * slotSize,
             range: MaterialBlock.sizeof,
         );
     }
 
+    /// The chunks are host visible, so writes reach the GPU without a copy
     void recordUpload(VkCommandBuffer commandBuffer)
     {
-        TransferBuffer[] snapshot;
-
-        synchronized(chunkMutex)
-            snapshot = chunks;
-
-        foreach(chunk; snapshot)
-            chunk.recordUpload(commandBuffer);
     }
 
-    private TransferBuffer chunkAt(size_t slot)
+    private MemoryBufferMappedToCPU chunkAt(size_t slot)
     {
-        TransferBuffer chunk;
+        MemoryBufferMappedToCPU chunk;
 
         synchronized(chunkMutex)
             chunk = chunks[slot / chunkCapacity];
