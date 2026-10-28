@@ -31,9 +31,13 @@ class ImageMemory : DeviceMemory
 
     this(LogicalDevice device, ref VkImageCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
     {
-        string reason;
-        if(!device.supportsImageFormat(ImageFormatRequest.from(createInfo), reason))
-            throw new PukanVulkanException(reason);
+        // Release relies on the startup requirements; this catches runtime parameters
+        debug
+        {
+            string reason;
+            if(!device.supportsImageFormat(ImageFormatRequest.from(createInfo), reason))
+                throw new PukanVulkanException(reason);
+        }
 
         image = device.createImage(createInfo);
 
