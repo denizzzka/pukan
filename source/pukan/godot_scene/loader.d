@@ -7,6 +7,7 @@ import pukan.godot_scene.binary: parseGodotResourceData;
 import pukan.godot_scene.ctex: GodotCtexImage, loadCtex;
 import pukan.godot_scene.material: GodotMaterialData, readGodotMaterial;
 import pukan.godot_scene.paths: normalizeResourcePath;
+import pukan.godot_scene.remap: resolveGodotPath;
 import pukan.godot_scene.source: DirectorySource, GodotSource;
 import pukan.godot_scene.mesh: GodotArraySurface, GodotPrimitive, decodeArrayMesh;
 import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
@@ -57,17 +58,25 @@ private final class GodotProject
         return "res://" ~ normalizeResourcePath(path);
     }
 
+    /// Stored path after exported `.remap` and source `.import` chains
+    string resolve(string key)
+    {
+        return resolveGodotPath(source, key);
+    }
+
     /// Filesystem path for loaders that take a filename, null for packs
-    string physical(string key) const
+    string physical(string key)
     {
         if(auto directory = cast(DirectorySource) source)
-            return directory.physical(key);
+            return directory.physical(resolve(key));
 
         return null;
     }
 
     GodotTextDocument document(string key)
     {
+        key = resolve(key);
+
         if(auto cached = key in documents)
             return *cached;
 
@@ -373,9 +382,9 @@ private final class GodotLoader
                     auto external = findExternal(document, instanceRef.id);
                     if(external !is null && external.type == "PackedScene")
                     {
-                        const key = project.key(external.path);
+                        const key = project.resolve(project.key(external.path));
 
-                        if(isGltfPath(external.path))
+                        if(isGltfPath(key))
                         {
                             const physical = project.physical(key);
                             if(physical.length)
@@ -782,7 +791,7 @@ private final class GodotLoader
             return null;
         }
 
-        const path = project.key(external.path);
+        const path = project.resolve(project.key(external.path));
 
         if(auto cached = path in textureCache)
             return *cached;

@@ -46,14 +46,14 @@ enum cameraFar = 100.0f;
 
 void main(string[] args)
 {
-    string scenePath = "demo/assets/godot_samples/generated/procedural.tscn";
+    string scenePath;
     string packPath;
     bool useSceneCamera;
     uint frames;
 
     auto getoptResult = getopt(
         args,
-        "scene", "Godot scene to load", &scenePath,
+        "scene", "Godot scene to load; defaults to the pack main scene or a fixture", &scenePath,
         "pack", "load the scene from this PCK instead", &packPath,
         "scene-camera", "use the Camera3D from the scene", &useSceneCamera,
         "frames", "exit after N frames (0 = run forever)", &frames,
@@ -157,11 +157,14 @@ void main(string[] args)
 
     scene.shadowsEnabled = false;
 
+    if(scenePath.length == 0 && packPath.length == 0)
+        scenePath = "demo/assets/godot_samples/generated/procedural.tscn";
+
     auto godotScene = packPath.length
         ? scene.godotFactory.createPacked(packPath, scenePath)
         : scene.godotFactory.create(scenePath);
     scope(exit) destroy(godotScene);
-    writeln("loaded ", scenePath, ": meshes ", godotScene.meshCount,
+    writeln("loaded ", packPath.length ? packPath : scenePath, ": meshes ", godotScene.meshCount,
         ", nodes skipped ", godotScene.skippedNodes,
         ", resources skipped ", godotScene.skippedResources,
         ", lights ", godotScene.lights.length,

@@ -171,8 +171,12 @@ final class PckArchive
             const start = pos;
             pos += length;
 
-            const hasNul = length && data[pos - 1] == 0;
-            return cast(string) data[start .. pos - (hasNul ? 1 : 0)].idup;
+            // The exporter pads paths to a four-byte boundary with NULs.
+            auto end = pos;
+            while(end > start && data[end - 1] == 0)
+                --end;
+
+            return cast(string) data[start .. end].idup;
         }
 
         void seek(ulong offset)

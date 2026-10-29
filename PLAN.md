@@ -95,7 +95,8 @@ or the pack.
 - [x] New `demo_godot` subpackage: a minimal window, camera and scene loader,
       separate from the glTF arena in `demo`.
 - [x] A `--scene` path option that loads one fixture at startup.
-- [x] `--pack` to load a `res://` scene from a PCK.
+- [x] `--pack` to load a `res://` scene from a PCK; without `--scene` it uses
+      `application/run/main_scene` from `project.binary`.
 
 #### Phase 2: lights, cameras and environment
 
@@ -116,7 +117,7 @@ The end goal is a game exported by Godot, not only a source project.
       variant encoding and resource properties.
 - [x] `PackedScene._bundled` decoder for binary `.scn`.
 - [ ] `PackedScene` base scenes and child index ordering.
-- [ ] `.import` remap, exported `.remap` chains and `project.binary`.
+- [x] `.import` remap, exported `.remap` chains and `project.binary`.
 - [x] `.pck` v2-v4 reader, unencrypted, with a `GodotSource` abstraction shared
       by directory and pack sources.
 - [ ] Stream or memory-map pack files instead of loading the whole archive.
@@ -126,7 +127,7 @@ The end goal is a game exported by Godot, not only a source project.
       decoder.
 - [x] Binary `.res` materials and meshes.
 - [ ] Resource deduplication across a scene.
-- [ ] Packed project fixture exported with Godot 4.7 and checked in.
+- [x] Packed project fixture exported with Godot 4.7 and checked in.
 
 #### Phase 4: instances, skinned meshes and animation
 
@@ -173,6 +174,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       `.ctex` textures.
 - [x] Generated `nested.tscn` and `nested_binary.tscn` instancing text and
       binary PackedScenes, checked through a PCK as well.
+- [x] `exported/exported.pck`, a Godot 4.7 `--export-pack` build with `.remap`
+      chains, an imported `.ctex`, binary resources and `project.binary`.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external
       material and both override forms.
 - [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer

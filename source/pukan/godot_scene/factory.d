@@ -1,6 +1,8 @@
 module pukan.godot_scene.factory;
 
+import pukan.exceptions: PukanException;
 import pukan.godot_scene.loader: GodotLoadOptions, loadGodotScene;
+import pukan.godot_scene.project: loadGodotProjectSettings;
 import pukan.godot_scene.source: PckSource;
 import pukan.godot_scene.scene: GodotScene;
 import pukan.gltf.factory: GltfFactory;
@@ -46,9 +48,20 @@ class GodotFactory
     }
 
     /// Loads a `res://` scene from an unencrypted PCK pack
-    GodotScene createPacked(string packPath, string scenePath)
+    GodotScene createPacked(string packPath, string scenePath = "")
     {
         assert(pbr.device);
-        return loadGodotScene(new PckSource(packPath), scenePath, pbr, gltfFactory, loadOptions);
+
+        auto source = new PckSource(packPath);
+
+        if(scenePath.length == 0)
+        {
+            scenePath = loadGodotProjectSettings(source).mainScene;
+
+            if(scenePath.length == 0)
+                throw new PukanException(packPath ~ ": pack has no application/run/main_scene");
+        }
+
+        return loadGodotScene(source, scenePath, pbr, gltfFactory, loadOptions);
     }
 }

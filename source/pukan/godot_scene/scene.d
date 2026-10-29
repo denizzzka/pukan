@@ -145,7 +145,7 @@ final class GodotScene : DrawableByVulkan, Blended
 
         foreach(instance; instances)
             if(auto blended = cast(Blended) instance)
-                if(blended.isBlended)
+                if(blended.isBlended())
                     return true;
 
         return false;

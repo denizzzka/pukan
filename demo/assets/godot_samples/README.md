@@ -1,9 +1,9 @@
 # Godot scene fixtures
 
-Two scenes come from the official Godot demo projects, and one is generated
-here. They cover the text scene format, the binary RSRC format, ArrayMesh
-surfaces, primitive meshes, StandardMaterial3D, external glTF scenes, skeletons
-and animation.
+Two scenes come from the official Godot demo projects, one is generated here,
+and one is a small project exported as a PCK. They cover the text scene format,
+the binary RSRC format, ArrayMesh surfaces, primitive meshes,
+StandardMaterial3D, external glTF scenes, skeletons and animation.
 
 ## Sources
 
@@ -66,3 +66,35 @@ through `.tres` materials.
 ```sh
 ./demo_godot/pukan_demo_godot --pack demo/assets/godot_samples/generated/fixtures.pck --scene res://procedural.tscn --frames 2
 ```
+
+## Exported project
+
+`exported/` is a small source project plus `exported.pck`, made with Godot 4.7
+`--export-pack`. It is the only fixture that uses the production layout:
+
+- `main.tscn`, `nested.tscn`, `panel_material.tres` and
+  `procedural_mesh.tres` are customized to binary resources and referenced
+  through `*.remap` files;
+- `checker.png` is imported to `.godot/imported/*.ctex` and referenced through
+  `checker.png.import`;
+- `project.binary` supplies `application/run/main_scene`.
+
+The pack also exposes the whole `.godot/exported` and `.godot/imported`
+directories, so the loader has to follow the remaps instead of reading the
+source paths. Load it without `--scene`:
+
+```sh
+./demo_godot/pukan_demo_godot --pack demo/assets/godot_samples/exported/exported.pck --frames 2
+```
+
+To regenerate after changing the source project:
+
+```sh
+cd demo/assets/godot_samples/exported
+godot --headless --path . --import
+godot --headless --path . --export-pack "Linux" exported.pck
+```
+
+`export_presets.cfg` only exists so the command above is reproducible. The
+`checker.png.import` file is committed; without the local `.godot` cache the
+loader falls back to the source PNG.

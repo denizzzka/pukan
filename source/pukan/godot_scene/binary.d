@@ -92,6 +92,7 @@ GodotTextDocument parseGodotBinary(const(ubyte)[] data, string path)
     return reader.parse(path);
 }
 
+
 private struct BinaryReader
 {
     const(ubyte)[] data;
