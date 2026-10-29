@@ -39,10 +39,9 @@ or the pack.
 
 #### Shared PBR groundwork
 
-- [ ] Extract `PbrPipelines` and `PbrMesh`/`MeshGeometry` from the glTF code,
-      keep the glTF loader on top of them, and put `GodotFactory`, `GodotScene`
-      and `GodotMesh` beside them.
-- [ ] Add vertex colors to the PBR path: a color vertex stream with a white
+- [x] Extract `PbrPipelines`, `PbrMesh`/`MeshGeometry` and the shared
+      `PbrFactory`; glTF and Godot both use them.
+- [x] Add vertex colors to the PBR path: a color vertex stream with a white
       fallback, `fragColor` in `mesh_pbr*.vert`, `COLOR_0` in glTF and `COLOR`
       in Godot surfaces. glTF allows `COLOR_0`; the loader never implemented
       it. This is a gap in pukan, not a format requirement.
@@ -58,8 +57,9 @@ or the pack.
 - [x] Text parser for `gd_scene`/`gd_resource`: tags, ext/sub resources, nodes,
       properties, typed arrays, dictionaries, `SubResource`/`ExtResource`,
       base64 `PackedByteArray` (format 4).
-- [ ] `res://` resolution from `project.godot`; external text resources and
-      `.glb`/`.gltf` references through the existing loader.
+- [x] `res://` resolution from `project.godot` and external text resources and
+      textures.
+- [ ] External `.glb`/`.gltf`/`.obj` references through the existing loaders.
 - [x] `ArrayMesh` decoder for uncompressed version 2 surfaces: separate
       position, normal and tangent regions in `vertex_data`, interleaved
       `attribute_data` and `skin_data`, octahedral normals and tangents, RGBA8
@@ -67,24 +67,32 @@ or the pack.
 - [ ] Attribute-compressed surface decoding: quantized positions, half-float
       UVs and octahedron TBN.
 - [ ] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
-- [ ] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
+- [x] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
       `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
-- [ ] `MeshInstance3D`: node tree, `transform`, `visible`, `cast_shadow`,
-      shared mesh resources and per-surface materials.
-- [ ] `StandardMaterial3D` and `ORMMaterial3D`: albedo, metallic, roughness,
-      emission, normal, AO, transparency, alpha scissor, cull mode, unshaded,
-      vertex colors, UV1 scale/offset and channel selectors.
-- [ ] Textures from `.png`, `.jpg`, `.webp`, `.tga` and `.hdr` through the
+- [ ] Primitive subdivisions, and the exact `CapsuleMesh` and `PrismMesh`
+      shapes.
+- [x] `MeshInstance3D`: node tree, `transform`, `visible`, mesh and
+      per-surface materials.
+- [ ] `MeshInstance3D`: `cast_shadow` and shared mesh resources.
+- [x] `StandardMaterial3D` and `ORMMaterial3D`: albedo, metallic, roughness,
+      emission, normal, AO, transparency, alpha scissor, cull mode, unshaded
+      and vertex colors.
+- [ ] Separate metallic and roughness maps, channel selectors and UV1
+      scale/offset in the Godot shader variant.
+- [x] Textures from `.png`, `.jpg`, `.webp`, `.tga` and `.hdr` through the
       existing image loader; `.ctex` belongs to phase 3.
-- [ ] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
-      phase, AABB, name and material override.
-- [ ] Fixtures and the `demo_godot` app, see below.
+- [x] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
+      phase, AABB and name.
+- [ ] `GodotScene`: material override.
+- [x] First vertical slice: `ArrayMesh`, `StandardMaterial3D`, a PNG texture
+      and vertex colors render through `GodotFactory` in `demo_godot`.
+- [x] Fixtures and the `demo_godot` app, see below.
 
 #### Demo
 
-- [ ] New `demo_godot` subpackage: a minimal window, camera and scene loader,
+- [x] New `demo_godot` subpackage: a minimal window, camera and scene loader,
       separate from the glTF arena in `demo`.
-- [ ] A `--scene` path option that loads one fixture at startup.
+- [x] A `--scene` path option that loads one fixture at startup.
 
 #### Phase 2: lights, cameras and environment
 
