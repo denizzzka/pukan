@@ -65,6 +65,7 @@ private enum nameIndexMask = (1 << nameIndexBits) - 1;
 private enum noParentSaved = 0x7FFFFFFF;
 private enum typeInstantiated = 0x7FFFFFFF;
 private enum flagInstanceIsPlaceholder = 1 << 30;
+private enum flagIdIsPath = 1 << 30;
 private enum variantIndexMask = (1 << 24) - 1;
 
 /// Reads a Godot text or binary resource, choosing by the file magic
@@ -74,7 +75,13 @@ GodotTextDocument parseGodotResourceData(const(ubyte)[] data, string label)
         return parseGodotBinary(data, label);
 
     if(data.length >= 4 && data[0] == 'R' && data[1] == 'S' && data[2] == 'C' && data[3] == 'C')
-        throw new PukanException(label ~ ": compressed resources are not supported yet");
+    {
+        const decoded = decompressGodotResource(data, label);
+        auto resource = new ubyte[decoded.length + 4];
+        resource[0 .. 4] = ['R', 'S', 'R', 'C'];
+        resource[4 .. $] = decoded;
+        return parseGodotBinary(resource, label, 4);
+    }
 
     return parseGodotText(cast(string) data);
 }
@@ -85,10 +92,77 @@ GodotTextDocument parseGodotResourceFile(string path)
     return parseGodotResourceData(cast(ubyte[]) read(path), path);
 }
 
-GodotTextDocument parseGodotBinary(const(ubyte)[] data, string path)
+/// Decodes the RSCC block stream of a compressed resource
+private ubyte[] decompressGodotResource(const(ubyte)[] data, string label)
+{
+    import pukan.zstd: decompressZstd;
+    import std.algorithm: min;
+
+    size_t pos = 4;
+
+    uint u32()
+    {
+        if(pos + 4 > data.length)
+            throw new PukanException(label ~ ": unexpected end of compressed resource");
+
+        const value = cast(uint) data[pos] |
+            (cast(uint) data[pos + 1] << 8) |
+            (cast(uint) data[pos + 2] << 16) |
+            (cast(uint) data[pos + 3] << 24);
+        pos += 4;
+        return value;
+    }
+
+    const mode = u32();
+    const blockSize = u32();
+    const total = u32();
+
+    if(blockSize == 0)
+        throw new PukanException(label ~ ": compressed resource has a zero block size");
+
+    const blockCount = total / blockSize + 1;
+    uint[] compressedSizes;
+    compressedSizes.length = blockCount;
+
+    foreach(i; 0 .. blockCount)
+        compressedSizes[i] = u32();
+
+    auto result = new ubyte[total];
+    size_t sourceOffset = pos;
+
+    foreach(i; 0 .. blockCount)
+    {
+        const destinationOffset = i * blockSize;
+        const destinationSize = min(blockSize, total - destinationOffset);
+
+        if(destinationSize == 0)
+        {
+            sourceOffset += compressedSizes[i];
+            continue;
+        }
+
+        const block = data[sourceOffset .. sourceOffset + compressedSizes[i]];
+        auto destination = result[destinationOffset .. destinationOffset + destinationSize];
+
+        if(mode == 2) // Zstandard
+        {
+            if(!decompressZstd(block, destination))
+                throw new PukanException(label ~ ": failed to decompress a Zstandard block");
+        }
+        else
+            throw new PukanException(label ~ ": unsupported compressed resource mode " ~ mode.to!string);
+
+        sourceOffset += compressedSizes[i];
+    }
+
+    return result;
+}
+
+GodotTextDocument parseGodotBinary(const(ubyte)[] data, string path, size_t offsetBias = 0)
 {
     BinaryReader reader;
     reader.data = data;
+    reader.offsetBias = offsetBias;
     return reader.parse(path);
 }
 
@@ -100,6 +174,7 @@ private struct BinaryReader
     bool realIsDouble;
     string[] strings;
     GodotTextExternal[] externals;
+    size_t offsetBias;
 
     private void ensure(size_t count) const
     {
@@ -242,7 +317,7 @@ private struct BinaryReader
                 return GodotVariant(text());
 
             case variantStringName:
-                return GodotVariant(GodotStringName(stringName()));
+                return GodotVariant(GodotStringName(text()));
 
             case variantVector2:
                 return GodotVariant(Vector2f(cast(float) realValue(), cast(float) realValue()));
@@ -602,7 +677,7 @@ private struct BinaryReader
 
         foreach(i, ref resource; internal)
         {
-            seek(resource.offset);
+            seek(resource.offset + offsetBias);
             const type = text();
             const propertyCount = u32();
 
@@ -650,6 +725,13 @@ private struct BinaryReader
         auto bundled = asDictionary(*bundledValue, "_bundled");
         auto names = required!(string[])(bundled, "names");
         auto variants = required!(GodotArray)(bundled, "variants");
+        GodotNodePath[] nodePaths;
+
+        if(auto value = bundled.get("node_paths"))
+        {
+            foreach(item; asArray(*value, "node_paths").items)
+                nodePaths ~= as!(GodotNodePath)(item, "node_path");
+        }
         const nodeCount = cast(size_t) required!long(bundled, "node_count");
         auto records = required!(int[])(bundled, "nodes");
 
@@ -690,6 +772,16 @@ private struct BinaryReader
             {
                 node.parent = "";
                 paths[i] = ".";
+            }
+            else if((parent & flagIdIsPath) != 0)
+            {
+                const pathIndex = parent & (flagIdIsPath - 1);
+
+                if(pathIndex >= nodePaths.length)
+                    throw new PukanException("PackedScene parent path index is out of range");
+
+                node.parent = nodePaths[pathIndex].value;
+                paths[i] = node.parent.length ? node.parent ~ "/" ~ node.name : node.name;
             }
             else
             {

@@ -432,7 +432,7 @@ private final class GodotLoader
                             else
                                 ++skippedResources;
                         }
-                        else if(isScenePath(external.path) && !options.loadStack.canFind(key))
+                        else if(isScenePath(key) && !options.loadStack.canFind(key))
                         {
                             GodotLoadOptions childOptions = options;
                             childOptions.loadStack = options.loadStack ~ scenePath;

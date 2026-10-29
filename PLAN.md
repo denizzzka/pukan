@@ -130,6 +130,8 @@ The end goal is a game exported by Godot, not only a source project.
       `pukan.compressed_texture`, with device feature checks and sRGB or linear
       sampling per material slot. Basis Universal stays unsupported.
 - [x] Binary `.res` materials and meshes.
+- [x] Compressed `RSCC` resources with Zstandard blocks, `StringName`
+      variants and `PackedScene` parent-path flags.
 - [x] Shared parsed glTF content and GPU buffers across instances of one file;
       node trees, animation state and joint buffers stay per instance.
 - [ ] Resource deduplication across a scene.

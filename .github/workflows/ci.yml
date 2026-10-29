@@ -24,6 +24,7 @@ jobs:
           sudo apt-get install -y \
             libvulkan-dev \
             libwebp-dev \
+            libzstd-dev \
             libglfw3 \
             libglfw3-dev \
             mesa-vulkan-drivers \
