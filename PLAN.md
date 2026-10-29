@@ -114,7 +114,19 @@ before compositing, so overlapping and self-intersecting transparent meshes no
 longer depend on a per-draw order. The resolve runs once before the colour copy
 and again after the transmission pass, filtered by the resolved scene depth, so
 glass shows blended objects behind it and blended fragments in front of glass
-stay in front.
+stay in front. Long term:
+
+- [ ] A second bounce for stacked glass. The colour is copied once, so a pane
+      behind another samples the background without the first pane. A second
+      copy, layered panes with their own samples, or tracing the glass in the
+      resolve would fix it.
+- [ ] Depth-aware rejection inside the refraction sample. Compare the depth at
+      the shifted coordinate with the glass surface and fall back to the
+      unshifted one, so a silhouette does not pull in an object in front of it.
+- [ ] A cheap glass mode: no refraction, dispersion, thickness or diffuse
+      transmission, just a light whitish Fresnel film over the surface colour,
+      as the first transmission attempt did. Per material or as a fallback when
+      the scene has no colour copy.
 
 ## Lighting
 
