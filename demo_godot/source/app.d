@@ -47,10 +47,12 @@ enum cameraFar = 100.0f;
 void main(string[] args)
 {
     string scenePath = "demo/assets/godot_samples/generated/procedural.tscn";
+    bool useSceneCamera;
 
     auto getoptResult = getopt(
         args,
         "scene", "Godot scene to load", &scenePath,
+        "scene-camera", "use the Camera3D from the scene", &useSceneCamera,
     );
 
     if(getoptResult.helpWanted)
@@ -154,14 +156,57 @@ void main(string[] args)
     auto godotScene = scene.godotFactory.create(scenePath);
     writeln("loaded ", scenePath, ": meshes ", godotScene.meshCount,
         ", nodes skipped ", godotScene.skippedNodes,
-        ", resources skipped ", godotScene.skippedResources);
+        ", resources skipped ", godotScene.skippedResources,
+        ", lights ", godotScene.lights.length);
+
+    foreach(light; godotScene.lights)
+    {
+        final switch(light.kind)
+        {
+            case GodotLightKind.directional:
+                scene.setSun(light.direction, light.color, light.energy);
+                break;
+
+            case GodotLightKind.point:
+                if(scene.activeLightCount >= maxLights)
+                    break;
+                scene.addPointLight(light.position, light.color * light.energy * 8.0f, light.range);
+                break;
+
+            case GodotLightKind.spot:
+                if(scene.activeLightCount >= maxLights)
+                    break;
+                scene.addSpotLight(
+                    light.position,
+                    light.direction,
+                    light.color * light.energy * 8.0f,
+                    light.range,
+                    light.innerAngle,
+                    light.outerAngle,
+                );
+                break;
+        }
+    }
 
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
 
-    const eye = Vector3f(0, 2.5f, -3.0f);
-    const target = Vector3f(0, 1.5f, 0);
-    const up = Vector3f(0, 1, 0);
+    Vector3f eye = Vector3f(0, 2.5f, -3.0f);
+    Vector3f target = Vector3f(0, 1.5f, 0);
+    Vector3f up = Vector3f(0, 1, 0);
+    float fov = cameraFov;
+    float nearPlane = cameraNear;
+    float farPlane = cameraFar;
+
+    if(useSceneCamera && godotScene.hasCamera)
+    {
+        eye = godotScene.camera.position;
+        target = godotScene.camera.target;
+        up = godotScene.camera.up;
+        fov = godotScene.camera.fov;
+        nearPlane = godotScene.camera.nearPlane;
+        farPlane = godotScene.camera.farPlane;
+    }
 
     while(!glfwWindowShouldClose(window))
     {
@@ -171,10 +216,10 @@ void main(string[] args)
         wtb.model = Matrix4x4f.identity();
         wtb.view = lookAtMatrix(eye, target, up);
         wtb.proj = perspectiveMatrix(
-            cameraFov,
+            fov,
             cast(float) scene.swapChain.imageExtent.width / scene.swapChain.imageExtent.height,
-            cameraNear,
-            cameraFar,
+            nearPlane,
+            farPlane,
         );
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {

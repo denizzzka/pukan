@@ -1,6 +1,6 @@
 module pukan.godot_scene.scene;
 
-import dlib.math: Matrix4x4f, Vector4f;
+import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.material: AlphaMode, MaterialBuffer, MaterialMode;
 import pukan.misc: Boxf;
 import pukan.pbr.accessor: BufferPieceOnGPU;
@@ -12,15 +12,48 @@ import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase;
 import pukan.vulkan.textures: Texture;
 import std.algorithm: sort;
 
+enum GodotLightKind
+{
+    directional,
+    point,
+    spot,
+}
+
+struct GodotLight
+{
+    GodotLightKind kind;
+    Vector3f position;
+    Vector3f direction; // toward the light for directional, beam for spot
+    Vector3f color;
+    float energy = 1.0f;
+    float range = 5.0f;
+    float innerAngle;
+    float outerAngle;
+}
+
+struct GodotCamera
+{
+    Vector3f position;
+    Vector3f target;
+    Vector3f up = Vector3f(0, 1, 0);
+    float fov = 75.0f;
+    float nearPlane = 0.05f;
+    float farPlane = 1000.0f;
+}
+
 class GodotNode
 {
     string name;
-    size_t skippedNodes;
-    size_t skippedResources;
+    string type;
     Matrix4x4f local = Matrix4x4f.identity();
     bool visible = true;
     PbrMesh[] meshes;
     GodotNode[] children;
+
+    GodotLight light;
+    bool hasLight;
+    GodotCamera camera;
+    bool hasCamera;
 
     void addChild(GodotNode child)
     {
@@ -42,6 +75,10 @@ final class GodotScene : DrawableByVulkan, Blended
     string name;
     size_t skippedNodes;
     size_t skippedResources;
+
+    GodotLight[] lights;
+    GodotCamera camera;
+    bool hasCamera;
 
     package(pukan) this(
         ref PbrPipelines pipelines,

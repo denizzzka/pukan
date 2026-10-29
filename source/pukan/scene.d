@@ -103,6 +103,22 @@ class Scene
         ));
     }
 
+    /// Replaces the sun; the direction points from the scene toward the light
+    void setSun(Vector3f direction, Vector3f color, float intensity = 1.0f)
+    {
+        const dir = direction.normalized;
+
+        lights[0] = Light(
+            Vector4f(dir.x, dir.y, dir.z, 0),
+            Vector4f(0, 0, 0, 0),
+            Vector4f(color.x * intensity, color.y * intensity, color.z * intensity, 0),
+            Vector4f(cast(float) LightType.directional, 0, 0, 0),
+        );
+    }
+
+    /// Number of lights already added, including the sun
+    uint activeLightCount() const => lightCount;
+
     private void addLight(Light light)
     {
         import std.exception: enforce;

@@ -1,12 +1,12 @@
 module pukan.godot_scene.loader;
 
-import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
+import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f, degtorad;
 import material_bindings;
 import pukan.exceptions: PukanException;
 import pukan.godot_scene.material: GodotMaterialData, readGodotMaterial;
 import pukan.godot_scene.mesh: GodotArraySurface, GodotPrimitive, decodeArrayMesh;
 import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
-import pukan.godot_scene.scene: GodotNode, GodotScene;
+import pukan.godot_scene.scene: GodotCamera, GodotLight, GodotLightKind, GodotNode, GodotScene;
 import pukan.godot_scene.text: GodotTextDocument, GodotTextExternal, GodotTextNode, GodotTextResource, parseGodotTextFile;
 import pukan.godot_scene.value;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
@@ -138,6 +138,11 @@ private final class GodotLoader
         auto document = project.document(scenePath);
         auto root = buildTree(document);
 
+        GodotLight[] lights;
+        GodotCamera camera;
+        bool hasCamera;
+        collectSceneNodes(root, Matrix4x4f.identity(), lights, camera, hasCamera);
+
         auto scene = new GodotScene(
             pbr.godotPipelines,
             pbr.resources.materials,
@@ -149,6 +154,9 @@ private final class GodotLoader
         );
         scene.skippedNodes = skippedNodes;
         scene.skippedResources = skippedResources;
+        scene.lights = lights;
+        scene.camera = camera;
+        scene.hasCamera = hasCamera;
         return scene;
     }
 
@@ -175,6 +183,47 @@ private final class GodotLoader
         }
 
         return dirName(scenePath);
+    }
+
+    private static void collectSceneNodes(
+        GodotNode node,
+        Matrix4x4f parent,
+        ref GodotLight[] lights,
+        ref GodotCamera camera,
+        ref bool hasCamera,
+    )
+    {
+        if(!node.visible)
+            return;
+
+        const world = parent * node.local;
+
+        if(node.hasLight)
+        {
+            GodotLight light = node.light;
+            light.position = Vector3f(world.a14, world.a24, world.a34);
+
+            const zAxis = Vector3f(world.a13, world.a23, world.a33).normalized;
+            light.direction = light.kind == GodotLightKind.directional ? zAxis : -zAxis;
+            lights ~= light;
+        }
+
+        if(node.hasCamera && !hasCamera)
+        {
+            const zAxis = Vector3f(world.a13, world.a23, world.a33).normalized;
+            const yAxis = Vector3f(world.a12, world.a22, world.a32).normalized;
+
+            camera.position = Vector3f(world.a14, world.a24, world.a34);
+            camera.target = camera.position - zAxis;
+            camera.up = yAxis;
+            camera.fov = node.camera.fov;
+            camera.nearPlane = node.camera.nearPlane;
+            camera.farPlane = node.camera.farPlane;
+            hasCamera = true;
+        }
+
+        foreach(child; node.children)
+            collectSceneNodes(child, world, lights, camera, hasCamera);
     }
 
     private GodotNode buildTree(ref GodotTextDocument document)
@@ -218,10 +267,35 @@ private final class GodotLoader
         return root;
     }
 
+    private static double propertyDouble(in GodotVariant[string] properties, string name, double defaultValue)
+    {
+        auto value = name in properties;
+        return value is null ? defaultValue : asDouble(*value, name);
+    }
+
+    private static long propertyLong(in GodotVariant[string] properties, string name, long defaultValue)
+    {
+        auto value = name in properties;
+        return value is null ? defaultValue : asLong(*value, name);
+    }
+
+    private static bool propertyBool(in GodotVariant[string] properties, string name, bool defaultValue)
+    {
+        auto value = name in properties;
+        return value is null ? defaultValue : asBool(*value, name);
+    }
+
+    private static GodotColor propertyColor(in GodotVariant[string] properties, string name, GodotColor defaultValue)
+    {
+        auto value = name in properties;
+        return value is null ? defaultValue : as!(GodotColor)(*value, name);
+    }
+
     private GodotNode createNode(ref GodotTextDocument document, ref GodotTextNode section)
     {
         auto node = new GodotNode;
         node.name = section.name;
+        node.type = section.type;
         node.local = Matrix4x4f.identity();
 
         if(auto value = "transform" in section.properties)
@@ -230,10 +304,52 @@ private final class GodotLoader
         if(auto value = "visible" in section.properties)
             node.visible = asBool(*value, "visible");
 
+        switch(section.type)
+        {
+            case "DirectionalLight3D":
+                node.light.kind = GodotLightKind.directional;
+                setLightCommon(node.light, section.properties);
+                node.hasLight = true;
+                break;
+
+            case "OmniLight3D":
+                node.light.kind = GodotLightKind.point;
+                setLightCommon(node.light, section.properties);
+                node.light.range = cast(float) propertyDouble(section.properties, "omni_range", 5.0);
+                node.hasLight = true;
+                break;
+
+            case "SpotLight3D":
+                node.light.kind = GodotLightKind.spot;
+                setLightCommon(node.light, section.properties);
+                node.light.range = cast(float) propertyDouble(section.properties, "spot_range", 5.0);
+                node.light.outerAngle = cast(float) degtorad(propertyDouble(section.properties, "spot_angle", 45.0));
+                node.light.innerAngle = node.light.outerAngle * 0.5f;
+                node.hasLight = true;
+                break;
+
+            case "Camera3D":
+                node.camera.fov = cast(float) propertyDouble(section.properties, "fov", 75.0);
+                node.camera.nearPlane = cast(float) propertyDouble(section.properties, "near", 0.05);
+                node.camera.farPlane = cast(float) propertyDouble(section.properties, "far", 1000.0);
+                node.hasCamera = true;
+                break;
+
+            default:
+                break;
+        }
+
         if(section.type == "MeshInstance3D")
             createMeshInstance(document, section, node);
 
         return node;
+    }
+
+    private static void setLightCommon(ref GodotLight light, in GodotVariant[string] properties)
+    {
+        const color = propertyColor(properties, "light_color", GodotColor(1, 1, 1, 1));
+        light.color = Vector3f(color.r, color.g, color.b);
+        light.energy = cast(float) propertyDouble(properties, "light_energy", 1.0);
     }
 
     private void createMeshInstance(
