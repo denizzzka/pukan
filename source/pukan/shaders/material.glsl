@@ -16,6 +16,8 @@ struct Material
     vec4 transmission; // x = factor
     vec4 volume; // x = thickness, y = attenuation distance
     vec4 attenuationColor;
+    vec4 uvTransform; // xy = scale, zw = offset
+    ivec4 textureChannels; // metallic, roughness, occlusion
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -43,6 +45,8 @@ const uint MATERIAL_FLAG_IRIDESCENCE_TEXTURE = 1u << 16;
 const uint MATERIAL_FLAG_IRIDESCENCE_THICKNESS_TEXTURE = 1u << 17;
 const uint MATERIAL_FLAG_TRANSMISSION_TEXTURE = 1u << 18;
 const uint MATERIAL_FLAG_VOLUME_THICKNESS_TEXTURE = 1u << 19;
+const uint MATERIAL_FLAG_GODOT_METALLIC_TEXTURE = 1u << 20;
+const uint MATERIAL_FLAG_GODOT_ROUGHNESS_TEXTURE = 1u << 21;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;

@@ -1,6 +1,6 @@
 module pukan.godot_scene.material;
 
-import dlib.math: Vector3f, Vector4f;
+import dlib.math: Vector3f, Vector4f, Vector4i;
 import pukan.godot_scene.value;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialFlags, MaterialMode;
 
@@ -16,13 +16,20 @@ struct GodotMaterialData
     GodotObjectRef normalTexture;
     GodotObjectRef occlusionTexture;
     GodotObjectRef emissiveTexture;
-    GodotObjectRef metallicRoughnessTexture;
+    GodotObjectRef metallicTexture;
+    GodotObjectRef roughnessTexture;
 
     bool hasBaseColorTexture;
     bool hasNormalTexture;
     bool hasOcclusionTexture;
     bool hasEmissiveTexture;
-    bool hasMetallicRoughnessTexture;
+    bool hasMetallicTexture;
+    bool hasRoughnessTexture;
+
+    int metallicChannel;
+    int roughnessChannel;
+    int occlusionChannel;
+    Vector4f uvTransform = Vector4f(1, 1, 0, 0);
 }
 
 GodotMaterialData readGodotMaterial(
@@ -44,6 +51,35 @@ GodotMaterialData readGodotMaterial(
     {
         result.baseColorTexture = asObjectRef(*value, "albedo_texture");
         result.hasBaseColorTexture = true;
+    }
+
+    {
+        Vector3f uvScale = Vector3f(1, 1, 1);
+        Vector3f uvOffset = Vector3f(0, 0, 0);
+
+        if(auto value = "uv1_scale" in properties)
+            uvScale = as!(Vector3f)(*value, "uv1_scale");
+
+        if(auto value = "uv1_offset" in properties)
+            uvOffset = as!(Vector3f)(*value, "uv1_offset");
+
+        result.uvTransform = Vector4f(uvScale.x, uvScale.y, uvOffset.x, uvOffset.y);
+    }
+
+    result.metallicChannel = cast(int) propertyLong(properties, "metallic_texture_channel", 0);
+    result.roughnessChannel = cast(int) propertyLong(properties, "roughness_texture_channel", 0);
+    result.occlusionChannel = cast(int) propertyLong(properties, "ao_texture_channel", 0);
+
+    if(auto value = "metallic_texture" in properties)
+    {
+        result.metallicTexture = asObjectRef(*value, "metallic_texture");
+        result.hasMetallicTexture = true;
+    }
+
+    if(auto value = "roughness_texture" in properties)
+    {
+        result.roughnessTexture = asObjectRef(*value, "roughness_texture");
+        result.hasRoughnessTexture = true;
     }
 
     if(auto value = "vertex_color_use_as_albedo" in properties)
@@ -150,16 +186,34 @@ GodotMaterialData readGodotMaterial(
         if(auto texture = "orm_texture" in properties)
         {
             const textureRef = asObjectRef(*texture, "orm_texture");
-            result.metallicRoughnessTexture = textureRef;
+            result.metallicTexture = textureRef;
+            result.roughnessTexture = textureRef;
             result.occlusionTexture = textureRef;
-            result.hasMetallicRoughnessTexture = true;
+            result.hasMetallicTexture = true;
+            result.hasRoughnessTexture = true;
             result.hasOcclusionTexture = true;
+            result.metallicChannel = 2; // blue
+            result.roughnessChannel = 1; // green
+            result.occlusionChannel = 0; // red
             result.material.metallic = 1.0f;
             result.material.roughness = 1.0f;
             result.material.occlusionStrength = 1.0f;
         }
     }
 
+    result.material.uvTransform = result.uvTransform;
+    result.material.textureChannels = Vector4i(
+        result.metallicChannel,
+        result.roughnessChannel,
+        result.occlusionChannel,
+        0,
+    );
     result.material.alphaMode = result.alphaMode;
     return result;
+}
+
+private long propertyLong(in GodotVariant[string] properties, string name, long defaultValue)
+{
+    auto value = name in properties;
+    return value is null ? defaultValue : asLong(*value, name);
 }

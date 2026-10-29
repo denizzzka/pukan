@@ -68,7 +68,7 @@ final class PbrMesh : Mesh
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
     private VkDescriptorBufferInfo jointsUboInfo;
-    private VkDescriptorImageInfo[MATERIAL_VOLUME_THICKNESS + 1] materialTextures;
+    private VkDescriptorImageInfo[MATERIAL_GODOT_ROUGHNESS + 1] materialTextures;
     private VkBuffer fallbackVertex;
 
     package(pukan) this(
@@ -199,6 +199,8 @@ final class PbrMesh : Mesh
             imageWriteDescriptor(descriptorSet, MATERIAL_IRIDESCENCE_THICKNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_IRIDESCENCE_THICKNESS]),
             imageWriteDescriptor(descriptorSet, MATERIAL_TRANSMISSION, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_TRANSMISSION]),
             imageWriteDescriptor(descriptorSet, MATERIAL_VOLUME_THICKNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_VOLUME_THICKNESS]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_GODOT_METALLIC, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_GODOT_METALLIC]),
+            imageWriteDescriptor(descriptorSet, MATERIAL_GODOT_ROUGHNESS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, materialTextures[MATERIAL_GODOT_ROUGHNESS]),
         ];
 
         device.updateDescriptorSets(descriptorWrites);

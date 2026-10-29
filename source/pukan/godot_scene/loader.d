@@ -139,7 +139,7 @@ private final class GodotLoader
         auto root = buildTree(document);
 
         auto scene = new GodotScene(
-            pbr.pipelineCfgs,
+            pbr.godotPipelines,
             pbr.resources.materials,
             root,
             meshes,
@@ -421,9 +421,8 @@ private final class GodotLoader
             bind(mesh, document, material.baseColorTexture, material.hasBaseColorTexture,
                 MATERIAL_BASE_COLOR, MaterialFlag.baseColorTexture);
 
-            if(surface.geometry.tangents.length)
-                bind(mesh, document, material.normalTexture, material.hasNormalTexture,
-                    MATERIAL_NORMAL, MaterialFlag.normalTexture);
+            bind(mesh, document, material.normalTexture, material.hasNormalTexture,
+                MATERIAL_NORMAL, MaterialFlag.normalTexture);
 
             bind(mesh, document, material.occlusionTexture, material.hasOcclusionTexture,
                 MATERIAL_OCCLUSION, MaterialFlag.occlusionTexture);
@@ -431,8 +430,11 @@ private final class GodotLoader
             bind(mesh, document, material.emissiveTexture, material.hasEmissiveTexture,
                 MATERIAL_EMISSIVE, MaterialFlag.emissiveTexture);
 
-            bind(mesh, document, material.metallicRoughnessTexture, material.hasMetallicRoughnessTexture,
-                MATERIAL_METALLIC_ROUGHNESS, MaterialFlag.metallicRoughnessTexture);
+            bind(mesh, document, material.metallicTexture, material.hasMetallicTexture,
+                MATERIAL_GODOT_METALLIC, MaterialFlag.godotMetallicTexture);
+
+            bind(mesh, document, material.roughnessTexture, material.hasRoughnessTexture,
+                MATERIAL_GODOT_ROUGHNESS, MaterialFlag.godotRoughnessTexture);
         }
 
         if(surface.geometry.tangents.length && material.hasNormalTexture)

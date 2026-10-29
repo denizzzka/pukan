@@ -12,22 +12,39 @@ glslc ${TGT} ${INCLUDES} -DSHADOW -fshader-stage=vertex source/pukan/shaders/mes
 glslc ${TGT} ${INCLUDES} -DSHADOW -fshader-stage=vertex source/pukan/shaders/mesh_pbr_static.vert -o compiled_shaders/mesh_pbr_static_shadow_vert.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_shadow.frag -o compiled_shaders/mesh_shadow_frag.spv
 
-glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag.spv
-glslc ${TGT} ${INCLUDES} -DUNLIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_unlit.spv
-glslc ${TGT} ${INCLUDES} -DLIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_lit.spv
-glslc ${TGT} ${INCLUDES} -DSKY_ANALYTIC -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_analytic.spv
-glslc ${TGT} ${INCLUDES} -DSKY_NONE -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_nosky.spv
-glslc ${TGT} ${INCLUDES} -DCORE -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_core.spv
-glslc ${TGT} ${INCLUDES} -DCORE -DSKY_ANALYTIC -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_core_analytic.spv
-glslc ${TGT} ${INCLUDES} -DCORE -DSKY_NONE -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_core_nosky.spv
-glslc ${TGT} ${INCLUDES} -DOIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_oit.spv
-glslc ${TGT} ${INCLUDES} -DOIT -DSKY_ANALYTIC -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_oit_analytic.spv
-glslc ${TGT} ${INCLUDES} -DOIT -DSKY_NONE -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_oit_nosky.spv
-glslc ${TGT} ${INCLUDES} -DOIT -DCORE -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_core_oit.spv
-glslc ${TGT} ${INCLUDES} -DOIT -DCORE -DSKY_ANALYTIC -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_core_oit_analytic.spv
-glslc ${TGT} ${INCLUDES} -DOIT -DCORE -DSKY_NONE -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_core_oit_nosky.spv
-glslc ${TGT} ${INCLUDES} -DLIT -DOIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_lit_oit.spv
-glslc ${TGT} ${INCLUDES} -DUNLIT -DOIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_unlit_oit.spv
+pbr_frag() {
+    local name="$1"
+    shift
+    glslc ${TGT} ${INCLUDES} -fshader-stage=frag "$@" source/pukan/shaders/mesh_pbr.frag -o "compiled_shaders/${name}.spv"
+}
+
+for flavor in gltf godot; do
+    if [ "$flavor" = "godot" ]; then
+        define="-DGODOT_MATERIAL"
+        suffix="_godot"
+    else
+        define=""
+        suffix=""
+    fi
+
+    pbr_frag "mesh_pbr_frag${suffix}" $define
+    pbr_frag "mesh_pbr_frag_unlit${suffix}" $define -DUNLIT
+    pbr_frag "mesh_pbr_frag_lit${suffix}" $define -DLIT
+    pbr_frag "mesh_pbr_frag_analytic${suffix}" $define -DSKY_ANALYTIC
+    pbr_frag "mesh_pbr_frag_nosky${suffix}" $define -DSKY_NONE
+    pbr_frag "mesh_pbr_frag_core${suffix}" $define -DCORE
+    pbr_frag "mesh_pbr_frag_core_analytic${suffix}" $define -DCORE -DSKY_ANALYTIC
+    pbr_frag "mesh_pbr_frag_core_nosky${suffix}" $define -DCORE -DSKY_NONE
+    pbr_frag "mesh_pbr_frag_oit${suffix}" $define -DOIT
+    pbr_frag "mesh_pbr_frag_oit_analytic${suffix}" $define -DOIT -DSKY_ANALYTIC
+    pbr_frag "mesh_pbr_frag_oit_nosky${suffix}" $define -DOIT -DSKY_NONE
+    pbr_frag "mesh_pbr_frag_core_oit${suffix}" $define -DOIT -DCORE
+    pbr_frag "mesh_pbr_frag_core_oit_analytic${suffix}" $define -DOIT -DCORE -DSKY_ANALYTIC
+    pbr_frag "mesh_pbr_frag_core_oit_nosky${suffix}" $define -DOIT -DCORE -DSKY_NONE
+    pbr_frag "mesh_pbr_frag_lit_oit${suffix}" $define -DLIT -DOIT
+    pbr_frag "mesh_pbr_frag_unlit_oit${suffix}" $define -DUNLIT -DOIT
+done
+
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/fullscreen.vert -o compiled_shaders/fullscreen_vert.spv
 glslc ${TGT} ${INCLUDES} -DOIT_READ_ONLY -fshader-stage=frag source/pukan/shaders/oit_resolve.frag -o compiled_shaders/oit_resolve_frag.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/depth_resolve.frag -o compiled_shaders/depth_resolve_frag.spv
