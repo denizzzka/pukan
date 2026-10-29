@@ -9,6 +9,8 @@ import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
 import pukan.godot_scene.scene: GodotCamera, GodotLight, GodotLightKind, GodotNode, GodotScene;
 import pukan.godot_scene.text: GodotTextDocument, GodotTextExternal, GodotTextNode, GodotTextResource, parseGodotTextFile;
 import pukan.godot_scene.value;
+import pukan.gltf: GlTF;
+import pukan.gltf.factory: GltfFactory;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
 import pukan.misc: loadImageFromFile;
 import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
@@ -67,6 +69,7 @@ private final class GodotLoader
 {
     LogicalDevice device;
     PbrFactory pbr;
+    GltfFactory gltfFactory;
     GodotLoadOptions options;
     DescriptorAllocator allocator;
 
@@ -81,15 +84,17 @@ private final class GodotLoader
     PbrMesh[] meshes;
     Texture[] textures;
     Texture[string] textureCache;
+    GlTF[] instances;
     VkDescriptorImageInfo fakeTextureInfo;
 
     size_t skippedNodes;
     size_t skippedResources;
 
-    this(LogicalDevice device, PbrFactory pbr, GodotLoadOptions options)
+    this(LogicalDevice device, PbrFactory pbr, GltfFactory gltfFactory, GodotLoadOptions options)
     {
         this.device = device;
         this.pbr = pbr;
+        this.gltfFactory = gltfFactory;
         this.options = options;
         this.allocator = pbr.createAllocator();
 
@@ -150,6 +155,7 @@ private final class GodotLoader
             meshes,
             gpuBuffs,
             textures,
+            instances,
             root.name,
         );
         scene.skippedNodes = skippedNodes;
@@ -339,10 +345,35 @@ private final class GodotLoader
                 break;
         }
 
+        if(!isNil(section.instance))
+        {
+            if(section.instance.type is typeid(GodotObjectRef))
+            {
+                const instanceRef = asObjectRef(section.instance, "instance");
+                if(instanceRef.kind == GodotRefKind.extResource)
+                {
+                    auto external = findExternal(document, instanceRef.id);
+                    if(external !is null && external.type == "PackedScene" && isGltfPath(external.path))
+                    {
+                        node.instance = gltfFactory.create(project.absolute(external.path));
+                        instances ~= node.instance;
+                    }
+                    else
+                        ++skippedResources;
+                }
+            }
+        }
+
         if(section.type == "MeshInstance3D")
             createMeshInstance(document, section, node);
 
         return node;
+    }
+
+    private static bool isGltfPath(string path)
+    {
+        import std.algorithm: endsWith;
+        return path.endsWith(".glb") || path.endsWith(".gltf");
     }
 
     private static void setLightCommon(ref GodotLight light, in GodotVariant[string] properties)
@@ -670,9 +701,10 @@ private final class GodotLoader
 GodotScene loadGodotScene(
     string filename,
     PbrFactory pbr,
+    GltfFactory gltfFactory,
     GodotLoadOptions options = GodotLoadOptions.init,
 )
 {
-    auto loader = new GodotLoader(pbr.device, pbr, options);
+    auto loader = new GodotLoader(pbr.device, pbr, gltfFactory, options);
     return loader.run(filename);
 }

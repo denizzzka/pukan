@@ -468,9 +468,29 @@ class GlTF : DrawableByVulkan
 
         if(hasSkin)
         {
-            uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(
-                primitive.attributes["JOINTS_0"].get!uint
-            );
+            const jointAccessor = accessors[primitive.attributes["JOINTS_0"].get!uint];
+
+            if(jointAccessor.componentType == ComponentType.UNSIGNED_BYTE)
+            {
+                alias Vector4ub = Vector!(ubyte, 4);
+
+                const access = content.getAccess!(Type.VEC4, Vector4ub)(jointAccessor);
+                auto range = content.rangify!Vector4ub(access);
+
+                Vector4us[] joints;
+                joints.length = jointAccessor.count;
+
+                foreach(i; 0 .. jointAccessor.count)
+                {
+                    const joint = range[i];
+                    joints[i] = Vector4us(joint.x, joint.y, joint.z, joint.w);
+                }
+
+                uplVert.joints = createVertexBuffer(device, joints, gpuBuffs);
+            }
+            else
+                uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(jointAccessor);
+
             uplVert.weights = content.getAccess!(Type.VEC4, Vector4f)(
                 primitive.attributes["WEIGHTS_0"].get!uint
             );

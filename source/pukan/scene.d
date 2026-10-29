@@ -213,7 +213,7 @@ class Scene
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
         pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, shadowPass);
         gltfFactory = new GltfFactory(pbrFactory);
-        godotFactory = new GodotFactory(pbrFactory);
+        godotFactory = new GodotFactory(pbrFactory, gltfFactory);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
     }

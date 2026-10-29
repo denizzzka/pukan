@@ -2,6 +2,8 @@ module pukan.godot_scene.factory;
 
 import pukan.godot_scene.loader: GodotLoadOptions, loadGodotScene;
 import pukan.godot_scene.scene: GodotScene;
+import pukan.gltf.factory: GltfFactory;
+import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.pbr.factory: PbrFactory;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -10,6 +12,7 @@ import std.meta: AliasSeq;
 class GodotFactory
 {
     private alias requirements = AliasSeq!(
+        SkinMatrices.requirements,
         Requirement!(VkPhysicalDeviceFeatures.fragmentStoresAndAtomics),
         Requirement!(VkPhysicalDeviceExtendedDynamicStateFeaturesEXT.extendedDynamicState),
         Requirement!(VkQueueFamilyProperties.queueFlags, VK_QUEUE_GRAPHICS_BIT),
@@ -26,16 +29,18 @@ class GodotFactory
     );
 
     private PbrFactory pbr;
+    private GltfFactory gltfFactory;
     GodotLoadOptions loadOptions;
 
-    this(PbrFactory pbr)
+    this(PbrFactory pbr, GltfFactory gltfFactory)
     {
         this.pbr = pbr;
+        this.gltfFactory = gltfFactory;
     }
 
     GodotScene create(string filename)
     {
         assert(pbr.device);
-        return loadGodotScene(filename, pbr, loadOptions);
+        return loadGodotScene(filename, pbr, gltfFactory, loadOptions);
     }
 }

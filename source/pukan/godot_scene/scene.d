@@ -1,6 +1,7 @@
 module pukan.godot_scene.scene;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
+import pukan.gltf: GlTF;
 import pukan.material: AlphaMode, MaterialBuffer, MaterialMode;
 import pukan.misc: Boxf;
 import pukan.pbr.accessor: BufferPieceOnGPU;
@@ -54,6 +55,7 @@ class GodotNode
     bool hasLight;
     GodotCamera camera;
     bool hasCamera;
+    GlTF instance;
 
     void addChild(GodotNode child)
     {
@@ -79,6 +81,7 @@ final class GodotScene : DrawableByVulkan, Blended
     GodotLight[] lights;
     GodotCamera camera;
     bool hasCamera;
+    private GlTF[] instances;
 
     package(pukan) this(
         ref PbrPipelines pipelines,
@@ -87,6 +90,7 @@ final class GodotScene : DrawableByVulkan, Blended
         PbrMesh[] meshes,
         BufferPieceOnGPU[] gpuBuffs,
         Texture[] textures,
+        GlTF[] instances,
         string name,
     )
     {
@@ -96,6 +100,7 @@ final class GodotScene : DrawableByVulkan, Blended
         this.meshes = meshes;
         this.gpuBuffs = gpuBuffs;
         this.textures = textures;
+        this.instances = instances;
         this.name = name;
     }
 
@@ -108,16 +113,34 @@ final class GodotScene : DrawableByVulkan, Blended
         foreach(ref texture; textures)
             if(texture)
                 destroy(texture);
+
+        foreach(instance; instances)
+            if(instance)
+                destroy(instance);
     }
 
     string possibleName() const => name;
     size_t meshCount() const => meshes.length;
+    size_t instanceCount() const => instances.length;
+
+    Boxf[] instanceBounds() const
+    {
+        Boxf[] result;
+        foreach(instance; instances)
+            result ~= instance.calcAABB;
+        return result;
+    }
 
     bool isBlended() const
     {
         foreach(mesh; meshes)
             if(mesh.alphaMode == AlphaMode.blend)
                 return true;
+
+        foreach(instance; instances)
+            if(auto blended = cast(Blended) instance)
+                if(blended.isBlended)
+                    return true;
 
         return false;
     }
@@ -149,6 +172,9 @@ final class GodotScene : DrawableByVulkan, Blended
             materialBuffer.recordUpload(buf);
         });
 
+        foreach(instance; instances)
+            instance.uploadToGPUImmediate(device, commandPool, commandBuffer);
+
         foreach(mesh; meshes)
             mesh.updateDescriptorSetsAndUniformBuffers(device);
 
@@ -157,6 +183,8 @@ final class GodotScene : DrawableByVulkan, Blended
 
     void refreshBuffers(VkCommandBuffer buf)
     {
+        foreach(instance; instances)
+            instance.refreshBuffers(buf);
     }
 
     void drawingBufferFilling(
@@ -200,6 +228,35 @@ final class GodotScene : DrawableByVulkan, Blended
         foreach(draw; draws)
             if(matchesPhase(draw.mesh, phase))
                 draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+
+        void drawInstances(GodotNode node, Matrix4x4f trans)
+        {
+            if(!node.visible)
+                return;
+
+            trans *= node.local;
+
+            if(node.instance !is null)
+            {
+                debug
+                {
+                    import std.stdio: writeln;
+                    static bool printed;
+                    if(!printed)
+                    {
+                        printed = true;
+                        writeln("GodotScene instance draw ", node.name, " phase ", phase);
+                    }
+                }
+
+                node.instance.drawingBufferFilling(buf, trans, frameSet, phase);
+            }
+
+            foreach(child; node.children)
+                drawInstances(child, trans);
+        }
+
+        drawInstances(root, trans);
     }
 
     private static bool matchesPhase(const PbrMesh mesh, DrawPhase phase)
