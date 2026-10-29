@@ -194,6 +194,14 @@ assert that a mesh is never shared between two different handedness values.
       still differ.
 - [x] Verify `demo`, `orientation.tscn`, `lights_and_shadows`, `enemy_twins` and
       the exported enemy, from both camera sides.
+- [ ] Replace `lookAtMatrix` with a camera transform whose inverse is the view
+      matrix, the way Dagon uses `invAbsoluteTransformation`:
+      https://github.com/gecko0307/dlib/pull/192#issuecomment-2835001161
+      `demo`, `demo_godot`, the stereo pair and the shadow light all build a
+      view from eye, target and up and assert when that view is parallel to the
+      up vector. A `Camera3D` node and a directional light already carry a
+      transform to invert, so the eye and target pair only has to exist for the
+      command line.
 
 #### GridMap
 
