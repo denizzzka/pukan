@@ -1,0 +1,8 @@
+name "demo_godot"
+description "Godot scene loading demo"
+authors "Denis Feklushkin"
+copyright "Copyright © 2025, Denis Feklushkin"
+license "BSL-1.0"
+dependency "pukan" path=".."
+dependency "glfw-d" version="~>1.1.2"
+dflags "-preview=in"

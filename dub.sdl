@@ -18,5 +18,6 @@ cImportPaths "$VULKAN_SDK\\Include" platform="windows"
 
 subPackage "demo"
 subPackage "demo_compute"
+subPackage "demo_godot"
 
 #TODO: vulkan subpackage
