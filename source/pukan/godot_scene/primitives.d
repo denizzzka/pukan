@@ -163,30 +163,57 @@ private void makeBox(ref MeshGeometry geometry, in GodotVariant[string] properti
 {
     const size = propertyVector3(properties, "size", Vector3f(1, 1, 1));
     const half = size / 2;
+    const subdivideW = max(cast(int) propertyLong(properties, "subdivide_width", 0), 0);
+    const subdivideH = max(cast(int) propertyLong(properties, "subdivide_height", 0), 0);
+    const subdivideD = max(cast(int) propertyLong(properties, "subdivide_depth", 0), 0);
 
     void face(
         Vector3f center,
         Vector3f u,
         Vector3f v,
         Vector3f normal,
+        int columns,
+        int rows,
     )
     {
-        const p0 = center - u - v;
-        const p1 = center + u - v;
-        const p2 = center + u + v;
-        const p3 = center - u + v;
+        Vector3f point(int column, int row)
+        {
+            const fu = cast(float) column / (columns + 1);
+            const fv = cast(float) row / (rows + 1);
+            return center + (fu * 2 - 1) * u + (fv * 2 - 1) * v;
+        }
 
-        addQuad(geometry, p0, p1, p2, p3,
-            normal, normal, normal, normal,
-            Vector2f(0, 0), Vector2f(1, 0), Vector2f(1, 1), Vector2f(0, 1));
+        foreach(row; 0 .. rows + 1)
+        {
+            foreach(column; 0 .. columns + 1)
+            {
+                const u0 = cast(float) column / (columns + 1);
+                const v0 = cast(float) row / (rows + 1);
+                const u1 = cast(float) (column + 1) / (columns + 1);
+                const v1 = cast(float) (row + 1) / (rows + 1);
+
+                addQuad(geometry,
+                    point(column, row), point(column + 1, row),
+                    point(column + 1, row + 1), point(column, row + 1),
+                    normal, normal, normal, normal,
+                    Vector2f(u0, v0), Vector2f(u1, v0), Vector2f(u1, v1), Vector2f(u0, v1),
+                );
+            }
+        }
     }
 
-    face(Vector3f(half.x, 0, 0), Vector3f(0, 0, -half.z), Vector3f(0, half.y, 0), Vector3f(1, 0, 0));
-    face(Vector3f(-half.x, 0, 0), Vector3f(0, 0, half.z), Vector3f(0, half.y, 0), Vector3f(-1, 0, 0));
-    face(Vector3f(0, half.y, 0), Vector3f(half.x, 0, 0), Vector3f(0, 0, -half.z), Vector3f(0, 1, 0));
-    face(Vector3f(0, -half.y, 0), Vector3f(half.x, 0, 0), Vector3f(0, 0, half.z), Vector3f(0, -1, 0));
-    face(Vector3f(0, 0, half.z), Vector3f(half.x, 0, 0), Vector3f(0, half.y, 0), Vector3f(0, 0, 1));
-    face(Vector3f(0, 0, -half.z), Vector3f(-half.x, 0, 0), Vector3f(0, half.y, 0), Vector3f(0, 0, -1));
+    face(Vector3f(half.x, 0, 0), Vector3f(0, 0, -half.z), Vector3f(0, half.y, 0), Vector3f(1, 0, 0),
+        subdivideD, subdivideH);
+    face(Vector3f(-half.x, 0, 0), Vector3f(0, 0, half.z), Vector3f(0, half.y, 0), Vector3f(-1, 0, 0),
+        subdivideD, subdivideH);
+    face(Vector3f(0, half.y, 0), Vector3f(half.x, 0, 0), Vector3f(0, 0, -half.z), Vector3f(0, 1, 0),
+        subdivideW, subdivideD);
+    face(Vector3f(0, -half.y, 0), Vector3f(half.x, 0, 0), Vector3f(0, 0, half.z), Vector3f(0, -1, 0),
+        subdivideW, subdivideD);
+    face(Vector3f(0, 0, half.z), Vector3f(half.x, 0, 0), Vector3f(0, half.y, 0), Vector3f(0, 0, 1),
+        subdivideW, subdivideH);
+    face(Vector3f(0, 0, -half.z), Vector3f(-half.x, 0, 0), Vector3f(0, half.y, 0), Vector3f(0, 0, -1),
+        subdivideW, subdivideH);
 }
 
 private void makePlane(ref MeshGeometry geometry, in GodotVariant[string] properties, bool quad)
@@ -194,43 +221,47 @@ private void makePlane(ref MeshGeometry geometry, in GodotVariant[string] proper
     const size = propertyVector2(properties, "size", Vector2f(1, 1));
     const center = propertyVector3(properties, "center_offset", Vector3f(0, 0, 0));
     const orientation = cast(int) propertyLong(properties, "orientation", quad ? 2 : 1);
+    const subdivideW = max(cast(int) propertyLong(properties, "subdivide_width", 0), 0);
+    const subdivideD = max(cast(int) propertyLong(properties, "subdivide_depth", 0), 0);
 
-    Vector3f p0, p1, p2, p3;
     Vector3f normal;
-
-    switch(orientation)
+    Vector3f point(float u, float v)
     {
-        case 0: // FACE_X
-            p0 = Vector3f(0, -size.y / 2, -size.x / 2);
-            p1 = Vector3f(0, -size.y / 2, size.x / 2);
-            p2 = Vector3f(0, size.y / 2, size.x / 2);
-            p3 = Vector3f(0, size.y / 2, -size.x / 2);
-            normal = Vector3f(1, 0, 0);
-            break;
+        switch(orientation)
+        {
+            case 0: // FACE_X
+                normal = Vector3f(1, 0, 0);
+                return center + Vector3f(0, (v - 0.5f) * size.y, (u - 0.5f) * size.x);
 
-        case 1: // FACE_Y
-            p0 = Vector3f(-size.x / 2, 0, -size.y / 2);
-            p1 = Vector3f(size.x / 2, 0, -size.y / 2);
-            p2 = Vector3f(size.x / 2, 0, size.y / 2);
-            p3 = Vector3f(-size.x / 2, 0, size.y / 2);
-            normal = Vector3f(0, 1, 0);
-            break;
+            case 1: // FACE_Y
+                normal = Vector3f(0, 1, 0);
+                return center + Vector3f((u - 0.5f) * size.x, 0, (v - 0.5f) * size.y);
 
-        case 2: // FACE_Z
-            p0 = Vector3f(-size.x / 2, -size.y / 2, 0);
-            p1 = Vector3f(size.x / 2, -size.y / 2, 0);
-            p2 = Vector3f(size.x / 2, size.y / 2, 0);
-            p3 = Vector3f(-size.x / 2, size.y / 2, 0);
-            normal = Vector3f(0, 0, 1);
-            break;
+            case 2: // FACE_Z
+                normal = Vector3f(0, 0, 1);
+                return center + Vector3f((u - 0.5f) * size.x, (v - 0.5f) * size.y, 0);
 
-        default:
-            assert(0);
+            default:
+                assert(0);
+        }
     }
 
-    addQuad(geometry, center + p0, center + p1, center + p2, center + p3,
-        normal, normal, normal, normal,
-        Vector2f(0, 0), Vector2f(1, 0), Vector2f(1, 1), Vector2f(0, 1));
+    foreach(row; 0 .. subdivideD + 1)
+    {
+        foreach(column; 0 .. subdivideW + 1)
+        {
+            const u0 = cast(float) column / (subdivideW + 1);
+            const v0 = cast(float) row / (subdivideD + 1);
+            const u1 = cast(float) (column + 1) / (subdivideW + 1);
+            const v1 = cast(float) (row + 1) / (subdivideD + 1);
+
+            addQuad(geometry,
+                point(u0, v0), point(u1, v0), point(u1, v1), point(u0, v1),
+                normal, normal, normal, normal,
+                Vector2f(u0, v0), Vector2f(u1, v0), Vector2f(u1, v1), Vector2f(u0, v1),
+            );
+        }
+    }
 }
 
 private void makeSphere(ref MeshGeometry geometry, in GodotVariant[string] properties)
@@ -413,73 +444,272 @@ private void makeTorus(ref MeshGeometry geometry, in GodotVariant[string] proper
 
 private void makeCapsule(ref MeshGeometry geometry, in GodotVariant[string] properties)
 {
-    // Approximated by an ellipsoid; enough to show the node and its material.
-    const radius = cast(float) propertyDouble(properties, "radius", 0.5);
+    const radius = min(cast(float) propertyDouble(properties, "radius", 0.5),
+        cast(float) propertyDouble(properties, "height", 2.0) / 2);
     const height = cast(float) propertyDouble(properties, "height", 2.0);
     const segments = cast(int) propertyLong(properties, "radial_segments", 64);
-    const rings = cast(int) propertyLong(properties, "rings", 32);
+    const rings = max(cast(int) propertyLong(properties, "rings", 32), 0);
 
-    if(segments < 3 || rings < 1)
+    if(segments < 3)
         return;
 
     const halfHeight = height / 2;
+    const cylinderHeight = height - 2 * radius;
 
-    Vector3f point(size_t ring, size_t segment)
+    Vector3f radial(float u)
     {
-        const theta = PI * ring / rings;
-        const phi = 2 * PI * segment / segments;
-
-        return Vector3f(
-            radius * sin(theta) * cos(phi),
-            halfHeight * cos(theta),
-            radius * sin(theta) * sin(phi),
-        );
+        return Vector3f(-sin(u * 2 * PI), 0, cos(u * 2 * PI));
     }
 
-    foreach(ring; 0 .. rings)
+    // Top hemisphere, cylinder and bottom hemisphere share the seam rows.
+    void section(float yOffset, bool top, ref MeshGeometry target)
     {
+        Vector3f point(int ring, int segment)
+        {
+            const v = cast(float) ring / (rings + 1);
+            const u = cast(float) segment / segments;
+            const direction = radial(u);
+
+            if(top)
+            {
+                const w = sin(0.5f * PI * v);
+                const y = cos(0.5f * PI * v);
+                return Vector3f(direction.x * w, y, direction.z * w) * radius +
+                    Vector3f(0, yOffset, 0);
+            }
+            else
+            {
+                const w = cos(0.5f * PI * v);
+                const y = -sin(0.5f * PI * v);
+                return Vector3f(direction.x * w, y, direction.z * w) * radius +
+                    Vector3f(0, yOffset, 0);
+            }
+        }
+
+        Vector3f normal(int ring, int segment)
+        {
+            const v = cast(float) ring / (rings + 1);
+            const u = cast(float) segment / segments;
+
+            if(top)
+            {
+                const w = sin(0.5f * PI * v);
+                const y = cos(0.5f * PI * v);
+                return Vector3f(radial(u).x * w, y, radial(u).z * w);
+            }
+            else
+            {
+                const w = cos(0.5f * PI * v);
+                const y = -sin(0.5f * PI * v);
+                return Vector3f(radial(u).x * w, y, radial(u).z * w);
+            }
+        }
+
+        foreach(ring; 0 .. rings + 1)
+        {
+            foreach(segment; 0 .. segments)
+            {
+                const u0 = cast(float) segment / segments;
+                const u1 = cast(float) (segment + 1) / segments;
+                const v0 = cast(float) ring / (rings + 1);
+                const v1 = cast(float) (ring + 1) / (rings + 1);
+
+                addQuad(target,
+                    point(ring, segment), point(ring + 1, segment),
+                    point(ring + 1, segment + 1), point(ring, segment + 1),
+                    normal(ring, segment), normal(ring + 1, segment),
+                    normal(ring + 1, segment + 1), normal(ring, segment + 1),
+                    Vector2f(u0, v0), Vector2f(u0, v1), Vector2f(u1, v1), Vector2f(u1, v0),
+                );
+            }
+        }
+    }
+
+    section(halfHeight - radius, true, geometry);
+
+    // Cylinder
+    foreach(ring; 0 .. rings + 1)
+    {
+        const v0 = cast(float) ring / (rings + 1);
+        const v1 = cast(float) (ring + 1) / (rings + 1);
+        const y0 = halfHeight - radius - cylinderHeight * v0;
+        const y1 = halfHeight - radius - cylinderHeight * v1;
+
         foreach(segment; 0 .. segments)
         {
-            const p0 = point(ring, segment);
-            const p1 = point(ring + 1, segment);
-            const p2 = point(ring + 1, segment + 1);
-            const p3 = point(ring, segment + 1);
+            const u0 = cast(float) segment / segments;
+            const u1 = cast(float) (segment + 1) / segments;
+            const d0 = radial(u0);
+            const d1 = radial(u1);
 
-            addQuad(geometry, p0, p1, p2, p3,
-                p0.normalized, p1.normalized, p2.normalized, p3.normalized,
-                Vector2f(cast(float) segment / segments, cast(float) ring / rings),
-                Vector2f(cast(float) segment / segments, cast(float) (ring + 1) / rings),
-                Vector2f(cast(float) (segment + 1) / segments, cast(float) (ring + 1) / rings),
-                Vector2f(cast(float) (segment + 1) / segments, cast(float) ring / rings),
+            addQuad(geometry,
+                Vector3f(d0.x * radius, y0, d0.z * radius),
+                Vector3f(d0.x * radius, y1, d0.z * radius),
+                Vector3f(d1.x * radius, y1, d1.z * radius),
+                Vector3f(d1.x * radius, y0, d1.z * radius),
+                d0, d0, d1, d1,
+                Vector2f(u0, v0), Vector2f(u0, v1), Vector2f(u1, v1), Vector2f(u1, v0),
             );
         }
     }
+
+    section(-halfHeight + radius, false, geometry);
 }
 
 private void makePrism(ref MeshGeometry geometry, in GodotVariant[string] properties)
 {
     const size = propertyVector3(properties, "size", Vector3f(1, 1, 1));
     const half = size / 2;
-    const left = cast(float) propertyDouble(properties, "left_to_right", 0.5) * size.x - half.x;
+    const leftToRight = cast(float) propertyDouble(properties, "left_to_right", 0.5);
+    const subdivideW = max(cast(int) propertyLong(properties, "subdivide_width", 0), 0);
+    const subdivideH = max(cast(int) propertyLong(properties, "subdivide_height", 0), 0);
+    const subdivideD = max(cast(int) propertyLong(properties, "subdivide_depth", 0), 0);
 
-    const p0 = Vector3f(-half.x, -half.y, -half.z);
-    const p1 = Vector3f(left, half.y, -half.z);
-    const p2 = Vector3f(-half.x, -half.y, half.z);
-    const p3 = Vector3f(-half.x, half.y, -half.z);
-    const p4 = Vector3f(left, half.y, half.z);
-    const p5 = Vector3f(-half.x, half.y, half.z);
+    // Front and back triangular faces
+    foreach(back; 0 .. 2)
+    {
+        const z = back ? half.z : -half.z;
+        const normal = Vector3f(0, 0, back ? -1 : 1);
 
-    addTriangle(geometry, p0, p3, p1, Vector3f(0, 0, -1), Vector3f(0, 0, -1), Vector3f(0, 0, -1),
-        Vector2f(0, 0), Vector2f(0, 1), Vector2f(1, 1));
-    addTriangle(geometry, p2, p4, p5, Vector3f(0, 0, 1), Vector3f(0, 0, 1), Vector3f(0, 0, 1),
-        Vector2f(0, 0), Vector2f(1, 1), Vector2f(0, 1));
-    addQuad(geometry, p0, p1, p4, p2,
-        Vector3f(-1, 0, 0), Vector3f(-1, 0, 0), Vector3f(-1, 0, 0), Vector3f(-1, 0, 0),
-        Vector2f(0, 0), Vector2f(1, 0), Vector2f(1, 1), Vector2f(0, 1));
-    addQuad(geometry, p0, p2, p5, p3,
-        Vector3f(0, -1, 0), Vector3f(0, -1, 0), Vector3f(0, -1, 0), Vector3f(0, -1, 0),
-        Vector2f(0, 0), Vector2f(1, 0), Vector2f(1, 1), Vector2f(0, 1));
-    addQuad(geometry, p1, p3, p5, p4,
-        Vector3f(0, 1, 0), Vector3f(0, 1, 0), Vector3f(0, 1, 0), Vector3f(0, 1, 0),
-        Vector2f(0, 0), Vector2f(1, 0), Vector2f(1, 1), Vector2f(0, 1));
+        foreach(row; 0 .. subdivideH + 1)
+        {
+            const scale0 = cast(float) row / (subdivideH + 1);
+            const scale1 = cast(float) (row + 1) / (subdivideH + 1);
+            const start0 = -half.x + (1 - scale0) * size.x * leftToRight;
+            const start1 = -half.x + (1 - scale1) * size.x * leftToRight;
+            const width0 = scale0 * size.x;
+            const width1 = scale1 * size.x;
+            const y0 = half.y - size.y * scale0;
+            const y1 = half.y - size.y * scale1;
+
+            foreach(column; 0 .. subdivideW + 1)
+            {
+                const u0 = cast(float) column / (subdivideW + 1);
+                const u1 = cast(float) (column + 1) / (subdivideW + 1);
+
+                addQuad(geometry,
+                    Vector3f(start0 + width0 * u0, y0, z),
+                    Vector3f(start0 + width0 * u1, y0, z),
+                    Vector3f(start1 + width1 * u1, y1, z),
+                    Vector3f(start1 + width1 * u0, y1, z),
+                    normal, normal, normal, normal,
+                    Vector2f(u0, scale0), Vector2f(u1, scale0),
+                    Vector2f(u1, scale1), Vector2f(u0, scale1),
+                );
+            }
+        }
+    }
+
+    // Slanted left and right faces
+    const leftNormal = Vector3f(-size.y, size.x * leftToRight, 0).normalized;
+    const rightNormal = Vector3f(size.y, size.x * (1 - leftToRight), 0).normalized;
+
+    foreach(right; 0 .. 2)
+    {
+        const normal = right ? rightNormal : leftNormal;
+
+        foreach(row; 0 .. subdivideH + 1)
+        {
+            const scale0 = cast(float) row / (subdivideH + 1);
+            const scale1 = cast(float) (row + 1) / (subdivideH + 1);
+            const left0 = -half.x + size.x * (1 - scale0) * leftToRight;
+            const left1 = -half.x + size.x * (1 - scale1) * leftToRight;
+            const x0 = right ? left0 + size.x * scale0 : left0;
+            const x1 = right ? left1 + size.x * scale1 : left1;
+            const y0 = half.y - size.y * scale0;
+            const y1 = half.y - size.y * scale1;
+
+            foreach(depth; 0 .. subdivideD + 1)
+            {
+                const v0 = cast(float) depth / (subdivideD + 1);
+                const v1 = cast(float) (depth + 1) / (subdivideD + 1);
+                const z0 = -half.z + size.z * v0;
+                const z1 = -half.z + size.z * v1;
+
+                addQuad(geometry,
+                    Vector3f(x0, y0, z0), Vector3f(x1, y1, z0),
+                    Vector3f(x1, y1, z1), Vector3f(x0, y0, z1),
+                    normal, normal, normal, normal,
+                    Vector2f(scale0, v0), Vector2f(scale1, v0),
+                    Vector2f(scale1, v1), Vector2f(scale0, v1),
+                );
+            }
+        }
+    }
+
+    // Bottom face
+    foreach(row; 0 .. subdivideD + 1)
+    {
+        const v0 = cast(float) row / (subdivideD + 1);
+        const v1 = cast(float) (row + 1) / (subdivideD + 1);
+        const z0 = -half.z + size.z * v0;
+        const z1 = -half.z + size.z * v1;
+
+        foreach(column; 0 .. subdivideW + 1)
+        {
+            const u0 = cast(float) column / (subdivideW + 1);
+            const u1 = cast(float) (column + 1) / (subdivideW + 1);
+
+            addQuad(geometry,
+                Vector3f(-half.x + size.x * u0, -half.y, z0),
+                Vector3f(-half.x + size.x * u1, -half.y, z0),
+                Vector3f(-half.x + size.x * u1, -half.y, z1),
+                Vector3f(-half.x + size.x * u0, -half.y, z1),
+                Vector3f(0, -1, 0), Vector3f(0, -1, 0), Vector3f(0, -1, 0), Vector3f(0, -1, 0),
+                Vector2f(u0, v0), Vector2f(u1, v0), Vector2f(u1, v1), Vector2f(u0, v1),
+            );
+        }
+    }
+}
+
+unittest
+{
+    GodotVariant[string] properties;
+    properties["size"] = GodotVariant(Vector3f(1, 1, 1));
+    properties["subdivide_width"] = GodotVariant(1L);
+    properties["subdivide_height"] = GodotVariant(1L);
+    properties["subdivide_depth"] = GodotVariant(1L);
+
+    const box = decodePrimitiveMesh("BoxMesh", properties);
+    assert(box.positions.length == 96);
+    assert(box.indices.length == 144);
+
+    properties["size"] = GodotVariant(Vector2f(2, 2));
+    properties["subdivide_width"] = GodotVariant(2L);
+    properties["subdivide_depth"] = GodotVariant(2L);
+
+    const plane = decodePrimitiveMesh("PlaneMesh", properties);
+    assert(plane.positions.length == 36);
+    assert(plane.indices.length == 54);
+
+    properties = null;
+    properties["radius"] = GodotVariant(0.5);
+    properties["height"] = GodotVariant(2.0);
+    properties["radial_segments"] = GodotVariant(8L);
+    properties["rings"] = GodotVariant(2L);
+
+    const capsule = decodePrimitiveMesh("CapsuleMesh", properties);
+    assert(capsule.positions.length == 288);
+    assert(capsule.indices.length == 432);
+
+    foreach(position; capsule.positions)
+    {
+        assert(position.y >= -1.001f && position.y <= 1.001f);
+        assert(position.x * position.x + position.z * position.z <= 0.251f);
+    }
+
+    properties = null;
+    properties["size"] = GodotVariant(Vector3f(1.5, 1.5, 1));
+    properties["left_to_right"] = GodotVariant(0.3);
+    properties["subdivide_width"] = GodotVariant(1L);
+    properties["subdivide_height"] = GodotVariant(1L);
+    properties["subdivide_depth"] = GodotVariant(1L);
+
+    const prism = decodePrimitiveMesh("PrismMesh", properties);
+    assert(prism.positions.length > 0);
+    assert(prism.indices.length > 0);
+    assert(prism.aabb.max.y == 0.75f);
+    assert(prism.aabb.min.y == -0.75f);
+    assert(prism.aabb.max.x == 0.75f);
+    assert(prism.aabb.min.x == -0.75f);
 }

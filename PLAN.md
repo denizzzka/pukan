@@ -69,7 +69,7 @@ or the pack.
 - [x] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
 - [x] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
       `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
-- [ ] Primitive subdivisions, and the exact `CapsuleMesh` and `PrismMesh`
+- [x] Primitive subdivisions, and the exact `CapsuleMesh` and `PrismMesh`
       shapes.
 - [x] `MeshInstance3D`: node tree, `transform`, `visible`, mesh and
       per-surface materials.
@@ -201,6 +201,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       ETC2 and ASTC need device support.
 - [x] Generated `nested.tscn` and `nested_binary.tscn` instancing text and
       binary PackedScenes, checked through a PCK as well.
+- [x] Generated `primitives.tscn` with subdivided box and plane, a capsule and
+      a prism.
 - [x] `exported/exported.pck`, a Godot 4.7 `--export-pack` build with `.remap`
       chains, an imported `.ctex`, binary resources and `project.binary`.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external

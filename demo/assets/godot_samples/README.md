@@ -116,3 +116,7 @@ godot --headless --path . --export-pack "Linux" exported.pck
 `export_presets.cfg` only exists so the command above is reproducible. The
 `checker.png.import` file is committed; without the local `.godot` cache the
 loader falls back to the source PNG.
+
+`primitives.tscn` exercises primitive subdivisions and the capsule and prism
+shapes: a subdivided `BoxMesh`, a subdivided `PlaneMesh`, a `CapsuleMesh` and a
+`PrismMesh` with `left_to_right`.
