@@ -444,9 +444,15 @@ void main(string[] args) {
                     frame,
                     (buf, eye, eyeExtent, phase) {
                         const view = crossEyed ? 1 - eye : eye;
-                        auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
-                        tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
-                        scene.updateFrameUniforms(frame, view, stereoWtb[view]);
+
+                        // Both phases of an eye share the view and the uniform
+                        if(phase == DrawPhase.surface)
+                        {
+                            auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
+                            tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
+                            scene.updateFrameUniforms(frame, view, stereoWtb[view]);
+                        }
+
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
                     },
                     (buf, eye, eyeExtent, phase) {
