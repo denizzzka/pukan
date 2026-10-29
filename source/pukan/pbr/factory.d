@@ -243,7 +243,7 @@ class PbrFactory
                 depthBiasSlopeFactor: 1.75f,
             );
 
-            VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE];
+            VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE];
 
             const skinnedShadow = pipelines.declare(RenderTechnique(
                 name: "PBR shadow",
@@ -315,7 +315,7 @@ class PbrFactory
 
     private PbrPipelineVariants createVariants(string prefix, ShaderInfo[] stages, ShaderInfo[] oitStages, RenderPass renderPass)
     {
-        VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE];
+        VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE];
 
         TechniqueId declare(string suffix, ShaderInfo[] techniqueStages, FixedState state)
         {

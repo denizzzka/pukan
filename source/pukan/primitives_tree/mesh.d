@@ -37,6 +37,7 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
         this.resources = resources;
         this.vertices = vertices;
         this.indices = indices;
+        frontFace = VK_FRONT_FACE_CLOCKWISE;
 
         static if(hasNormal!VertexT)
             material = Material(Vector3f(1, 1, 1), MaterialMode.lit, MaterialFlags(MaterialFlag.vertexColor));

@@ -11,6 +11,7 @@ class GodotFactory
 {
     private alias requirements = AliasSeq!(
         Requirement!(VkPhysicalDeviceFeatures.fragmentStoresAndAtomics),
+        Requirement!(VkPhysicalDeviceExtendedDynamicStateFeaturesEXT.extendedDynamicState),
         Requirement!(VkQueueFamilyProperties.queueFlags, VK_QUEUE_GRAPHICS_BIT),
         ImageFormatRequirement!(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),

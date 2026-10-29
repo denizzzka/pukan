@@ -5,9 +5,15 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.frame_builder: FrameBuilder;
 import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
+import pukan.vulkan.requirements: Requirement;
+import std.meta: AliasSeq;
 
 struct PrimitivesFactory(T)
 {
+    private alias requirements = AliasSeq!(
+        Requirement!(VkPhysicalDeviceExtendedDynamicStateFeaturesEXT.extendedDynamicState),
+    );
+
     LogicalDevice device;
     private DescriptorAllocator allocator;
     private MeshResources resources;
@@ -21,7 +27,7 @@ struct PrimitivesFactory(T)
         const technique = pipelines.declare(RenderTechnique(
             name: T.techniqueName(),
             stages: T.shaderStages(device),
-            dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE],
+            dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE],
         ), 10);
 
         allocator = pipelines.descriptorAllocator(technique);

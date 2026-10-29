@@ -80,6 +80,9 @@ class Mesh
     VkIndexType indexType;
     uint indexCount;
 
+    /// Native winding of this mesh; set per draw with dynamic state
+    VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
     protected MaterialBuffer materialBuffer;
     protected size_t materialSlot;
 
@@ -184,6 +187,8 @@ class Mesh
                 0,
                 null,
             );
+
+        vkCmdSetFrontFace(buf, frontFace);
 
         if(indexCount)
             vkCmdDrawIndexed(buf, indexCount, 1, 0, 0, 0);
