@@ -1,8 +1,8 @@
 [gd_scene format=4]
 
-[ext_resource type="PackedScene" path="res://town/model/town_model.gltf" id="1_model"]
+[ext_resource type="PackedScene" path="res://town/model/town_model.scn" id="1_model"]
 [ext_resource type="Material" path="res://town/sky_day.tres" id="2_sky"]
-[ext_resource type="PackedScene" path="res://town/tree/scene.gltf" id="3_tree"]
+[ext_resource type="PackedScene" path="res://town/tree/scene.scn" id="3_tree"]
 [ext_resource type="PackedScene" path="res://town/lamp/lamp_scene.tscn" id="4_lamp"]
 
 [sub_resource type="Sky" id="Sky_1"]
@@ -29,19 +29,19 @@ environment = SubResource("Environment_1")
 [node name="Trees" type="Node3D" parent="."]
 
 [node name="Tree" parent="Trees" instance=ExtResource("3_tree")]
-transform = Transform3D(0.00375, 0, 0, 0, 0.00375, 0, 0, 0, 0.00375, 5.548664, 9.214607, 21.853706)
+transform = Transform3D(0.375, 0, 0, 0, 0.375, 0, 0, 0, 0.375, 5.548664, 9.214607, 21.853706)
 
 [node name="Tree2" parent="Trees" instance=ExtResource("3_tree")]
-transform = Transform3D(-0.001781004, 0, 0.0027185518, 0, 0.00325, 0, -0.0027185518, 0, -0.001781004, 22.705954, 8.334187, -12.540859)
+transform = Transform3D(-0.1781004, 0, 0.27185518, 0, 0.325, 0, -0.27185518, 0, -0.1781004, 22.705954, 8.334187, -12.540859)
 
 [node name="Tree3" parent="Trees" instance=ExtResource("3_tree")]
-transform = Transform3D(0.0010563323, 0, 0.0042713186, 0, 0.0044, 0, -0.0042713186, 0, 0.0010563323, 50.709362, 10.075925, -6.032544)
+transform = Transform3D(0.10563323, 0, 0.42713186, 0, 0.44, 0, -0.42713186, 0, 0.10563323, 50.709362, 10.075925, -6.032544)
 
 [node name="Tree4" parent="Trees" instance=ExtResource("3_tree")]
-transform = Transform3D(0.0041906354, 0, 0.0013411105, 0, 0.0044, 0, -0.0013411105, 0, 0.0041906354, -12.516531, 12.71288, -15.442337)
+transform = Transform3D(0.41906354, 0, 0.13411105, 0, 0.44, 0, -0.13411105, 0, 0.41906354, -12.516531, 12.71288, -15.442337)
 
 [node name="Tree5" parent="Trees" instance=ExtResource("3_tree")]
-transform = Transform3D(0.0023812625, 0, -0.0017412893, 0, 0.00295, 0, 0.0017412893, 0, 0.0023812625, -20.612381, 3.7711592, 1.7494526)
+transform = Transform3D(0.23812625, 0, -0.17412893, 0, 0.295, 0, 0.17412893, 0, 0.23812625, -20.612381, 3.7711592, 1.7494526)
 
 [node name="Lamps" type="Node3D" parent="."]
 

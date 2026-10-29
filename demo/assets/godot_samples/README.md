@@ -18,7 +18,8 @@ Commit: `b761b4cd5718a7118f2c95eb55f181d0a5f004f1` (`master`).
   must skip resource types it does not render.
 - `truck_town/` is `3d/truck_town/town` with the project file and the
   `town_view.tscn` wrapper added here. The model, the trees, the lamps and the
-  sky are kept; the scripts and the UI are left out.
+  sky are kept as the `.scn` files Godot 4.7 imports; the raw `.gltf` sources,
+  the scripts and the UI are left out.
 
 The demo projects are MIT licensed, see `LICENSE.godot-demo-projects.md`.
 `lights_and_shadows/checker.png` is CC0 by Kenney, see
@@ -166,15 +167,20 @@ lamps under a directional light, the sky of the original scene and a `Camera3D`
 that frames the whole terrain. The model is a 2048 unit ground mesh with roads,
 houses and a racetrack: 60930 triangles in 75 primitives and 9 materials.
 
-It is the only fixture that keeps an external `.gltf`: the mesh data lives in
-`town_model0.bin`, and the textures are WebP files referenced through
-`EXT_texture_webp` with the path percent-encoded (`textures%2F...`), the way the
-Godot glTF exporter writes them. The loader decodes both, and `--fov`/`--far`
-exist so a terrain this large can be viewed.
+Unlike the other fixtures, this one ships the imported scene rather than the
+source asset. `town/model/town_model.scn`, `town/tree/scene.scn` and
+`town/lamp/scene.scn` are what Godot 4.7 produces from the upstream `.gltf`
+files, and that is what a game runs. The tree's `nodes/root_scale=0.01` from
+`scene.gltf.import` is applied at import, so its instances keep the upstream
+transforms. Only the textures stay as source `.webp`, `.jpeg` and `.png` files.
 
 ```sh
 ./demo_godot/pukan_demo_godot --scene demo/assets/godot_samples/truck_town/town_view.tscn --scene-camera --frames 2
 ```
+
+To regenerate the three `.scn` files, copy `town/{model,tree,lamp}` together
+with their `.import` files into a Godot 4.7 project, run `--headless --import`
+and copy the `.scn` files out of `.godot/imported`.
 
 The sky is kept as far as the fixture goes, but the loader does not render
 `WorldEnvironment` yet, and `demo_godot` says so:
@@ -184,7 +190,6 @@ nodes not rendered: WorldEnvironment x1
 resources not rendered: Environment x1, Material x1, Sky x1
 ```
 
-The tree model carries the 100x Sketchfab scale from its own nodes, so the
-instances use the upstream transforms scaled by 0.01 to stand next to the
-houses. Shadows stay off in `demo_godot`, so the background is transparent and
-the model is lit by the sun only.
+Shadows are on in `demo_godot`, but the shadow frustum is a fixed 10 units
+around the origin, far smaller than this map, so the terrain shows none. The
+background is transparent, so the model is lit by the sun only.

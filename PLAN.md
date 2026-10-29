@@ -64,8 +64,8 @@ or the pack.
       position, normal and tangent regions in `vertex_data`, interleaved
       `attribute_data` and `skin_data`, octahedral normals and tangents, RGBA8
       colors, float32 UVs and 16/32-bit indices.
-- [x] Attribute-compressed surface decoding: quantized positions, 16-bit UVs,
-      octahedron normal and tangent angle.
+- [x] Attribute-compressed surface decoding: quantized positions, 16-bit UVs
+      and a TBN axis-angle pair, which gives both the normal and the tangent.
 - [x] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
 - [x] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
       `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
@@ -121,6 +121,10 @@ The end goal is a game exported by Godot, not only a source project.
 - [x] `PackedScene._bundled` decoder for binary `.scn`.
 - [ ] `PackedScene` base scenes and child index ordering.
 - [x] `.import` remap, exported `.remap` chains and `project.binary`.
+- [ ] Read the glTF import settings next to a source asset: at least
+      `nodes/apply_root_scale` and `nodes/root_scale`, which is what makes the
+      town tree stand at the right size, plus `nodes/use_name_suffixes` and
+      `materials/extract` when a project relies on them.
 - [x] `.pck` v2-v4 reader, unencrypted, with a `GodotSource` abstraction shared
       by directory and pack sources.
 - [ ] Stream or memory-map pack files instead of loading the whole archive.
@@ -262,9 +266,10 @@ Fixtures live in `demo/assets/godot_samples/`.
       material and both override forms.
 - [x] `compressed_array_mesh.tres` and `compressed_mesh.tscn`, produced by the
       glTF importer from the AnimatedCube sample with mesh compression enabled.
-- [x] `truck_town/town_view.tscn`, a 2048 unit landscape from a glTF town:
-      terrain, roads, houses, trees, street lamps and a sky. It is the first
-      fixture with an external `.gltf`, a `.bin` buffer and WebP textures.
+- [x] `truck_town/town_view.tscn`, a 2048 unit landscape with terrain, roads,
+      houses, trees, street lamps and a sky. It ships the `.scn` that Godot 4.7
+      imports from the upstream `.gltf`, because a game runs the imported
+      scene; only the textures stay as source files.
 - [ ] Interior fixture: a room assembled from CC0 Kenney furniture with omni
       lights and a camera, to test many small glTF instances and indoor light
       falloff.

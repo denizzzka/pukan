@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cf2bmynxs522"]
 
-[ext_resource type="PackedScene" uid="uid://b3cpmxc6oy0fh" path="res://town/lamp/scene.gltf" id="1_wddoj"]
+[ext_resource type="PackedScene" uid="uid://b3cpmxc6oy0fh" path="res://town/lamp/scene.scn" id="1_wddoj"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_pxdqy"]
 height = 7.2680664
