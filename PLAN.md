@@ -95,9 +95,9 @@ or the pack.
 
 #### Phase 2: lights, cameras and environment
 
-- [ ] `DirectionalLight3D`, `OmniLight3D` and `SpotLight3D` to the `Scene`
+- [x] `DirectionalLight3D`, `OmniLight3D` and `SpotLight3D` to the `Scene`
       light list; add a `Scene.setSun` path for the directional one.
-- [ ] `Camera3D` exposed on the loaded scene; the demo decides whether to use
+- [x] `Camera3D` exposed on the loaded scene; the demo decides whether to use
       it.
 - [ ] `WorldEnvironment`, `Environment` and `Sky`: background colour, ambient
       light and tonemap; IBL, fog, SDFGI and volumetrics stay unsupported at
