@@ -129,3 +129,14 @@ even though each node keeps its own material and transform.
 parsed `enemy.glb` asset, including its vertex buffers and textures, while each
 keeps its own node transforms and joint buffers. `demo_godot` reports
 `gltf assets 1`.
+
+`platformer/platformer.pck` is a Godot 4.7 export of the platformer sample. It
+contains the compressed `enemy.glb` import with `Skeleton3D` and `Skin`, so it
+exercises native Godot skinning and the RSCC/Zstandard resource path:
+
+```sh
+./demo_godot/pukan_demo_godot --pack demo/assets/godot_samples/platformer/platformer.pck --scene res://enemy/enemy.tscn --frames 2
+```
+
+The enemy currently renders in its bind pose; animation tracks are not applied
+yet.

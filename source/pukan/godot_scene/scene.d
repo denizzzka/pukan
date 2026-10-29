@@ -20,6 +20,30 @@ enum GodotLightKind
     spot,
 }
 
+struct GodotBone
+{
+    string name;
+    int parent = -1;
+    Matrix4x4f rest = Matrix4x4f.identity();
+    Matrix4x4f local = Matrix4x4f.identity();
+    bool enabled = true;
+}
+
+/// Bone hierarchy of one Skeleton3D node
+struct GodotSkeleton
+{
+    GodotBone[] bones;
+    Matrix4x4f[] globalPoses;
+}
+
+/// One Skin resource resolved for a mesh instance
+final class GodotSkin
+{
+    TransferBuffer buffer;
+    VkDescriptorBufferInfo info;
+    Matrix4x4f[] matrices;
+}
+
 struct GodotLight
 {
     GodotLightKind kind;
@@ -56,6 +80,9 @@ class GodotNode
     GodotCamera camera;
     bool hasCamera;
     DrawableByVulkan instance;
+    GodotSkeleton skeleton;
+    bool hasSkeleton;
+    GodotSkin skin;
 
     void addChild(GodotNode child)
     {
@@ -85,6 +112,7 @@ final class GodotScene : DrawableByVulkan, Blended
     GodotCamera camera;
     bool hasCamera;
     private DrawableByVulkan[] instances;
+    private GodotSkin[] skins;
 
     package(pukan) this(
         ref PbrPipelines pipelines,
@@ -95,6 +123,7 @@ final class GodotScene : DrawableByVulkan, Blended
         BufferPieceOnGPU[] gpuBuffs,
         Texture[] textures,
         DrawableByVulkan[] instances,
+        GodotSkin[] skins,
         string name,
     )
     {
@@ -106,6 +135,7 @@ final class GodotScene : DrawableByVulkan, Blended
         this.gpuBuffs = gpuBuffs;
         this.textures = textures;
         this.instances = instances;
+        this.skins = skins;
         this.name = name;
     }
 
@@ -121,6 +151,10 @@ final class GodotScene : DrawableByVulkan, Blended
 
         foreach(instance; instances)
             destroyInstance(instance);
+
+        foreach(skin; skins)
+            if(skin && skin.buffer)
+                destroy(skin.buffer);
     }
 
     string possibleName() const => name;
@@ -229,6 +263,9 @@ final class GodotScene : DrawableByVulkan, Blended
             foreach(ref piece; gpuBuffs)
                 if(piece)
                     piece.recordUpload(buf);
+
+            foreach(skin; skins)
+                skin.buffer.recordUpload(buf);
 
             materialBuffer.recordUpload(buf);
         });

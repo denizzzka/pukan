@@ -143,28 +143,26 @@ The end goal is a game exported by Godot, not only a source project.
 - [ ] Instance property overrides and editable children.
 - [ ] `MultiMeshInstance3D` and `MultiMesh`.
 - [ ] Native Godot skinning, broken down:
-  - [ ] Fixture reconnaissance: export `platformer/` as a PCK and confirm the
+  - [x] Fixture reconnaissance: export `platformer/` as a PCK and confirm the
         importer output (`Skeleton3D`, `Skin`, `ArrayMesh` skin data).
-  - [ ] Read `Skin`: `bind_count`, `bind/{i}/bone`, `bind/{i}/name`,
+  - [x] Read `Skin`: `bind_count`, `bind/{i}/bone`, `bind/{i}/name`,
         `bind/{i}/pose`; fall back to name lookup for named skins.
-  - [ ] Read `Skeleton3D`: `bones/{i}/name`, `parent`, `rest`, `enabled`,
+  - [x] Read `Skeleton3D`: `bones/{i}/name`, `parent`, `rest`, `enabled`,
         `position`, `rotation`, `scale` and `bone_meta`; ignore metadata.
-  - [ ] Resolve `MeshInstance3D.skin` and `MeshInstance3D.skeleton` NodePaths and
+  - [x] Resolve `MeshInstance3D.skin` and `MeshInstance3D.skeleton` NodePaths and
         default an empty `skeleton` to the parent `Skeleton3D`.
-  - [ ] Compute rest and pose bone transforms through the bone hierarchy,
-        honoring `enabled` and rest-only; derive inverse bind matrices from the
-        skin's `pose` and `bone`.
-  - [ ] CPU skinning first: bake joint matrices into the existing `joints` and
-        `weights` streams, as glTF does for a static skin.
-  - [ ] GPU path: one joint matrix buffer per `Skeleton3D`, bound through
-        `MATERIAL_JOINTS`; reuse `SkinMatrices` where its node model fits.
+  - [x] Compute rest and pose bone transforms through the bone hierarchy,
+        honoring `enabled`; derive joint matrices from the skin's `pose` and
+        `bone`.
+  - [ ] CPU skinning fallback for devices without the GPU path.
+  - [x] GPU path: one joint matrix buffer per skin, bound through
+        `MATERIAL_JOINTS`; the imported enemy renders in its bind pose.
   - [ ] `BoneAttachment3D`: resolve `bone_name`/`bone_idx` and apply the bone's
         global pose to the node and its children.
   - [ ] `AnimationPlayer` and `Animation`: decode `AnimationLibrary`,
         `AnimationPlayer` and `Animation`; sample transform tracks, `autoplay`
         and looping, and drive skeleton poses per frame.
-  - [ ] Verify: load `enemy.tscn` from the source project and from an exported
-        pack; rest pose and walk animation match the glTF path; `dub test`.
+  - [ ] Verify the walk animation against the glTF path.
   - Note: `enemy.tscn` overrides `bones/N/...` on an instanced child, so native
     skinning needs instance property overrides to reach feature parity.
 - [ ] Animation of material and node properties.
@@ -195,6 +193,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       skeleton and animation.
 - [x] `platformer/enemy/enemy_twins.tscn`: two instances of `enemy.tscn` with
       one shared glTF asset and independent node and joint state.
+- [x] `platformer/platformer.pck`: a Godot 4.7 export with the RSCC imported
+      `enemy.glb`, `Skeleton3D` and `Skin`.
 - [x] Generated `procedural.tscn`, `.scn` and `.res` with two uncompressed
       `ArrayMesh` surfaces, built by Godot 4.7 headless.
 - [x] Generated `binary.tscn` referencing the binary `.res` mesh, and a binary

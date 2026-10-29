@@ -1,6 +1,6 @@
 module pukan.godot_scene.loader;
 
-import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f, degtorad;
+import dlib.math: Matrix4x4f, Quaternionf, Vector2f, Vector3f, Vector4f, degtorad, scaleMatrix, translationMatrix;
 import material_bindings;
 import pukan.compressed_texture: CompressedFamily, familySupported, formatSupported;
 import pukan.exceptions: PukanException;
@@ -12,7 +12,7 @@ import pukan.godot_scene.remap: resolveGodotPath;
 import pukan.godot_scene.source: DirectorySource, GodotSource;
 import pukan.godot_scene.mesh: GodotArraySurface, GodotPrimitive, decodeArrayMesh;
 import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
-import pukan.godot_scene.scene: GodotCamera, GodotLight, GodotLightKind, GodotNode, GodotScene;
+import pukan.godot_scene.scene: GodotBone, GodotCamera, GodotLight, GodotLightKind, GodotNode, GodotScene, GodotSkin, GodotSkeleton;
 import pukan.godot_scene.text: GodotTextDocument, GodotTextExternal, GodotTextNode, GodotTextResource, parseGodotTextFile;
 import pukan.godot_scene.value;
 import pukan.gltf: GlTF;
@@ -31,7 +31,8 @@ import std.algorithm: canFind, endsWith;
 import std.conv: to;
 import std.file: exists, getcwd;
 import std.path: buildNormalizedPath, buildPath, dirName, extension, isAbsolute, relativePath;
-import std.string: replace, startsWith, toLower;
+import std.algorithm: startsWith;
+import std.string: replace, split, toLower;
 
 /// Options for loading one Godot scene
 struct GodotLoadOptions
@@ -140,6 +141,7 @@ private final class GodotLoader
     Texture[] textures;
     Texture[string] textureCache;
     DrawableByVulkan[] instances;
+    GodotSkin[] skins;
     VkDescriptorImageInfo fakeTextureInfo;
 
     size_t skippedNodes;
@@ -218,6 +220,7 @@ private final class GodotLoader
             gpuBuffs,
             textures,
             instances,
+            skins,
             root.name,
         );
         scene.skippedNodes = skippedNodes;
@@ -328,7 +331,7 @@ private final class GodotLoader
                 continue;
             }
 
-            auto node = createNode(document, section);
+            auto node = createNode(document, section, *parent);
             (*parent).addChild(node);
             byPath[parentPath == "." ? section.name : parentPath ~ "/" ~ section.name] = node;
         }
@@ -360,7 +363,136 @@ private final class GodotLoader
         return value is null ? defaultValue : as!(GodotColor)(*value, name);
     }
 
-    private GodotNode createNode(ref GodotTextDocument document, ref GodotTextNode section)
+    private static GodotSkeleton parseSkeleton(in GodotVariant[string] properties)
+    {
+        import std.algorithm: max;
+
+        size_t boneCount;
+
+        foreach(key; properties.keys)
+        {
+            if(!key.startsWith("bones/"))
+                continue;
+
+            const parts = key.split("/");
+            if(parts.length < 3)
+                continue;
+
+            const index = parts[1].to!size_t;
+            boneCount = max(boneCount, index + 1);
+        }
+
+        GodotSkeleton result;
+        result.bones.length = boneCount;
+        result.globalPoses.length = boneCount;
+
+        bool[] hasPosition;
+        bool[] hasRotation;
+        bool[] hasScale;
+        Vector3f[] positions;
+        Quaternionf[] rotations;
+        Vector3f[] scales;
+        hasPosition.length = hasRotation.length = hasScale.length = boneCount;
+        positions.length = rotations.length = scales.length = boneCount;
+
+        foreach(key, ref value; properties)
+        {
+            if(!key.startsWith("bones/"))
+                continue;
+
+            const parts = key.split("/");
+            if(parts.length < 3)
+                continue;
+
+            const index = parts[1].to!size_t;
+            if(index >= boneCount)
+                continue;
+
+            ref bone = result.bones[index];
+
+            switch(parts[2])
+            {
+                case "name":
+                    bone.name = asString(value, key);
+                    break;
+
+                case "parent":
+                    bone.parent = cast(int) asLong(value, key);
+                    break;
+
+                case "rest":
+                    bone.rest = as!(GodotTransform3D)(value, key).toMatrix;
+                    break;
+
+                case "enabled":
+                    bone.enabled = asBool(value, key);
+                    break;
+
+                case "position":
+                    positions[index] = as!(Vector3f)(value, key);
+                    hasPosition[index] = true;
+                    break;
+
+                case "rotation":
+                    rotations[index] = as!(Quaternionf)(value, key);
+                    hasRotation[index] = true;
+                    break;
+
+                case "scale":
+                    scales[index] = as!(Vector3f)(value, key);
+                    hasScale[index] = true;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        bool[] done;
+        done.length = boneCount;
+
+        Matrix4x4f resolve(size_t index, size_t depth)
+        {
+            if(done[index])
+                return result.globalPoses[index];
+
+            if(depth > boneCount)
+                return result.bones[index].local;
+
+            ref GodotBone bone = result.bones[index];
+            bone.local = bone.rest;
+
+            if(hasPosition[index] || hasRotation[index] || hasScale[index])
+            {
+                Matrix4x4f local = Matrix4x4f.identity();
+
+                if(hasPosition[index])
+                    local *= translationMatrix(positions[index]);
+                if(hasRotation[index])
+                    local *= rotations[index].toMatrix4x4;
+                if(hasScale[index])
+                    local *= scaleMatrix(scales[index]);
+
+                bone.local = bone.enabled ? local : bone.rest;
+            }
+
+            Matrix4x4f global = bone.local;
+
+            if(bone.parent >= 0 && cast(size_t) bone.parent < boneCount)
+                global = resolve(cast(size_t) bone.parent, depth + 1) * global;
+
+            result.globalPoses[index] = global;
+            done[index] = true;
+            return global;
+        }
+
+        foreach(i; 0 .. boneCount)
+            resolve(i, 0);
+
+        return result;
+    }
+
+    private GodotNode createNode(ref GodotTextDocument document, ref GodotTextNode section, GodotNode parent = null)
     {
         auto node = new GodotNode;
         node.name = section.name;
@@ -448,8 +580,14 @@ private final class GodotLoader
             }
         }
 
+        if(section.type == "Skeleton3D")
+        {
+            node.skeleton = parseSkeleton(section.properties);
+            node.hasSkeleton = true;
+        }
+
         if(section.type == "MeshInstance3D")
-            createMeshInstance(document, section, node);
+            createMeshInstance(document, section, node, parent);
 
         return node;
     }
@@ -475,6 +613,7 @@ private final class GodotLoader
         ref GodotTextDocument document,
         ref GodotTextNode section,
         GodotNode node,
+        GodotNode parent,
     )
     {
         auto meshValue = "mesh" in section.properties;
@@ -520,6 +659,38 @@ private final class GodotLoader
             return;
         }
 
+        GodotSkeleton* skeleton;
+
+        if(parent !is null && parent.hasSkeleton)
+            skeleton = &parent.skeleton;
+
+        if(auto value = "skeleton" in section.properties)
+        {
+            const path = as!(GodotNodePath)(*value, "skeleton").value;
+
+            if(path == ".." && parent !is null && parent.hasSkeleton)
+                skeleton = &parent.skeleton;
+            else if(path == "." && node.hasSkeleton)
+                skeleton = &node.skeleton;
+        }
+
+        GodotSkin skin;
+        bool hasSkin;
+
+        if(skeleton !is null)
+        {
+            if(auto value = "skin" in section.properties)
+            {
+                skin = resolveSkin(document, asObjectRef(*value, "skin"), *skeleton);
+
+                if(skin !is null)
+                {
+                    skins ~= skin;
+                    hasSkin = true;
+                }
+            }
+        }
+
         const castShadowMode = cast(int) propertyLong(section.properties, "cast_shadow", 1);
         const meshKey = documentPath ~ "#" ~ meshRef.id;
         GodotVariant materialOverride;
@@ -546,7 +717,9 @@ private final class GodotLoader
                 addSurfaceMesh(
                     document, documentPath, surface, section.name, node,
                     materialOverride, surfaceOverride, castShadowMode,
-                    meshKey ~ "/" ~ i.to!string,
+                    meshKey ~ "/" ~ i.to!string ~ (hasSkin ? ":skin" : ""),
+                    hasSkin ? skin.info : pbr.resources.identityJointsInfo,
+                    hasSkin,
                 );
             }
         }
@@ -567,7 +740,9 @@ private final class GodotLoader
             addSurfaceMesh(
                 document, documentPath, surface, section.name, node,
                 materialOverride, surfaceOverride, castShadowMode,
-                meshKey ~ "/0",
+                meshKey ~ "/0" ~ (hasSkin ? ":skin" : ""),
+                hasSkin ? skin.info : pbr.resources.identityJointsInfo,
+                hasSkin,
             );
         }
         else
@@ -613,6 +788,8 @@ private final class GodotLoader
         GodotVariant surfaceOverride,
         int castShadowMode,
         string geometryKey,
+        VkDescriptorBufferInfo jointInfo,
+        bool hasSkin,
     )
     {
         auto material = defaultMaterial(surface.geometry.colors.length > 0, documentPath);
@@ -632,7 +809,7 @@ private final class GodotLoader
                 surface.geometry.colors.length > 0,
             );
 
-        auto mesh = createMesh(surface, material, nodeName, geometryKey);
+        auto mesh = createMesh(surface, material, nodeName, geometryKey, jointInfo, hasSkin);
         mesh.castShadow = castShadowMode != 0;
         mesh.shadowsOnly = castShadowMode == 3;
         node.meshes ~= mesh;
@@ -710,6 +887,8 @@ private final class GodotLoader
         GodotMaterialData material,
         string nodeName,
         string geometryKey,
+        VkDescriptorBufferInfo jointInfo,
+        bool hasSkin,
     )
     {
         PbrGeometry geometry;
@@ -735,7 +914,7 @@ private final class GodotLoader
                 streams.indices = IndicesDescr(indices, VK_INDEX_TYPE_UINT32);
             }
 
-            geometry = new PbrGeometry(streams, false, pbr.resources.fallbackVertex.buf);
+            geometry = new PbrGeometry(streams, hasSkin, pbr.resources.fallbackVertex.buf);
             geometry.build(gpuBuffs);
 
             if(geometryKey.length)
@@ -750,11 +929,102 @@ private final class GodotLoader
             allocator,
             pbr.resources.materials,
             fakeTextureInfo,
-            pbr.resources.identityJointsInfo,
+            jointInfo,
         );
 
         applyMaterial(mesh, surface, material);
         return mesh;
+    }
+
+    private GodotSkin resolveSkin(
+        ref GodotTextDocument document,
+        GodotObjectRef reference,
+        ref GodotSkeleton skeleton,
+    )
+    {
+        string type;
+        GodotVariant[string] properties;
+
+        if(reference.kind == GodotRefKind.subResource)
+        {
+            auto resource = findSubResource(document, reference.id);
+            if(resource is null)
+                return null;
+
+            type = resource.type;
+            properties = resource.properties;
+        }
+        else if(reference.kind == GodotRefKind.extResource)
+        {
+            auto external = findExternal(document, reference.id);
+            if(external is null || !isResourcePath(external.path))
+                return null;
+
+            auto skinDocument = project.document(project.key(external.path));
+            type = skinDocument.resourceType;
+            properties = skinDocument.resourceProperties;
+        }
+
+        if(type != "Skin")
+            return null;
+
+        const bindCount = cast(size_t) propertyLong(properties, "bind_count", 0);
+
+        if(bindCount == 0)
+            return null;
+
+        Matrix4x4f[] matrices;
+        matrices.length = bindCount;
+        matrices[] = Matrix4x4f.identity;
+
+        foreach(i; 0 .. bindCount)
+        {
+            const prefix = "bind/" ~ i.to!string ~ "/";
+
+            int bone = cast(int) propertyLong(properties, prefix ~ "bone", -1);
+
+            if(bone < 0)
+            {
+                if(auto value = prefix ~ "name" in properties)
+                {
+                    const name = asString(*value, prefix ~ "name");
+
+                    foreach(index, ref candidate; skeleton.bones)
+                        if(candidate.name == name)
+                        {
+                            bone = cast(int) index;
+                            break;
+                        }
+                }
+            }
+
+            if(bone < 0 || cast(size_t) bone >= skeleton.globalPoses.length)
+                continue;
+
+            Matrix4x4f bindPose = Matrix4x4f.identity;
+
+            if(auto value = prefix ~ "pose" in properties)
+                bindPose = as!(GodotTransform3D)(*value, prefix ~ "pose").toMatrix;
+
+            matrices[i] = skeleton.globalPoses[cast(size_t) bone] * bindPose;
+        }
+
+        auto buffer = device.create!TransferBuffer(
+            bindCount * Matrix4x4f.sizeof,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        );
+        (cast(Matrix4x4f[]) buffer.cpuBuf)[] = matrices;
+
+        auto skin = new GodotSkin;
+        skin.buffer = buffer;
+        skin.matrices = matrices;
+        skin.info = VkDescriptorBufferInfo(
+            buffer: buffer.gpuBuffer,
+            offset: 0,
+            range: buffer.length,
+        );
+
+        return skin;
     }
 
     private void applyMaterial(
