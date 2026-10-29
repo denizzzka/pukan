@@ -142,6 +142,15 @@ final class GodotDictionary
     GodotVariant[] keys;
     GodotVariant[] values;
 
+    GodotVariant* get(string key)
+    {
+        foreach(i, k; keys)
+            if(k.type == typeid(string) && k.get!string == key)
+                return &values[i];
+
+        return null;
+    }
+
     const(GodotVariant)* get(string key) const
     {
         foreach(i, k; keys)

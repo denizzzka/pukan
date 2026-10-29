@@ -60,10 +60,13 @@ or the pack.
       base64 `PackedByteArray` (format 4).
 - [ ] `res://` resolution from `project.godot`; external text resources and
       `.glb`/`.gltf` references through the existing loader.
-- [ ] `ArrayMesh` decoder: interleaved `vertex_data`, `attribute_data`,
-      `skin_data` and `index_data`, format version 2, octahedral normals and
-      tangents, half-float UVs, RGBA8 colors, 16/32-bit indices, compressed and
-      uncompressed surfaces.
+- [x] `ArrayMesh` decoder for uncompressed version 2 surfaces: separate
+      position, normal and tangent regions in `vertex_data`, interleaved
+      `attribute_data` and `skin_data`, octahedral normals and tangents, RGBA8
+      colors, float32 UVs and 16/32-bit indices.
+- [ ] Attribute-compressed surface decoding: quantized positions, half-float
+      UVs and octahedron TBN.
+- [ ] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
 - [ ] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
       `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
 - [ ] `MeshInstance3D`: node tree, `transform`, `visible`, `cast_shadow`,
