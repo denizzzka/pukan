@@ -443,7 +443,7 @@ unittest
     import std.file: read;
     import std.path: buildPath, dirName;
 
-    const root = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets", "godot_samples", "exported");
+    const root = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot", "godot_samples", "exported");
     const pack = new PckArchive(buildPath(root, "exported.pck"));
 
     const settings = parseGodotProjectBinary(pack.read("res://project.binary"), "project.binary");

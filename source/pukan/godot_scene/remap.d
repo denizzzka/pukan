@@ -147,7 +147,7 @@ unittest
     import std.algorithm: endsWith;
     import std.path: buildPath, dirName;
 
-    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets",
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot",
         "godot_samples", "exported", "exported.pck");
     auto source = new PckSource(new PckArchive(path));
 

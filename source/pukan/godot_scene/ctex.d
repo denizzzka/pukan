@@ -232,7 +232,7 @@ private const(CompressedFormat)* compressedByGodotFormat(uint imageFormat)
 private string fixturePath(string name)
 {
     import std.path: buildPath, dirName;
-    return buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets",
+    return buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot",
         "godot_samples", "generated", name);
 }
 

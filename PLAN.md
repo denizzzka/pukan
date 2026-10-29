@@ -232,7 +232,7 @@ assert that a mesh is never shared between two different handedness values.
 
 #### Fixtures
 
-Fixtures live in `demo/assets/godot_samples/`.
+Fixtures live in `demo_godot/godot_samples/`.
 
 - [x] `lights_and_shadows/test.tscn` from the Godot demo projects: text scene,
       primitives, `StandardMaterial3D`, textures and lights.

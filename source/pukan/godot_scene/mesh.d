@@ -450,7 +450,7 @@ unittest
 private string fixturePath(string relative)
 {
     import std.path: buildPath, dirName;
-    return buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets", "godot_samples", relative);
+    return buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot", "godot_samples", relative);
 }
 
 unittest
@@ -458,7 +458,7 @@ unittest
     import pukan.godot_scene.text: parseGodotTextFile;
     import std.path: buildPath, dirName;
 
-    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets",
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot",
         "godot_samples", "generated", "compressed_array_mesh.tres");
     auto document = parseGodotTextFile(path);
     auto surfaces = decodeArrayMesh(document.resourceProperties["_surfaces"]);
@@ -486,7 +486,7 @@ unittest
     import pukan.godot_scene.text: parseGodotTextFile;
     import std.path: buildPath, dirName;
 
-    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets",
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot",
         "godot_samples", "generated", "compressed_array_mesh.tres");
     auto document = parseGodotTextFile(path);
     const surfacesValue = document.resourceProperties["_surfaces"];

@@ -1256,7 +1256,7 @@ EOS";
 private string fixturePath(string relative)
 {
     import std.path: buildPath, dirName;
-    return buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets", "godot_samples", relative);
+    return buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot", "godot_samples", relative);
 }
 
 unittest

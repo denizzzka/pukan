@@ -69,7 +69,7 @@ unittest
     import std.file: read;
     import std.path: buildPath, dirName;
 
-    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "demo", "assets",
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "demo_godot",
         "godot_samples", "platformer", "particle.webp");
     const data = cast(const(ubyte)[]) read(path);
 

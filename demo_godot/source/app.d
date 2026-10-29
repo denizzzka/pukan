@@ -209,7 +209,7 @@ void main(string[] args)
     scene.shadowsEnabled = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
-        scenePath = "demo/assets/godot_samples/generated/procedural.tscn";
+        scenePath = "demo_godot/godot_samples/generated/procedural.tscn";
 
     auto godotScene = packPath.length
         ? scene.godotFactory.createPacked(packPath, scenePath)

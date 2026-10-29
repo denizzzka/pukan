@@ -192,7 +192,7 @@ unittest
 {
     import std.path: buildPath, dirName;
 
-    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets", "godot_samples", "generated", "fixtures.pck");
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo_godot", "godot_samples", "generated", "fixtures.pck");
     auto pack = new PckArchive(path);
 
     assert(pack.exists("res://procedural.tscn"));
