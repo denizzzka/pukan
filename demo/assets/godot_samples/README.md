@@ -69,8 +69,8 @@ demo `checker.png` and `checker_normal.png` and the platformer `particle.webp`:
 
 The `compressed_*.tscn` scenes reference them directly. ETC2 and ASTC load only
 when the Vulkan device exposes those formats; otherwise the loader reports the
-missing format instead of rendering an untextured mesh. `libwebp` is required
-when building pukan.
+missing format instead of rendering an untextured mesh. `libwebp` and its development headers are
+required when building pukan; the declarations are imported through ImportC.
 
 `compressed_array_mesh.tres` and `compressed_mesh.tscn` use the ready-made
 `AnimatedCube` glTF sample from the glTF sample models, imported by Godot 4.7

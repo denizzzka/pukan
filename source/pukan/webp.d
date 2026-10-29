@@ -3,13 +3,7 @@ module pukan.webp;
 import pukan.exceptions: PukanException;
 import std.conv: to;
 
-// Mirrors webp/decode.h; explicit declarations keep the wrappers nothrow @nogc.
-extern(C)
-{
-    int WebPGetInfo(const(ubyte)* data, size_t dataSize, int* width, int* height) nothrow @nogc;
-    ubyte* WebPDecodeRGBAInto(const(ubyte)* data, size_t dataSize, ubyte* output, size_t outputSize,
-        int outputStride) nothrow @nogc;
-}
+import pukan.webp_bindings;
 
 /// Decoded RGBA8 WebP pixels
 struct WebpImage
