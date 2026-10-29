@@ -48,11 +48,13 @@ void main(string[] args)
 {
     string scenePath = "demo/assets/godot_samples/generated/procedural.tscn";
     bool useSceneCamera;
+    uint frames;
 
     auto getoptResult = getopt(
         args,
         "scene", "Godot scene to load", &scenePath,
         "scene-camera", "use the Camera3D from the scene", &useSceneCamera,
+        "frames", "exit after N frames (0 = run forever)", &frames,
     );
 
     if(getoptResult.helpWanted)
@@ -154,10 +156,16 @@ void main(string[] args)
     scene.shadowsEnabled = false;
 
     auto godotScene = scene.godotFactory.create(scenePath);
+    scope(exit) destroy(godotScene);
     writeln("loaded ", scenePath, ": meshes ", godotScene.meshCount,
         ", nodes skipped ", godotScene.skippedNodes,
         ", resources skipped ", godotScene.skippedResources,
-        ", lights ", godotScene.lights.length);
+        ", lights ", godotScene.lights.length,
+        ", instances ", godotScene.instanceCount);
+
+    foreach(bounds; godotScene.instanceBounds)
+        writeln("instance aabb ", bounds.min.x, " ", bounds.min.y, " ", bounds.min.z,
+            " ", bounds.max.x, " ", bounds.max.y, " ", bounds.max.z);
 
     foreach(light; godotScene.lights)
     {
@@ -208,8 +216,11 @@ void main(string[] args)
         farPlane = godotScene.camera.farPlane;
     }
 
-    while(!glfwWindowShouldClose(window))
+    uint frameIndex;
+
+    while(!glfwWindowShouldClose(window) && (frames == 0 || frameIndex < frames))
     {
+        ++frameIndex;
         glfwPollEvents();
 
         WorldTransformation wtb;
@@ -231,6 +242,7 @@ void main(string[] args)
             }
 
             scene.updateFrameUniforms(frame, 0, wtb);
+            godotScene.refreshBuffers(frame.commandBuffer);
 
             const modelViewProj = wtb.proj * wtb.view * wtb.model;
 
