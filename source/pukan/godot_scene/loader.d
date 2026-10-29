@@ -229,6 +229,7 @@ private final class GodotLoader
         scene.skippedNodes = skippedNodes;
         scene.skippedResources = skippedResources;
         scene.geometryCount = geometryCache.length;
+        scene.importedGltf = gltfImportedScene;
         scene.lights = lights;
         scene.camera = camera;
         scene.hasCamera = hasCamera;
@@ -934,9 +935,6 @@ private final class GodotLoader
             fakeTextureInfo,
             jointInfo,
         );
-
-        if(gltfImportedScene)
-            mesh.frontFace = VK_FRONT_FACE_CLOCKWISE;
 
         applyMaterial(mesh, surface, material);
         return mesh;
