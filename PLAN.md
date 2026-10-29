@@ -155,6 +155,9 @@ The end goal is a game exported by Godot, not only a source project.
 
 - [x] Nested text and binary `PackedScene` instances, including packs.
 - [ ] Instance property overrides and editable children.
+  - [x] Properties on the instanced root, which is how the platformer stage
+        replaces the `data` of its `GridMap`.
+  - [ ] Children addressed by `parent_id_path` and `index`.
 - [ ] `MultiMeshInstance3D` and `MultiMesh`.
 - [ ] Native Godot skinning, broken down:
   - [x] Fixture reconnaissance: export `platformer/` as a PCK and confirm the
@@ -214,16 +217,18 @@ assert that a mesh is never shared between two different handedness values.
 
 #### GridMap
 
-- [ ] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
-      an integer grid with a mesh library per cell; decide whether to import that
-      data as is or to grow the same cell-and-library model on top of #16.
+- [x] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
+      an integer grid with a mesh library per cell; the packed cells and the
+      `MeshLibrary` are read as they are.
 - [x] Add `platformer/stage/stage.tscn` as the GridMap landscape fixture: the
       ready-made stage of the same demo project, with its `grid_map.scn`, the
       `MeshLibrary` and the tile meshes. Only the floor renders so far, and the
       report names `GridMap` and `MeshLibrary`.
-- [ ] Render the landscape from cells: import the GridMap cells, their per-cell
-      transforms and the MeshLibrary items, and check the result against Godot
-      next to the glTF terrain of `truck_town`.
+- [x] Render the landscape from cells: decode the packed cell triples, the
+      `cell_size` and centre flags, the 24 orthogonal rotations and the
+      `MeshLibrary` items, and draw one node per occupied cell with the item
+      mesh shared. The stage renders 2921 cells; collision shapes and navigation
+      data stay out.
 - [ ] The stage's sky, reflection probes and script stay unsupported and
       counted.
 

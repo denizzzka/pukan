@@ -164,23 +164,29 @@ yet.
 ## GridMap landscape
 
 `platformer/stage/stage.tscn` is the stage of the same demo project, the
-ready-made GridMap landscape: a `GridMap` scene, 20 tile meshes in a
+ready-made GridMap landscape: a `GridMap` scene, 18 tile meshes in a
 `MeshLibrary`, a floor, seven reflection probes, a sky and a label. The loader
-does not read `GridMap` yet, so only the floor renders and `demo_godot` says
-what stayed out:
+reads the cell grid, `cell_size`, the cell centre flags and the 24 orthogonal
+rotations, then draws one node per occupied cell with the item mesh shared.
+
+The scene places 2921 cells through a property override on the instanced
+`GridMap` root; a scene placed as an instance now applies such overrides to its
+root. The parts that stay unsupported are counted:
 
 ```
-nodes not rendered: GridMap x1, Label3D x1, ReflectionProbe x7, WorldEnvironment x1
-resources not rendered: CompressedCubemap x1, Environment x1, MeshLibrary x1, Shader x1, ShaderMaterial x1, Sky x1
+nodes not rendered: Label3D x1, ReflectionProbe x7, WorldEnvironment x1
+resources not rendered: CompressedCubemap x1, Environment x1, Shader x1, ShaderMaterial x1, Sky x1
 ```
 
-The files are the upstream ones. `stage/meshes/*`, `stage/collision/*` and the
-tile textures are kept so the cells can render once the loader reads the
-`MeshLibrary` and the cell grid.
+The files are upstream. `stage/meshes/*`, `stage/meshes/previews/*`, the tile
+textures and `stage/collision/*` are kept; collision shapes and navigation data
+are ignored for now.
 
 ```sh
 ./demo_godot/pukan_demo_godot --scene demo_godot/godot_samples/platformer/stage/stage.tscn --frames 2
 ```
+
+Add `--eye 75,55,75 --target 35,5,10 --fov 60 --far 400` to see the whole level.
 
 ## Landscape
 
