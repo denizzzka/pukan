@@ -18,11 +18,10 @@ import pukan.godot_scene.value;
 import pukan.gltf: GlTF;
 import pukan.gltf.factory: GltfFactory;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
-import pukan.mesh: mirrors;
 import pukan.misc: linearFormat, loadImageFromMemory;
 import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.pbr.factory: PbrFactory;
-import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us;
+import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.image: identityComponentMapping, loadImageToMemory, loadImageWithMips;
@@ -215,6 +214,9 @@ private final class GodotLoader
         bool hasCamera;
         collectSceneNodes(root, Matrix4x4f.identity(), lights, camera, hasCamera);
 
+        // Godot stores clockwise triangles in its meshes and primitives
+        applyWinding!(GodotNode, GodotNode)(root, Matrix4x4f.identity(), false, node => node.local);
+
         auto scene = new GodotScene(
             pbr.godotPipelines,
             device,
@@ -273,10 +275,6 @@ private final class GodotLoader
             return;
 
         const world = parent * node.local;
-        const mirrored = world.mirrors;
-
-        foreach(mesh; node.meshes)
-            mesh.applyFrontFace(mirrored, false);
 
         if(node.hasLight)
         {

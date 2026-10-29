@@ -9,7 +9,7 @@ import pukan.gltf.loader;
 import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, transmissionPass;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.mesh: mirrors;
-import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams;
+import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
@@ -289,26 +289,13 @@ class GlTF : DrawableByVulkan, Blended
             setUpEachNode(node, device);
         });
 
-        applyWinding();
-    }
-
-    /// A mirrored place in the hierarchy flips the winding of its meshes
-    private void applyWinding()
-    {
-        void walk(Matrix4x4f trans, Node node)
-        {
-            trans *= node.trans.calcMatrix;
-
-            const mirrored = trans.mirrors;
-
-            foreach(mesh; node.meshes)
-                mesh.applyFrontFace(mirrored, true);
-
-            foreach(c; node.children)
-                walk(trans, cast(Node) c);
-        }
-
-        walk(Matrix4x4f.identity, cast(Node) rootSceneNode);
+        // Raw glTF indices keep the counter-clockwise winding of the file
+        applyWinding!(Node, BaseNode)(
+            cast(Node) rootSceneNode,
+            Matrix4x4f.identity,
+            true,
+            node => node.trans.calcMatrix,
+        );
     }
 
     protected void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)

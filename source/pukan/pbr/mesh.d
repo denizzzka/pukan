@@ -4,7 +4,7 @@ import dlib.math;
 import material_bindings;
 import pukan.pbr.accessor;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
-import pukan.mesh: Mesh, VertexStream, fallbackVertexSize;
+import pukan.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -58,6 +58,22 @@ struct MeshGeometry
 }
 
 alias Vector4us = Vector!(ushort, 4);
+
+/// Sets the front face of every mesh below a node, from the accumulated transform.
+/// `counterClockwise` is the winding the source stores its triangles with; nothing
+/// else changes: no vertices, indices, normals or camera are touched.
+void applyWinding(N, Child)(N node, Matrix4x4f trans, bool counterClockwise, scope Matrix4x4f delegate(N) localOf)
+{
+    trans *= localOf(node);
+
+    const mirrored = trans.mirrors;
+
+    foreach(mesh; node.meshes)
+        mesh.applyFrontFace(mirrored, counterClockwise);
+
+    foreach(child; node.children)
+        applyWinding!(N, Child)(cast(N) child, trans, counterClockwise, localOf);
+}
 
 /// Vertex and index buffers shared by every instance of one mesh
 final class PbrGeometry
