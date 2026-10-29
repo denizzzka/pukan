@@ -1,6 +1,6 @@
 module pukan.scene;
 
-import dlib.math: lookAtMatrix, perspectiveMatrix, translation, Matrix4x4f, Vector3f, Vector4f;
+import dlib.math: perspectiveMatrix, translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.pbr.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
@@ -12,6 +12,63 @@ import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+
+/// Transform of a camera placed at `eye` and looking at `target`
+Matrix4x4f cameraTransform(Vector3f eye, Vector3f target, Vector3f up)
+{
+    import dlib.math: cross;
+    import std.math: abs;
+
+    const forward = (target - eye).normalized;
+    auto realUp = up;
+
+    // A view along the up axis has no right axis, so any other axis serves
+    if(abs(forward.dot(realUp)) > 0.999f)
+        realUp = abs(forward.y) > 0.9f ? Vector3f(0, 0, 1) : Vector3f(0, 1, 0);
+
+    const right = cross(forward, realUp).normalized;
+    realUp = cross(right, forward);
+
+    Matrix4x4f result = Matrix4x4f.identity;
+    // Each column is a world axis of the camera
+    result.a11 = right.x;    result.a21 = right.y;    result.a31 = right.z;
+    result.a12 = realUp.x;   result.a22 = realUp.y;   result.a32 = realUp.z;
+    result.a13 = -forward.x; result.a23 = -forward.y; result.a33 = -forward.z;
+    result.a14 = eye.x;      result.a24 = eye.y;      result.a34 = eye.z;
+    return result;
+}
+
+/// View matrix of a camera whose -Z axis points at `target`
+Matrix4x4f cameraView(Vector3f eye, Vector3f target, Vector3f up)
+{
+    return cameraTransform(eye, target, up).inverse;
+}
+
+unittest
+{
+    import dlib.math: lookAtMatrix;
+    import std.math: abs;
+
+    const eye = Vector3f(3, 4, -5);
+    const target = Vector3f(0, 1, 0);
+    const up = Vector3f(0, 1, 0);
+
+    // The inverse of the camera transform matches dlib for a normal view
+    const expected = lookAtMatrix(eye, target, up);
+    const view = cameraView(eye, target, up);
+
+    foreach(i; 0 .. 16)
+        assert(abs(view.arrayof[i] - expected.arrayof[i]) < 1e-5f);
+
+    // A view along the up axis must not assert and still give an orthonormal basis
+    const vertical = cameraView(Vector3f(0, 10, 0), Vector3f(0, 0, 0), up);
+    const x = Vector3f(vertical.a11, vertical.a12, vertical.a13);
+    const y = Vector3f(vertical.a21, vertical.a22, vertical.a23);
+
+    assert(abs(x.length - 1) < 1e-5f);
+    assert(abs(y.length - 1) < 1e-5f);
+    assert(abs(x.dot(y)) < 1e-5f);
+}
 
 /// Perspective projection for Vulkan, whose clip space has Y pointing down,
 /// unlike the OpenGL convention that dlib builds
@@ -615,7 +672,7 @@ class Scene
             ).normalized;
 
             const shadowEye = sun * shadowDistance;
-            const shadowView = lookAtMatrix(shadowEye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
+            const shadowView = cameraView(shadowEye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
             const shadowProj = vulkanPerspectiveMatrix(shadowFov, 1.0f, 1.0f, shadowDistance * 2.0f);
             shadowViewProj = shadowProj * shadowView;
             data.shadowViewProj = shadowViewProj;

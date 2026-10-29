@@ -292,12 +292,7 @@ private final class GodotLoader
 
         if(node.hasCamera && !hasCamera)
         {
-            const zAxis = Vector3f(world.a13, world.a23, world.a33).normalized;
-            const yAxis = Vector3f(world.a12, world.a22, world.a32).normalized;
-
-            camera.position = Vector3f(world.a14, world.a24, world.a34);
-            camera.target = camera.position - zAxis;
-            camera.up = yAxis;
+            camera.view = world.inverse;
             camera.fov = node.camera.fov;
             camera.nearPlane = node.camera.nearPlane;
             camera.farPlane = node.camera.farPlane;

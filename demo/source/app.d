@@ -881,12 +881,7 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     WorldTransformation wtb;
 
     wtb.model = rotationMatrix!float(Axis.y, sceneYaw) * rotationMatrix!float(Axis.x, scenePitch);
-    // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
-    wtb.view = lookAtMatrix(
-        cameraEye(),
-        cameraTarget(),
-        Vector3f(0, 1, 0),
-    );
+    wtb.view = cameraView(cameraEye(), cameraTarget(), Vector3f(0, 1, 0));
     wtb.proj = vulkanPerspectiveMatrix(
         cameraFovY,
         cast(float) imageExtent.width / imageExtent.height,

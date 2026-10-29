@@ -1,6 +1,7 @@
 module pukan.stereo;
 
-import dlib.math: Matrix4x4f, Vector3f, Vector4f, cross, frustumMatrix, lookAtMatrix;
+import dlib.math: Matrix4x4f, Vector3f, Vector4f, cross, frustumMatrix;
+import pukan.scene: cameraView;
 import pukan.vulkan.bindings: VkExtent2D;
 import std.math: PI, abs, tan;
 
@@ -39,7 +40,7 @@ StereoView[2] makeStereoViews(
         const eyePos = eye + right * offset;
         const shift = -offset * near / convergenceDistance;
 
-        ret[eyeIdx].view = lookAtMatrix(eyePos, eyePos + forward, up);
+        ret[eyeIdx].view = cameraView(eyePos, eyePos + forward, up);
         ret[eyeIdx].proj = frustumMatrix(
             -halfWidth + shift,
             halfWidth + shift,

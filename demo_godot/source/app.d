@@ -1,4 +1,4 @@
-import dlib.math: Matrix4x4f, Vector3f, lookAtMatrix;
+import dlib.math: Matrix4x4f, Vector3f;
 import pukan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
@@ -273,15 +273,17 @@ void main(string[] args)
     float nearPlane = cameraNear;
     float farPlane = farOption;
 
+    Matrix4x4f view;
+
     if(useSceneCamera && godotScene.hasCamera)
     {
-        eye = godotScene.camera.position;
-        target = godotScene.camera.target;
-        up = godotScene.camera.up;
+        view = godotScene.camera.view;
         fov = godotScene.camera.fov;
         nearPlane = godotScene.camera.nearPlane;
         farPlane = godotScene.camera.farPlane;
     }
+    else
+        view = cameraView(eye, target, up);
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
@@ -293,7 +295,7 @@ void main(string[] args)
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
-        wtb.view = lookAtMatrix(eye, target, up);
+        wtb.view = view;
         wtb.proj = vulkanPerspectiveMatrix(
             fov,
             cast(float) scene.swapChain.imageExtent.width / scene.swapChain.imageExtent.height,

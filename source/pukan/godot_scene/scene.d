@@ -59,9 +59,8 @@ struct GodotLight
 
 struct GodotCamera
 {
-    Vector3f position;
-    Vector3f target;
-    Vector3f up = Vector3f(0, 1, 0);
+    /// Inverse of the camera node's world transform
+    Matrix4x4f view = Matrix4x4f.identity;
     float fov = 75.0f;
     float nearPlane = 0.05f;
     float farPlane = 1000.0f;
