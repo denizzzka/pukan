@@ -6,6 +6,7 @@ import pukan.pbr.accessor;
 import pukan.gltf.animation;
 import pukan.pbr.pipelines: PbrPipelines;
 import pukan.material: MaterialBuffer;
+import pukan.exceptions: PukanException;
 import pukan.misc: linearFormat;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -194,6 +195,20 @@ private VkSamplerAddressMode wrapMode(GltfWrap value)
     }
 }
 
+/// An extension such as EXT_texture_webp supplies the image instead of the texture
+private size_t imageOfTexture(in Json texture)
+{
+    if(auto source = "source" in texture)
+        return source.get!size_t;
+
+    if(auto extensions = "extensions" in texture)
+        foreach(ref extension; *extensions)
+            if(auto source = "source" in extension)
+                return source.get!size_t;
+
+    throw new PukanException("glTF texture has no source image");
+}
+
 /// Images sampled by data maps skip the sRGB decode; shared color images keep it
 private bool[] linearImages(in Json json, bool extensions)
 {
@@ -211,7 +226,8 @@ private bool[] linearImages(in Json json, bool extensions)
 
     size_t imageOf(in Json texture)
     {
-        return (*textures)[texture["index"].get!size_t]["source"].get!size_t;
+        const tx = (*textures)[texture["index"].get!size_t];
+        return imageOfTexture(tx);
     }
 
     foreach(ref material; *materials)
@@ -373,6 +389,28 @@ unittest
         false, true, true, true, false, false, false, false, false, false, false, false, false, false,
         false,
     ]);
+}
+
+unittest
+{
+    import std.exception: assertThrown;
+
+    auto json = parseJsonString(`{
+        "textures": [
+            {"source": 3},
+            {"extensions": {"EXT_texture_webp": {"source": 5}}},
+            {"sampler": 0}
+        ]
+    }`);
+
+    const textures = &json["textures"];
+    assert(imageOfTexture((*textures)[0]) == 3);
+    assert(imageOfTexture((*textures)[1]) == 5);
+    assertThrown(imageOfTexture((*textures)[2]));
+
+    // Godot writes nested texture paths with %2F
+    assert(build_path("root", "textures%2Fgrass.webp")
+        == "root" ~ std.path.dirSeparator ~ "textures/grass.webp");
 }
 
 ///
@@ -578,7 +616,7 @@ package GltfAsset loadGltfAsset(
             samplerInfo = gltfSampler((*samplers)[samplerIndex.get!size_t]);
         }
 
-        auto image = ret.images[ tx["source"].get!ushort ];
+        auto image = ret.images[imageOfTexture(tx)];
         ret.textures ~= device.create!Texture(image, samplerInfo);
     }
 
@@ -1003,7 +1041,13 @@ struct GltfContent
     }
 }
 
-private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
+private string build_path(string dir, string filename)
+{
+    import std.uri: decodeComponent;
+
+    // Godot writes nested texture paths with %2F
+    return dir ~ std.path.dirSeparator ~ decodeComponent(filename);
+}
 
 private Buffer readBufUri(string dir, in Json fileDescr)
 {

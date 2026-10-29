@@ -3,25 +3,59 @@ module pukan.misc;
 import gamut;
 import pukan.exceptions;
 import pukan.vulkan.bindings: VkFormat;
+import pukan.webp: decodeWebp;
 import std.conv: to;
 import std.exception: enforce;
 
 Image loadImageFromFile(string filepath, out VkFormat format)
 {
-    Image image;
-    image.loadFromFile(filepath, LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT|LOAD_ALPHA);
+    import std.file: read;
 
-    check(image, format);
+    Image image;
+
+    // gamut cannot read WebP, so these files are decoded before it sees them
+    if(isWebp(cast(const(ubyte)[]) read(filepath, 12)))
+        webpImage(cast(const(ubyte)[]) read(filepath), image, format);
+    else
+    {
+        image.loadFromFile(filepath, LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT|LOAD_ALPHA);
+        check(image, format);
+    }
+
     return image;
 }
 
 Image loadImageFromMemory(const(ubyte)[] blob, out VkFormat format)
 {
     Image image;
-    image.loadFromMemory(blob, LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT|LOAD_ALPHA);
 
-    check(image, format);
+    if(isWebp(blob))
+        webpImage(blob, image, format);
+    else
+    {
+        image.loadFromMemory(blob, LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT|LOAD_ALPHA);
+        check(image, format);
+    }
+
     return image;
+}
+
+private bool isWebp(const(ubyte)[] blob) nothrow @nogc
+{
+    return blob.length >= 12
+        && blob[0 .. 4] == "RIFF"
+        && blob[8 .. 12] == "WEBP";
+}
+
+private void webpImage(const(ubyte)[] blob, ref Image image, out VkFormat format)
+{
+    const webp = decodeWebp(blob);
+
+    image.create(webp.width, webp.height, PixelType.rgba8, LAYOUT_GAPLESS|LAYOUT_VERT_STRAIGHT);
+    image.allPixelsAtOnce()[] = webp.pixels[];
+
+    with(VkFormat)
+        format = VK_FORMAT_R8G8B8A8_SRGB;
 }
 
 private void check(ref Image image, out VkFormat format)
@@ -46,6 +80,27 @@ private void check(ref Image image, out VkFormat format)
         default:
             enforce!PukanException(false, "Unsupported texture type: "~image.type.to!string);
     }
+}
+
+unittest
+{
+    import std.file: read;
+    import std.path: buildPath, dirName;
+
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "demo", "assets",
+        "godot_samples", "platformer", "particle.webp");
+
+    VkFormat format;
+    const image = loadImageFromFile(path, format);
+    with(VkFormat)
+        assert(format == VK_FORMAT_R8G8B8A8_SRGB);
+    assert(image.width == 16 && image.height == 16);
+
+    const blob = cast(const(ubyte)[]) read(path);
+    const fromMemory = loadImageFromMemory(blob, format);
+    with(VkFormat)
+        assert(format == VK_FORMAT_R8G8B8A8_SRGB);
+    assert(fromMemory.width == 16 && fromMemory.height == 16);
 }
 
 /// Same texel layout, but sampled without the sRGB transfer function
