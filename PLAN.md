@@ -111,6 +111,11 @@ or the pack.
       light and tonemap; IBL, fog, SDFGI and volumetrics stay unsupported at
       first.
 - [ ] Layers, visibility ranges and `cast_shadow` modes.
+- [ ] Size the sun's shadow map to the loaded scene. `Scene` still uses a fixed
+      24 degree perspective cone 10 units from the origin, so only small arenas
+      get shadows; expose the distance or fit an orthographic frustum to the
+      scene bounds, and check it on `truck_town`. Cascades stay a separate item
+      in `## Lighting`.
 
 #### Phase 3: binary resources and packed production projects
 
@@ -198,7 +203,7 @@ assert that a mesh is never shared between two different handedness values.
       still differ.
 - [x] Verify `demo`, `orientation.tscn`, `lights_and_shadows`, `enemy_twins` and
       the exported enemy, from both camera sides.
-- [ ] Replace `lookAtMatrix` with a camera transform whose inverse is the view
+- [x] Replace `lookAtMatrix` with a camera transform whose inverse is the view
       matrix, the way Dagon uses `invAbsoluteTransformation`:
       https://github.com/gecko0307/dlib/pull/192#issuecomment-2835001161
       `demo`, `demo_godot`, the stereo pair and the shadow light all build a
@@ -273,7 +278,20 @@ Fixtures live in `demo_godot/godot_samples/`.
 - [ ] Interior fixture: a room assembled from CC0 Kenney furniture with omni
       lights and a camera, to test many small glTF instances and indoor light
       falloff.
-- [ ] `combined.tscn` instancing the three, for composition checks.
+- [ ] `combined.tscn` instancing `lights_and_shadows/test.tscn`,
+      `platformer/enemy/enemy.tscn` and `generated/procedural.tscn` in one
+      scene, for composition checks. Godot cannot reference resources across
+      projects, and each fixture is its own project today, so this needs:
+  - [ ] one Godot project for the combined scene: either promote
+        `godot_samples/` to a single project and prefix every fixture `res://`
+        path, or add a `combined/` project that owns rewritten copies;
+  - [ ] rewrite the fixture-internal `res://` references and re-check their
+        `.import` and `.pck` fixtures;
+  - [ ] one camera and a far plane that covers the placed instances, and a
+        decision about the lights demo's 20 lights against `maxLights = 16`;
+  - [ ] verify that each part renders, that shared geometry and glTF assets are
+        counted once, and that the skipped counters aggregate;
+  - [ ] README and fixture list.
 - [x] README with source URLs, commit, licenses and the regeneration script.
 
 ## Geometric algebra: PGA and CGA
