@@ -16,6 +16,7 @@ import std.conv: to;
 import std.exception: enforce;
 static import std.file;
 static import std.path;
+static import std.uri;
 import vibe.data.json;
 
 /// Options for loading glTF materials
@@ -408,8 +409,8 @@ unittest
     assert(imageOfTexture((*textures)[1]) == 5);
     assertThrown(imageOfTexture((*textures)[2]));
 
-    // Godot writes nested texture paths with %2F
-    assert(build_path("root", "textures%2Fgrass.webp")
+    // Godot writes nested texture paths as textures%2Fname.webp
+    assert(std.path.buildPath("root", std.uri.decodeComponent("textures%2Fgrass.webp"))
         == "root" ~ std.path.dirSeparator ~ "textures/grass.webp");
 }
 
@@ -1041,14 +1042,6 @@ struct GltfContent
     }
 }
 
-private string build_path(string dir, string filename)
-{
-    import std.uri: decodeComponent;
-
-    // Godot writes nested texture paths with %2F
-    return dir ~ std.path.dirSeparator ~ decodeComponent(filename);
-}
-
 private Buffer readBufUri(string dir, in Json fileDescr)
 {
     import std.algorithm.searching: startsWith;
@@ -1059,7 +1052,7 @@ private Buffer readBufUri(string dir, in Json fileDescr)
     Buffer ret;
 
     if(!uri.startsWith("data:"))
-        ret.buf = cast(ubyte[]) std.file.read(build_path(dir, uri));
+        ret.buf = cast(ubyte[]) std.file.read(std.path.buildPath(dir, std.uri.decodeComponent(uri)));
     else
         ret.buf = parseDataUri(uri).payload;
 
@@ -1107,7 +1100,7 @@ private auto loadImageFromUri(string dir, string uri, out VkFormat format)
     import std.algorithm.searching: startsWith;
 
     if(!uri.startsWith("data:"))
-        return loadImageFromFile(build_path(dir, uri), format);
+        return loadImageFromFile(std.path.buildPath(dir, std.uri.decodeComponent(uri)), format);
 
     const data = parseDataUri(uri);
     enforceImageMime(data.mimeType);
