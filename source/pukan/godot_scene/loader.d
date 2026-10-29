@@ -2,9 +2,10 @@ module pukan.godot_scene.loader;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f, degtorad;
 import material_bindings;
+import pukan.compressed_texture: CompressedFamily, familySupported, formatSupported;
 import pukan.exceptions: PukanException;
 import pukan.godot_scene.binary: parseGodotResourceData;
-import pukan.godot_scene.ctex: GodotCtexImage, loadCtex;
+import pukan.godot_scene.ctex: GodotCtexImage, isTwoChannelNormal, loadCtex;
 import pukan.godot_scene.material: GodotMaterialData, readGodotMaterial;
 import pukan.godot_scene.paths: normalizeResourcePath;
 import pukan.godot_scene.remap: resolveGodotPath;
@@ -17,13 +18,13 @@ import pukan.godot_scene.value;
 import pukan.gltf: GlTF;
 import pukan.gltf.factory: GltfFactory;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
-import pukan.misc: loadImageFromMemory;
+import pukan.misc: linearFormat, loadImageFromMemory;
 import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.pbr.factory: PbrFactory;
 import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrMesh, Vector4us;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.image: loadImageToMemory, loadImageWithMips;
+import pukan.vulkan.image: identityComponentMapping, loadImageToMemory, loadImageWithMips;
 import pukan.vulkan.pipelines: DescriptorAllocator;
 import pukan.vulkan.textures: Texture;
 import std.algorithm: canFind, endsWith;
@@ -45,12 +46,14 @@ private final class GodotProject
 {
     GodotSource source;
     string root;
+    LogicalDevice device;
     GodotTextDocument[string] documents;
 
-    this(GodotSource source, string root)
+    this(GodotSource source, string root, LogicalDevice device = null)
     {
         this.source = source;
         this.root = root;
+        this.device = device;
     }
 
     string key(string path) const
@@ -61,7 +64,30 @@ private final class GodotProject
     /// Stored path after exported `.remap` and source `.import` chains
     string resolve(string key)
     {
-        return resolveGodotPath(source, key);
+        return resolveGodotPath(source, key, &supportedRemap);
+    }
+
+    private bool supportedRemap(string feature)
+    {
+        if(device is null)
+            return true;
+
+        final switch(feature)
+        {
+            case "s3tc":
+            case "bptc":
+                return familySupported(device, CompressedFamily.bc);
+
+            case "etc2":
+                return familySupported(device, CompressedFamily.etc2);
+
+            case "astc":
+                return familySupported(device, CompressedFamily.astc);
+
+            case "mobile":
+                return familySupported(device, CompressedFamily.etc2) ||
+                    familySupported(device, CompressedFamily.astc);
+        }
     }
 
     /// Filesystem path for loaders that take a filename, null for packs
@@ -85,6 +111,13 @@ private final class GodotProject
         return document;
     }
 }
+
+private enum raAsRgMapping = VkComponentMapping(
+    r: VK_COMPONENT_SWIZZLE_R,
+    g: VK_COMPONENT_SWIZZLE_A,
+    b: VK_COMPONENT_SWIZZLE_ZERO,
+    a: VK_COMPONENT_SWIZZLE_ONE,
+);
 
 private final class GodotLoader
 {
@@ -155,7 +188,7 @@ private final class GodotLoader
     GodotScene run(GodotSource source, string sceneKey, string rootDir)
     {
         scenePath = sceneKey;
-        project = new GodotProject(source, rootDir);
+        project = new GodotProject(source, rootDir, device);
 
         commandPool = device.createCommandPool();
         auto buffers = commandPool.allocateBuffers(1);
@@ -722,22 +755,22 @@ private final class GodotLoader
         if(hasUv)
         {
             bind(mesh, material.documentPath, material.baseColorTexture, material.hasBaseColorTexture,
-                MATERIAL_BASE_COLOR, MaterialFlag.baseColorTexture);
+                MATERIAL_BASE_COLOR, MaterialFlag.baseColorTexture, true);
 
             bind(mesh, material.documentPath, material.normalTexture, material.hasNormalTexture,
-                MATERIAL_NORMAL, MaterialFlag.normalTexture);
+                MATERIAL_NORMAL, MaterialFlag.normalTexture, false);
 
             bind(mesh, material.documentPath, material.occlusionTexture, material.hasOcclusionTexture,
-                MATERIAL_OCCLUSION, MaterialFlag.occlusionTexture);
+                MATERIAL_OCCLUSION, MaterialFlag.occlusionTexture, false);
 
             bind(mesh, material.documentPath, material.emissiveTexture, material.hasEmissiveTexture,
-                MATERIAL_EMISSIVE, MaterialFlag.emissiveTexture);
+                MATERIAL_EMISSIVE, MaterialFlag.emissiveTexture, true);
 
             bind(mesh, material.documentPath, material.metallicTexture, material.hasMetallicTexture,
-                MATERIAL_GODOT_METALLIC, MaterialFlag.godotMetallicTexture);
+                MATERIAL_GODOT_METALLIC, MaterialFlag.godotMetallicTexture, false);
 
             bind(mesh, material.documentPath, material.roughnessTexture, material.hasRoughnessTexture,
-                MATERIAL_GODOT_ROUGHNESS, MaterialFlag.godotRoughnessTexture);
+                MATERIAL_GODOT_ROUGHNESS, MaterialFlag.godotRoughnessTexture, false);
         }
 
         if(surface.geometry.tangents.length && material.hasNormalTexture)
@@ -756,14 +789,18 @@ private final class GodotLoader
         bool present,
         size_t binding,
         MaterialFlag flag,
+        bool srgb,
     )
     {
         if(!present)
             return;
 
-        auto texture = resolveTexture(documentPath, objectRef);
+        auto texture = resolveTexture(documentPath, objectRef, srgb);
         if(texture is null)
             return;
+
+        if(texture.normalTwoChannel && binding == MATERIAL_NORMAL)
+            mesh.material.flags = mesh.material.flags | MaterialFlag.godotNormalTwoChannel;
 
         mesh.bindTexture(binding, flag, VkDescriptorImageInfo(
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -772,7 +809,7 @@ private final class GodotLoader
         ));
     }
 
-    private Texture resolveTexture(string documentPath, GodotObjectRef objectRef)
+    private Texture resolveTexture(string documentPath, GodotObjectRef objectRef, bool srgb)
     {
         if(objectRef.kind != GodotRefKind.extResource)
         {
@@ -792,8 +829,9 @@ private final class GodotLoader
         }
 
         const path = project.resolve(project.key(external.path));
+        const cacheKey = path ~ (srgb ? ":srgb" : ":linear");
 
-        if(auto cached = path in textureCache)
+        if(auto cached = cacheKey in textureCache)
             return *cached;
 
         const lower = path.toLower;
@@ -814,12 +852,23 @@ private final class GodotLoader
 
             if(ctex.levels.length)
             {
+                const format = srgb && ctex.srgbFormat != VK_FORMAT_UNDEFINED
+                    ? ctex.srgbFormat
+                    : ctex.format;
+
+                if(ctex.compressed && !formatSupported(device, format))
+                    throw new PukanException(path ~ ": compressed texture format is not supported by the device");
+
                 auto memory = loadImageWithMips(
                     device, commandPool, commandBuffer,
-                    ctex.width, ctex.height, ctex.levels, ctex.format,
+                    ctex.width, ctex.height, ctex.levels, format,
                 );
-                auto texture = device.create!Texture(memory, samplerInfo);
-                textureCache[path] = texture;
+                auto texture = device.create!Texture(
+                    memory, samplerInfo,
+                    ctex.raAsRg ? raAsRgMapping : identityComponentMapping,
+                );
+                texture.normalTwoChannel = ctex.raAsRg || isTwoChannelNormal(format);
+                textureCache[cacheKey] = texture;
                 textures ~= texture;
                 return texture;
             }
@@ -831,10 +880,14 @@ private final class GodotLoader
 
         VkFormat format;
         auto image = loadImageFromMemory(imageData, format);
+
+        if(!srgb)
+            format = linearFormat(format);
+
         auto memory = loadImageToMemory(device, commandPool, commandBuffer, image, format);
         auto texture = device.create!Texture(memory, samplerInfo);
 
-        textureCache[path] = texture;
+        textureCache[cacheKey] = texture;
         textures ~= texture;
         return texture;
     }

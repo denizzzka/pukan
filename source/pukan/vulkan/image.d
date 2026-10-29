@@ -431,6 +431,14 @@ auto createFakeImage1x1(LogicalDevice device, CommandPool commandPool, VkCommand
     return loadImageToMemory(device, commandPool, commandBuf, extFormatImg, VK_FORMAT_R8G8B8A8_SRGB);
 }
 
+/// Identity component mapping for a sampled image view
+enum identityComponentMapping = VkComponentMapping(
+    r: VK_COMPONENT_SWIZZLE_IDENTITY,
+    g: VK_COMPONENT_SWIZZLE_IDENTITY,
+    b: VK_COMPONENT_SWIZZLE_IDENTITY,
+    a: VK_COMPONENT_SWIZZLE_IDENTITY,
+);
+
 /// Transitions one image subresource between layouts
 void transitionImageLayout(
     VkCommandBuffer buf,

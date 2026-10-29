@@ -59,6 +59,19 @@ run, it is a local import cache.
 raw RGBA8 one. The matching `ctex.tscn` and `raw.tscn` scenes reference them
 through `.tres` materials.
 
+The compressed variants are Godot 4.7 import outputs of the ready-made lights
+demo `checker.png` and `checker_normal.png` and the platformer `particle.webp`:
+
+- `checker.s3tc.ctex` (BC1), `checker.bptc.ctex` (BC7),
+  `checker.etc2.ctex` (ETC2 RGB8), `checker.astc.ctex` (ASTC 4x4);
+- `checker_normal.s3tc.ctex` (BC5) for the two-channel normal map path;
+- `particle.webp.ctex` (lossless WebP inside a ctex).
+
+The `compressed_*.tscn` scenes reference them directly. ETC2 and ASTC load only
+when the Vulkan device exposes those formats; otherwise the loader reports the
+missing format instead of rendering an untextured mesh. `libwebp` is required
+when building pukan.
+
 `fixtures.pck` is an unencrypted Godot 4 PCK v2 created by
 `generated/pack_fixtures.py`. It contains `res://procedural.tscn`,
 `res://procedural_mesh.res` and `res://checker.png`. Load it with:

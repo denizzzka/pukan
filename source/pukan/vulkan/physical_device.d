@@ -30,6 +30,20 @@ class PhysicalDevice
         properties = props;
     }
 
+    /// Optimal tiling features of a format
+    VkFormatFeatureFlags formatFeatures(VkFormat format)
+    {
+        VkFormatProperties properties;
+        vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &properties);
+        return properties.optimalTilingFeatures;
+    }
+
+    /// Whether a format supports all the requested optimal tiling features
+    bool supportsFormat(VkFormat format, VkFormatFeatureFlags features = 0)
+    {
+        return (formatFeatures(format) & features) == features;
+    }
+
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
     {
         VkPhysicalDeviceMemoryProperties memProperties;

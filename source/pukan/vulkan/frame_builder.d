@@ -246,18 +246,14 @@ class SyncFramesInFlight
     }
 }
 
-void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat imageFormat, VkImage image, uint levelCount = 1)
+void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat imageFormat, VkImage image,
+    uint levelCount = 1, VkComponentMapping components = identityComponentMapping)
 {
     VkImageViewCreateInfo cinf = {
         sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         viewType: VK_IMAGE_VIEW_TYPE_2D,
         format: imageFormat,
-        components: VkComponentMapping(
-            r: VK_COMPONENT_SWIZZLE_IDENTITY,
-            g: VK_COMPONENT_SWIZZLE_IDENTITY,
-            b: VK_COMPONENT_SWIZZLE_IDENTITY,
-            a: VK_COMPONENT_SWIZZLE_IDENTITY,
-        ),
+        components: components,
         subresourceRange: VkImageSubresourceRange(
             aspectMask: VK_IMAGE_ASPECT_COLOR_BIT,
             baseMipLevel: 0,

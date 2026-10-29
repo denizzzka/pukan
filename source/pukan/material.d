@@ -39,6 +39,7 @@ enum MaterialFlag: uint
     volumeThicknessTexture = 1u << 19,
     godotMetallicTexture = 1u << 20,
     godotRoughnessTexture = 1u << 21,
+    godotNormalTwoChannel = 1u << 22,
 }
 
 alias MaterialFlags = BitFlags!MaterialFlag;

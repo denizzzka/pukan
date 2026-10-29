@@ -43,9 +43,19 @@ layout(location = 4) in vec4 fragTangent;
 
 layout(location = 0) out vec4 outColor;
 
-vec3 perturbNormalFromDerivatives(sampler2D normalMap, float scale, vec3 normal, vec3 position, vec2 uv)
+vec3 perturbNormalFromDerivatives(sampler2D normalMap, float scale, vec3 normal, vec3 position, vec2 uv, bool twoChannel)
 {
-    const vec3 sampled = texture(normalMap, uv).xyz * 2.0 - 1.0;
+    const vec4 texel = texture(normalMap, uv);
+    vec3 sampled;
+
+    if(twoChannel)
+    {
+        const vec2 xy = texel.rg * 2.0 - 1.0;
+        sampled = vec3(xy, sqrt(max(0.0, 1.0 - dot(xy, xy))));
+    }
+    else
+        sampled = texel.xyz * 2.0 - 1.0;
+
     const vec3 mapNormal = vec3(sampled.xy * scale, sampled.z);
 
     const vec3 dp1 = dFdx(position);
@@ -66,7 +76,7 @@ vec3 perturbNormalFromDerivatives(sampler2D normalMap, float scale, vec3 normal,
     return dot(perturbed, perturbed) > 1e-8 ? normalize(perturbed) : normalize(normal);
 }
 
-vec3 perturbNormalFromTangent(sampler2D normalMap, float scale, vec3 normal, vec3 position, vec2 uv, vec4 tangent)
+vec3 perturbNormalFromTangent(sampler2D normalMap, float scale, vec3 normal, vec3 position, vec2 uv, vec4 tangent, bool twoChannel)
 {
     const vec3 N = normalize(normal);
     const vec3 T = tangent.xyz - N * dot(N, tangent.xyz);
@@ -83,7 +93,17 @@ vec3 perturbNormalFromTangent(sampler2D normalMap, float scale, vec3 normal, vec
         dot(dFdy(position), B) / dot(B, B)
     );
 
-    const vec3 sampled = textureGrad(normalMap, uv, uvDx, uvDy).xyz * 2.0 - 1.0;
+    const vec4 texel = textureGrad(normalMap, uv, uvDx, uvDy);
+    vec3 sampled;
+
+    if(twoChannel)
+    {
+        const vec2 xy = texel.rg * 2.0 - 1.0;
+        sampled = vec3(xy, sqrt(max(0.0, 1.0 - dot(xy, xy))));
+    }
+    else
+        sampled = texel.xyz * 2.0 - 1.0;
+
     const vec3 mapNormal = vec3(sampled.xy * scale, sampled.z);
     const mat3 TBN = mat3(normalize(T), normalize(B), N);
     const vec3 perturbed = TBN * mapNormal;
@@ -167,9 +187,9 @@ void main()
         if((flags & MATERIAL_FLAG_NORMAL_TEXTURE) != 0u)
         {
             if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
-                normal = perturbNormalFromTangent(normalTexture, material.metallicRoughness.z, normal, fragPosition, uv, fragTangent);
+                normal = perturbNormalFromTangent(normalTexture, material.metallicRoughness.z, normal, fragPosition, uv, fragTangent, (flags & MATERIAL_FLAG_GODOT_NORMAL_TWO_CHANNEL) != 0u);
             else
-                normal = perturbNormalFromDerivatives(normalTexture, material.metallicRoughness.z, normal, fragPosition, uv);
+                normal = perturbNormalFromDerivatives(normalTexture, material.metallicRoughness.z, normal, fragPosition, uv, (flags & MATERIAL_FLAG_GODOT_NORMAL_TWO_CHANNEL) != 0u);
         }
 
         // Isolated white pixels appeared on distant normal-mapped surfaces:
@@ -238,9 +258,9 @@ void main()
         if(clearcoat > 0.0 && (flags & MATERIAL_FLAG_CLEARCOAT_NORMAL_TEXTURE) != 0u)
         {
             if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
-                clearcoatNormal = perturbNormalFromTangent(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, uv, fragTangent);
+                clearcoatNormal = perturbNormalFromTangent(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, uv, fragTangent, false);
             else
-                clearcoatNormal = perturbNormalFromDerivatives(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, uv);
+                clearcoatNormal = perturbNormalFromDerivatives(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, uv, false);
         }
 
         vec3 sheenColor = material.sheen.rgb;

@@ -22,8 +22,11 @@ class Texture
     ImageMemory textureImageMemory;
     VkImageView imageView;
     VkSampler sampler;
+    /// Godot normal map stores only X and Y and reconstructs Z
+    bool normalTwoChannel;
 
-    this(LogicalDevice device, ImageMemory image, ref VkSamplerCreateInfo samplerInfo)
+    this(LogicalDevice device, ImageMemory image, ref VkSamplerCreateInfo samplerInfo,
+        VkComponentMapping components = identityComponentMapping)
     {
         this.device = device;
 
@@ -38,6 +41,7 @@ class Texture
             textureImageMemory.format,
             textureImageMemory.image,
             textureImageMemory.mipLevels,
+            components,
         );
 
         vkCall(device.device, cast() &samplerInfo, device.alloc, &sampler);

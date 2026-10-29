@@ -5,16 +5,21 @@ import pukan.godot_scene.source: GodotSource;
 import std.string: indexOf, splitLines, startsWith, strip;
 
 /// Follows `<path>.remap` and `<path>.import` to the stored resource
-string resolveGodotPath(GodotSource source, string path, size_t maxDepth = 8)
+string resolveGodotPath(
+    GodotSource source,
+    string path,
+    bool delegate(string feature) supported = null,
+    size_t maxDepth = 8,
+)
 {
     auto current = "res://" ~ normalizeResourcePath(path);
 
     foreach(_; 0 .. maxDepth)
     {
-        auto target = remapTarget(source, current ~ ".remap");
+        auto target = selectRemap(source, current ~ ".remap", supported);
 
         if(target.length == 0)
-            target = remapTarget(source, current ~ ".import");
+            target = selectRemap(source, current ~ ".import", supported);
 
         if(target.length == 0 || !source.exists(target))
             break;
@@ -25,13 +30,49 @@ string resolveGodotPath(GodotSource source, string path, size_t maxDepth = 8)
     return current;
 }
 
-/// Reads the `path` of the `[remap]` section, empty when absent
-string remapTarget(GodotSource source, string remapPath)
+private string selectRemap(
+    GodotSource source,
+    string remapPath,
+    bool delegate(string feature) supported,
+)
 {
     if(!source.exists(remapPath))
         return "";
 
+    auto entries = remapEntries(source, remapPath);
+    string plain;
+
+    foreach(entry; entries)
+        if(entry.key == "path")
+            plain = entry.path;
+
+    if(plain.length)
+        return plain;
+
+    // Desktop S3TC first, then BPTC, ETC2 and ASTC, as Godot exports them.
+    foreach(feature; ["s3tc", "bptc", "etc2", "astc", "mobile"])
+    {
+        if(supported !is null && !supported(feature))
+            continue;
+
+        foreach(entry; entries)
+            if(entry.key == "path." ~ feature)
+                return entry.path;
+    }
+
+    return "";
+}
+
+private struct RemapEntry
+{
+    string key;
+    string path;
+}
+
+private RemapEntry[] remapEntries(GodotSource source, string remapPath)
+{
     const text = cast(string) source.read(remapPath);
+    RemapEntry[] result;
     bool inRemap;
 
     foreach(line; text.splitLines)
@@ -54,13 +95,18 @@ string remapTarget(GodotSource source, string remapPath)
         if(equals < 0)
             continue;
 
-        if(trimmed[0 .. equals].strip != "path")
+        const key = trimmed[0 .. equals].strip;
+
+        if(key != "path" && !key.startsWith("path."))
             continue;
 
-        return "res://" ~ normalizeResourcePath(unquote(trimmed[equals + 1 .. $].strip));
+        result ~= RemapEntry(
+            key,
+            "res://" ~ normalizeResourcePath(unquote(trimmed[equals + 1 .. $].strip)),
+        );
     }
 
-    return "";
+    return result;
 }
 
 private string unquote(string value)

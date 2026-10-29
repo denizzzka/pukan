@@ -1,6 +1,7 @@
 module pukan;
 
 public import pukan.background;
+public import pukan.compressed_texture;
 public import pukan.gltf;
 public import pukan.godot_scene;
 public import pukan.material;
@@ -14,6 +15,7 @@ public import pukan.scene;
 public import pukan.screenshot;
 public import pukan.stereo;
 public import pukan.vulkan;
+public import pukan.webp;
 
 import pukan.vulkan.bindings;
 

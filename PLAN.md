@@ -125,8 +125,9 @@ The end goal is a game exported by Godot, not only a source project.
 - [ ] Stream or memory-map pack files instead of loading the whole archive.
 - [x] `.ctex` textures: embedded PNG and raw `DATA_FORMAT_IMAGE` for RGBA8,
       RGB8, RG8, R8, LA8 and L8, with mip chains uploaded directly.
-- [ ] `.ctex` WebP and VRAM-compressed formats (BC, ETC2, ASTC); WebP needs a
-      decoder.
+- [x] `.ctex` WebP and VRAM-compressed formats (BC, ETC2, ASTC) through
+      `pukan.compressed_texture`, with device feature checks and sRGB or linear
+      sampling per material slot. Basis Universal stays unsupported.
 - [x] Binary `.res` materials and meshes.
 - [ ] Resource deduplication across a scene.
 - [x] Packed project fixture exported with Godot 4.7 and checked in.
@@ -195,6 +196,9 @@ Fixtures live in `demo/assets/godot_samples/`.
       `GodotSource` and `--pack`.
 - [x] Generated `ctex.tscn` and `raw.tscn` covering embedded PNG and raw RGBA8
       `.ctex` textures.
+- [x] Generated `compressed_*.tscn` from the lights-demo checker and the
+      platformer particle: BC1, BC7, ETC2, ASTC, BC5 normals and lossless WebP.
+      ETC2 and ASTC need device support.
 - [x] Generated `nested.tscn` and `nested_binary.tscn` instancing text and
       binary PackedScenes, checked through a PCK as well.
 - [x] `exported/exported.pck`, a Godot 4.7 `--export-pack` build with `.remap`
