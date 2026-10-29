@@ -134,6 +134,7 @@ private final class GodotLoader
 
     GodotProject project;
     string scenePath;
+    bool gltfImportedScene;
 
     BufferPieceOnGPU[] gpuBuffs;
     PbrMesh[] meshes;
@@ -191,6 +192,8 @@ private final class GodotLoader
     GodotScene run(GodotSource source, string sceneKey, string rootDir)
     {
         scenePath = sceneKey;
+        gltfImportedScene = sceneKey.canFind(".godot/imported/") &&
+            (sceneKey.canFind(".glb-") || sceneKey.canFind(".gltf-"));
         project = new GodotProject(source, rootDir, device);
 
         commandPool = device.createCommandPool();
@@ -931,6 +934,9 @@ private final class GodotLoader
             fakeTextureInfo,
             jointInfo,
         );
+
+        if(gltfImportedScene)
+            mesh.frontFace = VK_FRONT_FACE_CLOCKWISE;
 
         applyMaterial(mesh, surface, material);
         return mesh;
