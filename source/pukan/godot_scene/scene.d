@@ -2,7 +2,7 @@ module pukan.godot_scene.scene;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
-import pukan.material: AlphaMode, MaterialBuffer, MaterialMode;
+import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.misc: Boxf;
 import pukan.pbr.accessor: BufferPieceOnGPU;
 import pukan.pbr.mesh: PbrMesh;
@@ -67,6 +67,7 @@ class GodotNode
 final class GodotScene : DrawableByVulkan, Blended
 {
     private PbrPipelines pipelines;
+    private LogicalDevice device;
     private MaterialBuffer materialBuffer;
     private GodotNode root;
     private PbrMesh[] meshes;
@@ -85,6 +86,7 @@ final class GodotScene : DrawableByVulkan, Blended
 
     package(pukan) this(
         ref PbrPipelines pipelines,
+        LogicalDevice device,
         MaterialBuffer materialBuffer,
         GodotNode root,
         PbrMesh[] meshes,
@@ -95,6 +97,7 @@ final class GodotScene : DrawableByVulkan, Blended
     )
     {
         this.pipelines = pipelines;
+        this.device = device;
         this.materialBuffer = materialBuffer;
         this.root = root;
         this.meshes = meshes;
@@ -120,6 +123,21 @@ final class GodotScene : DrawableByVulkan, Blended
 
     string possibleName() const => name;
     size_t meshCount() const => meshes.length;
+
+    /// Replaces every surface material at runtime
+    void setMaterialOverride(Material material)
+    {
+        foreach(mesh; meshes)
+        {
+            mesh.material = material;
+            mesh.commitMaterial();
+            mesh.updateDescriptorSetsAndUniformBuffers(device);
+        }
+
+        foreach(instance; instances)
+            if(auto scene = cast(GodotScene) instance)
+                scene.setMaterialOverride(material);
+    }
     size_t instanceCount() const => instances.length;
 
     Boxf[] instanceBounds() const

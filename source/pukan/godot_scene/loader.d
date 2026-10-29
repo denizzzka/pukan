@@ -210,6 +210,7 @@ private final class GodotLoader
 
         auto scene = new GodotScene(
             pbr.godotPipelines,
+            device,
             pbr.resources.materials,
             root,
             meshes,

@@ -85,7 +85,7 @@ or the pack.
       existing image loader; `.ctex` belongs to phase 3.
 - [x] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
       phase, AABB and name.
-- [ ] `GodotScene`: runtime material override.
+- [x] `GodotScene`: runtime material override.
 - [x] First vertical slice: `ArrayMesh`, `StandardMaterial3D`, a PNG texture
       and vertex colors render through `GodotFactory` in `demo_godot`.
 - [x] Fixtures and the `demo_godot` app, see below.
