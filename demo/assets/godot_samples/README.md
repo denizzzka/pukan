@@ -52,6 +52,10 @@ godot --headless --path generated --script res://generate.gd
 `checker.png` is copied from the lights demo; remove `generated/.godot` after a
 run, it is a local import cache.
 
+`checker.ctex` is an embedded-PNG `CompressedTexture2D`; `raw.ctex` is a 4x4
+raw RGBA8 one. The matching `ctex.tscn` and `raw.tscn` scenes reference them
+through `.tres` materials.
+
 `fixtures.pck` is an unencrypted Godot 4 PCK v2 created by
 `generated/pack_fixtures.py`. It contains `res://procedural.tscn`,
 `res://procedural_mesh.res` and `res://checker.png`. Load it with:

@@ -4,6 +4,7 @@ import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f, degtorad;
 import material_bindings;
 import pukan.exceptions: PukanException;
 import pukan.godot_scene.binary: parseGodotResourceData;
+import pukan.godot_scene.ctex: GodotCtexImage, loadCtex;
 import pukan.godot_scene.material: GodotMaterialData, readGodotMaterial;
 import pukan.godot_scene.paths: normalizeResourcePath;
 import pukan.godot_scene.source: DirectorySource, GodotSource;
@@ -21,9 +22,10 @@ import pukan.pbr.factory: PbrFactory;
 import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrMesh, Vector4us;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.image: loadImageToMemory;
+import pukan.vulkan.image: loadImageToMemory, loadImageWithMips;
 import pukan.vulkan.pipelines: DescriptorAllocator;
 import pukan.vulkan.textures: Texture;
+import std.algorithm: endsWith;
 import std.conv: to;
 import std.file: exists, getcwd;
 import std.path: buildNormalizedPath, buildPath, dirName, extension, isAbsolute, relativePath;
@@ -766,14 +768,41 @@ private final class GodotLoader
         if(auto cached = path in textureCache)
             return *cached;
 
-        if(!isImagePath(path))
+        const lower = path.toLower;
+        const isCtex = lower.endsWith(".ctex");
+
+        if(!isCtex && !isImagePath(path))
         {
             ++skippedResources;
             return null;
         }
 
+        const(ubyte)[] imageData;
+        GodotCtexImage ctex;
+
+        if(isCtex)
+        {
+            ctex = loadCtex(project.source.read(path), path);
+
+            if(ctex.levels.length)
+            {
+                auto memory = loadImageWithMips(
+                    device, commandPool, commandBuffer,
+                    ctex.width, ctex.height, ctex.levels, ctex.format,
+                );
+                auto texture = device.create!Texture(memory, samplerInfo);
+                textureCache[path] = texture;
+                textures ~= texture;
+                return texture;
+            }
+
+            imageData = ctex.png;
+        }
+        else
+            imageData = project.source.read(path);
+
         VkFormat format;
-        auto image = loadImageFromMemory(project.source.read(path), format);
+        auto image = loadImageFromMemory(imageData, format);
         auto memory = loadImageToMemory(device, commandPool, commandBuffer, image, format);
         auto texture = device.create!Texture(memory, samplerInfo);
 

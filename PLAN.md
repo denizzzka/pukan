@@ -120,9 +120,10 @@ The end goal is a game exported by Godot, not only a source project.
 - [x] `.pck` v2-v4 reader, unencrypted, with a `GodotSource` abstraction shared
       by directory and pack sources.
 - [ ] Stream or memory-map pack files instead of loading the whole archive.
-- [ ] `.ctex` textures: embedded PNG first, then raw and VRAM-compressed
-      `DATA_FORMAT_IMAGE`; WebP needs a decoder. Upload mip chains directly
-      when the device supports the format, with a documented fallback.
+- [x] `.ctex` textures: embedded PNG and raw `DATA_FORMAT_IMAGE` for RGBA8,
+      RGB8, RG8, R8, LA8 and L8, with mip chains uploaded directly.
+- [ ] `.ctex` WebP and VRAM-compressed formats (BC, ETC2, ASTC); WebP needs a
+      decoder.
 - [x] Binary `.res` materials and meshes.
 - [ ] Resource deduplication across a scene.
 - [ ] Packed project fixture exported with Godot 4.7 and checked in.
@@ -167,6 +168,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       `.scn` scene loaded through `demo_godot`.
 - [x] Generated `fixtures.pck` with a text scene and texture, loaded through
       `GodotSource` and `--pack`.
+- [x] Generated `ctex.tscn` and `raw.tscn` covering embedded PNG and raw RGBA8
+      `.ctex` textures.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external
       material and both override forms.
 - [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer

@@ -1,0 +1,11 @@
+[gd_scene format=4]
+
+[ext_resource type="Material" path="res://raw_material.tres" id="1_mat"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_1"]
+
+[node name="Root" type="Node3D"]
+
+[node name="RawCtexBox" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_1")
+material_override = ExtResource("1_mat")

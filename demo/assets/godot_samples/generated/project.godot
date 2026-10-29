@@ -3,3 +3,7 @@ config_version=5
 [application]
 
 config/name="pukan Godot fixtures"
+
+[rendering]
+
+textures/lossless_compression/force_png=true
