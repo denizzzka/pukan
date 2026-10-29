@@ -25,9 +25,124 @@ only a suggested grouping.
 
 ## Content formats
 
+### Godot 4 scenes
+
+Goal: load Godot 4 3D scenes from source projects and from packed production
+builds, a `.pck` or an exported directory. Godot 3 is out of scope. Code lives
+in `source/pukan/godot_scene/`; shared PBR pieces move to
+`source/pukan/pbr/`.
+
+Formats in scope: `.tscn`, `.tres`, `.escn` (text), `.scn`, `.res` (binary
+RSRC 5/6), `.ctex` (CompressedTexture2D), imported `.glb`/`.gltf`/`.obj`
+references, and `.pck` archives. `res://` resolves inside the project directory
+or the pack.
+
+#### Shared PBR groundwork
+
+- [ ] Extract `PbrPipelines` and `PbrMesh`/`MeshGeometry` from the glTF code,
+      keep the glTF loader on top of them, and put `GodotFactory`, `GodotScene`
+      and `GodotMesh` beside them.
+- [ ] Add vertex colors to the PBR path: a color vertex stream with a white
+      fallback, `fragColor` in `mesh_pbr*.vert`, `COLOR_0` in glTF and `COLOR`
+      in Godot surfaces. glTF allows `COLOR_0`; the loader never implemented
+      it. This is a gap in pukan, not a format requirement.
+- [ ] Add a static `GODOT_MATERIAL` shader variant, or split the shader files,
+      for Godot's separate metallic and roughness maps, channel selectors and
+      UV1 transform. Sample the maps directly; do not repack textures on the
+      CPU.
+- [ ] Extend `Material` with the fields the Godot variant needs and keep the
+      glTF layout working.
+
+#### Phase 1: text scenes, static geometry and materials
+
+- [ ] Text parser for `gd_scene`/`gd_resource`: tags, ext/sub resources, nodes,
+      properties, typed arrays, dictionaries, `SubResource`/`ExtResource`,
+      base64 `PackedByteArray` (format 4).
+- [ ] `res://` resolution from `project.godot`; external text resources and
+      `.glb`/`.gltf` references through the existing loader.
+- [ ] `ArrayMesh` decoder: interleaved `vertex_data`, `attribute_data`,
+      `skin_data` and `index_data`, format version 2, octahedral normals and
+      tangents, half-float UVs, RGBA8 colors, 16/32-bit indices, compressed and
+      uncompressed surfaces.
+- [ ] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
+      `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
+- [ ] `MeshInstance3D`: node tree, `transform`, `visible`, `cast_shadow`,
+      shared mesh resources and per-surface materials.
+- [ ] `StandardMaterial3D` and `ORMMaterial3D`: albedo, metallic, roughness,
+      emission, normal, AO, transparency, alpha scissor, cull mode, unshaded,
+      vertex colors, UV1 scale/offset and channel selectors.
+- [ ] Textures from `.png`, `.jpg`, `.webp`, `.tga` and `.hdr` through the
+      existing image loader; `.ctex` belongs to phase 3.
+- [ ] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
+      phase, AABB, name and material override.
+- [ ] Demo flag and fixtures, see the fixture list below.
+
+#### Phase 2: lights, cameras and environment
+
+- [ ] `DirectionalLight3D`, `OmniLight3D` and `SpotLight3D` to the `Scene`
+      light list; add a `Scene.setSun` path for the directional one.
+- [ ] `Camera3D` exposed on the loaded scene; the demo decides whether to use
+      it.
+- [ ] `WorldEnvironment`, `Environment` and `Sky`: background colour, ambient
+      light and tonemap; IBL, fog, SDFGI and volumetrics stay unsupported at
+      first.
+- [ ] Layers, visibility ranges and `cast_shadow` modes.
+
+#### Phase 3: binary resources and packed production projects
+
+The end goal is a game exported by Godot, not only a source project.
+
+- [ ] RSRC 5/6 reader: string table, external and internal resource tables, the
+      variant encoding and resource properties.
+- [ ] `PackedScene._bundled` decoder for binary `.scn`.
+- [ ] `.import` remap, exported `.remap` chains and `project.binary`.
+- [ ] `.pck` v2 reader with a VFS layer shared by directory and pack sources.
+- [ ] `.ctex` textures: header, mip chain and format mapping; upload directly
+      when the device supports the format, with a documented fallback.
+- [ ] Binary `.res` materials and meshes; resource deduplication across a
+      scene.
+- [ ] Packed project fixture exported with Godot 4.7 and checked in.
+
+#### Phase 4: instances, skinned meshes and animation
+
+- [ ] `PackedScene` instances, property overrides and editable children.
+- [ ] `MultiMeshInstance3D` and `MultiMesh`.
+- [ ] `Skeleton3D`, `Skin`, `BoneAttachment3D` and bone weights in `ArrayMesh`;
+      joint matrices on the CPU first, then the existing GPU skinning path.
+- [ ] `AnimationPlayer` and `Animation` resources: transform and property
+      tracks needed for skeletal animation, key-array sampling and looping.
+- [ ] Animation of material and node properties.
+
+#### GridMap
+
 - [ ] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
       an integer grid with a mesh library per cell; decide whether to import that
       data as is or to grow the same cell-and-library model on top of #16.
+
+#### Compatibility policy
+
+- [ ] Unknown nodes and resources: count and report them for now, never crash.
+      Before production support is called done, enumerate every type used by
+      the supported projects and either implement it or record why it is
+      dropped. Remove the silent skip at that point.
+- [ ] `ShaderMaterial`, CSG, particles, decals, GI probes, fog volumes,
+      SkeletonIK and custom scripts stay out until a project needs them.
+- [ ] Encrypted `.pck` archives stay out.
+
+#### Fixtures
+
+Fixtures live in `demo/assets/godot_samples/`.
+
+- [x] `lights_and_shadows/test.tscn` from the Godot demo projects: text scene,
+      primitives, `StandardMaterial3D`, textures and lights.
+- [x] `platformer/enemy/enemy.tscn` plus `enemy.glb`: external `PackedScene`,
+      skeleton and animation.
+- [x] Generated `procedural.tscn`, `.scn` and `.res` with two uncompressed
+      `ArrayMesh` surfaces, built by Godot 4.7 headless.
+- [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer
+      with mesh compression enabled.
+- [ ] `combined.tscn` instancing the three, for composition checks.
+- [x] README with source URLs, commit, licenses and the regeneration script.
 
 ## Geometric algebra: PGA and CGA
 
