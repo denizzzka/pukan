@@ -2,6 +2,7 @@ module pukan;
 
 public import pukan.background;
 public import pukan.gltf;
+public import pukan.godot_scene;
 public import pukan.material;
 public import pukan.mesh;
 public import pukan.misc;

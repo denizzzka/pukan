@@ -55,7 +55,7 @@ or the pack.
 
 #### Phase 1: text scenes, static geometry and materials
 
-- [ ] Text parser for `gd_scene`/`gd_resource`: tags, ext/sub resources, nodes,
+- [x] Text parser for `gd_scene`/`gd_resource`: tags, ext/sub resources, nodes,
       properties, typed arrays, dictionaries, `SubResource`/`ExtResource`,
       base64 `PackedByteArray` (format 4).
 - [ ] `res://` resolution from `project.godot`; external text resources and
