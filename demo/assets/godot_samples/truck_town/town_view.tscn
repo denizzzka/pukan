@@ -1,0 +1,17 @@
+[gd_scene format=4]
+
+[ext_resource type="PackedScene" path="res://town/model/town_model.gltf" id="1_model"]
+
+[node name="TownView" type="Node3D"]
+
+[node name="TownModel" parent="." instance=ExtResource("1_model")]
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.793955, 0.350561, -0.496732, -0.295414, 0.491651, 0.819152, 0.531381, 0.797111, -0.286788, 11.0084, 12.3453, -31.3148)
+light_energy = 1.45
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.8321, 0.5547, 0, -0.5547, 0.8321, 0, 60, 90)
+fov = 75.0
+near = 0.05
+far = 1000.0

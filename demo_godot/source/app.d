@@ -73,6 +73,8 @@ void main(string[] args)
     uint screenshotFrame;
     string eyeOption;
     string targetOption;
+    float fovOption = cameraFov;
+    float farOption = cameraFar;
 
     auto getoptResult = getopt(
         args,
@@ -84,6 +86,8 @@ void main(string[] args)
         "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
         "eye", "override the camera position, x,y,z", &eyeOption,
         "target", "override the camera target, x,y,z", &targetOption,
+        "fov", "vertical field of view in degrees", &fovOption,
+        "far", "far clipping distance", &farOption,
     );
 
     if(getoptResult.helpWanted)
@@ -244,9 +248,9 @@ void main(string[] args)
         target = parseVector(targetOption);
 
     Vector3f up = Vector3f(0, 1, 0);
-    float fov = cameraFov;
+    float fov = fovOption;
     float nearPlane = cameraNear;
-    float farPlane = cameraFar;
+    float farPlane = farOption;
 
     if(useSceneCamera && godotScene.hasCamera)
     {

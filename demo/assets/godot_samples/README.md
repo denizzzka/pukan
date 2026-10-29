@@ -1,9 +1,9 @@
 # Godot scene fixtures
 
-Two scenes come from the official Godot demo projects, one is generated here,
-and one is a small project exported as a PCK. They cover the text scene format,
-the binary RSRC format, ArrayMesh surfaces, primitive meshes,
-StandardMaterial3D, external glTF scenes, skeletons and animation.
+Three scenes come from the official Godot demo projects, one is generated
+here, and one is a small project exported as a PCK. They cover the text scene
+format, the binary RSRC format, ArrayMesh surfaces, primitive meshes,
+StandardMaterial3D, external glTF scenes, skeletons, a landscape and animation.
 
 ## Sources
 
@@ -16,6 +16,9 @@ Commit: `b761b4cd5718a7118f2c95eb55f181d0a5f004f1` (`master`).
 - `platformer/` is the `enemy` part of `3d/platformer`. Audio streams and
   screenshots are omitted, but `enemy.tscn` still declares them, so the loader
   must skip resource types it does not render.
+- `truck_town/` is `3d/truck_town/town/model` with the project file and the
+  `town_view.tscn` wrapper added here. The tree and lamp models, the sky, the
+  scripts and the UI of the town scene are left out.
 
 The demo projects are MIT licensed, see `LICENSE.godot-demo-projects.md`.
 `lights_and_shadows/checker.png` is CC0 by Kenney, see
@@ -153,3 +156,23 @@ exercises native Godot skinning and the RSCC/Zstandard resource path:
 
 The enemy currently renders in its bind pose; animation tracks are not applied
 yet.
+
+## Landscape
+
+`truck_town/town_view.tscn` puts the town model under a directional light and a
+`Camera3D` that frames the whole terrain. The model is a 2048 unit ground mesh
+with roads, houses and a racetrack: 60930 triangles in 75 primitives and 9
+materials.
+
+It is the only fixture that keeps an external `.gltf`: the mesh data lives in
+`town_model0.bin`, and the textures are WebP files referenced through
+`EXT_texture_webp` with the path percent-encoded (`textures%2F...`), the way the
+Godot glTF exporter writes them. The loader decodes both, and `--fov`/`--far`
+exist so a terrain this large can be viewed.
+
+```sh
+./demo_godot/pukan_demo_godot --scene demo/assets/godot_samples/truck_town/town_view.tscn --scene-camera --frames 2
+```
+
+The scene has no sky and no shadows are enabled in `demo_godot`, so the
+background is transparent and the model is lit by the sun only.

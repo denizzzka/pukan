@@ -1,0 +1,7 @@
+config_version=5
+
+[application]
+
+config/name="Truck Town"
+config/features=PackedStringArray("4.7")
+run/main_scene="res://town_view.tscn"
