@@ -306,11 +306,13 @@ class DefaultRenderPass : RenderPass
     }
 }
 
-/// Which of the two 3D passes a draw belongs to
+/// Which of the 3D passes a draw belongs to
 enum DrawPhase : uint
 {
-    /// Opaque and blended draws, before the colour copy
+    /// Opaque draws, before the colour copy
     surface,
+    /// Blended draws, after every opaque one so their fragments see the final depth
+    blended,
     /// Draws that sample the copy of the colour the surface phase left
     transmission,
 }

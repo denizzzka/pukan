@@ -4,6 +4,8 @@
 #include "material_bindings.h"
 #ifdef OIT
 #include "oit.glsl"
+// The list is a side effect: without this, occluded fragments still record
+layout(early_fragment_tests) in;
 #endif
 
 layout(binding = MATERIAL_UNIFORM) uniform MaterialBlock
@@ -102,6 +104,7 @@ void main()
     // derivative widens the cutoff by one pixel; the discard below it stays,
     // so masks survive a pass without multisampling, where alpha is ignored.
     float outAlpha = 1.0;
+#ifndef OIT
     if(masked)
     {
         const float width = max(fwidth(base.a), 1e-5);
@@ -112,7 +115,9 @@ void main()
 
         outAlpha = coverage;
     }
-    else if(alphaMode == MATERIAL_ALPHA_BLEND)
+    else
+#endif
+    if(alphaMode == MATERIAL_ALPHA_BLEND)
         outAlpha = base.a;
 
     vec3 color;

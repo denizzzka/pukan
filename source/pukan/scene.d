@@ -442,8 +442,8 @@ class Scene
 
     void recordCommandBuffer(
         ref Frame frame,
-        void delegate(ref VkCommandBuffer) drawScene,
-        void delegate(ref VkCommandBuffer) drawTransmission = null,
+        SceneDrawCallback drawScene,
+        SceneDrawCallback drawTransmission = null,
     )
     {
         auto commandBuffer = frame.commandBuffer;
@@ -456,7 +456,10 @@ class Scene
         renderPass.recordCommandBuffer(
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf); },
-            drawScene,
+            (ref VkCommandBuffer buf) {
+                drawScene(buf, DrawPhase.surface);
+                drawScene(buf, DrawPhase.blended);
+            },
         );
 
         if(transmissionPassEnabled)
@@ -467,7 +470,7 @@ class Scene
                 commandBuffer,
                 (ref VkCommandBuffer buf) {
                     if(drawTransmission !is null)
-                        drawTransmission(buf);
+                        drawTransmission(buf, DrawPhase.transmission);
                 },
             );
         }
@@ -477,9 +480,10 @@ class Scene
         presentColor(frame);
     }
 
-    alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent);
+    alias SceneDrawCallback = void delegate(ref VkCommandBuffer, DrawPhase phase);
+    alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent, DrawPhase phase);
 
-    private void drawStereoEyes(VkCommandBuffer buf, StereoDrawCallback drawScene)
+    private void drawStereoEyes(VkCommandBuffer buf, StereoDrawCallback drawScene, bool transmission = false)
     {
         const extent = swapChain.imageExtent;
         const leftWidth = extent.width / 2;
@@ -507,7 +511,13 @@ class Scene
             vkCmdSetViewport(buf, 0, 1, &viewport);
             vkCmdSetScissor(buf, 0, 1, &scissor);
 
-            drawScene(buf, eye, eyeExtent);
+            if(transmission)
+                drawScene(buf, eye, eyeExtent, DrawPhase.transmission);
+            else
+            {
+                drawScene(buf, eye, eyeExtent, DrawPhase.surface);
+                drawScene(buf, eye, eyeExtent, DrawPhase.blended);
+            }
         }
     }
 
@@ -542,7 +552,7 @@ class Scene
                 commandBuffer,
                 (ref VkCommandBuffer buf) {
                     if(drawTransmission !is null)
-                        drawStereoEyes(buf, drawTransmission);
+                        drawStereoEyes(buf, drawTransmission, true);
                 },
             );
         }

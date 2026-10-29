@@ -802,25 +802,29 @@ class GlTF : DrawableByVulkan
         MeshDraw[] draws;
         collectDraws(trans, rootSceneNode, draws);
 
-        foreach(draw; draws)
-            if(draw.mesh.alphaMode != AlphaMode.blend && matchesPhase(draw.mesh, phase))
-                draw.mesh.draw(buf, selectPipeline(draw.mesh), draw.trans, frameSet);
-
-        draws.sort!((a, b) => a.depth > b.depth);
+        // Back to front only matters for the in-place blend path
+        if(phase == DrawPhase.blended)
+            draws.sort!((a, b) => a.depth > b.depth);
 
         foreach(draw; draws)
-            if(draw.mesh.alphaMode == AlphaMode.blend && matchesPhase(draw.mesh, phase))
+            if(matchesPhase(draw.mesh, phase))
                 draw.mesh.draw(buf, selectPipeline(draw.mesh), draw.trans, frameSet);
     }
 
     private static bool matchesPhase(const MeshClass mesh, DrawPhase phase)
     {
+        const blended = mesh.alphaMode == AlphaMode.blend;
         const transmissive = mesh.material.transmission.x > 0.0f;
+        // Without its own pass, a transmissive mesh draws where the opaque ones do
+        const ownPass = transmissive && transmissionPass;
 
         if(phase == DrawPhase.transmission)
             return transmissive;
 
-        return !transmissive || !transmissionPass;
+        if(phase == DrawPhase.blended)
+            return blended && !ownPass;
+
+        return !blended && !ownPass;
     }
 
 

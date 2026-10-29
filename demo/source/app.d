@@ -442,24 +442,19 @@ void main(string[] args) {
             {
                 scene.recordStereoCommandBuffer(
                     frame,
-                    (buf, eye, eyeExtent) {
+                    (buf, eye, eyeExtent, phase) {
                         const view = crossEyed ? 1 - eye : eye;
                         auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
                         tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
                         scene.updateFrameUniforms(frame, view, stereoWtb[view]);
-                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet);
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
                     },
-                    (buf, eye, eyeExtent) {
+                    (buf, eye, eyeExtent, phase) {
                         const view = crossEyed ? 1 - eye : eye;
                         auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
                         tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
                         scene.updateFrameUniforms(frame, view, stereoWtb[view]);
-                        tree.drawingBufferFilling(
-                            buf,
-                            Matrix4x4f.identity,
-                            frame.frameSets[view].descriptorSet,
-                            DrawPhase.transmission,
-                        );
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
                     },
                 );
             }
@@ -469,16 +464,11 @@ void main(string[] args) {
 
                 scene.recordCommandBuffer(
                     frame,
-                    (buf) {
-                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet);
+                    (buf, phase) {
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
-                    (buf) {
-                        tree.drawingBufferFilling(
-                            buf,
-                            Matrix4x4f.identity,
-                            frame.frameSets[0].descriptorSet,
-                            DrawPhase.transmission,
-                        );
+                    (buf, phase) {
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
                 );
             }

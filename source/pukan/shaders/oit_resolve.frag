@@ -51,15 +51,15 @@ void main()
         discard;
 
     vec3 premultiplied = vec3(0.0);
-    float transmittance = 1.0;
+    float alpha = 0.0;
 
+    // Far to near: each layer paints over everything already composited
     for(uint i = 0u; i < count; ++i)
     {
-        premultiplied += transmittance * colors[i].a * colors[i].rgb;
-        transmittance *= 1.0 - colors[i].a;
+        const float a = colors[i].a;
+        premultiplied = a * colors[i].rgb + (1.0 - a) * premultiplied;
+        alpha = a + (1.0 - a) * alpha;
     }
-
-    const float alpha = 1.0 - transmittance;
 
     if(alpha <= 0.0)
         discard;
