@@ -45,11 +45,10 @@ or the pack.
       fallback, `fragColor` in `mesh_pbr*.vert`, `COLOR_0` in glTF and `COLOR`
       in Godot surfaces. glTF allows `COLOR_0`; the loader never implemented
       it. This is a gap in pukan, not a format requirement.
-- [ ] Add a static `GODOT_MATERIAL` shader variant, or split the shader files,
-      for Godot's separate metallic and roughness maps, channel selectors and
-      UV1 transform. Sample the maps directly; do not repack textures on the
-      CPU.
-- [ ] Extend `Material` with the fields the Godot variant needs and keep the
+- [x] Add a static `GODOT_MATERIAL` shader variant for Godot's separate
+      metallic and roughness maps, channel selectors and UV1 transform. Sample
+      the maps directly; do not repack textures on the CPU.
+- [x] Extend `Material` with the fields the Godot variant needs and keep the
       glTF layout working.
 
 #### Phase 1: text scenes, static geometry and materials
@@ -77,7 +76,7 @@ or the pack.
 - [x] `StandardMaterial3D` and `ORMMaterial3D`: albedo, metallic, roughness,
       emission, normal, AO, transparency, alpha scissor, cull mode, unshaded
       and vertex colors.
-- [ ] Separate metallic and roughness maps, channel selectors and UV1
+- [x] Separate metallic and roughness maps, channel selectors and UV1
       scale/offset in the Godot shader variant.
 - [x] Textures from `.png`, `.jpg`, `.webp`, `.tga` and `.hdr` through the
       existing image loader; `.ctex` belongs to phase 3.
