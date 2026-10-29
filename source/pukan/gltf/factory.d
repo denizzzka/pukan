@@ -4,7 +4,7 @@ import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import material_bindings;
 import pukan.gltf;
 import pukan.gltf.loader: GltfLoadOptions;
-import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines;
+import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines;
 import pukan.material: MaterialBuffer;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
@@ -44,6 +44,11 @@ private ShaderVertexInput vertexInput()
                 stride: Vector4f.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: 6,
+                stride: 4,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
         ],
         [
             VkVertexInputAttributeDescription(
@@ -76,6 +81,11 @@ private ShaderVertexInput vertexInput()
                 location: 5,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
             ),
+            VkVertexInputAttributeDescription(
+                binding: 6,
+                location: 6,
+                format: VK_FORMAT_R8G8B8A8_UNORM,
+            ),
         ],
     );
 }
@@ -104,6 +114,11 @@ private ShaderVertexInput staticVertexInput()
                 stride: Vector4f.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: 4,
+                stride: 4,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
         ],
         [
             VkVertexInputAttributeDescription(
@@ -125,6 +140,11 @@ private ShaderVertexInput staticVertexInput()
                 binding: 3,
                 location: 3,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 4,
+                location: 6,
+                format: VK_FORMAT_R8G8B8A8_UNORM,
             ),
         ],
     );
@@ -196,7 +216,7 @@ class GltfFactory
     private PipelineFactory pipelines;
     private TechniqueId technique;
     private MeshResources resources;
-    GltfPipelines pipelineCfgs;
+    PbrPipelines pipelineCfgs;
     GltfLoadOptions loadOptions;
 
     this(
@@ -319,7 +339,7 @@ class GltfFactory
         ];
     }
 
-    private GltfPipelineVariants createVariants(string prefix, ShaderInfo[] stages, ShaderInfo[] oitStages, RenderPass renderPass)
+    private PbrPipelineVariants createVariants(string prefix, ShaderInfo[] stages, ShaderInfo[] oitStages, RenderPass renderPass)
     {
         VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE];
 
@@ -365,7 +385,7 @@ class GltfFactory
             colorWriteMask: 0,
         ));
 
-        GltfPipelineVariants result;
+        PbrPipelineVariants result;
         result.opaque = pipelines.acquire(opaque, renderPass, 1);
         result.doubleSided = pipelines.acquire(doubleSided, renderPass, 1);
         result.blend = pipelines.acquire(blend, renderPass, 1);
@@ -435,12 +455,17 @@ class GltfFactory
         );
     }
 
+    /// A private allocator, so loads can run on different threads.
+    DescriptorAllocator createAllocator()
+    {
+        return pipelines.createDescriptorAllocator(technique);
+    }
+
     auto create(string filename)
     {
         assert(device);
 
-        // A private allocator, so loads can run on different threads.
-        auto allocator = pipelines.createDescriptorAllocator(technique);
+        auto allocator = createAllocator();
 
         try
             return loadGlTF2(

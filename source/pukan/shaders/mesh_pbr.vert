@@ -19,6 +19,7 @@ layout(location = 2) in uvec4 jointIndices;
 layout(location = 3) in vec4 weight;
 layout(location = 4) in vec3 vertNormal;
 layout(location = 5) in vec4 vertTangent;
+layout(location = 6) in vec4 vertColor;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTextureCoord;
@@ -39,7 +40,7 @@ void main()
     return;
 #endif
 
-    fragColor = vec3(1.0);
+    fragColor = vertColor.rgb;
     fragTextureCoord = vertTextureCoord;
 
     const mat4 skinMatrix =

@@ -2,7 +2,7 @@ module pukan.scene;
 
 import dlib.math: lookAtMatrix, perspectiveMatrix, translation, Vector3f, Vector4f;
 import pukan;
-import pukan.gltf.pipelines: oitPass, transmissionPass;
+import pukan.pbr.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;

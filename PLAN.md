@@ -75,7 +75,13 @@ or the pack.
       existing image loader; `.ctex` belongs to phase 3.
 - [ ] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
       phase, AABB, name and material override.
-- [ ] Demo flag and fixtures, see the fixture list below.
+- [ ] Fixtures and the `demo_godot` app, see below.
+
+#### Demo
+
+- [ ] New `demo_godot` subpackage: a minimal window, camera and scene loader,
+      separate from the glTF arena in `demo`.
+- [ ] A `--scene` path option that loads one fixture at startup.
 
 #### Phase 2: lights, cameras and environment
 

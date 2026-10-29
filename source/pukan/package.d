@@ -5,6 +5,7 @@ public import pukan.gltf;
 public import pukan.material;
 public import pukan.mesh;
 public import pukan.misc;
+public import pukan.pbr;
 public import pukan.primitives_tree;
 public import pukan.primitives_tree.mesh;
 public import pukan.primitives_tree.tree;

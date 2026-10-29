@@ -1,4 +1,4 @@
-module pukan.gltf.accessor;
+module pukan.pbr.accessor;
 
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -23,7 +23,7 @@ struct BufAccess
     uint count;
 }
 
-package struct AccessRange(T, bool isOutput)
+package(pukan) struct AccessRange(T, bool isOutput)
 {
     private const void[] buf;
     const BufAccess accessor;
@@ -33,7 +33,7 @@ package struct AccessRange(T, bool isOutput)
 
     alias Elem = T;
 
-    package this(in void[] b, in BufAccess a)
+    package(pukan) this(in void[] b, in BufAccess a)
     {
         buf = b;
 

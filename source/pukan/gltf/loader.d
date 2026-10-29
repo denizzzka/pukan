@@ -2,9 +2,9 @@ module pukan.gltf.loader;
 
 import dlib.math;
 import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
-import pukan.gltf.accessor;
+import pukan.pbr.accessor;
 import pukan.gltf.animation;
-import pukan.gltf.pipelines: GltfPipelines;
+import pukan.pbr.pipelines: PbrPipelines;
 import pukan.material: MaterialBuffer;
 import pukan.misc: linearFormat;
 import pukan.vulkan.bindings;
@@ -381,7 +381,7 @@ package GlTF loadGlTF2(
     DescriptorAllocator allocator,
     MaterialBuffer materialBuffer,
     LogicalDevice device,
-    ref GltfPipelines pipelines,
+    ref PbrPipelines pipelines,
     Texture fakeTexture,
     VkBuffer vertexFallback,
     bool computeJointsOnGPU,

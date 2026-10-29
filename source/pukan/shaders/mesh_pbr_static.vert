@@ -11,6 +11,7 @@ layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 vertTextureCoord;
 layout(location = 2) in vec3 vertNormal;
 layout(location = 3) in vec4 vertTangent;
+layout(location = 6) in vec4 vertColor;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTextureCoord;
@@ -25,7 +26,7 @@ void main()
     return;
 #endif
 
-    fragColor = vec3(1.0);
+    fragColor = vertColor.rgb;
     fragTextureCoord = vertTextureCoord;
 
     const mat4 model = frameUbo.frame.invViewProj * trans;

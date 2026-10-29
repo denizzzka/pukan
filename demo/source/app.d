@@ -3,7 +3,7 @@ import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
 import pukan.vulkan.renderpass: DrawPhase;
 import pukan.material: runtimeMaterialOverride;
-import pukan.gltf.pipelines: LightingMode, lightingMode;
+import pukan.pbr.pipelines: LightingMode, lightingMode;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.mesh: LitVertex;

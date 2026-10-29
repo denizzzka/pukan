@@ -3,11 +3,12 @@ module pukan.gltf;
 import dlib.math;
 public import pukan.gltf.loader: LoadStats, loadGlTF2;
 public import pukan.gltf.factory: GltfFactory;
-import pukan.gltf.accessor;
+import pukan.pbr.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode, oitPass, transmissionPass;
-import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
+import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, transmissionPass;
+import pukan.gltf.material: applyGltfMaterial;
+import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.misc: Boxf;
 import pukan.gltf.skin_matrices: SkinMatrices;
@@ -166,7 +167,7 @@ class GlTF : DrawableByVulkan
     private VkDescriptorImageInfo fakeTextureInfo;
     private VkBuffer vertexFallback;
     private GltfLoadOptions loadOptions;
-    private GltfPipelines pipelines;
+    private PbrPipelines pipelines;
 
     private MeshClass[] meshes;
 
@@ -191,7 +192,7 @@ class GlTF : DrawableByVulkan
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
     package this(
-        ref GltfPipelines pipelines,
+        ref PbrPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
@@ -445,7 +446,7 @@ class GlTF : DrawableByVulkan
         int skinIdx,
     )
     {
-        UploadedVertices uplVert;
+        MeshStreams uplVert;
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -504,14 +505,14 @@ class GlTF : DrawableByVulkan
                     widened ~= value;
 
                 const widenedAccess = createVertexBuffer(device, widened, gpuBuffs, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                uplVert.indices = IndicesDescr(device, widenedAccess, ComponentType.UNSIGNED_SHORT);
+                uplVert.indices = IndicesDescr(widenedAccess, VK_INDEX_TYPE_UINT16);
             }
             else
             {
                 const indicesAccessor = content.getAccess(indices);
                 createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-                uplVert.indices = IndicesDescr(device, indicesAccessor, indices.componentType);
+                uplVert.indices = IndicesDescr(indicesAccessor, indices.componentType == ComponentType.UNSIGNED_INT ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
             }
         }
 
@@ -529,6 +530,47 @@ class GlTF : DrawableByVulkan
 
             uplVert.texCoords = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        }
+
+        const hasVertexColors = ("COLOR_0" in primitive.attributes) !is null;
+        if(hasVertexColors)
+        {
+            const colorIdx = primitive.attributes["COLOR_0"].get!ushort;
+            auto colors = &accessors[colorIdx];
+            enforce(colors.count == vertexCount);
+            debug assert(colors.type == Type.VEC3 || colors.type == Type.VEC4);
+
+            const view = content.bufferViews[colors.viewIdx];
+            const stride = view.stride ? view.stride : colors.typeSizeOf;
+            const ubyte* data = view.buf.ptr + colors.offset;
+
+            uint[] packed;
+            packed.length = colors.count;
+
+            float component(const ubyte* p, size_t index) const
+            {
+                with(ComponentType)
+                switch(colors.componentType)
+                {
+                    case FLOAT:          return (cast(const float*) p)[index];
+                    case UNSIGNED_BYTE:  return p[index] / 255.0f;
+                    case UNSIGNED_SHORT: return (cast(const ushort*) p)[index] / 65535.0f;
+                    default: assert(0);
+                }
+            }
+
+            foreach(i; 0 .. colors.count)
+            {
+                const p = data + i * stride;
+                const a = colors.type == Type.VEC4 ? component(p, 3) : 1.0f;
+                packed[i] =
+                    packColorComponent(component(p, 0)) |
+                    (packColorComponent(component(p, 1)) << 8) |
+                    (packColorComponent(component(p, 2)) << 16) |
+                    (packColorComponent(a) << 24);
+            }
+
+            uplVert.colors = createVertexBuffer(device, packed, gpuBuffs);
         }
 
         // Tangent data is only needed when a normal map samples it
@@ -678,7 +720,7 @@ class GlTF : DrawableByVulkan
         // Every mesh binds MATERIAL_JOINTS; without a skin the shader ignores it
         VkDescriptorBufferInfo jointsUboInfo = jointsUboInfos[skinIdx >= 0 ? skinIdx : 0];
 
-        auto m = new GltfMesh(
+        auto m = new PbrMesh(
             mesh.name,
             uplVert,
             allocator,
@@ -689,7 +731,7 @@ class GlTF : DrawableByVulkan
             jointsUboInfo,
         );
 
-        m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents, loadOptions);
+        applyGltfMaterial(m, primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents, hasVertexColors, loadOptions);
         m.buildGeometry(gpuBuffs);
         return m;
     }
@@ -697,6 +739,12 @@ class GlTF : DrawableByVulkan
     private static bool hasNormalTexture(in Json json)
     {
         return json.type == Json.Type.object && ("normalTexture" in json) !is null;
+    }
+
+    private static ubyte packColorComponent(float value)
+    {
+        import std.algorithm: max, min;
+        return cast(ubyte) (min(max(value, 0.0f), 1.0f) * 255.0f + 0.5f);
     }
 
     private static Matrix4x4f skinMatrix(
@@ -853,7 +901,7 @@ class GlTF : DrawableByVulkan
         return selectVariant(variants, mesh);
     }
 
-    private static GraphicsPipelineCfg selectVariant(GltfPipelineVariants variants, const MeshClass mesh)
+    private static GraphicsPipelineCfg selectVariant(PbrPipelineVariants variants, const MeshClass mesh)
     {
         if(mesh.alphaMode == AlphaMode.blend)
         {
@@ -880,7 +928,7 @@ class GlTF : DrawableByVulkan
 class SkinnedGlTF : GlTF
 {
     package this(
-        ref GltfPipelines pipelines,
+        ref PbrPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
@@ -953,7 +1001,7 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
     package SkinMatrices[] skinMatrices;
 
     package this(
-        ref GltfPipelines pipelines,
+        ref PbrPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
