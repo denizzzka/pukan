@@ -6,7 +6,7 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode, transmissionPass;
+import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode, oitPass, transmissionPass;
 import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.misc: Boxf;
@@ -845,10 +845,15 @@ class GlTF : DrawableByVulkan
 
     private static GraphicsPipelineCfg selectVariant(GltfPipelineVariants variants, const MeshClass mesh)
     {
-        if(mesh.doubleSided)
-            return mesh.alphaMode == AlphaMode.blend ? variants.doubleSidedBlend : variants.doubleSided;
+        if(mesh.alphaMode == AlphaMode.blend)
+        {
+            if(oitPass)
+                return mesh.doubleSided ? variants.doubleSidedOit : variants.oit;
 
-        return mesh.alphaMode == AlphaMode.blend ? variants.blend : variants.opaque;
+            return mesh.doubleSided ? variants.doubleSidedBlend : variants.blend;
+        }
+
+        return mesh.doubleSided ? variants.doubleSided : variants.opaque;
     }
 
     protected void uploadSkinMatricesStatic(scope VkCommandBuffer commandBuffer)

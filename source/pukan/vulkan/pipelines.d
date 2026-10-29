@@ -130,6 +130,10 @@ struct FixedState
     VkBool32 blendEnable = VK_FALSE;
     /// Turns the fragment alpha into sample coverage, needs a multisampled pass
     VkBool32 alphaToCoverage = VK_FALSE;
+    /// Zero writes no colour, for passes that only consume the fragments
+    VkColorComponentFlags colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 }
 
 struct RenderTechnique
@@ -275,6 +279,24 @@ final class PipelineFactory
             VkDescriptorSetLayoutBinding(
                 binding: FRAME_SCENE_COLOR,
                 descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: FRAME_OIT_HEADS,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: FRAME_OIT_FRAGMENTS,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: FRAME_OIT_COUNTER,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
@@ -467,8 +489,7 @@ final class PipelineFactory
             srcAlphaBlendFactor: VK_BLEND_FACTOR_ONE,
             dstAlphaBlendFactor: state.blendEnable ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ZERO,
             alphaBlendOp: VK_BLEND_OP_ADD,
-            colorWriteMask: VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+            colorWriteMask: state.colorWriteMask,
         };
 
         VkPipelineMultisampleStateCreateInfo multisampleState = multisampling;

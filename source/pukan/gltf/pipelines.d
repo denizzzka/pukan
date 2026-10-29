@@ -8,6 +8,8 @@ struct GltfPipelineVariants
     GraphicsPipelineCfg doubleSided;
     GraphicsPipelineCfg blend;
     GraphicsPipelineCfg doubleSidedBlend;
+    GraphicsPipelineCfg oit;
+    GraphicsPipelineCfg doubleSidedOit;
 }
 
 /// Lighting of the scene, chosen at draw time
@@ -25,6 +27,10 @@ LightingMode lightingMode = LightingMode.ibl;
 /// Draw-time mirror of `Scene.transmissionPassEnabled`: transmissive draws go to
 /// their own pass only while that pass runs
 bool transmissionPass = true;
+
+/// Draw-time mirror of `Scene.oitEnabled`: blended draws store their fragments
+/// for the resolve pass instead of blending in place
+bool oitPass = true;
 
 struct GltfSkyPipelines
 {

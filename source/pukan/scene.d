@@ -2,9 +2,10 @@ module pukan.scene;
 
 import dlib.math: translation, Vector3f, Vector4f;
 import pukan;
-import pukan.gltf.pipelines: transmissionPass;
+import pukan.gltf.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
+import pukan.oit: OitFrame, OitResolve;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
@@ -39,6 +40,11 @@ class Scene
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
     IblTextures ibl;
+
+    /// Blended draws store their fragments in per-pixel lists this resolves
+    bool oitEnabled = true;
+    private OitResolve oitResolve;
+    private OitFrame[] oitFrames;
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
@@ -88,6 +94,8 @@ class Scene
 
         background = new Checkerboard(device, pipelineFactory, renderPass);
 
+        oitResolve = new OitResolve(device, pipelineFactory, surfaceFormat.format);
+
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null, surfaceFormat.colorSpace, presentMode);
         createFrameSets();
@@ -103,6 +111,13 @@ class Scene
     ~this()
     {
         background.destroy;
+
+        foreach(ref oit; oitFrames)
+            if(oit)
+                destroy(oit);
+
+        if(oitResolve)
+            destroy(oitResolve);
 
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
@@ -139,12 +154,25 @@ class Scene
         auto prefiltered = imageInfo(ibl.prefiltered);
         auto brdfLut = imageInfo(ibl.brdfLut);
 
+        foreach(ref oit; oitFrames)
+            if(oit)
+                destroy(oit);
+        oitFrames = null;
+
         foreach(ref frame; swapChain.frames)
             frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
 
-        foreach(ref frame; swapChain.frames)
+        oitFrames.length = swapChain.frames.length;
+
+        foreach(i, ref frame; swapChain.frames)
         {
             auto sceneColor = imageInfo(frame.sceneColor);
+
+            oitFrames[i] = new OitFrame(device, oitResolve.pass, frame.imageView, swapChain.imageExtent);
+
+            auto oitHeads = oitFrames[i].headsImageInfo;
+            auto oitFragments = oitFrames[i].fragmentsInfo;
+            auto oitCounter = oitFrames[i].counterInfo;
 
             foreach(eye; 0 .. 2)
                 frame.frameSets[eye] = new FrameSet(
@@ -155,6 +183,9 @@ class Scene
                     prefiltered,
                     brdfLut,
                     sceneColor,
+                    oitHeads,
+                    oitFragments,
+                    oitCounter,
                 );
         }
     }
@@ -408,6 +439,9 @@ class Scene
         auto commandBuffer = frame.commandBuffer;
 
         transmissionPass = transmissionPassEnabled;
+        oitPass = oitEnabled;
+
+        clearOit(frame);
 
         renderPass.recordCommandBuffer(
             commandBuffer,
@@ -427,8 +461,10 @@ class Scene
                 },
             );
         }
-        else
-            presentColor(frame);
+
+        resolveOit(frame);
+
+        presentColor(frame);
     }
 
     alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent);
@@ -476,6 +512,9 @@ class Scene
         auto commandBuffer = frame.commandBuffer;
 
         transmissionPass = transmissionPassEnabled;
+        oitPass = oitEnabled;
+
+        clearOit(frame);
 
         renderPass.recordCommandBuffer(
             commandBuffer,
@@ -497,8 +536,87 @@ class Scene
                 },
             );
         }
-        else
-            presentColor(frame);
+
+        resolveOit(frame);
+
+        presentColor(frame);
+    }
+
+    private size_t frameIndex(ref Frame frame)
+    {
+        foreach(i, f; swapChain.frames)
+            if(f is frame)
+                return i;
+
+        assert(false, "frame does not belong to the swapchain");
+    }
+
+    /// Empties the per-pixel lists before the opaque and blended draws fill them
+    private void clearOit(ref Frame frame)
+    {
+        if(!oitEnabled)
+            return;
+
+        oitFrames[frameIndex(frame)].recordClear(frame.commandBuffer);
+    }
+
+    /// Blends the fragments each pixel collected, after every other pass wrote colour
+    private void resolveOit(ref Frame frame)
+    {
+        if(!oitEnabled)
+            return;
+
+        auto oit = oitFrames[frameIndex(frame)];
+        auto cb = frame.commandBuffer;
+        const extent = swapChain.imageExtent;
+
+        // Fragments written by the passes above must be visible to the resolve
+        VkMemoryBarrier fragmentBarrier = {
+            sType: VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            srcAccessMask: VK_ACCESS_SHADER_WRITE_BIT,
+            dstAccessMask: VK_ACCESS_SHADER_READ_BIT,
+        };
+
+        vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 1, &fragmentBarrier, 0, null, 0, null);
+
+        VkRenderPassBeginInfo renderPassInfo = {
+            sType: VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+            renderPass: oitResolve.pass.vkRenderPass,
+            framebuffer: oit.renderedFrameBuffer,
+            renderArea: VkRect2D(
+                offset: VkOffset2D(0, 0),
+                extent: extent,
+            ),
+        };
+
+        vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        VkViewport viewport = {
+            x: 0.0f,
+            y: 0.0f,
+            width: cast(float) extent.width,
+            height: cast(float) extent.height,
+            minDepth: 0.0f,
+            maxDepth: 1.0f,
+        };
+        VkRect2D scissor = {
+            offset: VkOffset2D(0, 0),
+            extent: extent,
+        };
+
+        vkCmdSetViewport(cb, 0, 1, &viewport);
+        vkCmdSetScissor(cb, 0, 1, &scissor);
+
+        vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, oitResolve.pipeline.graphicsPipeline);
+
+        VkDescriptorSet frameSet = frame.frameSets[0].descriptorSet;
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            oitResolve.pipeline.pipelineLayout, 1, 1, &frameSet, 0, null);
+
+        vkCmdDraw(cb, 3, 1, 0, 0);
+
+        vkCmdEndRenderPass(cb);
     }
 
     void recreateSwapChain()

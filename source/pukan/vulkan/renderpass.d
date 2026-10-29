@@ -129,7 +129,8 @@ class DefaultRenderPass : RenderPass
 
             VkAttachmentDescription resolve = resolveAttachment;
             resolve.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            resolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            // The OIT resolve pass follows and still draws into it
+            resolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
             auto secondAttachments = [color, depth, resolve];
 
@@ -198,7 +199,7 @@ class DefaultRenderPass : RenderPass
     enum VkAttachmentDescription defaultResolveAttachment = {
         samples: VK_SAMPLE_COUNT_1_BIT,
         loadOp: VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        storeOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        storeOp: VK_ATTACHMENT_STORE_OP_STORE,
         stencilLoadOp: VK_ATTACHMENT_LOAD_OP_DONT_CARE,
         stencilStoreOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
         initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,

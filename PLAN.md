@@ -108,20 +108,16 @@ per node, so a file may use several. Still missing:
 
 ### Transparency
 
-Opaque, mask (through alpha-to-coverage) and blend are covered, but blended
-draws are sorted back to front by the depth of their node origin, so
-overlapping and self-intersecting transparent meshes come out in the wrong
-order. Missing:
+Opaque, mask (through alpha-to-coverage) and blend are covered. Blended draws
+store their fragments in per-pixel lists and a resolve pass sorts them by depth
+before compositing, so overlapping and self-intersecting transparent meshes no
+longer depend on a per-draw order. Missing:
 
-- [ ] Order-independent transparency for the blended queue: keep the fragments
-      of each pixel, as a per-pixel linked list or an A-buffer, and resolve them
-      in depth order after the pass. Removes the per-draw sort, so a transparent
-      mesh that crosses itself or another one stops flickering as the camera
-      moves.
-- [ ] Transmission copies the colour once per frame, so glass behind glass shows
-      the scene without the first pane, and the screen-space refraction offset
-      can pull in a neighbour at the silhouette. Depth-aware rejection or a
-      second bounce would fix both.
+- [ ] Transmission copies the colour once per frame, before the blended resolve:
+      glass behind glass loses the first pane, glass does not show blended
+      objects behind it, and the refraction offset can pull in a neighbour at
+      the silhouette. The resolve also runs after the transmission pass, so
+      blended fragments composite over transmissive ones at any depth.
 
 ## Lighting
 

@@ -177,6 +177,7 @@ class GltfFactory
 
     private alias requirements = AliasSeq!(
         SkinMatrices.requirements,
+        Requirement!(VkPhysicalDeviceFeatures.fragmentStoresAndAtomics),
         Requirement!(VkQueueFamilyProperties.queueFlags, VK_QUEUE_GRAPHICS_BIT),
         ImageFormatRequirement!(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
@@ -220,58 +221,69 @@ class GltfFactory
             stages: skinnedPbr,
         ), 20);
 
-        pipelineCfgs.skinned.pbr.ibl = createVariants("glTF", skinnedPbr, renderPass);
-        pipelineCfgs.skinned.pbr.analytic = createVariants("glTF analytic sky", shaderStages!"mesh_pbr_frag_analytic.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbr.none = createVariants("glTF no sky", shaderStages!"mesh_pbr_frag_nosky.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbrCore.ibl = createVariants("glTF core", shaderStages!"mesh_pbr_frag_core.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbrCore.analytic = createVariants("glTF core analytic sky", shaderStages!"mesh_pbr_frag_core_analytic.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbrCore.none = createVariants("glTF core no sky", shaderStages!"mesh_pbr_frag_core_nosky.spv"(device), renderPass);
-        pipelineCfgs.skinned.lit = createVariants("glTF lit", shaderStages!"mesh_pbr_frag_lit.spv"(device), renderPass);
-        pipelineCfgs.skinned.unlit = createVariants("glTF unlit", shaderStages!"mesh_pbr_frag_unlit.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbr.ibl = createVariants("glTF", skinnedPbr, shaderStages!"mesh_pbr_frag_oit.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbr.analytic = createVariants("glTF analytic sky", shaderStages!"mesh_pbr_frag_analytic.spv"(device), shaderStages!"mesh_pbr_frag_oit_analytic.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbr.none = createVariants("glTF no sky", shaderStages!"mesh_pbr_frag_nosky.spv"(device), shaderStages!"mesh_pbr_frag_oit_nosky.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbrCore.ibl = createVariants("glTF core", shaderStages!"mesh_pbr_frag_core.spv"(device), shaderStages!"mesh_pbr_frag_core_oit.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbrCore.analytic = createVariants("glTF core analytic sky", shaderStages!"mesh_pbr_frag_core_analytic.spv"(device), shaderStages!"mesh_pbr_frag_core_oit_analytic.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbrCore.none = createVariants("glTF core no sky", shaderStages!"mesh_pbr_frag_core_nosky.spv"(device), shaderStages!"mesh_pbr_frag_core_oit_nosky.spv"(device), renderPass);
+        pipelineCfgs.skinned.lit = createVariants("glTF lit", shaderStages!"mesh_pbr_frag_lit.spv"(device), shaderStages!"mesh_pbr_frag_lit_oit.spv"(device), renderPass);
+        pipelineCfgs.skinned.unlit = createVariants("glTF unlit", shaderStages!"mesh_pbr_frag_unlit.spv"(device), shaderStages!"mesh_pbr_frag_unlit_oit.spv"(device), renderPass);
 
-        pipelineCfgs.unskinned.pbr.ibl = createVariants("glTF static", staticPbr, renderPass);
-        pipelineCfgs.unskinned.pbr.analytic = createVariants("glTF static analytic sky", staticShaderStages!"mesh_pbr_frag_analytic.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbr.none = createVariants("glTF static no sky", staticShaderStages!"mesh_pbr_frag_nosky.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbrCore.ibl = createVariants("glTF static core", staticShaderStages!"mesh_pbr_frag_core.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbrCore.analytic = createVariants("glTF static core analytic sky", staticShaderStages!"mesh_pbr_frag_core_analytic.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbrCore.none = createVariants("glTF static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky.spv"(device), renderPass);
-        pipelineCfgs.unskinned.lit = createVariants("glTF static lit", staticShaderStages!"mesh_pbr_frag_lit.spv"(device), renderPass);
-        pipelineCfgs.unskinned.unlit = createVariants("glTF static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbr.ibl = createVariants("glTF static", staticPbr, staticShaderStages!"mesh_pbr_frag_oit.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbr.analytic = createVariants("glTF static analytic sky", staticShaderStages!"mesh_pbr_frag_analytic.spv"(device), staticShaderStages!"mesh_pbr_frag_oit_analytic.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbr.none = createVariants("glTF static no sky", staticShaderStages!"mesh_pbr_frag_nosky.spv"(device), staticShaderStages!"mesh_pbr_frag_oit_nosky.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbrCore.ibl = createVariants("glTF static core", staticShaderStages!"mesh_pbr_frag_core.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbrCore.analytic = createVariants("glTF static core analytic sky", staticShaderStages!"mesh_pbr_frag_core_analytic.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_analytic.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbrCore.none = createVariants("glTF static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_nosky.spv"(device), renderPass);
+        pipelineCfgs.unskinned.lit = createVariants("glTF static lit", staticShaderStages!"mesh_pbr_frag_lit.spv"(device), staticShaderStages!"mesh_pbr_frag_lit_oit.spv"(device), renderPass);
+        pipelineCfgs.unskinned.unlit = createVariants("glTF static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(device), staticShaderStages!"mesh_pbr_frag_unlit_oit.spv"(device), renderPass);
     }
 
-    private GltfPipelineVariants createVariants(string prefix, ShaderInfo[] stages, RenderPass renderPass)
+    private GltfPipelineVariants createVariants(string prefix, ShaderInfo[] stages, ShaderInfo[] oitStages, RenderPass renderPass)
     {
         VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE];
 
-        TechniqueId declare(string suffix, FixedState state)
+        TechniqueId declare(string suffix, ShaderInfo[] techniqueStages, FixedState state)
         {
             return pipelines.declare(RenderTechnique(
                 name: prefix ~ suffix,
-                stages: stages,
+                stages: techniqueStages,
                 state: state,
                 dynamicStates: dynamicStates,
             ), 20);
         }
 
-        const opaque = declare("", FixedState(
+        const opaque = declare("", stages, FixedState(
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
             alphaToCoverage: VK_TRUE,
         ));
-        const doubleSided = declare(" double sided", FixedState(
+        const doubleSided = declare(" double sided", stages, FixedState(
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
             cullMode: VK_CULL_MODE_NONE,
             alphaToCoverage: VK_TRUE,
         ));
-        const blend = declare(" blend", FixedState(
+        const blend = declare(" blend", stages, FixedState(
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
             blendEnable: VK_TRUE,
             depthWriteEnable: VK_FALSE,
         ));
-        const doubleSidedBlend = declare(" double sided blend", FixedState(
+        const doubleSidedBlend = declare(" double sided blend", stages, FixedState(
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
             cullMode: VK_CULL_MODE_NONE,
             blendEnable: VK_TRUE,
             depthWriteEnable: VK_FALSE,
+        ));
+        const oit = declare(" oit", oitStages, FixedState(
+            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            depthWriteEnable: VK_FALSE,
+            colorWriteMask: 0,
+        ));
+        const doubleSidedOit = declare(" double sided oit", oitStages, FixedState(
+            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            cullMode: VK_CULL_MODE_NONE,
+            depthWriteEnable: VK_FALSE,
+            colorWriteMask: 0,
         ));
 
         GltfPipelineVariants result;
@@ -279,6 +291,8 @@ class GltfFactory
         result.doubleSided = pipelines.acquire(doubleSided, renderPass, 1);
         result.blend = pipelines.acquire(blend, renderPass, 1);
         result.doubleSidedBlend = pipelines.acquire(doubleSidedBlend, renderPass, 1);
+        result.oit = pipelines.acquire(oit, renderPass, 1);
+        result.doubleSidedOit = pipelines.acquire(doubleSidedOit, renderPass, 1);
 
         return result;
     }

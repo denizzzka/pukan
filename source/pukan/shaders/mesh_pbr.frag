@@ -2,6 +2,9 @@
 
 #include "material.glsl"
 #include "material_bindings.h"
+#ifdef OIT
+#include "oit.glsl"
+#endif
 
 layout(binding = MATERIAL_UNIFORM) uniform MaterialBlock
 {
@@ -326,6 +329,10 @@ void main()
         color = shadePbr(surface);
         color = toneMap(color * frameUbo.frame.exposureParams.x);
     }
+#endif
+
+#ifdef OIT
+    oitStoreFragment(vec4(color, outAlpha));
 #endif
 
     outColor = vec4(color, outAlpha);
