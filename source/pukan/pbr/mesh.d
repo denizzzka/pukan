@@ -59,48 +59,156 @@ struct MeshGeometry
 
 alias Vector4us = Vector!(ushort, 4);
 
-final class PbrMesh : Mesh
+/// Vertex and index buffers shared by every instance of one mesh
+final class PbrGeometry
 {
     package(pukan) MeshStreams vert;
-    package(pukan) AlphaMode alphaMode;
-    package(pukan) bool doubleSided;
     package(pukan) bool hasSkin;
-    bool castShadow = true;
-    bool shadowsOnly;
+    uint vertexCount;
+    VkBuffer indexBuffer;
+    VkDeviceSize indexOffset;
+    VkIndexType indexType;
+    uint indexCount;
 
-    private VkWriteDescriptorSet jointsUboWriteDescr;
-    private VkDescriptorBufferInfo jointsUboInfo;
-    private VkDescriptorImageInfo[MATERIAL_GODOT_ROUGHNESS + 1] materialTextures;
     private VkBuffer fallbackVertex;
+    private VkBuffer[] buffers;
+    private VkDeviceSize[] offsets;
+    private VkDeviceSize[] sizes;
+    private VkDeviceSize[] strides;
 
-    package(pukan) this(
-        string name,
-        MeshStreams vert,
-        DescriptorAllocator allocator,
-        MaterialBuffer materialBuffer,
-        VkDescriptorImageInfo fakeTexture,
-        bool hasSkin,
-        VkBuffer fallbackVertex,
-        ref VkDescriptorBufferInfo jointsUboInfo,
-    )
+    package(pukan) this(MeshStreams vert, bool hasSkin, VkBuffer fallbackVertex)
     {
-        super(materialBuffer);
-
-        this.name = name;
-        this.descriptorSet = allocator.allocate();
         this.vert = vert;
         this.hasSkin = hasSkin;
         this.fallbackVertex = fallbackVertex;
-        materialTextures[] = fakeTexture;
 
         assert(vert.vertices.viewIdx >= 0);
+    }
 
-        material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
-        writeMaterial();
+    /// Resolves the accessors to GPU buffers once, before any instance draws
+    package(pukan) void build(ref BufferPieceOnGPU[] gpuBuffs)
+    {
+        VertexStream stream(BufAccess accessor)
+        {
+            assert(accessor.viewIdx >= 0);
 
-        // The write descriptor keeps a pointer to this copy, so it lives here
-        this.jointsUboInfo = jointsUboInfo;
-        jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, MATERIAL_JOINTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, this.jointsUboInfo);
+            auto gpuBuf = gpuBuffs[accessor.viewIdx];
+            assert(gpuBuf !is null);
+
+            return VertexStream(
+                buffer: gpuBuf.buffer.gpuBuffer,
+                offset: accessor.offset,
+                size: gpuBuf.buffer.cpuBuf.length - accessor.offset,
+                stride: accessor.stride,
+            );
+        }
+
+        VertexStream constantVertex()
+        {
+            // A zero stride reads one element for every vertex
+            return VertexStream(
+                buffer: fallbackVertex,
+                offset: 0,
+                size: fallbackVertexSize,
+                stride: 0,
+            );
+        }
+
+        VertexStream[] streams = [
+            stream(vert.vertices),
+            vert.texCoords.viewIdx >= 0 ? stream(vert.texCoords) : constantVertex(),
+        ];
+
+        if(hasSkin)
+        {
+            streams ~= stream(vert.joints);
+            streams ~= stream(vert.weights);
+        }
+
+        streams ~= vert.normals.viewIdx >= 0 ? stream(vert.normals) : constantVertex();
+        streams ~= vert.tangents.viewIdx >= 0 ? stream(vert.tangents) : constantVertex();
+        streams ~= vert.colors.viewIdx >= 0 ? stream(vert.colors) : constantVertex();
+
+        setStreams(streams);
+        vertexCount = vert.vertices.count;
+
+        if(vert.indices.accessor.count)
+        {
+            auto indicesBuffer = gpuBuffs[vert.indices.accessor.viewIdx];
+            assert(indicesBuffer !is null);
+
+            indexBuffer = indicesBuffer.buffer.gpuBuffer;
+            indexOffset = vert.indices.accessor.offset;
+            indexType = vert.indices.indexType;
+            indexCount = vert.indices.accessor.count;
+        }
+    }
+
+    private void setStreams(VertexStream[] streams)
+    {
+        buffers.length = streams.length;
+        offsets.length = streams.length;
+        sizes.length = streams.length;
+        strides.length = streams.length;
+
+        foreach(i, ref stream; streams)
+        {
+            buffers[i] = stream.buffer;
+            offsets[i] = stream.offset;
+            sizes[i] = stream.size;
+            strides[i] = stream.stride;
+        }
+    }
+
+    package(pukan) void drawGeometry(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        Matrix4x4f trans,
+        VkFrontFace frontFace,
+        VkDescriptorSet descriptorSet,
+    )
+    {
+        vkCmdPushConstants(
+            buf,
+            pipeline.pipelineLayout,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0,
+            cast(uint) trans.sizeof,
+            cast(void*) &trans,
+        );
+
+        if(buffers.length)
+            vkCmdBindVertexBuffers2(
+                buf,
+                0,
+                cast(uint) buffers.length,
+                buffers.ptr,
+                offsets.ptr,
+                sizes.ptr,
+                strides.ptr,
+            );
+
+        if(indexCount)
+            vkCmdBindIndexBuffer(buf, indexBuffer, indexOffset, indexType);
+
+        if(descriptorSet)
+            vkCmdBindDescriptorSets(
+                buf,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineLayout,
+                0,
+                1,
+                &descriptorSet,
+                0,
+                null,
+            );
+
+        vkCmdSetFrontFace(buf, frontFace);
+
+        if(indexCount)
+            vkCmdDrawIndexed(buf, indexCount, 1, 0, 0, 0);
+        else
+            vkCmdDraw(buf, vertexCount, 1, 0, 0);
     }
 
     package(pukan) auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
@@ -165,6 +273,66 @@ final class PbrMesh : Mesh
             isClose(a.max.z, b.max.z, tolerance, tolerance);
     }
 
+}
+
+final class PbrMesh : Mesh
+{
+    package(pukan) PbrGeometry geometry;
+    package(pukan) AlphaMode alphaMode;
+    package(pukan) bool doubleSided;
+    package(pukan) bool hasSkin;
+    bool castShadow = true;
+    bool shadowsOnly;
+
+    private VkWriteDescriptorSet jointsUboWriteDescr;
+    private VkDescriptorBufferInfo jointsUboInfo;
+    private VkDescriptorImageInfo[MATERIAL_GODOT_ROUGHNESS + 1] materialTextures;
+
+    package(pukan) this(
+        string name,
+        PbrGeometry geometry,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        VkDescriptorImageInfo fakeTexture,
+        ref VkDescriptorBufferInfo jointsUboInfo,
+    )
+    {
+        super(materialBuffer);
+
+        this.name = name;
+        this.descriptorSet = allocator.allocate();
+        this.geometry = geometry;
+        this.hasSkin = geometry.hasSkin;
+        materialTextures[] = fakeTexture;
+
+        material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
+        writeMaterial();
+
+        // The write descriptor keeps a pointer to this copy, so it lives here
+        this.jointsUboInfo = jointsUboInfo;
+        jointsUboWriteDescr = bufferWriteDescriptor(descriptorSet, MATERIAL_JOINTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, this.jointsUboInfo);
+    }
+
+    package(pukan) this(
+        string name,
+        MeshStreams vert,
+        DescriptorAllocator allocator,
+        MaterialBuffer materialBuffer,
+        VkDescriptorImageInfo fakeTexture,
+        bool hasSkin,
+        VkBuffer fallbackVertex,
+        ref VkDescriptorBufferInfo jointsUboInfo,
+    )
+    {
+        this(name, new PbrGeometry(vert, hasSkin, fallbackVertex), allocator, materialBuffer,
+            fakeTexture, jointsUboInfo);
+    }
+
+    package(pukan) auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
+    {
+        geometry.calcAABB(gpuBuffs, box);
+    }
+
     package(pukan) void bindTexture(size_t binding, MaterialFlag flag, VkDescriptorImageInfo image)
     {
         assert(binding < materialTextures.length);
@@ -213,65 +381,14 @@ final class PbrMesh : Mesh
     {
     }
 
-    /// Binds the streams the material actually reads, zeroed fallbacks otherwise.
     package(pukan) void buildGeometry(ref BufferPieceOnGPU[] gpuBuffs)
     {
-        VertexStream stream(BufAccess accessor)
-        {
-            assert(accessor.viewIdx >= 0);
+        geometry.build(gpuBuffs);
+    }
 
-            auto gpuBuf = gpuBuffs[accessor.viewIdx];
-            assert(gpuBuf !is null);
-
-            return VertexStream(
-                buffer: gpuBuf.buffer.gpuBuffer,
-                offset: accessor.offset,
-                size: gpuBuf.buffer.cpuBuf.length - accessor.offset,
-                stride: accessor.stride,
-            );
-        }
-
-        VertexStream constantVertex()
-        {
-            // A zero stride reads one element for every vertex
-            return VertexStream(
-                buffer: fallbackVertex,
-                offset: 0,
-                size: fallbackVertexSize,
-                stride: 0,
-            );
-        }
-
-        const bool needsNormals = material.mode != MaterialMode.unlit;
-        const bool needsTangents = needsNormals && material.flags.vertexTangent;
-
-        VertexStream[] streams = [
-            stream(vert.vertices),
-            vert.texCoords.viewIdx >= 0 ? stream(vert.texCoords) : constantVertex(),
-        ];
-
-        if(hasSkin)
-        {
-            streams ~= stream(vert.joints);
-            streams ~= stream(vert.weights);
-        }
-
-        streams ~= needsNormals && vert.normals.viewIdx >= 0 ? stream(vert.normals) : constantVertex();
-        streams ~= needsTangents ? stream(vert.tangents) : constantVertex();
-        streams ~= vert.colors.viewIdx >= 0 ? stream(vert.colors) : constantVertex();
-
-        setStreams(streams);
-        vertexCount = vert.vertices.count;
-
-        if(vert.indices.accessor.count)
-        {
-            auto indicesBuffer = gpuBuffs[vert.indices.accessor.viewIdx];
-            assert(indicesBuffer !is null);
-
-            indexBuffer = indicesBuffer.buffer.gpuBuffer;
-            indexOffset = vert.indices.accessor.offset;
-            indexType = vert.indices.indexType;
-            indexCount = vert.indices.accessor.count;
-        }
+    override void drawGeometry(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    {
+        geometry.drawGeometry(buf, pipeline, trans, frontFace, descriptorSet);
     }
 }
+

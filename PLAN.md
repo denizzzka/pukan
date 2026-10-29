@@ -75,7 +75,8 @@ or the pack.
       per-surface materials.
 - [x] `MeshInstance3D`: `cast_shadow` modes and load-time `material_override`
       and `surface_material_override/N`.
-- [ ] `MeshInstance3D`: shared mesh resources and material instances.
+- [x] `MeshInstance3D`: shared mesh geometry within a scene.
+- [ ] `MeshInstance3D`: material instances.
 - [x] `StandardMaterial3D` and `ORMMaterial3D`: albedo, metallic, roughness,
       emission, normal, AO, transparency, alpha scissor, cull mode, unshaded
       and vertex colors.
@@ -203,6 +204,7 @@ Fixtures live in `demo/assets/godot_samples/`.
       binary PackedScenes, checked through a PCK as well.
 - [x] Generated `primitives.tscn` with subdivided box and plane, a capsule and
       a prism.
+- [x] Generated `shared_mesh.tscn`, where five nodes share two geometries.
 - [x] `exported/exported.pck`, a Godot 4.7 `--export-pack` build with `.remap`
       chains, an imported `.ctex`, binary resources and `project.binary`.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external

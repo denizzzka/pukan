@@ -78,6 +78,8 @@ final class GodotScene : DrawableByVulkan, Blended
     string name;
     size_t skippedNodes;
     size_t skippedResources;
+    /// Distinct GPU geometries shared by the meshes
+    size_t geometryCount;
 
     GodotLight[] lights;
     GodotCamera camera;

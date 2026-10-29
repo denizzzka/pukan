@@ -21,7 +21,7 @@ import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
 import pukan.misc: linearFormat, loadImageFromMemory;
 import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.pbr.factory: PbrFactory;
-import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrMesh, Vector4us;
+import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.image: identityComponentMapping, loadImageToMemory, loadImageWithMips;
@@ -136,6 +136,7 @@ private final class GodotLoader
 
     BufferPieceOnGPU[] gpuBuffs;
     PbrMesh[] meshes;
+    PbrGeometry[string] geometryCache;
     Texture[] textures;
     Texture[string] textureCache;
     DrawableByVulkan[] instances;
@@ -221,6 +222,7 @@ private final class GodotLoader
         );
         scene.skippedNodes = skippedNodes;
         scene.skippedResources = skippedResources;
+        scene.geometryCount = geometryCache.length;
         scene.lights = lights;
         scene.camera = camera;
         scene.hasCamera = hasCamera;
@@ -519,6 +521,7 @@ private final class GodotLoader
         }
 
         const castShadowMode = cast(int) propertyLong(section.properties, "cast_shadow", 1);
+        const meshKey = documentPath ~ "#" ~ meshRef.id;
         GodotVariant materialOverride;
         if(auto value = "material_override" in section.properties)
             materialOverride = *value;
@@ -543,6 +546,7 @@ private final class GodotLoader
                 addSurfaceMesh(
                     document, documentPath, surface, section.name, node,
                     materialOverride, surfaceOverride, castShadowMode,
+                    meshKey ~ "/" ~ i.to!string,
                 );
             }
         }
@@ -563,6 +567,7 @@ private final class GodotLoader
             addSurfaceMesh(
                 document, documentPath, surface, section.name, node,
                 materialOverride, surfaceOverride, castShadowMode,
+                meshKey ~ "/0",
             );
         }
         else
@@ -607,6 +612,7 @@ private final class GodotLoader
         GodotVariant materialOverride,
         GodotVariant surfaceOverride,
         int castShadowMode,
+        string geometryKey,
     )
     {
         auto material = defaultMaterial(surface.geometry.colors.length > 0, documentPath);
@@ -626,7 +632,7 @@ private final class GodotLoader
                 surface.geometry.colors.length > 0,
             );
 
-        auto mesh = createMesh(document, surface, material, nodeName);
+        auto mesh = createMesh(surface, material, nodeName, geometryKey);
         mesh.castShadow = castShadowMode != 0;
         mesh.shadowsOnly = castShadowMode == 3;
         node.meshes ~= mesh;
@@ -700,44 +706,54 @@ private final class GodotLoader
     }
 
     private PbrMesh createMesh(
-        ref GodotTextDocument document,
         ref GodotArraySurface surface,
         GodotMaterialData material,
         string nodeName,
+        string geometryKey,
     )
     {
-        MeshStreams streams;
+        PbrGeometry geometry;
 
-        streams.vertices = upload(surface.geometry.positions, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        streams.normals = upload(surface.geometry.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        streams.tangents = upload(surface.geometry.tangents, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        streams.texCoords = upload(surface.geometry.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        streams.colors = upload(surface.geometry.colors, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        streams.joints = upload(surface.geometry.joints, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        streams.weights = upload(surface.geometry.weights, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-        streams.aabb = surface.geometry.aabb;
-
-        if(surface.geometry.indices.length)
+        if(auto cached = geometryKey in geometryCache)
+            geometry = *cached;
+        else
         {
-            const indices = upload(surface.geometry.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-            streams.indices = IndicesDescr(indices, VK_INDEX_TYPE_UINT32);
+            MeshStreams streams;
+
+            streams.vertices = upload(surface.geometry.positions, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            streams.normals = upload(surface.geometry.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            streams.tangents = upload(surface.geometry.tangents, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            streams.texCoords = upload(surface.geometry.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            streams.colors = upload(surface.geometry.colors, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            streams.joints = upload(surface.geometry.joints, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            streams.weights = upload(surface.geometry.weights, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+            streams.aabb = surface.geometry.aabb;
+
+            if(surface.geometry.indices.length)
+            {
+                const indices = upload(surface.geometry.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                streams.indices = IndicesDescr(indices, VK_INDEX_TYPE_UINT32);
+            }
+
+            geometry = new PbrGeometry(streams, false, pbr.resources.fallbackVertex.buf);
+            geometry.build(gpuBuffs);
+
+            if(geometryKey.length)
+                geometryCache[geometryKey] = geometry;
         }
 
         const name = surface.name.length ? surface.name : nodeName;
 
         auto mesh = new PbrMesh(
             name,
-            streams,
+            geometry,
             allocator,
             pbr.resources.materials,
             fakeTextureInfo,
-            false,
-            pbr.resources.fallbackVertex.buf,
             pbr.resources.identityJointsInfo,
         );
 
         applyMaterial(mesh, surface, material);
-        mesh.buildGeometry(gpuBuffs);
         return mesh;
     }
 

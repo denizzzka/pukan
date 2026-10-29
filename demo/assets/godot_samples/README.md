@@ -120,3 +120,7 @@ loader falls back to the source PNG.
 `primitives.tscn` exercises primitive subdivisions and the capsule and prism
 shapes: a subdivided `BoxMesh`, a subdivided `PlaneMesh`, a `CapsuleMesh` and a
 `PrismMesh` with `left_to_right`.
+
+`shared_mesh.tscn` has five `MeshInstance3D` nodes backed by two sub-resources.
+`demo_godot` reports `geometries 2`, so the vertex and index buffers are shared
+even though each node keeps its own material and transform.

@@ -169,6 +169,7 @@ void main(string[] args)
         : scene.godotFactory.create(scenePath);
     scope(exit) destroy(godotScene);
     writeln("loaded ", packPath.length ? packPath : scenePath, ": meshes ", godotScene.meshCount,
+        ", geometries ", godotScene.geometryCount,
         ", nodes skipped ", godotScene.skippedNodes,
         ", resources skipped ", godotScene.skippedResources,
         ", lights ", godotScene.lights.length,
