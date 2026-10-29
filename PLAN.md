@@ -123,26 +123,6 @@ order. Missing:
       can pull in a neighbour at the silhouette. Depth-aware rejection or a
       second bounce would fix both.
 
-### Material seams and white dots
-
-The dots on the helmet and the orange had two causes, both fixed: specular
-aliasing where the normal map changes faster than a pixel, and a degenerate
-normal-map texel at an island edge turning into a NaN normal. What is left on
-the black helmet's ridges is the Fresnel rim, which only temporal
-antialiasing smooths.
-
-If dots show up elsewhere, in this order:
-
-- [ ] Compare sampler states: CLAMP_TO_EDGE vs MIRRORED_REPEAT, nearest vs
-      linear, with and without mipmaps.
-- [ ] Check UV islands and texture borders: sampling across an island edge can
-      pull the opposite or border texel; use clamped samplers or gutters.
-- [ ] Compare culling: back-face culling vs none, and check the front-face
-      winding. Holes that vanish indicate reversed or missing triangles.
-- [ ] Inspect shared edges between primitives for duplicated vertices,
-      T-junctions and floating-point differences; overlap or weld them.
-- [ ] Check depth precision and z-fighting at coplanar seams.
-
 ## Lighting
 
 The frame carries one directional light and up to eight point lights; there are
