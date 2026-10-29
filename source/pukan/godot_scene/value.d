@@ -240,7 +240,7 @@ T as(T)(in GodotVariant value, string what = "value")
     return value.get!T;
 }
 
-bool isNil(in GodotVariant value) => value.type is typeid(GodotNil);
+bool isNil(in GodotVariant value) => value.type is typeid(GodotNil) || value.type is typeid(void);
 
 string asString(in GodotVariant value, string what = "value")
 {
@@ -323,4 +323,11 @@ string scalarId(in GodotVariant value, string what = "value")
         return value.get!GodotStringName.value;
 
     throw new PukanException(what ~ ": expected resource id, got " ~ variantTypeName(value));
+}
+
+unittest
+{
+    assert(isNil(GodotVariant.init));
+    assert(isNil(GodotVariant(GodotNil())));
+    assert(!isNil(GodotVariant(1L)));
 }
