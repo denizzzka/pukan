@@ -205,14 +205,41 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
             }
 
             Vector3f normal;
+            Vector3f tbnAxis;
+            float tbnAngle;
+            float tbnSign;
+
+            if(compressed && hasNormal)
+            {
+                const angle01 = (cast(const ushort*) vertex)[3] / 65535.0f;
+                tbnAngle = abs(angle01 * 2.0f - 1.0f) * PI;
+                tbnSign = angle01 > 0.5f ? 1.0f : -1.0f;
+            }
 
             if(hasNormal)
             {
                 const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride + normalOffset);
-                normal = octahedronDecode(Vector2f(
+                tbnAxis = octahedronDecode(Vector2f(
                     (packed & 0xFFFF) / 65535.0f,
                     ((packed >> 16) & 0xFFFF) / 65535.0f,
                 ));
+
+                if(compressed)
+                {
+                    // The packed vector is the TBN rotation axis; the normal is
+                    // the third row of the rotation it builds
+                    const c = cos(tbnAngle);
+                    const s = sin(tbnAngle);
+                    const omc = 1.0f - c;
+                    normal = Vector3f(
+                        omc * tbnAxis.x * tbnAxis.z - s * tbnAxis.y,
+                        omc * tbnAxis.y * tbnAxis.z + s * tbnAxis.x,
+                        omc * tbnAxis.z * tbnAxis.z + c,
+                    );
+                }
+                else
+                    normal = tbnAxis;
+
                 decoded.geometry.normals[i] = normal;
             }
 
@@ -220,19 +247,15 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
             {
                 if(compressed)
                 {
-                    const positionPacked = cast(const ushort*) vertex;
-                    const angle01 = positionPacked[3] / 65535.0f;
-                    const sign = angle01 > 0.5f ? 1.0f : -1.0f;
-                    const angle = abs(angle01 * 2.0f - 1.0f) * PI;
-                    const c = cos(angle);
-                    const s = sin(angle);
+                    const c = cos(tbnAngle);
+                    const s = sin(tbnAngle);
                     const omc = 1.0f - c;
                     const tangent = Vector3f(
-                        omc * normal.x * normal.x + c,
-                        omc * normal.x * normal.y - s * normal.z,
-                        omc * normal.x * normal.z + s * normal.y,
+                        omc * tbnAxis.x * tbnAxis.x + c,
+                        omc * tbnAxis.x * tbnAxis.y - s * tbnAxis.z,
+                        omc * tbnAxis.x * tbnAxis.z + s * tbnAxis.y,
                     );
-                    decoded.geometry.tangents[i] = Vector4f(tangent.x, tangent.y, tangent.z, sign);
+                    decoded.geometry.tangents[i] = Vector4f(tangent.x, tangent.y, tangent.z, tbnSign);
                 }
                 else
                 {
@@ -383,6 +406,45 @@ unittest
     assert(surfaces[1].geometry.positions.length == 3);
     assert(surfaces[1].geometry.colors.length == 0);
     assert(surfaces[1].geometry.indices == [0u, 2u, 1u]);
+}
+
+unittest
+{
+    import pukan.godot_scene.binary: parseGodotResourceFile;
+    import std.math: abs;
+
+    const document = parseGodotResourceFile(fixturePath("truck_town/town/model/town_model.scn"));
+
+    bool found;
+    foreach(ref resource; document.subResources)
+    {
+        if(resource.type != "ArrayMesh")
+            continue;
+
+        foreach(surface; decodeArrayMesh(resource.properties["_surfaces"]))
+        {
+            if(surface.geometry.positions.length != 12 || surface.geometry.normals.length != 12)
+                continue;
+
+            // The first normals of the outer ground, as Godot decodes them
+            const expected = [
+                Vector3f(-0.02467f, 0.998188f, 0.054876f),
+                Vector3f(-0.024693f, 0.998193f, -0.054788f),
+                Vector3f(0.000031f, 1.0f, 0.000024f),
+            ];
+
+            foreach(i, normal; expected)
+            {
+                assert(abs(surface.geometry.normals[i].x - normal.x) < 1e-4f);
+                assert(abs(surface.geometry.normals[i].y - normal.y) < 1e-4f);
+                assert(abs(surface.geometry.normals[i].z - normal.z) < 1e-4f);
+            }
+
+            found = true;
+        }
+    }
+
+    assert(found);
 }
 
 private string fixturePath(string relative)
