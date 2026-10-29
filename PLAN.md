@@ -324,6 +324,13 @@ the near-term ones; the first touches the vertex layout that the mesh merge now
 owns, the second the draw path. The rest are long-term spikes, each judged
 against the plain version it replaces.
 
+- **Mixed winding in one batch**
+  - [x] Enable `VK_DYNAMIC_STATE_FRONT_FACE` on the PBR and primitive
+        pipelines; `Mesh` carries a `VkFrontFace` per draw and sets it before
+        drawing. glTF and Godot keep their native index order, and a batch
+        switches state instead of re-encoding indices. Requires the Vulkan 1.3
+        `extendedDynamicState` feature.
+
 - **Instanced static primitives**
   - [ ] Batch any mesh that shares vertex and index buffers, pipeline variant
         and texture set into one instanced draw, not glTF primitives only: the
