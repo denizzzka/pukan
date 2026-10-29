@@ -66,7 +66,7 @@ or the pack.
       colors, float32 UVs and 16/32-bit indices.
 - [x] Attribute-compressed surface decoding: quantized positions, 16-bit UVs,
       octahedron normal and tangent angle.
-- [ ] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
+- [x] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
 - [x] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
       `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
 - [ ] Primitive subdivisions, and the exact `CapsuleMesh` and `PrismMesh`

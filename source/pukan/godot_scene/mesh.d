@@ -92,8 +92,11 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
 
         const format = propertyLong(surface, "format");
         const surfaceVersion = cast(int) ((format >> formatVersionShift) & formatVersionMask);
-        if(surfaceVersion != 1)
+        if(surfaceVersion > 1)
             throw new PukanException("unsupported mesh surface format version " ~ surfaceVersion.to!string);
+
+        // Version 1 interleaves positions, normals and tangents per vertex
+        const version1 = surfaceVersion == 0;
 
         const compressed = (format & flagCompressAttributes) != 0;
 
@@ -138,11 +141,14 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
         if(compressed && hasTangent && !hasNormal)
             throw new PukanException("compressed mesh tangents require normals");
 
-        const positionStride = compressed ? 4 * ushort.sizeof : 3 * float.sizeof;
-        const normalBase = vertexCount * positionStride;
-        const normalStride = compressed
-            ? (hasNormal ? 4 : 0)
-            : (hasNormal ? 4 : 0) + (hasTangent ? 4 : 0);
+        const vertexSize = compressed ? 4 * ushort.sizeof : 3 * float.sizeof;
+        const normalSize = hasNormal ? 4 : 0;
+        const tangentSize = compressed ? 0 : (hasTangent ? 4 : 0);
+        const positionStride = version1 ? vertexSize + normalSize + tangentSize : vertexSize;
+        const normalBase = version1 ? 0 : vertexCount * vertexSize;
+        const normalStride = version1 ? positionStride : normalSize + tangentSize;
+        const normalOffset = version1 ? vertexSize : 0;
+        const tangentOffset = normalOffset + normalSize;
         const uvSize = compressed ? 4 : 8;
         const attributeStride = (hasColor ? 4 : 0) + (hasUv ? uvSize : 0) + (hasUv2 ? uvSize : 0);
         const boneSize = (format & flag8BoneWeights) ? 16 : 8;
@@ -202,7 +208,7 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
 
             if(hasNormal)
             {
-                const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride);
+                const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride + normalOffset);
                 normal = octahedronDecode(Vector2f(
                     (packed & 0xFFFF) / 65535.0f,
                     ((packed >> 16) & 0xFFFF) / 65535.0f,
@@ -230,7 +236,7 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
                 }
                 else
                 {
-                    const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride + (hasNormal ? 4 : 0));
+                    const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride + tangentOffset);
                     float sign;
                     const tangent = octahedronTangentDecode(Vector2f(
                         (packed & 0xFFFF) / 65535.0f,
@@ -411,4 +417,52 @@ unittest
 
     assert(surfaces[0].geometry.texCoords[0].x >= -1.001f);
     assert(surfaces[0].geometry.texCoords[0].x <= 1.001f);
+}
+
+unittest
+{
+    import pukan.godot_scene.text: parseGodotTextFile;
+    import std.path: buildPath, dirName;
+
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets",
+        "godot_samples", "generated", "compressed_array_mesh.tres");
+    auto document = parseGodotTextFile(path);
+    const surfacesValue = document.resourceProperties["_surfaces"];
+    const surfaces = asArray(surfacesValue);
+    auto original = asDictionary(surfaces[0], "surface");
+
+    const format = asLong(*original.get("format"), "format");
+    const vertexCount = cast(size_t) asLong(*original.get("vertex_count"), "vertex_count");
+    const vertexData = propertyBytes(original, "vertex_data");
+
+    // Version 2 keeps positions in one block and normals in another.
+    assert((format & (1L << 29)) != 0);
+
+    ubyte[] interleaved;
+    interleaved.length = vertexCount * 12;
+
+    foreach(i; 0 .. vertexCount)
+    {
+        interleaved[i * 12 .. i * 12 + 8] = vertexData[i * 8 .. i * 8 + 8];
+
+        const normal = vertexCount * 8 + i * 4;
+        interleaved[i * 12 + 8 .. i * 12 + 12] = vertexData[normal .. normal + 4];
+    }
+
+    auto version1Surface = new GodotDictionary;
+    version1Surface.keys = original.keys.dup;
+    version1Surface.values = original.values.dup;
+    version1Surface.set("format", GodotVariant(format & ~(0xFFL << 35)));
+    version1Surface.set("vertex_data", GodotVariant(interleaved));
+
+    auto version1Surfaces = new GodotArray([GodotVariant(version1Surface)]);
+    const version1 = decodeArrayMesh(GodotVariant(version1Surfaces));
+    const version2 = decodeArrayMesh(surfacesValue);
+
+    assert(version1.length == 1);
+    assert(version2.length == 1);
+    assert(version1[0].geometry.positions == version2[0].geometry.positions);
+    assert(version1[0].geometry.normals == version2[0].geometry.normals);
+    assert(version1[0].geometry.tangents == version2[0].geometry.tangents);
+    assert(version1[0].geometry.texCoords == version2[0].geometry.texCoords);
 }
