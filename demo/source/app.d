@@ -64,6 +64,7 @@ void main(string[] args) {
     bool bench;
     uint frames;
     bool core;
+    bool noShadows;
     string materialMode = "authored";
     string[] sampleNames;
     auto getoptResult = getopt(
@@ -73,6 +74,7 @@ void main(string[] args) {
         "frames", "exit after N frames (0 = run forever)", &frames,
         "bench", "run the fixed benchmark scene and print metrics", &bench,
         "core", "ignore the KHR material extensions", &core,
+        "no-shadows", "do not cast shadows", &noShadows,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
     );
@@ -250,6 +252,8 @@ void main(string[] args) {
     );
     scope(exit) destroy(scene);
 
+    shadowsOn = !noShadows;
+
     scene.addPointLight(Vector3f(0.9f, 0.35f, 1.1f), Vector3f(1.0f, 0.25f, 0.15f) * 6.0f, 4.0f);
     scene.addPointLight(Vector3f(-0.8f, 0.4f, 0.8f), Vector3f(0.15f, 0.45f, 1.0f) * 6.0f, 4.0f);
     scene.addPointLight(Vector3f(0.0f, 1.1f, 1.4f), Vector3f(0.3f, 0.9f, 0.35f) * 4.0f, 5.0f);
@@ -409,6 +413,14 @@ void main(string[] args) {
         {
             skyChanged = false;
             writefln("lighting: %s", lightingMode);
+        }
+
+        scene.shadowsEnabled = shadowsOn;
+
+        if(shadowsChanged)
+        {
+            shadowsChanged = false;
+            writefln("shadows: %s", shadowsOn ? "on" : "off");
         }
 
         static if(runtimeMaterialOverride)
@@ -677,6 +689,8 @@ Vector3f cameraPan = Vector3f(0, 0, 0);
 Vector3f cursorRay = Vector3f(0, 0, 1);
 
 bool skyChanged;
+bool shadowsOn = true;
+bool shadowsChanged;
 
 static if(runtimeMaterialOverride)
 {
@@ -709,6 +723,12 @@ extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
                 materialOverridden = !materialOverridden;
                 overrideChanged = true;
             }
+
+        if(key == GLFW_KEY_T)
+        {
+            shadowsOn = !shadowsOn;
+            shadowsChanged = true;
+        }
     }
 }
 

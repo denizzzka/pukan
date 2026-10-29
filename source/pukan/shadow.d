@@ -165,6 +165,46 @@ final class ShadowMap
             layers: 1,
         };
         vkCreateFramebuffer(device, &frameBufferInfo, device.alloc, &frameBuffer).vkCheck;
+
+        // Valid sampled layout even while the pass is off and nothing writes it
+        {
+            auto pool = device.createCommandPool();
+            auto bufs = pool.allocateBuffers(1);
+
+            pool.recordOneTimeAndSubmit(bufs[0], (VkCommandBuffer buf) {
+                VkImageMemoryBarrier barrier = {
+                    sType: VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    oldLayout: VK_IMAGE_LAYOUT_UNDEFINED,
+                    newLayout: VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                    srcQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
+                    dstQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
+                    image: depth.image,
+                    srcAccessMask: 0,
+                    dstAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                    subresourceRange: VkImageSubresourceRange(
+                        aspectMask: VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                        baseMipLevel: 0,
+                        levelCount: 1,
+                        baseArrayLayer: 0,
+                        layerCount: 1,
+                    ),
+                };
+
+                vkCmdPipelineBarrier(buf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, null, 0, null, 1, &barrier);
+
+                barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+                vkCmdPipelineBarrier(buf, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, null, 0, null, 1, &barrier);
+            });
+
+            pool.freeBuffers(bufs);
+            destroy(pool);
+        }
     }
 
     ~this()

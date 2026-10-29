@@ -532,22 +532,28 @@ class Scene
         const viewProj = wtb.proj * wtb.view;
         const camera = translation(wtb.view.inverse);
 
-        const sun = Vector3f(
-            lights[0].positionRadius.x,
-            lights[0].positionRadius.y,
-            lights[0].positionRadius.z,
-        ).normalized;
-
-        const shadowEye = sun * shadowDistance;
-        const shadowView = lookAtMatrix(shadowEye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-        const shadowProj = perspectiveMatrix(shadowFov, 1.0f, 1.0f, shadowDistance * 2.0f);
-        shadowViewProj = shadowProj * shadowView;
-
         FrameUniforms data;
         data.invViewProj = viewProj.inverse;
         data.viewProj = viewProj;
-        data.shadowViewProj = shadowViewProj;
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
+
+        // The light matrices are only needed while the shadow pass runs
+        if(shadowsEnabled)
+        {
+            const sun = Vector3f(
+                lights[0].positionRadius.x,
+                lights[0].positionRadius.y,
+                lights[0].positionRadius.z,
+            ).normalized;
+
+            const shadowEye = sun * shadowDistance;
+            const shadowView = lookAtMatrix(shadowEye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
+            const shadowProj = perspectiveMatrix(shadowFov, 1.0f, 1.0f, shadowDistance * 2.0f);
+            shadowViewProj = shadowProj * shadowView;
+            data.shadowViewProj = shadowViewProj;
+        }
+
+        data.shadowParams = Vector4f(shadowsEnabled ? 1 : 0, 0, 0, 0);
         data.exposureParams = Vector4f(
             exposure,
             iblIntensity,
@@ -891,6 +897,7 @@ struct FrameUniforms
     Matrix4x4f shadowViewProj;
     Vector4f cameraPosition;
     Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
+    Vector4f shadowParams;   // x = 1 while the sun's shadow map is used
 }
 
 ///

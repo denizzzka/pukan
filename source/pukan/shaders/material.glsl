@@ -346,6 +346,9 @@ vec3 transmissionSample(Surface s, vec3 N, vec3 V, float ior, float roughness)
 /// Fraction of the sun that reaches a point, 3x3 PCF
 float shadowFactor(vec3 position, vec3 normal)
 {
+    if(frameUbo.frame.shadowParams.x < 0.5)
+        return 1.0;
+
     // A small normal offset keeps a surface from shadowing itself
     const vec4 clip = frameUbo.frame.shadowViewProj * vec4(position + normal * 0.015, 1.0);
 
