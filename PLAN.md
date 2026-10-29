@@ -200,6 +200,13 @@ assert that a mesh is never shared between two different handedness values.
 - [ ] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
       an integer grid with a mesh library per cell; decide whether to import that
       data as is or to grow the same cell-and-library model on top of #16.
+- [ ] Render a landscape from cells: import the `platformer` stage `GridMap`
+      with its `grid_map.scn` mesh library, per-cell transforms and the stage
+      textures, and check the result against Godot next to the glTF terrain of
+      `truck_town`.
+- [ ] Add `platformer/stage/stage.tscn` as the GridMap landscape fixture once
+      cells render; the rest of the stage (sky, reflection probes, script) can
+      stay unsupported and counted.
 
 #### Compatibility policy
 
@@ -247,6 +254,12 @@ Fixtures live in `demo/assets/godot_samples/`.
       material and both override forms.
 - [x] `compressed_array_mesh.tres` and `compressed_mesh.tscn`, produced by the
       glTF importer from the AnimatedCube sample with mesh compression enabled.
+- [x] `truck_town/town_view.tscn`, a 2048 unit landscape from a glTF town:
+      terrain, roads, houses, trees, street lamps and a sky. It is the first
+      fixture with an external `.gltf`, a `.bin` buffer and WebP textures.
+- [ ] Interior fixture: a room assembled from CC0 Kenney furniture with omni
+      lights and a camera, to test many small glTF instances and indoor light
+      falloff.
 - [ ] `combined.tscn` instancing the three, for composition checks.
 - [x] README with source URLs, commit, licenses and the regeneration script.
 

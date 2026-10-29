@@ -16,13 +16,15 @@ Commit: `b761b4cd5718a7118f2c95eb55f181d0a5f004f1` (`master`).
 - `platformer/` is the `enemy` part of `3d/platformer`. Audio streams and
   screenshots are omitted, but `enemy.tscn` still declares them, so the loader
   must skip resource types it does not render.
-- `truck_town/` is `3d/truck_town/town/model` with the project file and the
-  `town_view.tscn` wrapper added here. The tree and lamp models, the sky, the
-  scripts and the UI of the town scene are left out.
+- `truck_town/` is `3d/truck_town/town` with the project file and the
+  `town_view.tscn` wrapper added here. The model, the trees, the lamps and the
+  sky are kept; the scripts and the UI are left out.
 
 The demo projects are MIT licensed, see `LICENSE.godot-demo-projects.md`.
 `lights_and_shadows/checker.png` is CC0 by Kenney, see
-`lights_and_shadows/checker.LICENSE.md`.
+`lights_and_shadows/checker.LICENSE.md`. The truck town tree and lamp models
+are CC-BY 4.0 by Ricardo Sanchez and RitiWox; their `license.txt` files carry
+the attribution.
 
 ## Generated scene
 
@@ -159,10 +161,10 @@ yet.
 
 ## Landscape
 
-`truck_town/town_view.tscn` puts the town model under a directional light and a
-`Camera3D` that frames the whole terrain. The model is a 2048 unit ground mesh
-with roads, houses and a racetrack: 60930 triangles in 75 primitives and 9
-materials.
+`truck_town/town_view.tscn` puts the town model with five trees and ten street
+lamps under a directional light, the sky of the original scene and a `Camera3D`
+that frames the whole terrain. The model is a 2048 unit ground mesh with roads,
+houses and a racetrack: 60930 triangles in 75 primitives and 9 materials.
 
 It is the only fixture that keeps an external `.gltf`: the mesh data lives in
 `town_model0.bin`, and the textures are WebP files referenced through
@@ -174,5 +176,15 @@ exist so a terrain this large can be viewed.
 ./demo_godot/pukan_demo_godot --scene demo/assets/godot_samples/truck_town/town_view.tscn --scene-camera --frames 2
 ```
 
-The scene has no sky and no shadows are enabled in `demo_godot`, so the
-background is transparent and the model is lit by the sun only.
+The sky is kept as far as the fixture goes, but the loader does not render
+`WorldEnvironment` yet, and `demo_godot` says so:
+
+```
+nodes not rendered: WorldEnvironment x1
+resources not rendered: Environment x1, Material x1, Sky x1
+```
+
+The tree model carries the 100x Sketchfab scale from its own nodes, so the
+instances use the upstream transforms scaled by 0.01 to stand next to the
+houses. Shadows stay off in `demo_godot`, so the background is transparent and
+the model is lit by the sun only.
