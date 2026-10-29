@@ -3,6 +3,7 @@ module pukan.godot_scene.loader;
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f, degtorad;
 import material_bindings;
 import pukan.exceptions: PukanException;
+import pukan.godot_scene.binary: parseGodotResourceFile;
 import pukan.godot_scene.material: GodotMaterialData, readGodotMaterial;
 import pukan.godot_scene.mesh: GodotArraySurface, GodotPrimitive, decodeArrayMesh;
 import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
@@ -59,7 +60,7 @@ private final class GodotProject
         if(auto cached = path in documents)
             return *cached;
 
-        auto document = parseGodotTextFile(path);
+        auto document = parseGodotResourceFile(path);
         documents[path] = document;
         return document;
     }
@@ -417,7 +418,7 @@ private final class GodotLoader
         else if(meshRef.kind == GodotRefKind.extResource)
         {
             auto external = findExternal(document, meshRef.id);
-            if(external !is null && isTextResourcePath(external.path))
+            if(external !is null && isResourcePath(external.path))
             {
                 documentPath = project.absolute(external.path);
                 auto externalDocument = project.document(documentPath);
@@ -484,12 +485,13 @@ private final class GodotLoader
             ++skippedResources;
     }
 
-    private static bool isTextResourcePath(string path)
+    private static bool isResourcePath(string path)
     {
         import std.algorithm: endsWith;
 
         const lower = path.toLower;
-        return lower.endsWith(".tres") || lower.endsWith(".tscn") || lower.endsWith(".escn");
+        return lower.endsWith(".tres") || lower.endsWith(".tscn") ||
+            lower.endsWith(".escn") || lower.endsWith(".res") || lower.endsWith(".scn");
     }
 
     private GodotArraySurface decodePrimitiveSurface(string type, in GodotVariant[string] properties)
@@ -573,7 +575,7 @@ private final class GodotLoader
         else if(reference.kind == GodotRefKind.extResource)
         {
             auto external = findExternal(owner, reference.id);
-            if(external is null || !isTextResourcePath(external.path))
+            if(external is null || !isResourcePath(external.path))
             {
                 ++skippedResources;
                 return defaultMaterial(hasColors, documentPath);

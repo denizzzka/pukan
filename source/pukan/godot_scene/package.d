@@ -1,5 +1,6 @@
 module pukan.godot_scene;
 
+public import pukan.godot_scene.binary;
 public import pukan.godot_scene.factory;
 public import pukan.godot_scene.loader;
 public import pukan.godot_scene.material;

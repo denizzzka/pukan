@@ -29,6 +29,8 @@ The demo projects are MIT licensed, see `LICENSE.godot-demo-projects.md`.
 - `procedural.tscn`, a text scene (`format=4`) with an `ArrayMesh` sub-resource
   and a non-identity `Transform3D`;
 - `procedural.scn`, the same scene saved as a binary `PackedScene` (RSRC 6);
+- `binary.tscn`, which references `procedural_mesh.res` to exercise the binary
+  resource path;
 - `procedural_mesh.res` and `procedural_mesh.tres`, the mesh alone in binary
   and text form;
 - `procedural_material.tres`, a `StandardMaterial3D` with a texture and vertex

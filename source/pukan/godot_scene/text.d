@@ -43,6 +43,8 @@ struct GodotTextExternal
 struct GodotTextDocument
 {
     bool isScene;
+    bool binary;
+    uint binaryVersion;
     int format = 4;
     string resourceType;
     string scriptClass;

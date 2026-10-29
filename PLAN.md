@@ -111,15 +111,16 @@ or the pack.
 
 The end goal is a game exported by Godot, not only a source project.
 
-- [ ] RSRC 5/6 reader: string table, external and internal resource tables, the
+- [x] RSRC 5/6 reader: string table, external and internal resource tables, the
       variant encoding and resource properties.
-- [ ] `PackedScene._bundled` decoder for binary `.scn`.
+- [x] `PackedScene._bundled` decoder for binary `.scn`.
+- [ ] `PackedScene` base scenes and child index ordering.
 - [ ] `.import` remap, exported `.remap` chains and `project.binary`.
 - [ ] `.pck` v2 reader with a VFS layer shared by directory and pack sources.
 - [ ] `.ctex` textures: header, mip chain and format mapping; upload directly
       when the device supports the format, with a documented fallback.
-- [ ] Binary `.res` materials and meshes; resource deduplication across a
-      scene.
+- [x] Binary `.res` materials and meshes.
+- [ ] Resource deduplication across a scene.
 - [ ] Packed project fixture exported with Godot 4.7 and checked in.
 
 #### Phase 4: instances, skinned meshes and animation
@@ -158,6 +159,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       skeleton and animation.
 - [x] Generated `procedural.tscn`, `.scn` and `.res` with two uncompressed
       `ArrayMesh` surfaces, built by Godot 4.7 headless.
+- [x] Generated `binary.tscn` referencing the binary `.res` mesh, and a binary
+      `.scn` scene loaded through `demo_godot`.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external
       material and both override forms.
 - [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer
