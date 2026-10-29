@@ -217,13 +217,15 @@ assert that a mesh is never shared between two different handedness values.
 - [ ] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
       an integer grid with a mesh library per cell; decide whether to import that
       data as is or to grow the same cell-and-library model on top of #16.
-- [ ] Render a landscape from cells: import the `platformer` stage `GridMap`
-      with its `grid_map.scn` mesh library, per-cell transforms and the stage
-      textures, and check the result against Godot next to the glTF terrain of
-      `truck_town`.
-- [ ] Add `platformer/stage/stage.tscn` as the GridMap landscape fixture once
-      cells render; the rest of the stage (sky, reflection probes, script) can
-      stay unsupported and counted.
+- [x] Add `platformer/stage/stage.tscn` as the GridMap landscape fixture: the
+      ready-made stage of the same demo project, with its `grid_map.scn`, the
+      `MeshLibrary` and the tile meshes. Only the floor renders so far, and the
+      report names `GridMap` and `MeshLibrary`.
+- [ ] Render the landscape from cells: import the GridMap cells, their per-cell
+      transforms and the MeshLibrary items, and check the result against Godot
+      next to the glTF terrain of `truck_town`.
+- [ ] The stage's sky, reflection probes and script stay unsupported and
+      counted.
 
 #### Compatibility policy
 
@@ -247,6 +249,8 @@ Fixtures live in `demo_godot/godot_samples/`.
       one shared glTF asset and independent node and joint state.
 - [x] `platformer/platformer.pck`: a Godot 4.7 export with the RSCC imported
       `enemy.glb`, `Skeleton3D` and `Skin`.
+- [x] `platformer/stage/stage.tscn`: the ready-made GridMap landscape with its
+      `grid_map.scn`, 20 tile meshes and textures; counted until cells render.
 - [x] Generated `procedural.tscn`, `.scn` and `.res` with two uncompressed
       `ArrayMesh` surfaces, built by Godot 4.7 headless.
 - [x] Generated `binary.tscn` referencing the binary `.res` mesh, and a binary

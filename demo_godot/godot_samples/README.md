@@ -13,9 +13,10 @@ Commit: `b761b4cd5718a7118f2c95eb55f181d0a5f004f1` (`master`).
 - `lights_and_shadows/` is `3d/lights_and_shadows` without the icon, screenshots
   and `default_bus_layout.tres`. The scene keeps its texture and script
   references.
-- `platformer/` is the `enemy` part of `3d/platformer`. Audio streams and
-  screenshots are omitted, but `enemy.tscn` still declares them, so the loader
-  must skip resource types it does not render.
+- `platformer/` is the `enemy` and `stage` parts of `3d/platformer`. Audio
+  streams and screenshots are omitted, but `enemy.tscn` still declares them,
+  so the loader must skip resource types it does not render. `stage/` is the
+  ready-made GridMap landscape, with its cells and tile meshes.
 - `truck_town/` is `3d/truck_town/town` with the project file and the
   `town_view.tscn` wrapper added here. The model, the trees, the lamps and the
   sky are kept as the `.scn` files Godot 4.7 imports; the raw `.gltf` sources,
@@ -159,6 +160,27 @@ exercises native Godot skinning and the RSCC/Zstandard resource path:
 
 The enemy currently renders in its bind pose; animation tracks are not applied
 yet.
+
+## GridMap landscape
+
+`platformer/stage/stage.tscn` is the stage of the same demo project, the
+ready-made GridMap landscape: a `GridMap` scene, 20 tile meshes in a
+`MeshLibrary`, a floor, seven reflection probes, a sky and a label. The loader
+does not read `GridMap` yet, so only the floor renders and `demo_godot` says
+what stayed out:
+
+```
+nodes not rendered: GridMap x1, Label3D x1, ReflectionProbe x7, WorldEnvironment x1
+resources not rendered: CompressedCubemap x1, Environment x1, MeshLibrary x1, Shader x1, ShaderMaterial x1, Sky x1
+```
+
+The files are the upstream ones. `stage/meshes/*`, `stage/collision/*` and the
+tile textures are kept so the cells can render once the loader reads the
+`MeshLibrary` and the cell grid.
+
+```sh
+./demo_godot/pukan_demo_godot --scene demo_godot/godot_samples/platformer/stage/stage.tscn --frames 2
+```
 
 ## Landscape
 
