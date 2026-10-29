@@ -45,6 +45,9 @@ class Scene
     bool oitEnabled = true;
     private OitResolve oitResolve;
     private OitFrame[] oitFrames;
+    /// Lists of a replaced swapchain, kept until its commands are done
+    private OitFrame[][] retiredOitFrames;
+    private uint framesSinceOitRetire;
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
@@ -112,6 +115,11 @@ class Scene
     {
         background.destroy;
 
+        foreach(ref batch; retiredOitFrames)
+            foreach(ref oit; batch)
+                if(oit)
+                    destroy(oit);
+
         foreach(ref oit; oitFrames)
             if(oit)
                 destroy(oit);
@@ -154,9 +162,11 @@ class Scene
         auto prefiltered = imageInfo(ibl.prefiltered);
         auto brdfLut = imageInfo(ibl.brdfLut);
 
-        foreach(ref oit; oitFrames)
-            if(oit)
-                destroy(oit);
+        if(oitFrames.length)
+        {
+            retiredOitFrames ~= oitFrames;
+            framesSinceOitRetire = 0;
+        }
         oitFrames = null;
 
         foreach(ref frame; swapChain.frames)
@@ -542,6 +552,24 @@ class Scene
         presentColor(frame);
     }
 
+    /// Drops a replaced swapchain's lists after its commands have completed
+    private void retireOitFrames()
+    {
+        if(retiredOitFrames.length == 0)
+            return;
+
+        if(++framesSinceOitRetire < SwapChain.oldSwapchainFrames)
+            return;
+
+        foreach(ref batch; retiredOitFrames)
+            foreach(ref oit; batch)
+                if(oit)
+                    destroy(oit);
+
+        retiredOitFrames = null;
+        framesSinceOitRetire = 0;
+    }
+
     private size_t frameIndex(ref Frame frame)
     {
         foreach(i, f; swapChain.frames)
@@ -628,6 +656,8 @@ class Scene
     void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
     {
         import pukan.exceptions: PukanExceptionWithCode;
+
+        retireOitFrames();
 
         swapChain.oldSwapchainsMaintenance();
 

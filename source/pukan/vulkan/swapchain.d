@@ -70,6 +70,8 @@ class SwapChain
     VkFormat imageFormat;
     VkExtent2D imageExtent;
     enum maxFramesInFlight = 3;
+    /// Frames a replaced swapchain and its images stay alive
+    enum oldSwapchainFrames = 30;
     Frame[] frames;
     int currentFrameIdx;
     VkQueue presentQueue;
@@ -243,11 +245,9 @@ class SwapChain
     void oldSwapchainsMaintenance()
     {
         // To ensure that all buffers and queues are no longer in use
-        enum framesToOldSwapchainsDestroy = 30;
-
         if(oldSwapChain !is null)
         {
-            if(framesSinceSwapchainReplacement < framesToOldSwapchainsDestroy)
+            if(framesSinceSwapchainReplacement < oldSwapchainFrames)
                 framesSinceSwapchainReplacement++;
             else
             {
