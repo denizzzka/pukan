@@ -38,6 +38,7 @@ class Scene
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.LitMesh) litMeshFactory;
     GltfFactory gltfFactory;
+    PbrFactory pbrFactory;
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
     IblTextures ibl;
@@ -193,7 +194,8 @@ class Scene
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
-        gltfFactory = new GltfFactory(device, pipelineFactory, meshResources, renderPass, shadowPass);
+        pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, shadowPass);
+        gltfFactory = new GltfFactory(pbrFactory);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
     }
@@ -240,6 +242,9 @@ class Scene
 
         if(gltfFactory)
             destroy(gltfFactory);
+
+        if(pbrFactory)
+            destroy(pbrFactory);
 
         if(ibl.brdfLut)
             destroy(ibl.brdfLut);
