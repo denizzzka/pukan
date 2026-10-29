@@ -54,13 +54,23 @@ struct GodotBasis
 {
     Vector3f[3] rows;
 
-    /// Receives the basis columns as the scene serializer writes them
+    /// Axis vectors as the `Basis(x, y, z)` constructor takes them
     static GodotBasis fromColumns(Vector3f x, Vector3f y, Vector3f z)
     {
         GodotBasis result;
         result.rows[0] = Vector3f(x.x, y.x, z.x);
         result.rows[1] = Vector3f(x.y, y.y, z.y);
         result.rows[2] = Vector3f(x.z, y.z, z.z);
+        return result;
+    }
+
+    /// The scene serializer writes the nine numbers of a basis row by row
+    static GodotBasis fromRows(Vector3f row0, Vector3f row1, Vector3f row2)
+    {
+        GodotBasis result;
+        result.rows[0] = row0;
+        result.rows[1] = row1;
+        result.rows[2] = row2;
         return result;
     }
 

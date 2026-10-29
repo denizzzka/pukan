@@ -839,7 +839,7 @@ private struct GodotTextParser
         const v = numbers(arguments);
         requireCount(v, 9, "Basis");
 
-        return GodotVariant(GodotBasis.fromColumns(
+        return GodotVariant(GodotBasis.fromRows(
             Vector3f(cast(float) v[0], cast(float) v[1], cast(float) v[2]),
             Vector3f(cast(float) v[3], cast(float) v[4], cast(float) v[5]),
             Vector3f(cast(float) v[6], cast(float) v[7], cast(float) v[8]),
@@ -876,7 +876,7 @@ private struct GodotTextParser
         requireCount(v, 12, "Transform3D");
 
         return GodotVariant(GodotTransform3D(
-            GodotBasis.fromColumns(
+            GodotBasis.fromRows(
                 Vector3f(cast(float) v[0], cast(float) v[1], cast(float) v[2]),
                 Vector3f(cast(float) v[3], cast(float) v[4], cast(float) v[5]),
                 Vector3f(cast(float) v[6], cast(float) v[7], cast(float) v[8]),
@@ -1289,6 +1289,8 @@ unittest
     const matrix = transform.toMatrix;
     assert(matrix.a14 == 0 && matrix.a24 == 1 && matrix.a34 == 0);
     assert(matrix.a11 > 0.866f && matrix.a11 < 0.867f);
+    // Godot writes rows, so the Y rotation shows in a13 rather than a31
+    assert(matrix.a13 > 0.499f && matrix.a13 < 0.501f);
 }
 
 unittest
