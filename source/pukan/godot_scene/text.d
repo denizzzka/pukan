@@ -1101,7 +1101,7 @@ private struct GodotTextParser
         if(auto format = "format" in header.fields)
         {
             result.format = cast(int) asLong(*format, "format");
-            if(result.format < 2 || result.format > 4)
+            if(result.format < 3 || result.format > 4)
                 fail("unsupported text format " ~ result.format.to!string);
         }
 
