@@ -1,10 +1,11 @@
 module pukan.gltf.factory;
 
 import pukan.gltf;
-import pukan.gltf.loader: GltfLoadOptions;
+import pukan.gltf.loader: GltfAsset, GltfLoadOptions, createGltfInstance, loadGltfAsset;
 import pukan.pbr.factory: PbrFactory;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import std.conv: to;
 import std.meta: AliasSeq;
 
 class GltfFactory
@@ -30,6 +31,7 @@ class GltfFactory
 
     private PbrFactory pbr;
     private immutable bool computeJointsOnGPU;
+    private GltfAsset[string] assetCache;
     GltfLoadOptions loadOptions;
 
     this(PbrFactory pbr, bool computeJointsOnGPU = true)
@@ -42,25 +44,55 @@ class GltfFactory
     {
         assert(pbr.device);
 
+        const key = filename ~ "|" ~ loadOptions.extensions.to!string ~
+            "|" ~ loadOptions.modeOverride.to!string;
+
+        GltfAsset asset;
+
+        if(auto cached = key in assetCache)
+            asset = *cached;
+        else
+        {
+            try
+                asset = loadGltfAsset(filename, pbr.device, loadOptions);
+            catch(Exception e)
+            {
+                e.msg = filename ~ ": " ~ e.msg;
+                throw e;
+            }
+
+            assetCache[key] = asset;
+        }
+
         auto allocator = pbr.createAllocator();
 
-        try
-            return loadGlTF2(
-                filename,
-                allocator,
-                pbr.resources.materials,
-                pbr.device,
-                pbr.pipelineCfgs,
-                pbr.resources.fakeTexture,
-                pbr.resources.fallbackVertex.buf,
-                computeJointsOnGPU,
-                loadOptions,
-            );
-        catch(Exception e)
-        {
-            e.msg = filename~": "~e.msg;
-            //FIXME: use correct exception type
-            throw e;
-        }
+        return createGltfInstance(
+            asset,
+            allocator,
+            pbr.resources.materials,
+            pbr.device,
+            pbr.pipelineCfgs,
+            pbr.resources.fakeTexture,
+            pbr.resources.fallbackVertex.buf,
+            computeJointsOnGPU,
+            loadOptions,
+        );
+    }
+
+    /// Number of parsed glTF files currently shared by instances
+    size_t cachedAssetCount() const => assetCache.length;
+
+    /// Releases cached file content before the device is destroyed
+    void destroyAssets()
+    {
+        foreach(ref asset; assetCache)
+            destroy(asset);
+
+        assetCache = null;
+    }
+
+    ~this()
+    {
+        destroyAssets();
     }
 }

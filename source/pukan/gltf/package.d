@@ -1,7 +1,7 @@
 module pukan.gltf;
 
 import dlib.math;
-public import pukan.gltf.loader: LoadStats, loadGlTF2;
+public import pukan.gltf.loader: GltfAsset, LoadStats, createGltfInstance, loadGltfAsset;
 public import pukan.gltf.factory: GltfFactory;
 import pukan.pbr.accessor;
 import pukan.gltf.animation: AnimationSupport;
@@ -165,7 +165,7 @@ class GlTF : DrawableByVulkan, Blended
     package GltfContent content;
     alias this = content;
 
-    private BufferPieceOnGPU[] gpuBuffs;
+    package GltfAsset asset;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private VkDescriptorImageInfo fakeTextureInfo;
     private VkBuffer vertexFallback;
@@ -199,9 +199,7 @@ class GlTF : DrawableByVulkan, Blended
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
-        GltfContent cont,
-        LoaderNode[] nodes,
-        LoaderNode rootSceneNode,
+        GltfAsset asset,
         Texture fakeTexture,
         VkBuffer vertexFallback,
         GltfLoadOptions loadOptions,
@@ -212,7 +210,8 @@ class GlTF : DrawableByVulkan, Blended
         this.allocator = allocator;
         this.materialBuffer = materialBuffer;
         this.vertexFallback = vertexFallback;
-        content = cont;
+        this.asset = asset;
+        content = asset.content;
 
         fakeTextureInfo = VkDescriptorImageInfo(
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -222,14 +221,13 @@ class GlTF : DrawableByVulkan, Blended
 
         assert(content.meshes.length > 0);
 
-        animation = AnimationSupport(&content, nodes.length);
-        gpuBuffs.length = content.bufferViews.length;
-        skinsBaked = content.skins.length > 0 && !isSkinAnimated(content, nodes);
+        animation = AnimationSupport(&content, asset.nodes.length);
+        skinsBaked = content.skins.length > 0 && !isSkinAnimated(content, asset.nodes);
 
         {
-            baseNodeTranslations.length = nodes.length;
+            baseNodeTranslations.length = asset.nodes.length;
 
-            foreach(i, ref node; nodes)
+            foreach(i, ref node; asset.nodes)
                 baseNodeTranslations[i] = node.trans;
 
             // Vaules if object is not animated:
@@ -237,7 +235,7 @@ class GlTF : DrawableByVulkan, Blended
         }
 
         {
-            initJointMatricesBuffer(device, nodes);
+            initJointMatricesBuffer(device, asset.nodes);
 
             Node createNodeHier(ref LoaderNode ln)
             {
@@ -245,7 +243,7 @@ class GlTF : DrawableByVulkan, Blended
 
                 foreach(idx; ln.childrenNodeIndices)
                 {
-                    auto c = createNodeHier(nodes[idx]);
+                    auto c = createNodeHier(asset.nodes[idx]);
                     c.trans = &animation.perNodeTranslations[idx];
 
                     setupNodeTransFromRoot(c, idx);
@@ -256,8 +254,8 @@ class GlTF : DrawableByVulkan, Blended
                 return nn;
             }
 
-            this.rootSceneNode = createNodeHier(rootSceneNode);
-            this.rootSceneNodeTrans = rootSceneNode.trans;
+            this.rootSceneNode = createNodeHier(asset.rootSceneNode);
+            this.rootSceneNodeTrans = asset.rootSceneNode.trans;
             this.rootSceneNode.trans = &rootSceneNodeTrans;
         }
 
@@ -332,17 +330,9 @@ class GlTF : DrawableByVulkan, Blended
 
     ~this()
     {
-        foreach(ref piece; gpuBuffs)
-            if(piece && piece.buffer)
-                destroy(piece.buffer);
-
         foreach(ref buffer; jointMatricesBufs)
             if(buffer)
                 destroy(buffer);
-
-        foreach(ref texture; content.textures)
-            if(texture)
-                destroy(texture);
     }
 
     string possibleName() const
@@ -403,7 +393,7 @@ class GlTF : DrawableByVulkan, Blended
         Boxf r;
 
         foreach(m; meshes)
-            m.calcAABB(gpuBuffs, r);
+            m.calcAABB(asset.gpuBuffs, r);
 
         return r;
     }
@@ -419,9 +409,11 @@ class GlTF : DrawableByVulkan, Blended
         auto start = MonoTime.currTime;
 
         commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
-            foreach(ref piece; gpuBuffs)
+            foreach(ref piece; asset.gpuBuffs[asset.uploadedBuffers .. $])
                 if(piece)
                     piece.recordUpload(buf);
+
+            asset.uploadedBuffers = asset.gpuBuffs.length;
 
             materialBuffer.recordUpload(buf);
 
@@ -498,7 +490,7 @@ class GlTF : DrawableByVulkan, Blended
                     joints[i] = Vector4us(joint.x, joint.y, joint.z, joint.w);
                 }
 
-                uplVert.joints = createVertexBuffer(device, joints, gpuBuffs);
+                uplVert.joints = createVertexBuffer(device, joints, asset.gpuBuffs);
             }
             else
                 uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(jointAccessor);
@@ -536,7 +528,7 @@ class GlTF : DrawableByVulkan, Blended
                 foreach(value; range)
                     widened ~= value;
 
-                const widenedAccess = createVertexBuffer(device, widened, gpuBuffs, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                const widenedAccess = createVertexBuffer(device, widened, asset.gpuBuffs, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
                 uplVert.indices = IndicesDescr(widenedAccess, VK_INDEX_TYPE_UINT16);
             }
             else
@@ -602,7 +594,7 @@ class GlTF : DrawableByVulkan, Blended
                     (packColorComponent(a) << 24);
             }
 
-            uplVert.colors = createVertexBuffer(device, packed, gpuBuffs);
+            uplVert.colors = createVertexBuffer(device, packed, asset.gpuBuffs);
         }
 
         // Tangent data is only needed when a normal map samples it
@@ -689,7 +681,7 @@ class GlTF : DrawableByVulkan, Blended
                     bakedNormals[i] = Vector3f(baked.x, baked.y, baked.z).normalized;
                 }
 
-                uplVert.normals = createVertexBuffer(device, bakedNormals, gpuBuffs);
+                uplVert.normals = createVertexBuffer(device, bakedNormals, asset.gpuBuffs);
             }
 
             if(hasTangents)
@@ -724,10 +716,10 @@ class GlTF : DrawableByVulkan, Blended
                     bakedTangents[i] = Vector4f(n.x, n.y, n.z, t.w);
                 }
 
-                uplVert.tangents = createVertexBuffer(device, bakedTangents, gpuBuffs);
+                uplVert.tangents = createVertexBuffer(device, bakedTangents, asset.gpuBuffs);
             }
 
-            uplVert.vertices = createVertexBuffer(device, bakedPositions, gpuBuffs);
+            uplVert.vertices = createVertexBuffer(device, bakedPositions, asset.gpuBuffs);
 
             uplVert.aabb = Boxf.init;
             hasSkin = false;
@@ -764,7 +756,7 @@ class GlTF : DrawableByVulkan, Blended
         );
 
         applyGltfMaterial(m, primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents, hasVertexColors, loadOptions);
-        m.buildGeometry(gpuBuffs);
+        m.buildGeometry(asset.gpuBuffs);
         return m;
     }
 
@@ -810,10 +802,10 @@ class GlTF : DrawableByVulkan, Blended
 
     private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
     {
-        if(gpuBuffs[ac.viewIdx] is null)
-            gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
+        if(asset.gpuBuffs[ac.viewIdx] is null)
+            asset.gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
 
-        return &gpuBuffs[ac.viewIdx];
+        return &asset.gpuBuffs[ac.viewIdx];
     }
 
     void refreshBuffers(VkCommandBuffer buf)
@@ -965,15 +957,13 @@ class SkinnedGlTF : GlTF
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
-        GltfContent cont,
-        LoaderNode[] nodes,
-        LoaderNode rootSceneNode,
+        GltfAsset asset,
         Texture fakeTexture,
         VkBuffer vertexFallback,
         GltfLoadOptions loadOptions,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback, loadOptions);
+        super(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, loadOptions);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -1038,15 +1028,13 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
-        GltfContent cont,
-        LoaderNode[] nodes,
-        LoaderNode rootSceneNode,
+        GltfAsset asset,
         Texture fakeTexture,
         VkBuffer vertexFallback,
         GltfLoadOptions loadOptions,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback, loadOptions);
+        super(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, loadOptions);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)

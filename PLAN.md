@@ -130,6 +130,8 @@ The end goal is a game exported by Godot, not only a source project.
       `pukan.compressed_texture`, with device feature checks and sRGB or linear
       sampling per material slot. Basis Universal stays unsupported.
 - [x] Binary `.res` materials and meshes.
+- [x] Shared parsed glTF content and GPU buffers across instances of one file;
+      node trees, animation state and joint buffers stay per instance.
 - [ ] Resource deduplication across a scene.
 - [x] Packed project fixture exported with Godot 4.7 and checked in.
 
@@ -189,6 +191,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       primitives, `StandardMaterial3D`, textures and lights.
 - [x] `platformer/enemy/enemy.tscn` plus `enemy.glb`: external `PackedScene`,
       skeleton and animation.
+- [x] `platformer/enemy/enemy_twins.tscn`: two instances of `enemy.tscn` with
+      one shared glTF asset and independent node and joint state.
 - [x] Generated `procedural.tscn`, `.scn` and `.res` with two uncompressed
       `ArrayMesh` surfaces, built by Godot 4.7 headless.
 - [x] Generated `binary.tscn` referencing the binary `.res` mesh, and a binary

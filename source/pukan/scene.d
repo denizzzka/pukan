@@ -229,6 +229,8 @@ class Scene
         if(pendingScreenshot)
             destroy(pendingScreenshot);
 
+        gltfFactory.destroyAssets();
+
         background.destroy;
 
         foreach(ref batch; retiredOitFrames)

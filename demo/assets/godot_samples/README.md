@@ -124,3 +124,8 @@ shapes: a subdivided `BoxMesh`, a subdivided `PlaneMesh`, a `CapsuleMesh` and a
 `shared_mesh.tscn` has five `MeshInstance3D` nodes backed by two sub-resources.
 `demo_godot` reports `geometries 2`, so the vertex and index buffers are shared
 even though each node keeps its own material and transform.
+
+`enemy_twins.tscn` instances `enemy.tscn` twice. The two enemies share one
+parsed `enemy.glb` asset, including its vertex buffers and textures, while each
+keeps its own node transforms and joint buffers. `demo_godot` reports
+`gltf assets 1`.

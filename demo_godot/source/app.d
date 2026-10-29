@@ -173,7 +173,8 @@ void main(string[] args)
         ", nodes skipped ", godotScene.skippedNodes,
         ", resources skipped ", godotScene.skippedResources,
         ", lights ", godotScene.lights.length,
-        ", instances ", godotScene.instanceCount);
+        ", instances ", godotScene.instanceCount,
+        ", gltf assets ", scene.gltfFactory.cachedAssetCount);
 
     foreach(bounds; godotScene.instanceBounds)
         writeln("instance aabb ", bounds.min.x, " ", bounds.min.y, " ", bounds.min.z,

@@ -376,15 +376,9 @@ unittest
 }
 
 ///
-package GlTF loadGlTF2(
+package GltfAsset loadGltfAsset(
     string filename,
-    DescriptorAllocator allocator,
-    MaterialBuffer materialBuffer,
     LogicalDevice device,
-    ref PbrPipelines pipelines,
-    Texture fakeTexture,
-    VkBuffer vertexFallback,
-    bool computeJointsOnGPU,
     GltfLoadOptions options,
 )
 {
@@ -622,22 +616,41 @@ package GlTF loadGlTF2(
 
     stats.decodeNs += cast(ulong) (MonoTime.currTime - postStart).total!"nsecs";
 
-    auto ctorStart = MonoTime.currTime;
+    auto asset = new GltfAsset;
+    asset.content = ret;
+    asset.nodes = nodes;
+    asset.rootSceneNode = rootSceneNode;
+    asset.gpuBuffs.length = ret.bufferViews.length;
+    asset.loadStats = stats;
+
+    return asset;
+}
+
+GlTF createGltfInstance(
+    GltfAsset asset,
+    DescriptorAllocator allocator,
+    MaterialBuffer materialBuffer,
+    LogicalDevice device,
+    ref PbrPipelines pipelines,
+    Texture fakeTexture,
+    VkBuffer vertexFallback,
+    bool computeJointsOnGPU,
+    GltfLoadOptions options,
+)
+{
     GlTF result;
 
-    if(ret.skins.length > 0)
+    if(asset.content.skins.length > 0)
     {
         if(computeJointsOnGPU)
-            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
+            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, options);
         else
-            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
+            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, options);
     }
     else
-        result = new GlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
+        result = new GlTF(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, options);
 
-    stats.decodeNs += cast(ulong) (MonoTime.currTime - ctorStart).total!"nsecs";
-    result.loadStats = stats;
-
+    result.loadStats = asset.loadStats;
     return result;
 }
 
@@ -914,6 +927,28 @@ struct Node
     Trans trans;
     NodePayload payload;
     alias this = payload;
+}
+
+/// Parsed and GPU-resident content of one glTF file, shared by instances
+final class GltfAsset
+{
+    GltfContent content;
+    Node[] nodes;
+    Node rootSceneNode;
+    BufferPieceOnGPU[] gpuBuffs;
+    size_t uploadedBuffers;
+    LoadStats loadStats;
+
+    ~this()
+    {
+        foreach(ref piece; gpuBuffs)
+            if(piece && piece.buffer)
+                destroy(piece.buffer);
+
+        foreach(ref texture; content.textures)
+            if(texture)
+                destroy(texture);
+    }
 }
 
 struct GltfContent
