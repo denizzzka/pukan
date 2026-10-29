@@ -204,6 +204,7 @@ class GltfFactory
         PipelineFactory pipelines,
         MeshResources resources,
         RenderPass renderPass,
+        RenderPass shadowPass,
         bool computeJointsOnGPU = true,
     )
     {
@@ -238,6 +239,84 @@ class GltfFactory
         pipelineCfgs.unskinned.pbrCore.none = createVariants("glTF static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_nosky.spv"(device), renderPass);
         pipelineCfgs.unskinned.lit = createVariants("glTF static lit", staticShaderStages!"mesh_pbr_frag_lit.spv"(device), staticShaderStages!"mesh_pbr_frag_lit_oit.spv"(device), renderPass);
         pipelineCfgs.unskinned.unlit = createVariants("glTF static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(device), staticShaderStages!"mesh_pbr_frag_unlit_oit.spv"(device), renderPass);
+
+        {
+            const shadowState = FixedState(
+                frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                colorAttachmentCount: 0,
+                depthBiasEnable: VK_TRUE,
+                depthBiasConstantFactor: 1.25f,
+                depthBiasSlopeFactor: 1.75f,
+            );
+
+            VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE];
+
+            const skinnedShadow = pipelines.declare(RenderTechnique(
+                name: "glTF shadow",
+                stages: shadowShaderStages(device),
+                state: shadowState,
+                dynamicStates: dynamicStates,
+            ), 20);
+            const unskinnedShadow = pipelines.declare(RenderTechnique(
+                name: "glTF static shadow",
+                stages: staticShadowShaderStages(device),
+                state: shadowState,
+                dynamicStates: dynamicStates,
+            ), 20);
+
+            pipelineCfgs.skinnedShadow = pipelines.acquire(skinnedShadow, shadowPass, 0);
+            pipelineCfgs.unskinnedShadow = pipelines.acquire(unskinnedShadow, shadowPass, 0);
+        }
+    }
+
+    private static ShaderInfo[] shadowShaderStages(LogicalDevice device)
+    {
+        return [
+            device.uploadShaderToGPU(
+                cast(ubyte[]) import("mesh_pbr_shadow_vert.spv"),
+                VK_SHADER_STAGE_VERTEX_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: MATERIAL_JOINTS,
+                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    ),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+                vertexInput(),
+            ),
+            fragmentStage!"mesh_shadow_frag.spv"(device),
+        ];
+    }
+
+    private static ShaderInfo[] staticShadowShaderStages(LogicalDevice device)
+    {
+        return [
+            device.uploadShaderToGPU(
+                cast(ubyte[]) import("mesh_pbr_static_shadow_vert.spv"),
+                VK_SHADER_STAGE_VERTEX_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(
+                        binding: MATERIAL_JOINTS,
+                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                        descriptorCount: 1,
+                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    ),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+                staticVertexInput(),
+            ),
+            fragmentStage!"mesh_shadow_frag.spv"(device),
+        ];
     }
 
     private GltfPipelineVariants createVariants(string prefix, ShaderInfo[] stages, ShaderInfo[] oitStages, RenderPass renderPass)

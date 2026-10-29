@@ -471,6 +471,10 @@ void main(string[] args) {
                         scene.updateFrameUniforms(frame, view, stereoWtb[view]);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
                     },
+                    (buf) {
+                        tree.root.payload = Bone(scene.shadowViewProj * wtb.model);
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
+                    },
                 );
             }
             else
@@ -480,10 +484,16 @@ void main(string[] args) {
                 scene.recordCommandBuffer(
                     frame,
                     (buf, phase) {
+                        tree.root.payload = Bone(transl);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
                     (buf, phase) {
+                        tree.root.payload = Bone(transl);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
+                    },
+                    (buf) {
+                        tree.root.payload = Bone(scene.shadowViewProj * wtb.model);
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );
             }

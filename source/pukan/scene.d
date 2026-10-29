@@ -1,11 +1,12 @@
 module pukan.scene;
 
-import dlib.math: translation, Vector3f, Vector4f;
+import dlib.math: lookAtMatrix, perspectiveMatrix, translation, Vector3f, Vector4f;
 import pukan;
 import pukan.gltf.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: OitFrame, OitResolve;
+import pukan.shadow: ShadowMap, ShadowPass;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
@@ -43,6 +44,17 @@ class Scene
 
     /// Blended draws store their fragments in per-pixel lists this resolves
     bool oitEnabled = true;
+
+    /// The sun casts a shadow map before the main pass
+    bool shadowsEnabled = true;
+    enum shadowMapSize = 1024;
+    enum shadowFov = 24.0f;
+    enum shadowDistance = 10.0f;
+    /// Light view-projection the shadow map and the PBR sampling share
+    Matrix4x4f shadowViewProj;
+    private ShadowPass shadowPass;
+    private ShadowMap[] shadowMaps;
+    private VkSampler shadowSampler;
     private OitResolve oitResolve;
     private OitFrame[] oitFrames;
     /// Lists of a replaced swapchain, kept until its commands are done
@@ -115,7 +127,7 @@ class Scene
         this.surfaceFormat = surfaceFormat;
         this.presentMode = presentMode;
 
-        const sun = Vector3f(0.35f, 0.5f, 0.8f).normalized;
+        const sun = Vector3f(0.35f, 0.5f, -0.8f).normalized;
         lights[0] = Light(
             Vector4f(sun.x, sun.y, sun.z, 0),
             Vector4f(0, 0, 0, 0),
@@ -137,6 +149,25 @@ class Scene
 
         oitResolve = new OitResolve(device, pipelineFactory, surfaceFormat.format);
 
+        shadowPass = new ShadowPass(device, DefaultRenderPass.depthFormat);
+
+        {
+            VkSamplerCreateInfo samplerInfo = {
+                sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                magFilter: VK_FILTER_LINEAR,
+                minFilter: VK_FILTER_LINEAR,
+                mipmapMode: VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                compareEnable: VK_TRUE,
+                compareOp: VK_COMPARE_OP_LESS_OR_EQUAL,
+                borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+                unnormalizedCoordinates: VK_FALSE,
+            };
+            vkCall(device.device, &samplerInfo, device.alloc, &shadowSampler);
+        }
+
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null, surfaceFormat.colorSpace, presentMode);
         createFrameSets();
@@ -144,7 +175,7 @@ class Scene
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
-        gltfFactory = new GltfFactory(device, pipelineFactory, meshResources, renderPass);
+        gltfFactory = new GltfFactory(device, pipelineFactory, meshResources, renderPass, shadowPass);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
     }
@@ -165,6 +196,16 @@ class Scene
         foreach(ref buffer; lightBufs)
             if(buffer)
                 destroy(buffer);
+
+        foreach(ref map; shadowMaps)
+            if(map)
+                destroy(map);
+
+        if(shadowSampler)
+            vkDestroySampler(device.device, shadowSampler, device.alloc);
+
+        if(shadowPass)
+            destroy(shadowPass);
 
         if(oitResolve)
             destroy(oitResolve);
@@ -216,6 +257,16 @@ class Scene
                 destroy(buffer);
         lightBufs.length = swapChain.frames.length;
 
+        // The maps do not depend on the swapchain, so a replacement keeps them
+        if(shadowMaps.length != swapChain.frames.length)
+        {
+            foreach(ref map; shadowMaps)
+                if(map)
+                    destroy(map);
+
+            shadowMaps.length = swapChain.frames.length;
+        }
+
         foreach(ref frame; swapChain.frames)
             frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
 
@@ -226,6 +277,9 @@ class Scene
             auto sceneColor = imageInfo(frame.sceneColor);
 
             lightBufs[i] = device.create!MemoryBufferMappedToCPU(maxLights * Light.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+            shadowMaps[i] = new ShadowMap(device, shadowPass, shadowMapSize);
+            auto shadowInfo = shadowMaps[i].imageInfo(shadowSampler);
             auto lightInfo = VkDescriptorBufferInfo(
                 buffer: lightBufs[i].buf,
                 offset: 0,
@@ -251,6 +305,7 @@ class Scene
                     oitFragments,
                     oitCounter,
                     lightInfo,
+                    shadowInfo,
                 );
         }
     }
@@ -477,9 +532,21 @@ class Scene
         const viewProj = wtb.proj * wtb.view;
         const camera = translation(wtb.view.inverse);
 
+        const sun = Vector3f(
+            lights[0].positionRadius.x,
+            lights[0].positionRadius.y,
+            lights[0].positionRadius.z,
+        ).normalized;
+
+        const shadowEye = sun * shadowDistance;
+        const shadowView = lookAtMatrix(shadowEye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
+        const shadowProj = perspectiveMatrix(shadowFov, 1.0f, 1.0f, shadowDistance * 2.0f);
+        shadowViewProj = shadowProj * shadowView;
+
         FrameUniforms data;
         data.invViewProj = viewProj.inverse;
         data.viewProj = viewProj;
+        data.shadowViewProj = shadowViewProj;
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
         data.exposureParams = Vector4f(
             exposure,
@@ -499,12 +566,15 @@ class Scene
         ref Frame frame,
         SceneDrawCallback drawScene,
         SceneDrawCallback drawTransmission = null,
+        void delegate(ref VkCommandBuffer) drawShadow = null,
     )
     {
         auto commandBuffer = frame.commandBuffer;
 
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;
+
+        recordShadow(frame, drawShadow);
 
         clearOit(frame);
 
@@ -582,12 +652,15 @@ class Scene
         ref Frame frame,
         StereoDrawCallback drawScene,
         StereoDrawCallback drawTransmission = null,
+        void delegate(ref VkCommandBuffer) drawShadow = null,
     )
     {
         auto commandBuffer = frame.commandBuffer;
 
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;
+
+        recordShadow(frame, drawShadow);
 
         clearOit(frame);
 
@@ -642,6 +715,16 @@ class Scene
                 return i;
 
         assert(false, "frame does not belong to the swapchain");
+    }
+
+    /// Renders the sun's view of the opaque scene before the main pass
+    private void recordShadow(ref Frame frame, void delegate(ref VkCommandBuffer) drawShadow)
+    {
+        if(!shadowsEnabled || drawShadow is null)
+            return;
+
+        auto map = shadowMaps[frameIndex(frame)];
+        shadowPass.record(frame.commandBuffer, map.renderedFrameBuffer, map.renderExtent, drawShadow);
     }
 
     /// Empties the per-pixel lists before the opaque and blended draws fill them
@@ -805,6 +888,7 @@ struct FrameUniforms
 {
     Matrix4x4f invViewProj;
     Matrix4x4f viewProj;
+    Matrix4x4f shadowViewProj;
     Vector4f cameraPosition;
     Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
 }

@@ -134,6 +134,11 @@ struct FixedState
     VkColorComponentFlags colorWriteMask =
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    /// Zero for a depth-only pass
+    uint colorAttachmentCount = 1;
+    VkBool32 depthBiasEnable = VK_FALSE;
+    float depthBiasConstantFactor = 0.0f;
+    float depthBiasSlopeFactor = 0.0f;
 }
 
 struct RenderTechnique
@@ -306,6 +311,12 @@ final class PipelineFactory
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
+            VkDescriptorSetLayoutBinding(
+                binding: FRAME_SHADOW_MAP,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
         ];
         frameSetLayout = device.createDescriptorSetLayout(frameBindings);
     }
@@ -471,10 +482,10 @@ final class PipelineFactory
             polygonMode: VK_POLYGON_MODE_FILL,
             cullMode: state.cullMode,
             frontFace: state.frontFace,
-            depthBiasEnable: VK_FALSE,
-            depthBiasConstantFactor: 0.0f,
+            depthBiasEnable: state.depthBiasEnable,
+            depthBiasConstantFactor: state.depthBiasConstantFactor,
             depthBiasClamp: 0.0f,
-            depthBiasSlopeFactor: 0.0f,
+            depthBiasSlopeFactor: state.depthBiasSlopeFactor,
             lineWidth: 1.0f,
         };
 
@@ -506,8 +517,8 @@ final class PipelineFactory
             sType: VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
             logicOpEnable: VK_FALSE,
             logicOp: VK_LOGIC_OP_COPY,
-            attachmentCount: 1,
-            pAttachments: &colorBlendAttachment,
+            attachmentCount: state.colorAttachmentCount,
+            pAttachments: state.colorAttachmentCount > 0 ? &colorBlendAttachment : null,
             blendConstants: [0.0f, 0.0f, 0.0f, 0.0f],
         };
 

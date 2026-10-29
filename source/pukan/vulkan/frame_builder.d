@@ -87,6 +87,7 @@ final class FrameSet
         VkDescriptorBufferInfo oitFragments,
         VkDescriptorBufferInfo oitCounter,
         VkDescriptorBufferInfo lights,
+        VkDescriptorImageInfo shadowMap,
     )
     {
         buffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -103,6 +104,7 @@ final class FrameSet
             bufferWriteDescriptor(descriptorSet, FRAME_OIT_FRAGMENTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitFragments),
             bufferWriteDescriptor(descriptorSet, FRAME_OIT_COUNTER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitCounter),
             bufferWriteDescriptor(descriptorSet, FRAME_LIGHTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, lights),
+            imageWriteDescriptor(descriptorSet, FRAME_SHADOW_MAP, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shadowMap),
         ];
         device.updateDescriptorSets(writes);
     }

@@ -8,6 +8,9 @@ glslc ${TGT} ${INCLUDES} -DSKINNED -fshader-stage=vertex source/pukan/shaders/me
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/mesh_lit.vert -o compiled_shaders/mesh_lit_vert.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/mesh_pbr.vert -o compiled_shaders/mesh_pbr_vert.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/mesh_pbr_static.vert -o compiled_shaders/mesh_pbr_static_vert.spv
+glslc ${TGT} ${INCLUDES} -DSHADOW -fshader-stage=vertex source/pukan/shaders/mesh_pbr.vert -o compiled_shaders/mesh_pbr_shadow_vert.spv
+glslc ${TGT} ${INCLUDES} -DSHADOW -fshader-stage=vertex source/pukan/shaders/mesh_pbr_static.vert -o compiled_shaders/mesh_pbr_static_shadow_vert.spv
+glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_shadow.frag -o compiled_shaders/mesh_shadow_frag.spv
 
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag.spv
 glslc ${TGT} ${INCLUDES} -DUNLIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_unlit.spv

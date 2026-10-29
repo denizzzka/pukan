@@ -28,6 +28,17 @@ layout(location = 4) out vec4 fragTangent;
 
 void main()
 {
+#ifdef SHADOW
+    const mat4 shadowSkinMatrix =
+        jointMatrices[jointIndices.x] * weight.x +
+        jointMatrices[jointIndices.y] * weight.y +
+        jointMatrices[jointIndices.z] * weight.z +
+        jointMatrices[jointIndices.w] * weight.w;
+
+    gl_Position = trans * (shadowSkinMatrix * vec4(position, 1.0));
+    return;
+#endif
+
     fragColor = vec3(1.0);
     fragTextureCoord = vertTextureCoord;
 

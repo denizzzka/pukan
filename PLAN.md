@@ -122,12 +122,14 @@ longer depend on a per-draw order. Missing:
 ## Lighting
 
 The frame carries a light list in a storage buffer: the sun, then point and spot
-lights, sixteen entries in total. There are no shadows. Missing:
+lights, sixteen entries in total. The sun casts a single 1024x1024 shadow map
+with a normal offset and one filtered comparison; only opaque glTF meshes cast,
+there are no cascades and no local-light shadows. Missing:
 
-- [ ] Shadow maps. A cascaded directional map first, then an atlas for the
-      local lights; both need a depth-only pass, so they follow the pass
-      composition above.
-- [ ] Shadow filtering: PCF, normal offset bias and cascade blending.
+- [ ] Cascaded directional maps and an atlas for the local lights; the current
+      map is one perspective map around the scene centre and only the sun uses it.
+- [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.
+- [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
 - [ ] Light culling by distance and screen size.
 
 ## Deferred shading

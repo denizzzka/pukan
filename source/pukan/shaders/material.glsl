@@ -77,6 +77,7 @@ layout(set = 1, binding = FRAME_IRRADIANCE) uniform sampler2D irradianceMap;
 layout(set = 1, binding = FRAME_PREFILTERED) uniform sampler2D prefilteredMap;
 layout(set = 1, binding = FRAME_BRDF_LUT) uniform sampler2D brdfLut;
 layout(set = 1, binding = FRAME_SCENE_COLOR) uniform sampler2D sceneColorMap;
+layout(set = 1, binding = FRAME_SHADOW_MAP) uniform sampler2DShadow shadowMap;
 
 #ifdef SKY_ANALYTIC
 vec3 environment(vec3 direction)
@@ -342,6 +343,25 @@ vec3 transmissionSample(Surface s, vec3 N, vec3 V, float ior, float roughness)
     return textureLod(sceneColorMap, clamp(uv, vec2(0.0), vec2(1.0)), roughness * SCENE_COLOR_MAX_LOD).rgb;
 }
 
+/// Fraction of the sun that reaches a point, 3x3 PCF
+float shadowFactor(vec3 position, vec3 normal)
+{
+    // A small normal offset keeps a surface from shadowing itself
+    const vec4 clip = frameUbo.frame.shadowViewProj * vec4(position + normal * 0.015, 1.0);
+
+    if(clip.w <= 0.0)
+        return 1.0;
+
+    const vec3 ndc = clip.xyz / clip.w;
+    const vec2 uv = ndc.xy * 0.5 + 0.5;
+
+    if(any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
+        return 1.0;
+
+    // The sampler filters linearly, so one tap averages a 2x2 comparison
+    return texture(shadowMap, vec3(uv, ndc.z - 0.0015));
+}
+
 vec3 shadePbr(Surface s)
 {
     const vec3 N = normalize(s.normal);
@@ -485,14 +505,19 @@ vec3 shadePbr(Surface s)
         }
 #endif
 
-        direct += brdf * light.colorIntensity.rgb * NdotL * attenuation;
+        // Only the sun casts a shadow for now
+        const float shadow = (type == LIGHT_DIRECTIONAL && i == 0u)
+            ? shadowFactor(s.position, N)
+            : 1.0;
+
+        direct += brdf * light.colorIntensity.rgb * NdotL * attenuation * shadow;
 
 #ifndef CORE
         if(maxComponent(s.sheenColor) > 0.0)
         {
             const float sheenRoughness = clamp(s.sheenRoughness, 0.0001, 1.0);
             direct += s.sheenColor * D_Charlie(sheenRoughness, NdotH) * V_Neubelt(NdotV, NdotL)
-                * light.colorIntensity.rgb * NdotL * attenuation;
+                * light.colorIntensity.rgb * NdotL * attenuation * shadow;
         }
 #endif
     }

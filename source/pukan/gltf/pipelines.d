@@ -52,4 +52,6 @@ struct GltfPipelines
 {
     GltfModePipelines skinned;
     GltfModePipelines unskinned;
+    GraphicsPipelineCfg skinnedShadow;
+    GraphicsPipelineCfg unskinnedShadow;
 }

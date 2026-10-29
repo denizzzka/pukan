@@ -315,6 +315,8 @@ enum DrawPhase : uint
     blended,
     /// Draws that sample the copy of the colour the surface phase left
     transmission,
+    /// Depth-only pass that fills the shadow map
+    shadow,
 }
 
 ///

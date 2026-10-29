@@ -15,6 +15,7 @@ struct FrameData
 {
     mat4 invViewProj;
     mat4 viewProj;
+    mat4 shadowViewProj;
     vec4 cameraPosition;
     vec4 exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
 };

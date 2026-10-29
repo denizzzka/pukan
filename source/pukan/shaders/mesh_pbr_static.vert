@@ -20,6 +20,11 @@ layout(location = 4) out vec4 fragTangent;
 
 void main()
 {
+#ifdef SHADOW
+    gl_Position = trans * vec4(position, 1.0);
+    return;
+#endif
+
     fragColor = vec3(1.0);
     fragTextureCoord = vertTextureCoord;
 

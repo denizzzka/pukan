@@ -808,7 +808,7 @@ class GlTF : DrawableByVulkan
 
         foreach(draw; draws)
             if(matchesPhase(draw.mesh, phase))
-                draw.mesh.draw(buf, selectPipeline(draw.mesh), draw.trans, frameSet);
+                draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
     }
 
     private static bool matchesPhase(const MeshClass mesh, DrawPhase phase)
@@ -824,12 +824,18 @@ class GlTF : DrawableByVulkan
         if(phase == DrawPhase.blended)
             return blended && !ownPass;
 
+        if(phase == DrawPhase.shadow)
+            return !blended && !transmissive && mesh.alphaMode == AlphaMode.opaque;
+
         return !blended && !ownPass;
     }
 
 
-    private GraphicsPipelineCfg selectPipeline(const MeshClass mesh)
+    private GraphicsPipelineCfg selectPipeline(const MeshClass mesh, DrawPhase phase)
     {
+        if(phase == DrawPhase.shadow)
+            return mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow;
+
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
 
         if(mesh.material.mode == MaterialMode.unlit || lightingMode == LightingMode.unlit)
