@@ -130,7 +130,8 @@ The end goal is a game exported by Godot, not only a source project.
 
 #### Phase 4: instances, skinned meshes and animation
 
-- [ ] `PackedScene` instances, property overrides and editable children.
+- [x] Nested text and binary `PackedScene` instances, including packs.
+- [ ] Instance property overrides and editable children.
 - [ ] `MultiMeshInstance3D` and `MultiMesh`.
 - [ ] `Skeleton3D`, `Skin`, `BoneAttachment3D` and bone weights in `ArrayMesh`;
       joint matrices on the CPU first, then the existing GPU skinning path.
@@ -170,6 +171,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       `GodotSource` and `--pack`.
 - [x] Generated `ctex.tscn` and `raw.tscn` covering embedded PNG and raw RGBA8
       `.ctex` textures.
+- [x] Generated `nested.tscn` and `nested_binary.tscn` instancing text and
+      binary PackedScenes, checked through a PCK as well.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external
       material and both override forms.
 - [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer

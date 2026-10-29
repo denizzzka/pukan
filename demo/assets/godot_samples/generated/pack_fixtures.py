@@ -6,7 +6,7 @@ import struct
 from pathlib import Path
 
 root = Path(__file__).resolve().parent
-names = ["procedural.tscn", "procedural_mesh.res", "checker.png"]
+names = ["procedural.tscn", "procedural_mesh.res", "checker.png", "nested.tscn"]
 entries = [(f"res://{name}", (root / name).read_bytes()) for name in names]
 
 directory = bytearray()

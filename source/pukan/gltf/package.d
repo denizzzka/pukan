@@ -149,7 +149,7 @@ class Node : BaseNode
     }
 }
 
-class GlTF : DrawableByVulkan
+class GlTF : DrawableByVulkan, Blended
 {
     LoadStats loadStats;
 

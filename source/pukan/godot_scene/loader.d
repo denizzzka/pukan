@@ -25,7 +25,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.image: loadImageToMemory, loadImageWithMips;
 import pukan.vulkan.pipelines: DescriptorAllocator;
 import pukan.vulkan.textures: Texture;
-import std.algorithm: endsWith;
+import std.algorithm: canFind, endsWith;
 import std.conv: to;
 import std.file: exists, getcwd;
 import std.path: buildNormalizedPath, buildPath, dirName, extension, isAbsolute, relativePath;
@@ -36,6 +36,8 @@ struct GodotLoadOptions
 {
     /// Overrides the directory found by walking up to `project.godot`
     string projectRoot;
+    /// Scene keys already being instantiated, to break cycles
+    string[] loadStack;
 }
 
 private final class GodotProject
@@ -94,7 +96,7 @@ private final class GodotLoader
     PbrMesh[] meshes;
     Texture[] textures;
     Texture[string] textureCache;
-    GlTF[] instances;
+    DrawableByVulkan[] instances;
     VkDescriptorImageInfo fakeTextureInfo;
 
     size_t skippedNodes;
@@ -369,14 +371,28 @@ private final class GodotLoader
                 if(instanceRef.kind == GodotRefKind.extResource)
                 {
                     auto external = findExternal(document, instanceRef.id);
-                    if(external !is null && external.type == "PackedScene" && isGltfPath(external.path))
+                    if(external !is null && external.type == "PackedScene")
                     {
                         const key = project.key(external.path);
-                        const physical = project.physical(key);
-                        if(physical.length)
+
+                        if(isGltfPath(external.path))
                         {
-                            node.instance = gltfFactory.create(physical);
-                            node.instance.setFlipWinding(false);
+                            const physical = project.physical(key);
+                            if(physical.length)
+                            {
+                                auto gltf = gltfFactory.create(physical);
+                                gltf.setFlipWinding(false);
+                                node.instance = gltf;
+                                instances ~= node.instance;
+                            }
+                            else
+                                ++skippedResources;
+                        }
+                        else if(isScenePath(external.path) && !options.loadStack.canFind(key))
+                        {
+                            GodotLoadOptions childOptions = options;
+                            childOptions.loadStack = options.loadStack ~ scenePath;
+                            node.instance = loadGodotScene(project.source, key, pbr, gltfFactory, childOptions);
                             instances ~= node.instance;
                         }
                         else
@@ -396,8 +412,12 @@ private final class GodotLoader
 
     private static bool isGltfPath(string path)
     {
-        import std.algorithm: endsWith;
         return path.endsWith(".glb") || path.endsWith(".gltf");
+    }
+
+    private static bool isScenePath(string path)
+    {
+        return path.endsWith(".tscn") || path.endsWith(".scn") || path.endsWith(".escn");
     }
 
     private static void setLightCommon(ref GodotLight light, in GodotVariant[string] properties)
@@ -509,7 +529,7 @@ private final class GodotLoader
 
     private static bool isResourcePath(string path)
     {
-        import std.algorithm: endsWith;
+        import std.algorithm: canFind, endsWith;
 
         const lower = path.toLower;
         return lower.endsWith(".tres") || lower.endsWith(".tscn") ||

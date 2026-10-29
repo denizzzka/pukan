@@ -55,7 +55,7 @@ class GodotNode
     bool hasLight;
     GodotCamera camera;
     bool hasCamera;
-    GlTF instance;
+    DrawableByVulkan instance;
 
     void addChild(GodotNode child)
     {
@@ -81,7 +81,7 @@ final class GodotScene : DrawableByVulkan, Blended
     GodotLight[] lights;
     GodotCamera camera;
     bool hasCamera;
-    private GlTF[] instances;
+    private DrawableByVulkan[] instances;
 
     package(pukan) this(
         ref PbrPipelines pipelines,
@@ -90,7 +90,7 @@ final class GodotScene : DrawableByVulkan, Blended
         PbrMesh[] meshes,
         BufferPieceOnGPU[] gpuBuffs,
         Texture[] textures,
-        GlTF[] instances,
+        DrawableByVulkan[] instances,
         string name,
     )
     {
@@ -115,8 +115,7 @@ final class GodotScene : DrawableByVulkan, Blended
                 destroy(texture);
 
         foreach(instance; instances)
-            if(instance)
-                destroy(instance);
+            destroyInstance(instance);
     }
 
     string possibleName() const => name;
@@ -126,8 +125,15 @@ final class GodotScene : DrawableByVulkan, Blended
     Boxf[] instanceBounds() const
     {
         Boxf[] result;
+
         foreach(instance; instances)
-            result ~= instance.calcAABB;
+        {
+            if(auto gltf = cast(GlTF) instance)
+                result ~= gltf.calcAABB;
+            else if(auto scene = cast(GodotScene) instance)
+                result ~= scene.calcAABB;
+        }
+
         return result;
     }
 
@@ -257,6 +263,14 @@ final class GodotScene : DrawableByVulkan, Blended
         }
 
         drawInstances(root, trans);
+    }
+
+    private static void destroyInstance(DrawableByVulkan instance)
+    {
+        if(auto gltf = cast(GlTF) instance)
+            destroy(gltf);
+        else if(auto scene = cast(GodotScene) instance)
+            destroy(scene);
     }
 
     private static bool matchesPhase(const PbrMesh mesh, DrawPhase phase)
