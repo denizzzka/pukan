@@ -8,6 +8,7 @@ import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
 import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, transmissionPass;
 import pukan.gltf.material: applyGltfMaterial;
+import pukan.mesh: mirrors;
 import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.misc: Boxf;
@@ -153,9 +154,6 @@ class GlTF : DrawableByVulkan, Blended
 {
     LoadStats loadStats;
 
-    /// Mirrors the model for the project's inverted view; turn off for nesting
-    bool flipWinding = true;
-
     private bool uploaded;
     private bool skinsBaked;
 
@@ -290,6 +288,27 @@ class GlTF : DrawableByVulkan, Blended
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device);
         });
+
+        applyWinding();
+    }
+
+    /// A mirrored place in the hierarchy flips the winding of its meshes
+    private void applyWinding()
+    {
+        void walk(Matrix4x4f trans, Node node)
+        {
+            trans *= node.trans.calcMatrix;
+
+            const mirrored = trans.mirrors;
+
+            foreach(mesh; node.meshes)
+                mesh.applyFrontFace(mirrored, true);
+
+            foreach(c; node.children)
+                walk(trans, cast(Node) c);
+        }
+
+        walk(Matrix4x4f.identity, cast(Node) rootSceneNode);
     }
 
     protected void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -350,16 +369,6 @@ class GlTF : DrawableByVulkan, Blended
     }
 
     bool isAnimated() const => animation.animations.length > 0;
-
-    /// Turns the model mirror off for an instance nested in another scene
-    void setFlipWinding(bool value)
-    {
-        flipWinding = value;
-
-        // The mirror and the project's flipped view cancel out, so the winding stays as authored
-        foreach(mesh; meshes)
-            mesh.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    }
 
     static if(runtimeMaterialOverride)
     {
@@ -853,11 +862,20 @@ class GlTF : DrawableByVulkan, Blended
         }
 
         //TODO: not need to call this recursive - just call it in row and use fromSkinRootNodeTranslations to get coords
-        void collectDraws(Matrix4x4f trans, Node node, ref MeshDraw[] draws)
+        void collectDraws(Matrix4x4f trans, Node node, ref MeshDraw[] draws, bool mirrored)
         {
             assert(node.trans !is null);
 
-            trans *= node.trans.calcMatrix;
+            const local = node.trans.calcMatrix;
+            trans *= local;
+
+            debug
+            {
+                mirrored = mirrored != local.mirrors;
+
+                foreach(mesh; node.meshes)
+                    assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
+            }
 
             foreach(mesh; node.meshes)
             {
@@ -866,15 +884,11 @@ class GlTF : DrawableByVulkan, Blended
             }
 
             foreach(c; node.children)
-                collectDraws(trans, cast(Node) c, draws);
+                collectDraws(trans, cast(Node) c, draws, mirrored);
         }
 
-        // A nested glTF uses its meshes' clockwise front face instead
-        if(flipWinding)
-            trans *= Vector3f(-1, -1, -1).scaleMatrix;
-
         MeshDraw[] draws;
-        collectDraws(trans, rootSceneNode, draws);
+        collectDraws(trans, rootSceneNode, draws, false);
 
         // Back to front only matters for the in-place blend path
         if(phase == DrawPhase.blended)

@@ -3,6 +3,7 @@ module pukan.godot_scene.scene;
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
+import pukan.mesh: mirrors;
 import pukan.misc: Boxf;
 import pukan.pbr.accessor: BufferPieceOnGPU;
 import pukan.pbr.mesh: PbrMesh;
@@ -299,12 +300,20 @@ final class GodotScene : DrawableByVulkan, Blended
             float depth;
         }
 
-        void collect(Matrix4x4f trans, GodotNode node, ref MeshDraw[] draws)
+        void collect(Matrix4x4f trans, GodotNode node, ref MeshDraw[] draws, bool mirrored)
         {
             if(!node.visible)
                 return;
 
             trans *= node.local;
+
+            debug
+            {
+                mirrored = mirrored != node.local.mirrors;
+
+                foreach(mesh; node.meshes)
+                    assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
+            }
 
             foreach(mesh; node.meshes)
             {
@@ -313,11 +322,11 @@ final class GodotScene : DrawableByVulkan, Blended
             }
 
             foreach(child; node.children)
-                collect(trans, child, draws);
+                collect(trans, child, draws, mirrored);
         }
 
         MeshDraw[] draws;
-        collect(trans, root, draws);
+        collect(trans, root, draws, false);
 
         if(phase == DrawPhase.blended)
             draws.sort!((a, b) => a.depth > b.depth);

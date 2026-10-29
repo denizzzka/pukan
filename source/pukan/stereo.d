@@ -48,6 +48,8 @@ StereoView[2] makeStereoViews(
             near,
             far,
         );
+        // Vulkan clip space points Y down, unlike the OpenGL setup above
+        ret[eyeIdx].proj.a22 = -ret[eyeIdx].proj.a22;
     }
 
     return ret;

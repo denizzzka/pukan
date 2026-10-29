@@ -175,30 +175,25 @@ The end goal is a game exported by Godot, not only a source project.
 
 #### Coordinate system
 
-Two conventions live side by side:
+Both apps project through `vulkanPerspectiveMatrix`, which flips the Y row that
+dlib's OpenGL projection leaves alone, so the image is upright and models keep
+their authored orientation. The glTF path no longer mirrors models, and
+`flipWinding`/`setFlipWinding` are gone, so a nested instance needs no special
+case.
 
-- `demo_godot` flips the projection's Y row for Vulkan clip space and draws
-  Godot faces clockwise. A nested glTF instance inherits the scene transform
-  and calls `setFlipWinding(false)`, so it is not mirrored a second time.
-- The standalone `demo` keeps dlib's OpenGL projection and lets the glTF path
-  mirror every model with `(-1,-1,-1)`, which undoes the inverted view and also
-  turns models toward the camera. `setFlipWinding` then flips the front face.
+Winding follows the data instead of a flag. Godot's glTF importer stores
+clockwise triangles while a raw glTF file keeps counter-clockwise ones, and
+Vulkan's Y-down clip space adds one more flip, so `Mesh.applyFrontFace` takes
+both the source winding and whether the transform chain mirrors. The draw paths
+assert that a mesh is never shared between two different handedness values.
 
-The same asset is therefore drawn mirrored or not depending on which app loads
-it, and `flipWinding`, the projection flip and the front face are three knobs
-for one decision. A Y flip is a mirror, not a rotation, so a model transform
-can never compensate the projection without reflecting the model itself.
-
-- [ ] Add one projection helper that returns Vulkan clip space and use it in
-      `demo`, `demo_godot` and the shadow pass, instead of patching `a22` in the
-      app and leaving the shadow projection on the OpenGL convention.
-- [ ] Replace the glTF model mirror with a rotation about Y, or drop it and let
-      the demo show models from behind; then delete `flipWinding` and
-      `setFlipWinding` so nesting needs no special case.
-- [ ] Give `demo` and `demo_godot` the same camera defaults, so one screenshot
-      can be compared between the two.
-- [ ] Verify `demo` scenes, `orientation.tscn`, `lights_and_shadows` and the
-      exported enemy before and after the change.
+- [x] One projection helper for `demo`, `demo_godot` and the shadow pass.
+- [x] Drop the glTF model mirror together with `flipWinding`, and derive the
+      front face from the transform chain.
+- [x] Put both camera defaults in the same Y-up world; window size and far plane
+      still differ.
+- [x] Verify `demo`, `orientation.tscn`, `lights_and_shadows`, `enemy_twins` and
+      the exported enemy, from both camera sides.
 
 #### GridMap
 

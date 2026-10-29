@@ -18,6 +18,7 @@ import pukan.godot_scene.value;
 import pukan.gltf: GlTF;
 import pukan.gltf.factory: GltfFactory;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
+import pukan.mesh: mirrors;
 import pukan.misc: linearFormat, loadImageFromMemory;
 import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.pbr.factory: PbrFactory;
@@ -272,6 +273,10 @@ private final class GodotLoader
             return;
 
         const world = parent * node.local;
+        const mirrored = world.mirrors;
+
+        foreach(mesh; node.meshes)
+            mesh.applyFrontFace(mirrored, false);
 
         if(node.hasLight)
         {
@@ -561,7 +566,6 @@ private final class GodotLoader
                             if(physical.length)
                             {
                                 auto gltf = gltfFactory.create(physical);
-                                gltf.setFlipWinding(false);
                                 node.instance = gltf;
                                 instances ~= node.instance;
                             }
@@ -936,8 +940,6 @@ private final class GodotLoader
             jointInfo,
         );
 
-        // The project renders through a flipped projection, so faces wind clockwise
-        mesh.frontFace = VK_FRONT_FACE_CLOCKWISE;
         applyMaterial(mesh, surface, material);
 
         return mesh;

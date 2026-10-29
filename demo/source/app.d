@@ -868,7 +868,7 @@ private float clampPan(float value) nothrow @nogc
 
 private Vector3f cameraEye() nothrow @nogc
 {
-    return Vector3f(0, -0.2f, -cameraDistance) + cameraPan;
+    return Vector3f(0, 0.2f, -cameraDistance) + cameraPan;
 }
 
 private Vector3f cameraTarget() nothrow @nogc
@@ -885,9 +885,9 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     wtb.view = lookAtMatrix(
         cameraEye(),
         cameraTarget(),
-        Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
+        Vector3f(0, 1, 0),
     );
-    wtb.proj = perspectiveMatrix(
+    wtb.proj = vulkanPerspectiveMatrix(
         cameraFovY,
         cast(float) imageExtent.width / imageExtent.height,
         cameraNear, cameraFar,

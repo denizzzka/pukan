@@ -1,6 +1,6 @@
 module pukan.scene;
 
-import dlib.math: lookAtMatrix, perspectiveMatrix, translation, Vector3f, Vector4f;
+import dlib.math: lookAtMatrix, perspectiveMatrix, translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.pbr.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
@@ -12,6 +12,15 @@ import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+
+/// Perspective projection for Vulkan, whose clip space has Y pointing down,
+/// unlike the OpenGL convention that dlib builds
+Matrix4x4f vulkanPerspectiveMatrix(float fovY, float aspectRatio, float nearPlane, float farPlane)
+{
+    auto result = perspectiveMatrix(fovY, aspectRatio, nearPlane, farPlane);
+    result.a22 = -result.a22;
+    return result;
+}
 
 class Scene
 {
@@ -607,7 +616,7 @@ class Scene
 
             const shadowEye = sun * shadowDistance;
             const shadowView = lookAtMatrix(shadowEye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-            const shadowProj = perspectiveMatrix(shadowFov, 1.0f, 1.0f, shadowDistance * 2.0f);
+            const shadowProj = vulkanPerspectiveMatrix(shadowFov, 1.0f, 1.0f, shadowDistance * 2.0f);
             shadowViewProj = shadowProj * shadowView;
             data.shadowViewProj = shadowViewProj;
         }

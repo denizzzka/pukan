@@ -1,4 +1,4 @@
-import dlib.math: Matrix4x4f, Vector3f, lookAtMatrix, perspectiveMatrix;
+import dlib.math: Matrix4x4f, Vector3f, lookAtMatrix;
 import pukan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
@@ -269,14 +269,12 @@ void main(string[] args)
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
         wtb.view = lookAtMatrix(eye, target, up);
-        wtb.proj = perspectiveMatrix(
+        wtb.proj = vulkanPerspectiveMatrix(
             fov,
             cast(float) scene.swapChain.imageExtent.width / scene.swapChain.imageExtent.height,
             nearPlane,
             farPlane,
         );
-        // Vulkan clip space points Y down while dlib's projection assumes OpenGL
-        wtb.proj.a22 = -wtb.proj.a22;
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
             {
