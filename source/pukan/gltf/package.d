@@ -153,6 +153,9 @@ class GlTF : DrawableByVulkan
 {
     LoadStats loadStats;
 
+    /// Mirrors the model for the project's inverted view; turn off for nesting
+    bool flipWinding = true;
+
     private bool uploaded;
     private bool skinsBaked;
 
@@ -357,6 +360,15 @@ class GlTF : DrawableByVulkan
     }
 
     bool isAnimated() const => animation.animations.length > 0;
+
+    /// Sets the front face that matches the native winding without mirroring
+    void setFlipWinding(bool value)
+    {
+        flipWinding = value;
+
+        foreach(mesh; meshes)
+            mesh.frontFace = value ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
+    }
 
     static if(runtimeMaterialOverride)
     {

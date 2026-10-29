@@ -199,7 +199,7 @@ void main(string[] args)
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
 
-    Vector3f eye = Vector3f(0, 2.5f, -3.0f);
+    Vector3f eye = Vector3f(0, 3.0f, -8.0f);
     Vector3f target = Vector3f(0, 1.5f, 0);
     Vector3f up = Vector3f(0, 1, 0);
     float fov = cameraFov;

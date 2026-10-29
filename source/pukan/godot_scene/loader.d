@@ -356,6 +356,7 @@ private final class GodotLoader
                     if(external !is null && external.type == "PackedScene" && isGltfPath(external.path))
                     {
                         node.instance = gltfFactory.create(project.absolute(external.path));
+                        node.instance.setFlipWinding(false);
                         instances ~= node.instance;
                     }
                     else
