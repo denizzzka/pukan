@@ -91,6 +91,7 @@ void main(string[] args)
     uint screenshotFrame;
     string eyeOption;
     string targetOption;
+    bool noShadows;
     float fovOption = cameraFov;
     float farOption = cameraFar;
 
@@ -104,6 +105,7 @@ void main(string[] args)
         "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
         "eye", "override the camera position, x,y,z", &eyeOption,
         "target", "override the camera target, x,y,z", &targetOption,
+        "no-shadows", "do not cast shadows", &noShadows,
         "fov", "vertical field of view in degrees", &fovOption,
         "far", "far clipping distance", &farOption,
     );
@@ -204,7 +206,7 @@ void main(string[] args)
     scope scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat);
     scope(exit) destroy(scene);
 
-    scene.shadowsEnabled = false;
+    scene.shadowsEnabled = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
         scenePath = "demo/assets/godot_samples/generated/procedural.tscn";
