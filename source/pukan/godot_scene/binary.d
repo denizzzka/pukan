@@ -68,19 +68,21 @@ private enum flagInstanceIsPlaceholder = 1 << 30;
 private enum variantIndexMask = (1 << 24) - 1;
 
 /// Reads a Godot text or binary resource, choosing by the file magic
+GodotTextDocument parseGodotResourceData(const(ubyte)[] data, string label)
+{
+    if(data.length >= 4 && data[0] == 'R' && data[1] == 'S' && data[2] == 'R' && data[3] == 'C')
+        return parseGodotBinary(data, label);
+
+    if(data.length >= 4 && data[0] == 'R' && data[1] == 'S' && data[2] == 'C' && data[3] == 'C')
+        throw new PukanException(label ~ ": compressed resources are not supported yet");
+
+    return parseGodotText(cast(string) data);
+}
+
 GodotTextDocument parseGodotResourceFile(string path)
 {
     import std.file: read;
-
-    const data = cast(ubyte[]) read(path);
-
-    if(data.length >= 4 && data[0] == 'R' && data[1] == 'S' && data[2] == 'R' && data[3] == 'C')
-        return parseGodotBinary(data, path);
-
-    if(data.length >= 4 && data[0] == 'R' && data[1] == 'S' && data[2] == 'C' && data[3] == 'C')
-        throw new PukanException(path ~ ": compressed resources are not supported yet");
-
-    return parseGodotText(cast(string) data);
+    return parseGodotResourceData(cast(ubyte[]) read(path), path);
 }
 
 GodotTextDocument parseGodotBinary(const(ubyte)[] data, string path)

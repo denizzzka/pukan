@@ -51,3 +51,11 @@ godot --headless --path generated --script res://generate.gd
 
 `checker.png` is copied from the lights demo; remove `generated/.godot` after a
 run, it is a local import cache.
+
+`fixtures.pck` is an unencrypted Godot 4 PCK v2 created by
+`generated/pack_fixtures.py`. It contains `res://procedural.tscn`,
+`res://procedural_mesh.res` and `res://checker.png`. Load it with:
+
+```sh
+./demo_godot/pukan_demo_godot --pack demo/assets/godot_samples/generated/fixtures.pck --scene res://procedural.tscn --frames 2
+```

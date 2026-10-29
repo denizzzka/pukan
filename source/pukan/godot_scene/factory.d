@@ -1,6 +1,7 @@
 module pukan.godot_scene.factory;
 
 import pukan.godot_scene.loader: GodotLoadOptions, loadGodotScene;
+import pukan.godot_scene.source: PckSource;
 import pukan.godot_scene.scene: GodotScene;
 import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.skin_matrices: SkinMatrices;
@@ -42,5 +43,12 @@ class GodotFactory
     {
         assert(pbr.device);
         return loadGodotScene(filename, pbr, gltfFactory, loadOptions);
+    }
+
+    /// Loads a `res://` scene from an unencrypted PCK pack
+    GodotScene createPacked(string packPath, string scenePath)
+    {
+        assert(pbr.device);
+        return loadGodotScene(new PckSource(packPath), scenePath, pbr, gltfFactory, loadOptions);
     }
 }

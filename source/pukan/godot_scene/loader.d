@@ -3,8 +3,10 @@ module pukan.godot_scene.loader;
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f, degtorad;
 import material_bindings;
 import pukan.exceptions: PukanException;
-import pukan.godot_scene.binary: parseGodotResourceFile;
+import pukan.godot_scene.binary: parseGodotResourceData;
 import pukan.godot_scene.material: GodotMaterialData, readGodotMaterial;
+import pukan.godot_scene.paths: normalizeResourcePath;
+import pukan.godot_scene.source: DirectorySource, GodotSource;
 import pukan.godot_scene.mesh: GodotArraySurface, GodotPrimitive, decodeArrayMesh;
 import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
 import pukan.godot_scene.scene: GodotCamera, GodotLight, GodotLightKind, GodotNode, GodotScene;
@@ -13,7 +15,7 @@ import pukan.godot_scene.value;
 import pukan.gltf: GlTF;
 import pukan.gltf.factory: GltfFactory;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
-import pukan.misc: loadImageFromFile;
+import pukan.misc: loadImageFromMemory;
 import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.pbr.factory: PbrFactory;
 import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrMesh, Vector4us;
@@ -24,8 +26,8 @@ import pukan.vulkan.pipelines: DescriptorAllocator;
 import pukan.vulkan.textures: Texture;
 import std.conv: to;
 import std.file: exists, getcwd;
-import std.path: buildNormalizedPath, buildPath, dirName, extension, isAbsolute;
-import std.string: startsWith, toLower;
+import std.path: buildNormalizedPath, buildPath, dirName, extension, isAbsolute, relativePath;
+import std.string: replace, startsWith, toLower;
 
 /// Options for loading one Godot scene
 struct GodotLoadOptions
@@ -36,32 +38,37 @@ struct GodotLoadOptions
 
 private final class GodotProject
 {
+    GodotSource source;
     string root;
     GodotTextDocument[string] documents;
 
-    this(string root)
+    this(GodotSource source, string root)
     {
+        this.source = source;
         this.root = root;
     }
 
-    string absolute(string path) const
+    string key(string path) const
     {
-        if(path.startsWith("res://"))
-            return buildPath(root, path[6 .. $]);
-
-        if(isAbsolute(path))
-            return buildNormalizedPath(path);
-
-        return buildPath(root, path);
+        return "res://" ~ normalizeResourcePath(path);
     }
 
-    GodotTextDocument document(string path)
+    /// Filesystem path for loaders that take a filename, null for packs
+    string physical(string key) const
     {
-        if(auto cached = path in documents)
+        if(auto directory = cast(DirectorySource) source)
+            return directory.physical(key);
+
+        return null;
+    }
+
+    GodotTextDocument document(string key)
+    {
+        if(auto cached = key in documents)
             return *cached;
 
-        auto document = parseGodotResourceFile(path);
-        documents[path] = document;
+        auto document = parseGodotResourceData(source.read(key), key);
+        documents[key] = document;
         return document;
     }
 }
@@ -123,13 +130,19 @@ private final class GodotLoader
 
     GodotScene run(string filename)
     {
-        scenePath = absolutePath(filename);
-
+        const physicalPath = absolutePath(filename);
         const rootDir = options.projectRoot.length
             ? buildNormalizedPath(options.projectRoot)
-            : findProjectRoot(scenePath);
+            : findProjectRoot(physicalPath);
+        const sceneKey = "res://" ~ relativePath(physicalPath, rootDir).replace("\\", "/");
 
-        project = new GodotProject(rootDir);
+        return run(new DirectorySource(rootDir), sceneKey, rootDir);
+    }
+
+    GodotScene run(GodotSource source, string sceneKey, string rootDir)
+    {
+        scenePath = sceneKey;
+        project = new GodotProject(source, rootDir);
 
         commandPool = device.createCommandPool();
         auto buffers = commandPool.allocateBuffers(1);
@@ -356,9 +369,16 @@ private final class GodotLoader
                     auto external = findExternal(document, instanceRef.id);
                     if(external !is null && external.type == "PackedScene" && isGltfPath(external.path))
                     {
-                        node.instance = gltfFactory.create(project.absolute(external.path));
-                        node.instance.setFlipWinding(false);
-                        instances ~= node.instance;
+                        const key = project.key(external.path);
+                        const physical = project.physical(key);
+                        if(physical.length)
+                        {
+                            node.instance = gltfFactory.create(physical);
+                            node.instance.setFlipWinding(false);
+                            instances ~= node.instance;
+                        }
+                        else
+                            ++skippedResources;
                     }
                     else
                         ++skippedResources;
@@ -420,7 +440,7 @@ private final class GodotLoader
             auto external = findExternal(document, meshRef.id);
             if(external !is null && isResourcePath(external.path))
             {
-                documentPath = project.absolute(external.path);
+                documentPath = project.key(external.path);
                 auto externalDocument = project.document(documentPath);
                 resource.type = externalDocument.resourceType;
                 resource.properties = externalDocument.resourceProperties;
@@ -581,14 +601,14 @@ private final class GodotLoader
                 return defaultMaterial(hasColors, documentPath);
             }
 
-            documentPath = project.absolute(external.path);
+            documentPath = project.key(external.path);
             auto document = project.document(documentPath);
             type = document.resourceType;
             properties = document.resourceProperties;
         }
         else if(reference.kind == GodotRefKind.resource)
         {
-            documentPath = project.absolute(reference.id);
+            documentPath = project.key(reference.id);
             auto document = project.document(documentPath);
             type = document.resourceType;
             properties = document.resourceProperties;
@@ -741,7 +761,7 @@ private final class GodotLoader
             return null;
         }
 
-        const path = project.absolute(external.path);
+        const path = project.key(external.path);
 
         if(auto cached = path in textureCache)
             return *cached;
@@ -753,7 +773,7 @@ private final class GodotLoader
         }
 
         VkFormat format;
-        auto image = loadImageFromFile(path, format);
+        auto image = loadImageFromMemory(project.source.read(path), format);
         auto memory = loadImageToMemory(device, commandPool, commandBuffer, image, format);
         auto texture = device.create!Texture(memory, samplerInfo);
 
@@ -817,4 +837,16 @@ GodotScene loadGodotScene(
 {
     auto loader = new GodotLoader(pbr.device, pbr, gltfFactory, options);
     return loader.run(filename);
+}
+
+GodotScene loadGodotScene(
+    GodotSource source,
+    string scenePath,
+    PbrFactory pbr,
+    GltfFactory gltfFactory,
+    GodotLoadOptions options = GodotLoadOptions.init,
+)
+{
+    auto loader = new GodotLoader(pbr.device, pbr, gltfFactory, options);
+    return loader.run(source, scenePath, null);
 }

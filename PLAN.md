@@ -95,6 +95,7 @@ or the pack.
 - [x] New `demo_godot` subpackage: a minimal window, camera and scene loader,
       separate from the glTF arena in `demo`.
 - [x] A `--scene` path option that loads one fixture at startup.
+- [x] `--pack` to load a `res://` scene from a PCK.
 
 #### Phase 2: lights, cameras and environment
 
@@ -116,7 +117,9 @@ The end goal is a game exported by Godot, not only a source project.
 - [x] `PackedScene._bundled` decoder for binary `.scn`.
 - [ ] `PackedScene` base scenes and child index ordering.
 - [ ] `.import` remap, exported `.remap` chains and `project.binary`.
-- [ ] `.pck` v2 reader with a VFS layer shared by directory and pack sources.
+- [x] `.pck` v2-v4 reader, unencrypted, with a `GodotSource` abstraction shared
+      by directory and pack sources.
+- [ ] Stream or memory-map pack files instead of loading the whole archive.
 - [ ] `.ctex` textures: header, mip chain and format mapping; upload directly
       when the device supports the format, with a documented fallback.
 - [x] Binary `.res` materials and meshes.
@@ -161,6 +164,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       `ArrayMesh` surfaces, built by Godot 4.7 headless.
 - [x] Generated `binary.tscn` referencing the binary `.res` mesh, and a binary
       `.scn` scene loaded through `demo_godot`.
+- [x] Generated `fixtures.pck` with a text scene and texture, loaded through
+      `GodotSource` and `--pack`.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external
       material and both override forms.
 - [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer
