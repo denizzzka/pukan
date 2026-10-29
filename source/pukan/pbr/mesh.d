@@ -278,7 +278,7 @@ final class PbrGeometry
     {
         import std.math: isClose;
 
-        enum tolerance = 1e-5f;
+        enum tolerance = 1e-4f;
 
         return
             isClose(a.min.x, b.min.x, tolerance, tolerance) &&

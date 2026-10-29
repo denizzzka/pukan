@@ -41,6 +41,9 @@ struct GodotLoadOptions
     string projectRoot;
     /// Scene keys already being instantiated, to break cycles
     string[] loadStack;
+    /// Properties the parent scene overrides on this scene's root
+    GodotVariant[string] rootOverrides;
+    bool hasRootOverrides;
 }
 
 private final class GodotProject
@@ -119,6 +122,106 @@ private enum raAsRgMapping = VkComponentMapping(
     b: VK_COMPONENT_SWIZZLE_ZERO,
     a: VK_COMPONENT_SWIZZLE_ONE,
 );
+
+/// One occupied cell of a GridMap, decoded from its packed data array
+struct GridMapCell
+{
+    short x, y, z;
+    uint item;
+    uint rotation;
+}
+
+/// The packed array holds the key low half, the key high half and the cell
+GridMapCell[] decodeGridMapCells(const(int)[] packed)
+{
+    if(packed.length % 3 != 0)
+        throw new PukanException("GridMap data is not a list of cell triples");
+
+    GridMapCell[] result;
+    result.reserve(packed.length / 3);
+
+    foreach(i; 0 .. packed.length / 3)
+    {
+        const low = cast(uint) packed[i * 3];
+        const high = cast(uint) packed[i * 3 + 1];
+        const cell = cast(uint) packed[i * 3 + 2];
+
+        result ~= GridMapCell(
+            cast(short) (low & 0xFFFF),
+            cast(short) ((low >> 16) & 0xFFFF),
+            cast(short) (high & 0xFFFF),
+            cell & 0xFFFF,
+            (cell >> 16) & 0x1F,
+        );
+    }
+
+    return result;
+}
+
+unittest
+{
+    const cells = decodeGridMapCells([
+        3, 0, cast(int) (8 | (16 << 16)),
+        cast(int) 0x0000FFFE, 7, cast(int) 15,
+    ]);
+
+    assert(cells.length == 2);
+    assert(cells[0].x == 3 && cells[0].y == 0 && cells[0].z == 0);
+    assert(cells[0].item == 8 && cells[0].rotation == 16);
+    assert(cells[1].x == -2 && cells[1].y == 0 && cells[1].z == 7);
+    assert(cells[1].item == 15 && cells[1].rotation == 0);
+}
+
+/// Godot's 24 orthogonal cell orientations, each written as basis rows
+Matrix4x4f gridMapRotation(uint rotation)
+{
+    static immutable int[9][24] bases = [
+        [ 1,  0,  0,  0,  1,  0,  0,  0,  1],
+        [ 0, -1,  0,  1,  0,  0,  0,  0,  1],
+        [-1,  0,  0,  0, -1,  0,  0,  0,  1],
+        [ 0,  1,  0, -1,  0,  0,  0,  0,  1],
+        [ 1,  0,  0,  0,  0, -1,  0,  1,  0],
+        [ 0,  0,  1,  1,  0,  0,  0,  1,  0],
+        [-1,  0,  0,  0,  0,  1,  0,  1,  0],
+        [ 0,  0, -1, -1,  0,  0,  0,  1,  0],
+        [ 1,  0,  0,  0, -1,  0,  0,  0, -1],
+        [ 0,  1,  0,  1,  0,  0,  0,  0, -1],
+        [-1,  0,  0,  0,  1,  0,  0,  0, -1],
+        [ 0, -1,  0, -1,  0,  0,  0,  0, -1],
+        [ 1,  0,  0,  0,  0,  1,  0, -1,  0],
+        [ 0,  0, -1,  1,  0,  0,  0, -1,  0],
+        [-1,  0,  0,  0,  0, -1,  0, -1,  0],
+        [ 0,  0,  1, -1,  0,  0,  0, -1,  0],
+        [ 0,  0,  1,  0,  1,  0, -1,  0,  0],
+        [ 0, -1,  0,  0,  0,  1, -1,  0,  0],
+        [ 0,  0, -1,  0, -1,  0, -1,  0,  0],
+        [ 0,  1,  0,  0,  0, -1, -1,  0,  0],
+        [ 0,  0,  1,  0, -1,  0,  1,  0,  0],
+        [ 0,  1,  0,  0,  0,  1,  1,  0,  0],
+        [ 0,  0, -1,  0,  1,  0,  1,  0,  0],
+        [ 0, -1,  0,  0,  0, -1,  1,  0,  0],
+    ];
+
+    Matrix4x4f result = Matrix4x4f.identity;
+
+    if(rotation >= bases.length)
+        return result;
+
+    const b = bases[rotation];
+    result.a11 = b[0]; result.a12 = b[1]; result.a13 = b[2];
+    result.a21 = b[3]; result.a22 = b[4]; result.a23 = b[5];
+    result.a31 = b[6]; result.a32 = b[7]; result.a33 = b[8];
+    return result;
+}
+
+unittest
+{
+    const identity = gridMapRotation(0);
+    assert(identity.a11 == 1 && identity.a22 == 1 && identity.a33 == 1);
+
+    const turned = gridMapRotation(16);
+    assert(turned.a13 == 1 && turned.a31 == -1 && turned.a22 == 1);
+}
 
 private final class GodotLoader
 {
@@ -504,40 +607,49 @@ private final class GodotLoader
         node.type = section.type;
         node.local = Matrix4x4f.identity();
 
-        if(auto value = "transform" in section.properties)
+        auto properties = section.properties.dup;
+
+        // A scene placed as an instance may override properties on its root;
+        // the transform already travels with the instance node
+        if(options.hasRootOverrides && parent is null)
+            foreach(name, value; options.rootOverrides)
+                if(name != "transform")
+                    properties[name] = value;
+
+        if(auto value = "transform" in properties)
             node.local = as!(GodotTransform3D)(*value).toMatrix;
 
-        if(auto value = "visible" in section.properties)
+        if(auto value = "visible" in properties)
             node.visible = asBool(*value, "visible");
 
         switch(section.type)
         {
             case "DirectionalLight3D":
                 node.light.kind = GodotLightKind.directional;
-                setLightCommon(node.light, section.properties);
+                setLightCommon(node.light, properties);
                 node.hasLight = true;
                 break;
 
             case "OmniLight3D":
                 node.light.kind = GodotLightKind.point;
-                setLightCommon(node.light, section.properties);
-                node.light.range = cast(float) propertyDouble(section.properties, "omni_range", 5.0);
+                setLightCommon(node.light, properties);
+                node.light.range = cast(float) propertyDouble(properties, "omni_range", 5.0);
                 node.hasLight = true;
                 break;
 
             case "SpotLight3D":
                 node.light.kind = GodotLightKind.spot;
-                setLightCommon(node.light, section.properties);
-                node.light.range = cast(float) propertyDouble(section.properties, "spot_range", 5.0);
-                node.light.outerAngle = cast(float) degtorad(propertyDouble(section.properties, "spot_angle", 45.0));
+                setLightCommon(node.light, properties);
+                node.light.range = cast(float) propertyDouble(properties, "spot_range", 5.0);
+                node.light.outerAngle = cast(float) degtorad(propertyDouble(properties, "spot_angle", 45.0));
                 node.light.innerAngle = node.light.outerAngle * 0.5f;
                 node.hasLight = true;
                 break;
 
             case "Camera3D":
-                node.camera.fov = cast(float) propertyDouble(section.properties, "fov", 75.0);
-                node.camera.nearPlane = cast(float) propertyDouble(section.properties, "near", 0.05);
-                node.camera.farPlane = cast(float) propertyDouble(section.properties, "far", 1000.0);
+                node.camera.fov = cast(float) propertyDouble(properties, "fov", 75.0);
+                node.camera.nearPlane = cast(float) propertyDouble(properties, "near", 0.05);
+                node.camera.farPlane = cast(float) propertyDouble(properties, "far", 1000.0);
                 node.hasCamera = true;
                 break;
 
@@ -573,6 +685,8 @@ private final class GodotLoader
                         {
                             GodotLoadOptions childOptions = options;
                             childOptions.loadStack = options.loadStack ~ scenePath;
+                            childOptions.rootOverrides = section.properties;
+                            childOptions.hasRootOverrides = true;
                             node.instance = loadGodotScene(project.source, key, pbr, gltfFactory, childOptions);
                             instances ~= node.instance;
 
@@ -590,12 +704,18 @@ private final class GodotLoader
 
         if(section.type == "Skeleton3D")
         {
-            node.skeleton = parseSkeleton(section.properties);
+            node.skeleton = parseSkeleton(properties);
             node.hasSkeleton = true;
         }
 
         if(section.type == "MeshInstance3D")
-            createMeshInstance(document, section, node, parent);
+            createMeshInstance(document, section.name, properties, node, parent);
+
+        if(section.type == "GridMap" && !createGridMap(document, section.name, properties, node))
+        {
+            ++skippedNodes;
+            ++skippedNodeTypes["GridMap"];
+        }
 
         if(isUnsupportedVisualNode(section.type))
         {
@@ -603,7 +723,7 @@ private final class GodotLoader
             ++skippedNodeTypes[section.type];
 
             bool[string] visited;
-            foreach(_, ref value; section.properties)
+            foreach(_, ref value; properties)
                 countSkippedResource(document, value, visited);
         }
 
@@ -634,7 +754,6 @@ private final class GodotLoader
             case "VoxelGI":
             case "FogVolume":
             case "Decal":
-            case "GridMap":
             case "MultiMeshInstance3D":
             case "GPUParticles3D":
             case "CPUParticles3D":
@@ -710,14 +829,162 @@ private final class GodotLoader
         light.energy = cast(float) propertyDouble(properties, "light_energy", 1.0);
     }
 
+    /// Adds one child node per occupied cell, sharing a mesh per library item
+    private bool createGridMap(
+        ref GodotTextDocument document,
+        string nodeName,
+        GodotVariant[string] properties,
+        GodotNode node,
+    )
+    {
+        auto libraryValue = "mesh_library" in properties;
+        if(libraryValue is null || isNil(*libraryValue) || (*libraryValue).type !is typeid(GodotObjectRef))
+            return false;
+
+        const reference = asObjectRef(*libraryValue, "mesh_library");
+
+        GodotVariant[string] libraryProperties;
+        GodotTextDocument libraryDocument;
+        bool libraryInScene;
+
+        if(reference.kind == GodotRefKind.subResource)
+        {
+            auto resource = findSubResource(document, reference.id);
+            if(resource is null || resource.type != "MeshLibrary")
+                return false;
+
+            libraryProperties = resource.properties;
+            libraryInScene = true;
+        }
+        else if(reference.kind == GodotRefKind.extResource)
+        {
+            auto external = findExternal(document, reference.id);
+            if(external is null || !isResourcePath(external.path))
+                return false;
+
+            libraryDocument = project.document(project.key(external.path));
+
+            if(libraryDocument.resourceType != "MeshLibrary")
+                return false;
+
+            libraryProperties = libraryDocument.resourceProperties;
+        }
+        else
+            return false;
+
+        GodotVariant[long] itemMeshes;
+        Matrix4x4f[long] itemTransforms;
+
+        foreach(key, ref value; libraryProperties)
+        {
+            if(!key.startsWith("item/"))
+                continue;
+
+            const parts = key.split("/");
+            if(parts.length != 3)
+                continue;
+
+            const id = parts[1].to!long;
+
+            switch(parts[2])
+            {
+                case "mesh":
+                    if(value.type is typeid(GodotObjectRef))
+                        itemMeshes[id] = value;
+                    break;
+
+                case "mesh_transform":
+                    itemTransforms[id] = as!(GodotTransform3D)(value, key).toMatrix;
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        auto dataValue = "data" in properties;
+        if(dataValue is null)
+            return false;
+
+        auto data = asDictionary(*dataValue, "data");
+        auto cellsValue = data.get("cells");
+        if(cellsValue is null || cellsValue.type !is typeid(int[]))
+            return false;
+
+        GridMapCell[] cells;
+        try
+            cells = decodeGridMapCells(cellsValue.get!(int[])());
+        catch(PukanException)
+            return false;
+
+        Vector3f cellSize = Vector3f(2, 2, 2);
+        if(auto value = "cell_size" in properties)
+            cellSize = as!(Vector3f)(*value, "cell_size");
+
+        const halfCell = Vector3f(
+            propertyBool(properties, "cell_center_x", true) ? cellSize.x * 0.5f : 0.0f,
+            propertyBool(properties, "cell_center_y", true) ? cellSize.y * 0.5f : 0.0f,
+            propertyBool(properties, "cell_center_z", true) ? cellSize.z * 0.5f : 0.0f,
+        );
+
+        GodotNode[long] templates;
+
+        bool added;
+        foreach(cell; cells)
+        {
+            auto meshValue = cell.item in itemMeshes;
+            if(meshValue is null)
+                continue;
+
+            auto templateNode = cell.item in templates;
+            if(templateNode is null)
+            {
+                auto created = new GodotNode;
+                created.name = nodeName ~ " item " ~ cell.item.to!string;
+
+                GodotVariant[string] meshProperties;
+                meshProperties["mesh"] = *meshValue;
+
+                if(libraryInScene)
+                    createMeshInstance(document, created.name, meshProperties, created, null);
+                else
+                    createMeshInstance(libraryDocument, created.name, meshProperties, created, null);
+
+                templates[cell.item] = created;
+                templateNode = cell.item in templates;
+            }
+
+            if((*templateNode).meshes.length == 0)
+                continue;
+
+            auto cellNode = new GodotNode;
+            cellNode.name = "Cell";
+            cellNode.local = translationMatrix(Vector3f(
+                cell.x * cellSize.x,
+                cell.y * cellSize.y,
+                cell.z * cellSize.z,
+            ) + halfCell) * gridMapRotation(cell.rotation);
+
+            if(auto itemTransform = cell.item in itemTransforms)
+                cellNode.local *= *itemTransform;
+
+            cellNode.meshes = (*templateNode).meshes;
+            node.addChild(cellNode);
+            added = true;
+        }
+
+        return added;
+    }
+
     private void createMeshInstance(
         ref GodotTextDocument document,
-        ref GodotTextNode section,
+        string nodeName,
+        GodotVariant[string] properties,
         GodotNode node,
         GodotNode parent,
     )
     {
-        auto meshValue = "mesh" in section.properties;
+        auto meshValue = "mesh" in properties;
         if(meshValue is null || isNil(*meshValue))
             return;
 
@@ -765,7 +1032,7 @@ private final class GodotLoader
         if(parent !is null && parent.hasSkeleton)
             skeleton = &parent.skeleton;
 
-        if(auto value = "skeleton" in section.properties)
+        if(auto value = "skeleton" in properties)
         {
             const path = as!(GodotNodePath)(*value, "skeleton").value;
 
@@ -780,7 +1047,7 @@ private final class GodotLoader
 
         if(skeleton !is null)
         {
-            if(auto value = "skin" in section.properties)
+            if(auto value = "skin" in properties)
             {
                 skin = resolveSkin(document, asObjectRef(*value, "skin"), *skeleton);
 
@@ -792,10 +1059,10 @@ private final class GodotLoader
             }
         }
 
-        const castShadowMode = cast(int) propertyLong(section.properties, "cast_shadow", 1);
+        const castShadowMode = cast(int) propertyLong(properties, "cast_shadow", 1);
         const meshKey = documentPath ~ "#" ~ meshRef.id;
         GodotVariant materialOverride;
-        if(auto value = "material_override" in section.properties)
+        if(auto value = "material_override" in properties)
             materialOverride = *value;
 
         if(resource.type == "ArrayMesh")
@@ -812,11 +1079,11 @@ private final class GodotLoader
 
                 GodotVariant surfaceOverride;
                 const key = "surface_material_override/" ~ i.to!string;
-                if(auto value = key in section.properties)
+                if(auto value = key in properties)
                     surfaceOverride = *value;
 
                 addSurfaceMesh(
-                    document, documentPath, surface, section.name, node,
+                    document, documentPath, surface, nodeName, node,
                     materialOverride, surfaceOverride, castShadowMode,
                     meshKey ~ "/" ~ i.to!string ~ (hasSkin ? ":skin" : ""),
                     hasSkin ? skin.info : pbr.resources.identityJointsInfo,
@@ -835,11 +1102,11 @@ private final class GodotLoader
             }
 
             GodotVariant surfaceOverride;
-            if(auto value = "surface_material_override/0" in section.properties)
+            if(auto value = "surface_material_override/0" in properties)
                 surfaceOverride = *value;
 
             addSurfaceMesh(
-                document, documentPath, surface, section.name, node,
+                document, documentPath, surface, nodeName, node,
                 materialOverride, surfaceOverride, castShadowMode,
                 meshKey ~ "/0" ~ (hasSkin ? ":skin" : ""),
                 hasSkin ? skin.info : pbr.resources.identityJointsInfo,
