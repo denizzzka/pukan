@@ -876,8 +876,9 @@ class GlTF : DrawableByVulkan, Blended
                 collectDraws(trans, cast(Node) c, draws);
         }
 
-        // To avoid mirroring if loaded OpenGL mesh into Vulkan
-        trans *= Vector3f(-1, -1, -1).scaleMatrix;
+        // A nested glTF uses its meshes' clockwise front face instead
+        if(flipWinding)
+            trans *= Vector3f(-1, -1, -1).scaleMatrix;
 
         MeshDraw[] draws;
         collectDraws(trans, rootSceneNode, draws);

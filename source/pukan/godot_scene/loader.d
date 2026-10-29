@@ -381,7 +381,6 @@ private final class GodotLoader
                             if(physical.length)
                             {
                                 auto gltf = gltfFactory.create(physical);
-                                gltf.setFlipWinding(false);
                                 node.instance = gltf;
                                 instances ~= node.instance;
                             }
