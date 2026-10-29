@@ -401,24 +401,48 @@ private final class GodotLoader
         }
 
         const meshRef = asObjectRef(*meshValue, "mesh");
-        if(meshRef.kind != GodotRefKind.subResource)
+        string documentPath = scenePath;
+        GodotTextResource resource;
+        bool found;
+
+        if(meshRef.kind == GodotRefKind.subResource)
+        {
+            auto sub = findSubResource(document, meshRef.id);
+            if(sub !is null)
+            {
+                resource = *sub;
+                found = true;
+            }
+        }
+        else if(meshRef.kind == GodotRefKind.extResource)
+        {
+            auto external = findExternal(document, meshRef.id);
+            if(external !is null && isTextResourcePath(external.path))
+            {
+                documentPath = project.absolute(external.path);
+                auto externalDocument = project.document(documentPath);
+                resource.type = externalDocument.resourceType;
+                resource.properties = externalDocument.resourceProperties;
+                found = true;
+            }
+        }
+
+        if(!found)
         {
             ++skippedResources;
             return;
         }
 
-        auto resource = findSubResource(document, meshRef.id);
-        if(resource is null)
-        {
-            ++skippedResources;
-            return;
-        }
+        const castShadowMode = cast(int) propertyLong(section.properties, "cast_shadow", 1);
+        GodotVariant materialOverride;
+        if(auto value = "material_override" in section.properties)
+            materialOverride = *value;
 
         if(resource.type == "ArrayMesh")
         {
             auto surfaces = decodeArrayMesh(resource.properties["_surfaces"]);
 
-            foreach(ref surface; surfaces)
+            foreach(i, ref surface; surfaces)
             {
                 if(surface.primitive != GodotPrimitive.triangles)
                 {
@@ -426,7 +450,15 @@ private final class GodotLoader
                     continue;
                 }
 
-                addSurfaceMesh(document, surface, section.name, node);
+                GodotVariant surfaceOverride;
+                const key = "surface_material_override/" ~ i.to!string;
+                if(auto value = key in section.properties)
+                    surfaceOverride = *value;
+
+                addSurfaceMesh(
+                    document, documentPath, surface, section.name, node,
+                    materialOverride, surfaceOverride, castShadowMode,
+                );
             }
         }
         else if(isPrimitiveMesh(resource.type))
@@ -439,10 +471,25 @@ private final class GodotLoader
                 return;
             }
 
-            addSurfaceMesh(document, surface, section.name, node);
+            GodotVariant surfaceOverride;
+            if(auto value = "surface_material_override/0" in section.properties)
+                surfaceOverride = *value;
+
+            addSurfaceMesh(
+                document, documentPath, surface, section.name, node,
+                materialOverride, surfaceOverride, castShadowMode,
+            );
         }
         else
             ++skippedResources;
+    }
+
+    private static bool isTextResourcePath(string path)
+    {
+        import std.algorithm: endsWith;
+
+        const lower = path.toLower;
+        return lower.endsWith(".tres") || lower.endsWith(".tscn") || lower.endsWith(".escn");
     }
 
     private GodotArraySurface decodePrimitiveSurface(string type, in GodotVariant[string] properties)
@@ -467,41 +514,98 @@ private final class GodotLoader
 
     private void addSurfaceMesh(
         ref GodotTextDocument document,
+        string documentPath,
         ref GodotArraySurface surface,
         string nodeName,
         GodotNode node,
+        GodotVariant materialOverride,
+        GodotVariant surfaceOverride,
+        int castShadowMode,
     )
     {
-        auto material = defaultMaterial(surface.geometry.colors.length > 0);
+        auto material = defaultMaterial(surface.geometry.colors.length > 0, documentPath);
 
-        if(surface.hasMaterial)
-        {
-            auto materialResource = findSubResource(document, surface.material.id);
+        GodotVariant materialRef;
+        if(!isNil(surfaceOverride))
+            materialRef = surfaceOverride;
+        else if(!isNil(materialOverride))
+            materialRef = materialOverride;
+        else if(surface.hasMaterial)
+            materialRef = GodotVariant(surface.material);
 
-            if(materialResource !is null)
-            {
-                if(materialResource.type == "StandardMaterial3D" || materialResource.type == "ORMMaterial3D")
-                    material = readGodotMaterial(
-                        materialResource.type,
-                        materialResource.properties,
-                        surface.geometry.colors.length > 0,
-                    );
-                else
-                    ++skippedResources;
-            }
-        }
+        if(!isNil(materialRef) && materialRef.type is typeid(GodotObjectRef))
+            material = resolveMaterial(
+                documentPath,
+                asObjectRef(materialRef, "material"),
+                surface.geometry.colors.length > 0,
+            );
 
         auto mesh = createMesh(document, surface, material, nodeName);
+        mesh.castShadow = castShadowMode != 0;
+        mesh.shadowsOnly = castShadowMode == 3;
         node.meshes ~= mesh;
         meshes ~= mesh;
     }
 
-    private GodotMaterialData defaultMaterial(bool hasColors)
+    private GodotMaterialData resolveMaterial(
+        string ownerPath,
+        GodotObjectRef reference,
+        bool hasColors,
+    )
+    {
+        string documentPath = ownerPath;
+        string type;
+        GodotVariant[string] properties;
+        auto owner = project.document(documentPath);
+
+        if(reference.kind == GodotRefKind.subResource)
+        {
+            auto resource = findSubResource(owner, reference.id);
+            if(resource is null)
+            {
+                ++skippedResources;
+                return defaultMaterial(hasColors, documentPath);
+            }
+
+            type = resource.type;
+            properties = resource.properties;
+        }
+        else if(reference.kind == GodotRefKind.extResource)
+        {
+            auto external = findExternal(owner, reference.id);
+            if(external is null || !isTextResourcePath(external.path))
+            {
+                ++skippedResources;
+                return defaultMaterial(hasColors, documentPath);
+            }
+
+            documentPath = project.absolute(external.path);
+            auto document = project.document(documentPath);
+            type = document.resourceType;
+            properties = document.resourceProperties;
+        }
+        else if(reference.kind == GodotRefKind.resource)
+        {
+            documentPath = project.absolute(reference.id);
+            auto document = project.document(documentPath);
+            type = document.resourceType;
+            properties = document.resourceProperties;
+        }
+
+        if(type == "StandardMaterial3D" || type == "ORMMaterial3D")
+            return readGodotMaterial(type, properties, hasColors, documentPath);
+
+        ++skippedResources;
+        return defaultMaterial(hasColors, documentPath);
+    }
+
+    private GodotMaterialData defaultMaterial(bool hasColors, string documentPath = "")
     {
         GodotMaterialData result;
         result.material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
         result.alphaMode = AlphaMode.opaque;
         result.hasVertexColors = hasColors;
+        result.documentPath = documentPath;
 
         if(hasColors)
             result.material.flags = result.material.flags | MaterialFlag.vertexColor;
@@ -546,14 +650,13 @@ private final class GodotLoader
             pbr.resources.identityJointsInfo,
         );
 
-        applyMaterial(mesh, document, surface, material);
+        applyMaterial(mesh, surface, material);
         mesh.buildGeometry(gpuBuffs);
         return mesh;
     }
 
     private void applyMaterial(
         PbrMesh mesh,
-        ref GodotTextDocument document,
         ref GodotArraySurface surface,
         in GodotMaterialData material,
     )
@@ -566,22 +669,22 @@ private final class GodotLoader
 
         if(hasUv)
         {
-            bind(mesh, document, material.baseColorTexture, material.hasBaseColorTexture,
+            bind(mesh, material.documentPath, material.baseColorTexture, material.hasBaseColorTexture,
                 MATERIAL_BASE_COLOR, MaterialFlag.baseColorTexture);
 
-            bind(mesh, document, material.normalTexture, material.hasNormalTexture,
+            bind(mesh, material.documentPath, material.normalTexture, material.hasNormalTexture,
                 MATERIAL_NORMAL, MaterialFlag.normalTexture);
 
-            bind(mesh, document, material.occlusionTexture, material.hasOcclusionTexture,
+            bind(mesh, material.documentPath, material.occlusionTexture, material.hasOcclusionTexture,
                 MATERIAL_OCCLUSION, MaterialFlag.occlusionTexture);
 
-            bind(mesh, document, material.emissiveTexture, material.hasEmissiveTexture,
+            bind(mesh, material.documentPath, material.emissiveTexture, material.hasEmissiveTexture,
                 MATERIAL_EMISSIVE, MaterialFlag.emissiveTexture);
 
-            bind(mesh, document, material.metallicTexture, material.hasMetallicTexture,
+            bind(mesh, material.documentPath, material.metallicTexture, material.hasMetallicTexture,
                 MATERIAL_GODOT_METALLIC, MaterialFlag.godotMetallicTexture);
 
-            bind(mesh, document, material.roughnessTexture, material.hasRoughnessTexture,
+            bind(mesh, material.documentPath, material.roughnessTexture, material.hasRoughnessTexture,
                 MATERIAL_GODOT_ROUGHNESS, MaterialFlag.godotRoughnessTexture);
         }
 
@@ -596,7 +699,7 @@ private final class GodotLoader
 
     private void bind(
         PbrMesh mesh,
-        ref GodotTextDocument document,
+        string documentPath,
         GodotObjectRef objectRef,
         bool present,
         size_t binding,
@@ -606,7 +709,7 @@ private final class GodotLoader
         if(!present)
             return;
 
-        auto texture = resolveTexture(document, objectRef);
+        auto texture = resolveTexture(documentPath, objectRef);
         if(texture is null)
             return;
 
@@ -617,7 +720,7 @@ private final class GodotLoader
         ));
     }
 
-    private Texture resolveTexture(ref GodotTextDocument document, GodotObjectRef objectRef)
+    private Texture resolveTexture(string documentPath, GodotObjectRef objectRef)
     {
         if(objectRef.kind != GodotRefKind.extResource)
         {
@@ -625,6 +728,10 @@ private final class GodotLoader
             return null;
         }
 
+        if(documentPath.length == 0)
+            documentPath = scenePath;
+
+        auto document = project.document(documentPath);
         auto external = findExternal(document, objectRef.id);
         if(external is null)
         {

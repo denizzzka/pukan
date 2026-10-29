@@ -30,15 +30,18 @@ struct GodotMaterialData
     int roughnessChannel;
     int occlusionChannel;
     Vector4f uvTransform = Vector4f(1, 1, 0, 0);
+    string documentPath;
 }
 
 GodotMaterialData readGodotMaterial(
     string type,
     in GodotVariant[string] properties,
     bool meshHasColors,
+    string documentPath = "",
 )
 {
     GodotMaterialData result;
+    result.documentPath = documentPath;
     result.material = Material(Vector3f(1, 1, 1), MaterialMode.pbr);
 
     if(auto value = "albedo_color" in properties)

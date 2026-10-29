@@ -65,6 +65,8 @@ final class PbrMesh : Mesh
     package(pukan) AlphaMode alphaMode;
     package(pukan) bool doubleSided;
     package(pukan) bool hasSkin;
+    bool castShadow = true;
+    bool shadowsOnly;
 
     private VkWriteDescriptorSet jointsUboWriteDescr;
     private VkDescriptorBufferInfo jointsUboInfo;

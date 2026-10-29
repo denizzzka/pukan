@@ -58,7 +58,8 @@ or the pack.
       base64 `PackedByteArray` (format 4).
 - [x] `res://` resolution from `project.godot` and external text resources and
       textures.
-- [ ] External `.glb`/`.gltf`/`.obj` references through the existing loaders.
+- [x] External `.glb`/`.gltf` `PackedScene` references through the glTF loader.
+- [ ] External `.obj` references.
 - [x] `ArrayMesh` decoder for uncompressed version 2 surfaces: separate
       position, normal and tangent regions in `vertex_data`, interleaved
       `attribute_data` and `skin_data`, octahedral normals and tangents, RGBA8
@@ -72,7 +73,9 @@ or the pack.
       shapes.
 - [x] `MeshInstance3D`: node tree, `transform`, `visible`, mesh and
       per-surface materials.
-- [ ] `MeshInstance3D`: `cast_shadow` and shared mesh resources.
+- [x] `MeshInstance3D`: `cast_shadow` modes and load-time `material_override`
+      and `surface_material_override/N`.
+- [ ] `MeshInstance3D`: shared mesh resources and material instances.
 - [x] `StandardMaterial3D` and `ORMMaterial3D`: albedo, metallic, roughness,
       emission, normal, AO, transparency, alpha scissor, cull mode, unshaded
       and vertex colors.
@@ -82,7 +85,7 @@ or the pack.
       existing image loader; `.ctex` belongs to phase 3.
 - [x] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
       phase, AABB and name.
-- [ ] `GodotScene`: material override.
+- [ ] `GodotScene`: runtime material override.
 - [x] First vertical slice: `ArrayMesh`, `StandardMaterial3D`, a PNG texture
       and vertex colors render through `GodotFactory` in `demo_godot`.
 - [x] Fixtures and the `demo_godot` app, see below.
@@ -155,6 +158,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       skeleton and animation.
 - [x] Generated `procedural.tscn`, `.scn` and `.res` with two uncompressed
       `ArrayMesh` surfaces, built by Godot 4.7 headless.
+- [x] Generated `external.tscn` with an external `.tres` mesh, an external
+      material and both override forms.
 - [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer
       with mesh compression enabled.
 - [ ] `combined.tscn` instancing the three, for composition checks.

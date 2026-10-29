@@ -265,14 +265,17 @@ final class GodotScene : DrawableByVulkan, Blended
         const transmissive = mesh.material.transmission.x > 0.0f;
         const ownPass = transmissive && transmissionPass;
 
+        if(phase == DrawPhase.shadow)
+            return mesh.castShadow && !blended && !transmissive && mesh.alphaMode == AlphaMode.opaque;
+
+        if(mesh.shadowsOnly)
+            return false;
+
         if(phase == DrawPhase.transmission)
             return transmissive;
 
         if(phase == DrawPhase.blended)
             return blended && !ownPass;
-
-        if(phase == DrawPhase.shadow)
-            return !blended && !transmissive && mesh.alphaMode == AlphaMode.opaque;
 
         return !blended && !ownPass;
     }
