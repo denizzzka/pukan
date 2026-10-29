@@ -120,7 +120,8 @@ The end goal is a game exported by Godot, not only a source project.
 - [x] `.pck` v2-v4 reader, unencrypted, with a `GodotSource` abstraction shared
       by directory and pack sources.
 - [ ] Stream or memory-map pack files instead of loading the whole archive.
-- [ ] `.ctex` textures: header, mip chain and format mapping; upload directly
+- [ ] `.ctex` textures: embedded PNG first, then raw and VRAM-compressed
+      `DATA_FORMAT_IMAGE`; WebP needs a decoder. Upload mip chains directly
       when the device supports the format, with a documented fallback.
 - [x] Binary `.res` materials and meshes.
 - [ ] Resource deduplication across a scene.
