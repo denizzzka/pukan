@@ -342,6 +342,17 @@ against the plain version it replaces.
         29 ms of its 32 ms there; with one draw the target is the shader and
         setup that remain, about 14 ms.
 
+- **Vertex color attribute**
+  - [ ] Measure the always-bound color stream: 4 bytes per vertex for colored
+        meshes, a stride-0 fallback for the rest, and one attribute fetch in
+        every PBR and shadow pipeline. Run the fixed scene with the same
+        geometry, once with colors and once without.
+  - [ ] Choose from the numbers between the single path and a static
+        `VERTEX_COLOR` shader and pipeline variant for colored materials. The
+        variant removes the fetch and the fallback but multiplies every
+        existing PBR pipeline; the shadow vertex input can drop color on its own
+        without that multiplication.
+
 - **Quantized static geometry**
   - [ ] Optional extreme quantization for static batches: store positions and
         rotations in as few as 2 bits per component when the drawable is authored
