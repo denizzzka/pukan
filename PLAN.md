@@ -132,6 +132,11 @@ The end goal is a game exported by Godot, not only a source project.
 - [x] Binary `.res` materials and meshes.
 - [x] Compressed `RSCC` resources with Zstandard blocks, `StringName`
       variants and `PackedScene` parent-path flags.
+- [x] Text scenes store `Basis` columns while binary resources store its rows;
+      both now produce the intended rotation instead of its transpose.
+- [x] Godot content renders upright: `demo_godot` builds a Vulkan projection
+      with the Y axis flipped and draws Godot faces clockwise. The glTF path
+      keeps its own mirror for the standalone `demo` scenes.
 - [x] Shared parsed glTF content and GPU buffers across instances of one file;
       node trees, animation state and joint buffers stay per instance.
 - [ ] Resource deduplication across a scene.
@@ -156,7 +161,8 @@ The end goal is a game exported by Godot, not only a source project.
         `bone`.
   - [ ] CPU skinning fallback for devices without the GPU path.
   - [x] GPU path: one joint matrix buffer per skin, bound through
-        `MATERIAL_JOINTS`; the imported enemy renders in its bind pose.
+        `MATERIAL_JOINTS`; the imported enemy renders in its bind pose, upright
+        and oriented like Godot's own render.
   - [ ] `BoneAttachment3D`: resolve `bone_name`/`bone_idx` and apply the bone's
         global pose to the node and its children.
   - [ ] `AnimationPlayer` and `Animation`: decode `AnimationLibrary`,
@@ -211,6 +217,8 @@ Fixtures live in `demo/assets/godot_samples/`.
 - [x] Generated `primitives.tscn` with subdivided box and plane, a capsule and
       a prism.
 - [x] Generated `shared_mesh.tscn`, where five nodes share two geometries.
+- [x] Generated `orientation.tscn`, a labelled cube whose faces name their own
+      axis and carry an up arrow, for checking the coordinate system.
 - [x] `exported/exported.pck`, a Godot 4.7 `--export-pack` build with `.remap`
       chains, an imported `.ctex`, binary resources and `project.binary`.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external

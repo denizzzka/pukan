@@ -107,8 +107,6 @@ final class GodotScene : DrawableByVulkan, Blended
     size_t skippedResources;
     /// Distinct GPU geometries shared by the meshes
     size_t geometryCount;
-    /// Godot-imported glTF scenes use the opposite model handedness
-    bool importedGltf;
 
     GodotLight[] lights;
     GodotCamera camera;
@@ -308,21 +306,10 @@ final class GodotScene : DrawableByVulkan, Blended
 
             trans *= node.local;
 
-            Matrix4x4f modelTrans = trans;
-
-            if(importedGltf)
-            {
-                Matrix4x4f rotation = Matrix4x4f.identity();
-                rotation.a11 = -1;
-                rotation.a33 = -1;
-                modelTrans *= rotation;
-            }
-
             foreach(mesh; node.meshes)
             {
-                const clip = Vector4f(0, 0, 0, 1) * modelTrans;
-                draws ~= MeshDraw(mesh, modelTrans, clip.w);
-
+                const clip = Vector4f(0, 0, 0, 1) * trans;
+                draws ~= MeshDraw(mesh, trans, clip.w);
             }
 
             foreach(child; node.children)

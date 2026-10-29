@@ -374,19 +374,24 @@ private struct BinaryReader
                 ]));
 
             case variantBasis:
+            {
+                // Binary resources store the basis rows as they are laid out in memory
                 GodotBasis basis;
                 basis.rows[0] = Vector3f(cast(float) realValue(), cast(float) realValue(), cast(float) realValue());
                 basis.rows[1] = Vector3f(cast(float) realValue(), cast(float) realValue(), cast(float) realValue());
                 basis.rows[2] = Vector3f(cast(float) realValue(), cast(float) realValue(), cast(float) realValue());
                 return GodotVariant(basis);
+            }
 
             case variantTransform3d:
+            {
                 GodotTransform3D transform;
                 transform.rows[0] = Vector3f(cast(float) realValue(), cast(float) realValue(), cast(float) realValue());
                 transform.rows[1] = Vector3f(cast(float) realValue(), cast(float) realValue(), cast(float) realValue());
                 transform.rows[2] = Vector3f(cast(float) realValue(), cast(float) realValue(), cast(float) realValue());
                 transform.origin = Vector3f(cast(float) realValue(), cast(float) realValue(), cast(float) realValue());
                 return GodotVariant(transform);
+            }
 
             case variantProjection:
                 GodotProjection projection;

@@ -351,13 +351,14 @@ class GlTF : DrawableByVulkan, Blended
 
     bool isAnimated() const => animation.animations.length > 0;
 
-    /// Sets the front face that matches the native winding without mirroring
+    /// Turns the model mirror off for an instance nested in another scene
     void setFlipWinding(bool value)
     {
         flipWinding = value;
 
+        // The mirror and the project's flipped view cancel out, so the winding stays as authored
         foreach(mesh; meshes)
-            mesh.frontFace = value ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
+            mesh.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     }
 
     static if(runtimeMaterialOverride)

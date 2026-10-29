@@ -38,6 +38,25 @@ const(char)*[] glfwExtraExtensions(Modules...)()
     return ret;
 }
 
+Vector3f parseVector(string text)
+{
+    import std.algorithm: splitter;
+    import std.conv: to;
+
+    float[3] values;
+    size_t count;
+
+    foreach(part; text.splitter(','))
+    {
+        if(count == values.length)
+            break;
+
+        values[count++] = part.to!float;
+    }
+
+    return Vector3f(values[0], values[1], values[2]);
+}
+
 enum width = 800;
 enum height = 600;
 enum cameraFov = 45.0f;
@@ -52,6 +71,8 @@ void main(string[] args)
     uint frames;
     string screenshotPath;
     uint screenshotFrame;
+    string eyeOption;
+    string targetOption;
 
     auto getoptResult = getopt(
         args,
@@ -61,6 +82,8 @@ void main(string[] args)
         "frames", "exit after N frames (0 = run forever)", &frames,
         "screenshot", "save the captured frame to this PNG", &screenshotPath,
         "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
+        "eye", "override the camera position, x,y,z", &eyeOption,
+        "target", "override the camera target, x,y,z", &targetOption,
     );
 
     if(getoptResult.helpWanted)
@@ -214,6 +237,12 @@ void main(string[] args)
 
     Vector3f eye = Vector3f(0, 3.0f, -8.0f);
     Vector3f target = Vector3f(0, 1.5f, 0);
+
+    if(eyeOption.length)
+        eye = parseVector(eyeOption);
+    if(targetOption.length)
+        target = parseVector(targetOption);
+
     Vector3f up = Vector3f(0, 1, 0);
     float fov = cameraFov;
     float nearPlane = cameraNear;
@@ -246,6 +275,8 @@ void main(string[] args)
             nearPlane,
             farPlane,
         );
+        // Vulkan clip space points Y down while dlib's projection assumes OpenGL
+        wtb.proj.a22 = -wtb.proj.a22;
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
             {

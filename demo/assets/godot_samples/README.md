@@ -42,7 +42,20 @@ are uncompressed version 2 surfaces, so `attribute_data` holds RGBA8 colors and
 float32 UVs while `vertex_data` holds positions and octahedral normals and
 tangents.
 
-To regenerate:
+`orientation.tscn` is a labelled cube used to check the coordinate system. Each
+face names its own axis (`FRONT +Z`, `BACK -Z`, `RIGHT +X`, `LEFT -X`, `TOP +Y`,
+`BOTTOM -Y`) and carries an up arrow, so a mirrored or rotated view is obvious at
+a glance. The names are drawn into `orientation_*.png`, the labels load from the
+committed `orientation_*.ctex` copies.
+
+`orientation.gd` rebuilds the scene, no other fixture is touched:
+
+```sh
+godot --headless --path generated --import
+godot --headless --path generated --script res://orientation.gd
+```
+
+To regenerate the other scenes:
 
 ```sh
 godot --headless --path generated --import

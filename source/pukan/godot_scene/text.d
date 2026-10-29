@@ -833,21 +833,17 @@ private struct GodotTextParser
             const y = as!(Vector3f)(arguments[1]);
             const z = as!(Vector3f)(arguments[2]);
 
-            GodotBasis result;
-            result.rows[0] = Vector3f(x.x, y.x, z.x);
-            result.rows[1] = Vector3f(x.y, y.y, z.y);
-            result.rows[2] = Vector3f(x.z, y.z, z.z);
-            return GodotVariant(result);
+            return GodotVariant(GodotBasis.fromColumns(x, y, z));
         }
 
         const v = numbers(arguments);
         requireCount(v, 9, "Basis");
 
-        GodotBasis result;
-        result.rows[0] = Vector3f(cast(float) v[0], cast(float) v[1], cast(float) v[2]);
-        result.rows[1] = Vector3f(cast(float) v[3], cast(float) v[4], cast(float) v[5]);
-        result.rows[2] = Vector3f(cast(float) v[6], cast(float) v[7], cast(float) v[8]);
-        return GodotVariant(result);
+        return GodotVariant(GodotBasis.fromColumns(
+            Vector3f(cast(float) v[0], cast(float) v[1], cast(float) v[2]),
+            Vector3f(cast(float) v[3], cast(float) v[4], cast(float) v[5]),
+            Vector3f(cast(float) v[6], cast(float) v[7], cast(float) v[8]),
+        ));
     }
 
     private GodotVariant transform2d(in GodotVariant[] arguments)
@@ -879,12 +875,14 @@ private struct GodotTextParser
         const v = numbers(arguments);
         requireCount(v, 12, "Transform3D");
 
-        GodotTransform3D result;
-        result.rows[0] = Vector3f(cast(float) v[0], cast(float) v[1], cast(float) v[2]);
-        result.rows[1] = Vector3f(cast(float) v[3], cast(float) v[4], cast(float) v[5]);
-        result.rows[2] = Vector3f(cast(float) v[6], cast(float) v[7], cast(float) v[8]);
-        result.origin = Vector3f(cast(float) v[9], cast(float) v[10], cast(float) v[11]);
-        return GodotVariant(result);
+        return GodotVariant(GodotTransform3D(
+            GodotBasis.fromColumns(
+                Vector3f(cast(float) v[0], cast(float) v[1], cast(float) v[2]),
+                Vector3f(cast(float) v[3], cast(float) v[4], cast(float) v[5]),
+                Vector3f(cast(float) v[6], cast(float) v[7], cast(float) v[8]),
+            ).rows,
+            Vector3f(cast(float) v[9], cast(float) v[10], cast(float) v[11]),
+        ));
     }
 
     private GodotVariant aabb(in GodotVariant[] arguments)

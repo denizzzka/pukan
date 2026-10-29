@@ -229,7 +229,6 @@ private final class GodotLoader
         scene.skippedNodes = skippedNodes;
         scene.skippedResources = skippedResources;
         scene.geometryCount = geometryCache.length;
-        scene.importedGltf = gltfImportedScene;
         scene.lights = lights;
         scene.camera = camera;
         scene.hasCamera = hasCamera;
@@ -562,6 +561,7 @@ private final class GodotLoader
                             if(physical.length)
                             {
                                 auto gltf = gltfFactory.create(physical);
+                                gltf.setFlipWinding(false);
                                 node.instance = gltf;
                                 instances ~= node.instance;
                             }
@@ -936,7 +936,10 @@ private final class GodotLoader
             jointInfo,
         );
 
+        // The project renders through a flipped projection, so faces wind clockwise
+        mesh.frontFace = VK_FRONT_FACE_CLOCKWISE;
         applyMaterial(mesh, surface, material);
+
         return mesh;
     }
 
