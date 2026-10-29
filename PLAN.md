@@ -5,10 +5,6 @@ only a suggested grouping.
 
 - [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
       used independently of the rest of `pukan`. Keep module names unchanged.
-- [ ] Check format availability before use. `VK_FORMAT_R32G32B32_SFLOAT` and
-      similar are not mandatory: query `vkGetPhysicalDeviceFormatProperties`
-      (and `vkGetPhysicalDeviceImageFormatProperties` for images) instead of
-      assuming the format is usable.
 
 ## Open GitHub issues
 
