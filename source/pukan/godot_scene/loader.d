@@ -575,6 +575,9 @@ private final class GodotLoader
                             childOptions.loadStack = options.loadStack ~ scenePath;
                             node.instance = loadGodotScene(project.source, key, pbr, gltfFactory, childOptions);
                             instances ~= node.instance;
+
+                            if(auto child = cast(GodotScene) node.instance)
+                                mergeSkipped(child);
                         }
                         else
                             ++skippedResources;
@@ -605,6 +608,19 @@ private final class GodotLoader
         }
 
         return node;
+    }
+
+    /// A nested scene keeps its own loader, so bring its report up to the parent
+    private void mergeSkipped(GodotScene child)
+    {
+        skippedNodes += child.skippedNodes;
+        skippedResources += child.skippedResources;
+
+        foreach(type, count; child.skippedNodeTypes)
+            skippedNodeTypes[type] += count;
+
+        foreach(type, count; child.skippedResourceTypes)
+            skippedResourceTypes[type] += count;
     }
 
     /// Node types that draw or light something in Godot but have no loader support
