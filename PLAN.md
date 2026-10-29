@@ -97,6 +97,8 @@ or the pack.
 - [x] A `--scene` path option that loads one fixture at startup.
 - [x] `--pack` to load a `res://` scene from a PCK; without `--scene` it uses
       `application/run/main_scene` from `project.binary`.
+- [x] `--screenshot path` and `--screenshot-frame N` in both demos; the engine
+      saves the next rendered frame through `Scene.captureFrame`.
 
 #### Phase 2: lights, cameras and environment
 

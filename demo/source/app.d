@@ -67,6 +67,8 @@ void main(string[] args) {
     bool noShadows;
     string materialMode = "authored";
     string[] sampleNames;
+    string screenshotPath;
+    uint screenshotFrame;
     auto getoptResult = getopt(
         args,
         "stereo", "render side-by-side stereo", &stereo,
@@ -77,6 +79,8 @@ void main(string[] args) {
         "no-shadows", "do not cast shadows", &noShadows,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
+        "screenshot", "save the captured frame to this PNG", &screenshotPath,
+        "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
     );
 
     if(getoptResult.helpWanted)
@@ -340,6 +344,8 @@ void main(string[] args) {
     ulong[] benchFrameNs;
     ulong[] benchUpdateNs;
 
+    const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
+
     // Main loop
     uint frameCount;
     while (!glfwWindowShouldClose(window) && (frames == 0 || frameCount < frames))
@@ -441,6 +447,9 @@ void main(string[] args) {
             }
         }
 
+        if(screenshotPath.length && frameCount == captureFrame)
+            scene.captureFrame(screenshotPath);
+
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
 
             {
@@ -510,6 +519,9 @@ void main(string[] args) {
                 );
             }
         });
+
+        if(screenshotPath.length && frameCount == captureFrame)
+            writeln("screenshot saved to ", screenshotPath);
 
         const frameEnd = sw.peek;
 

@@ -50,6 +50,8 @@ void main(string[] args)
     string packPath;
     bool useSceneCamera;
     uint frames;
+    string screenshotPath;
+    uint screenshotFrame;
 
     auto getoptResult = getopt(
         args,
@@ -57,6 +59,8 @@ void main(string[] args)
         "pack", "load the scene from this PCK instead", &packPath,
         "scene-camera", "use the Camera3D from the scene", &useSceneCamera,
         "frames", "exit after N frames (0 = run forever)", &frames,
+        "screenshot", "save the captured frame to this PNG", &screenshotPath,
+        "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
     );
 
     if(getoptResult.helpWanted)
@@ -223,6 +227,7 @@ void main(string[] args)
         farPlane = godotScene.camera.farPlane;
     }
 
+    const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
 
     while(!glfwWindowShouldClose(window) && (frames == 0 || frameIndex < frames))
@@ -254,6 +259,9 @@ void main(string[] args)
             const modelViewProj = wtb.proj * wtb.view * wtb.model;
 
 
+            if(screenshotPath.length && frameIndex == captureFrame)
+                scene.captureFrame(screenshotPath);
+
             scene.recordCommandBuffer(
                 frame,
                 (buf, phase) {
@@ -265,6 +273,9 @@ void main(string[] args)
                 },
             );
         });
+
+        if(screenshotPath.length && frameIndex == captureFrame)
+            writeln("screenshot saved to ", screenshotPath);
     }
 
     vkDeviceWaitIdle(device.device);

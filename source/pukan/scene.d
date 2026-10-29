@@ -6,6 +6,7 @@ import pukan.pbr.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
+import pukan.screenshot: Screenshot;
 import pukan.shadow: ShadowMap, ShadowPass;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
@@ -46,6 +47,11 @@ class Scene
 
     /// Blended draws store their fragments in per-pixel lists this resolves
     bool oitEnabled = true;
+
+    private Screenshot pendingScreenshot;
+    private string pendingScreenshotPath;
+    /// Path of the frame saved by the last `captureFrame` call
+    string lastScreenshotPath;
 
     /// The sun casts a shadow map before the main pass
     bool shadowsEnabled = true;
@@ -220,6 +226,9 @@ class Scene
 
     ~this()
     {
+        if(pendingScreenshot)
+            destroy(pendingScreenshot);
+
         background.destroy;
 
         foreach(ref batch; retiredOitFrames)
@@ -437,7 +446,8 @@ class Scene
         return device.create!Texture(image, samplerInfo);
     }
 
-    private static void imageBarrier(
+    /// Transitions one image subresource between layouts
+    static void imageBarrier(
         VkCommandBuffer buf,
         VkImage image,
         VkImageLayout oldLayout,
@@ -451,22 +461,8 @@ class Scene
         VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT,
     )
     {
-        VkImageMemoryBarrier barrier;
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = oldLayout;
-        barrier.newLayout = newLayout;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = image;
-        barrier.srcAccessMask = srcAccess;
-        barrier.dstAccessMask = dstAccess;
-        barrier.subresourceRange.aspectMask = aspect;
-        barrier.subresourceRange.baseMipLevel = baseMip;
-        barrier.subresourceRange.levelCount = mipCount;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
-
-        vkCmdPipelineBarrier(buf, srcStage, dstStage, 0, 0, null, 0, null, 1, &barrier);
+        transitionImageLayout(buf, image, oldLayout, newLayout, srcStage, srcAccess,
+            dstStage, dstAccess, baseMip, mipCount, aspect);
     }
 
     /// Hands the colour to the presentation engine when nothing samples it
@@ -677,6 +673,7 @@ class Scene
             }
         }
 
+        recordPendingScreenshot(frame);
         presentColor(frame);
     }
 
@@ -769,6 +766,7 @@ class Scene
             }
         }
 
+        recordPendingScreenshot(frame);
         presentColor(frame);
     }
 
@@ -915,6 +913,28 @@ class Scene
         createFrameSets();
     }
 
+    /// Saves the next rendered frame to a PNG
+    void captureFrame(string path)
+    {
+        pendingScreenshotPath = path;
+    }
+
+    private void recordPendingScreenshot(ref Frame frame)
+    {
+        if(pendingScreenshotPath.length == 0)
+            return;
+
+        if(pendingScreenshot is null)
+            pendingScreenshot = new Screenshot(
+                device,
+                swapChain.imageExtent.width,
+                swapChain.imageExtent.height,
+                swapChain.imageFormat,
+            );
+
+        pendingScreenshot.record(frame.commandBuffer, frame.image);
+    }
+
     void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
     {
         import pukan.exceptions: PukanExceptionWithCode;
@@ -962,6 +982,16 @@ class Scene
                 if(ret != VK_SUCCESS)
                     throw new PukanExceptionWithCode(ret, "failed to queue image for presentation");
             }
+        }
+
+        if(pendingScreenshot !is null)
+        {
+            vkDeviceWaitIdle(device.device);
+            pendingScreenshot.save(pendingScreenshotPath);
+            lastScreenshotPath = pendingScreenshotPath;
+            pendingScreenshotPath = null;
+            destroy(pendingScreenshot);
+            pendingScreenshot = null;
         }
 
         swapChain.toNextFrame();
