@@ -56,7 +56,7 @@ struct GodotBasis
 
     Matrix4x4f toMatrix() const
     {
-        Matrix4x4f m = Matrix4x4f.identity;
+        Matrix4x4f m = Matrix4x4f.identity();
         m.a11 = rows[0].x; m.a12 = rows[0].y; m.a13 = rows[0].z;
         m.a21 = rows[1].x; m.a22 = rows[1].y; m.a23 = rows[1].z;
         m.a31 = rows[2].x; m.a32 = rows[2].y; m.a33 = rows[2].z;
@@ -76,7 +76,7 @@ struct GodotTransform3D
 
     Matrix4x4f toMatrix() const
     {
-        Matrix4x4f m = Matrix4x4f.identity;
+        Matrix4x4f m = Matrix4x4f.identity();
         m.a11 = rows[0].x; m.a12 = rows[0].y; m.a13 = rows[0].z;
         m.a21 = rows[1].x; m.a22 = rows[1].y; m.a23 = rows[1].z;
         m.a31 = rows[2].x; m.a32 = rows[2].y; m.a33 = rows[2].z;

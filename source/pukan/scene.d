@@ -38,6 +38,7 @@ class Scene
     PrimitivesFactory!(pukan.primitives_tree.mesh.TexturedMesh) texturedMeshFactory;
     PrimitivesFactory!(pukan.primitives_tree.mesh.LitMesh) litMeshFactory;
     GltfFactory gltfFactory;
+    GodotFactory godotFactory;
     PbrFactory pbrFactory;
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
@@ -196,6 +197,7 @@ class Scene
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
         pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, shadowPass);
         gltfFactory = new GltfFactory(pbrFactory);
+        godotFactory = new GodotFactory(pbrFactory);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
     }
@@ -239,6 +241,9 @@ class Scene
         // swapChain.frames should be destroyed before frameBuider
         swapChain.destroy;
         frameBuilder.destroy;
+
+        if(godotFactory)
+            destroy(godotFactory);
 
         if(gltfFactory)
             destroy(gltfFactory);

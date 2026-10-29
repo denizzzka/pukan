@@ -21,7 +21,7 @@ func _init() -> void:
     arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([
         Vector2(0, 0), Vector2(1, 0), Vector2(0, 1), Vector2(1, 1),
     ])
-    arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 2, 1, 1, 2, 3])
+    arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 1, 3, 2])
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
     var plain := []
@@ -35,6 +35,7 @@ func _init() -> void:
     plain[Mesh.ARRAY_TEX_UV] = PackedVector2Array([
         Vector2(0, 0), Vector2(1, 0), Vector2(0, 1),
     ])
+    plain[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 2, 1])
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, plain)
 
     var material := StandardMaterial3D.new()

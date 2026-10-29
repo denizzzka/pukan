@@ -312,11 +312,11 @@ unittest
     assert(surfaces[0].geometry.tangents[0].w > 0);
     assert(surfaces[0].geometry.colors[0] == 0xFF0000FF);
     assert(surfaces[0].geometry.texCoords[3] == Vector2f(1, 1));
-    assert(surfaces[0].geometry.indices == [0u, 2u, 1u, 1u, 2u, 3u]);
+    assert(surfaces[0].geometry.indices == [0u, 1u, 2u, 1u, 3u, 2u]);
 
     assert(surfaces[1].geometry.positions.length == 3);
     assert(surfaces[1].geometry.colors.length == 0);
-    assert(surfaces[1].geometry.indices.length == 0);
+    assert(surfaces[1].geometry.indices == [0u, 2u, 1u]);
 }
 
 private string fixturePath(string relative)
