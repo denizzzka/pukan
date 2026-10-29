@@ -108,7 +108,8 @@ class DrawableTree(Payload) : DrawableByVulkan
                 const clip = Vector4f(0, 0, 0, 1) * trans;
                 blended ~= Pending(dr, trans, clip.w);
             }
-            else
+            // A drawable without blended meshes has nothing to add in that phase
+            else if(phase != DrawPhase.blended)
                 dr.drawingBufferFilling(buf, trans, frameSet, phase);
         }
         else if(curr.payload.type == typeid(Bone))

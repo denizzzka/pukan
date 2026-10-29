@@ -27,8 +27,8 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         DrawPhase phase = DrawPhase.surface,
     )
     {
-        // Primitives have no transmission materials
-        if(phase == DrawPhase.transmission)
+        // Primitives are opaque and never transmissive
+        if(phase != DrawPhase.surface)
             return;
 
         drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, frameSet, root, phase);
