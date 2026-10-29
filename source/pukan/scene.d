@@ -5,7 +5,7 @@ import pukan;
 import pukan.gltf.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
-import pukan.oit: OitFrame, OitResolve;
+import pukan.oit: DepthResolve, OitFrame, OitResolve;
 import pukan.shadow: ShadowMap, ShadowPass;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
@@ -55,7 +55,9 @@ class Scene
     private ShadowPass shadowPass;
     private ShadowMap[] shadowMaps;
     private VkSampler shadowSampler;
+    private VkSampler resolveSampler;
     private OitResolve oitResolve;
+    private DepthResolve depthResolve;
     private OitFrame[] oitFrames;
     /// Lists of a replaced swapchain, kept until its commands are done
     private OitFrame[][] retiredOitFrames;
@@ -148,6 +150,7 @@ class Scene
         background = new Checkerboard(device, pipelineFactory, renderPass);
 
         oitResolve = new OitResolve(device, pipelineFactory, surfaceFormat.format);
+        depthResolve = new DepthResolve(device, pipelineFactory);
 
         shadowPass = new ShadowPass(device, DefaultRenderPass.depthFormat);
 
@@ -166,6 +169,21 @@ class Scene
                 unnormalizedCoordinates: VK_FALSE,
             };
             vkCall(device.device, &samplerInfo, device.alloc, &shadowSampler);
+        }
+
+        {
+            VkSamplerCreateInfo samplerInfo = {
+                sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                magFilter: VK_FILTER_NEAREST,
+                minFilter: VK_FILTER_NEAREST,
+                mipmapMode: VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                compareEnable: VK_FALSE,
+                unnormalizedCoordinates: VK_FALSE,
+            };
+            vkCall(device.device, &samplerInfo, device.alloc, &resolveSampler);
         }
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
@@ -204,8 +222,14 @@ class Scene
         if(shadowSampler)
             vkDestroySampler(device.device, shadowSampler, device.alloc);
 
+        if(resolveSampler)
+            vkDestroySampler(device.device, resolveSampler, device.alloc);
+
         if(shadowPass)
             destroy(shadowPass);
+
+        if(depthResolve)
+            destroy(depthResolve);
 
         if(oitResolve)
             destroy(oitResolve);
@@ -286,11 +310,19 @@ class Scene
                 range: maxLights * Light.sizeof,
             );
 
-            oitFrames[i] = new OitFrame(device, oitResolve.pass, frame.imageView, swapChain.imageExtent);
+            oitFrames[i] = new OitFrame(device, oitResolve.pass, depthResolve.pass, frame.imageView, swapChain.imageExtent);
 
             auto oitHeads = oitFrames[i].headsImageInfo;
             auto oitFragments = oitFrames[i].fragmentsInfo;
             auto oitCounter = oitFrames[i].counterInfo;
+            auto sceneDepth = oitFrames[i].sceneDepthInfo();
+            sceneDepth.sampler = resolveSampler;
+
+            auto depthMS = VkDescriptorImageInfo(
+                imageLayout: VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                imageView: frame.depthBuf.depthView,
+                sampler: resolveSampler,
+            );
 
             foreach(eye; 0 .. 2)
                 frame.frameSets[eye] = new FrameSet(
@@ -306,6 +338,8 @@ class Scene
                     oitCounter,
                     lightInfo,
                     shadowInfo,
+                    sceneDepth,
+                    depthMS,
                 );
         }
     }
@@ -388,6 +422,7 @@ class Scene
         VkAccessFlags dstAccess,
         uint baseMip = 0,
         uint mipCount = 1,
+        VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT,
     )
     {
         VkImageMemoryBarrier barrier;
@@ -399,7 +434,7 @@ class Scene
         barrier.image = image;
         barrier.srcAccessMask = srcAccess;
         barrier.dstAccessMask = dstAccess;
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.aspectMask = aspect;
         barrier.subresourceRange.baseMipLevel = baseMip;
         barrier.subresourceRange.levelCount = mipCount;
         barrier.subresourceRange.baseArrayLayer = 0;
@@ -593,6 +628,9 @@ class Scene
             },
         );
 
+        if(oitEnabled)
+            resolveOit(frame, false);
+
         if(transmissionPassEnabled)
         {
             copySceneColor(frame);
@@ -604,9 +642,14 @@ class Scene
                         drawTransmission(buf, DrawPhase.transmission);
                 },
             );
-        }
 
-        resolveOit(frame);
+            if(oitEnabled)
+            {
+                // Glass hides blended fragments behind it, the visible ones stay
+                resolveDepth(frame);
+                resolveOit(frame, true);
+            }
+        }
 
         presentColor(frame);
     }
@@ -676,6 +719,9 @@ class Scene
             (ref VkCommandBuffer buf) { drawStereoEyes(buf, drawScene); },
         );
 
+        if(oitEnabled)
+            resolveOit(frame, false);
+
         if(transmissionPassEnabled)
         {
             // One copy serves both eyes: the fragment coordinate already carries
@@ -689,9 +735,13 @@ class Scene
                         drawStereoEyes(buf, drawTransmission, true);
                 },
             );
-        }
 
-        resolveOit(frame);
+            if(oitEnabled)
+            {
+                resolveDepth(frame);
+                resolveOit(frame, true);
+            }
+        }
 
         presentColor(frame);
     }
@@ -743,7 +793,7 @@ class Scene
     }
 
     /// Blends the fragments each pixel collected, after every other pass wrote colour
-    private void resolveOit(ref Frame frame)
+    private void resolveOit(ref Frame frame, bool filterDepth)
     {
         if(!oitEnabled)
             return;
@@ -796,9 +846,41 @@ class Scene
         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
             oitResolve.pipeline.pipelineLayout, 1, 1, &frameSet, 0, null);
 
+        uint filterValue = filterDepth ? 1 : 0;
+        vkCmdPushConstants(cb, oitResolve.pipeline.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+            0, uint.sizeof, &filterValue);
+
         vkCmdDraw(cb, 3, 1, 0, 0);
 
         vkCmdEndRenderPass(cb);
+    }
+
+    /// Writes the nearest depth of the multisampled surface, glass included
+    private void resolveDepth(ref Frame frame)
+    {
+        auto oit = oitFrames[frameIndex(frame)];
+        auto cb = frame.commandBuffer;
+
+        imageBarrier(
+            cb, frame.depthBuf.depthImage.image,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+            0, 1, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+        );
+
+        depthResolve.pass.record(cb, oit.renderedSceneDepthFrameBuffer, swapChain.imageExtent, (ref VkCommandBuffer buf) {
+            vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, depthResolve.pipeline.graphicsPipeline);
+
+            VkDescriptorSet frameSet = frame.frameSets[0].descriptorSet;
+            vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                depthResolve.pipeline.pipelineLayout, 1, 1, &frameSet, 0, null);
+
+            vkCmdDraw(buf, 3, 1, 0, 0);
+        });
     }
 
     void recreateSwapChain()

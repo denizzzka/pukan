@@ -30,6 +30,7 @@ glslc ${TGT} ${INCLUDES} -DLIT -DOIT -fshader-stage=frag source/pukan/shaders/me
 glslc ${TGT} ${INCLUDES} -DUNLIT -DOIT -fshader-stage=frag source/pukan/shaders/mesh_pbr.frag -o compiled_shaders/mesh_pbr_frag_unlit_oit.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/fullscreen.vert -o compiled_shaders/fullscreen_vert.spv
 glslc ${TGT} ${INCLUDES} -DOIT_READ_ONLY -fshader-stage=frag source/pukan/shaders/oit_resolve.frag -o compiled_shaders/oit_resolve_frag.spv
+glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/depth_resolve.frag -o compiled_shaders/depth_resolve_frag.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_fragment.glsl -o compiled_shaders/mesh_frag.spv
 glslc ${TGT} ${INCLUDES} -DHAS_NORMAL -fshader-stage=frag source/pukan/shaders/mesh_fragment.glsl -o compiled_shaders/mesh_lit_frag.spv
 glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/line.vert -o compiled_shaders/line_vert.spv

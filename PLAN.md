@@ -111,13 +111,10 @@ per node, so a file may use several. Still missing:
 Opaque, mask (through alpha-to-coverage) and blend are covered. Blended draws
 store their fragments in per-pixel lists and a resolve pass sorts them by depth
 before compositing, so overlapping and self-intersecting transparent meshes no
-longer depend on a per-draw order. Missing:
-
-- [ ] Transmission copies the colour once per frame, before the blended resolve:
-      glass behind glass loses the first pane, glass does not show blended
-      objects behind it, and the refraction offset can pull in a neighbour at
-      the silhouette. The resolve also runs after the transmission pass, so
-      blended fragments composite over transmissive ones at any depth.
+longer depend on a per-draw order. The resolve runs once before the colour copy
+and again after the transmission pass, filtered by the resolved scene depth, so
+glass shows blended objects behind it and blended fragments in front of glass
+stay in front.
 
 ## Lighting
 

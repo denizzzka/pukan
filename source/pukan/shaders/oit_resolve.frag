@@ -2,6 +2,14 @@
 
 #include "oit.glsl"
 
+layout(set = 1, binding = FRAME_SCENE_DEPTH) uniform sampler2D sceneDepthMap;
+
+layout(push_constant) uniform Push
+{
+    /// Non-zero while only fragments in front of the scene depth are composited
+    uint filterDepth;
+} push;
+
 layout(location = 0) out vec4 outColor;
 
 /// Layers kept per pixel; a deeper stack drops its furthest fragments
@@ -17,6 +25,10 @@ void main()
     vec4 colors[OIT_MAX_LAYERS];
     uint count = 0u;
 
+    const float reference = push.filterDepth != 0u
+        ? texelFetch(sceneDepthMap, pixel, 0).r
+        : 1.0;
+
     uint index = imageLoad(oitHeads, pixel).r;
 
     for(uint guard = 0u; index != OIT_EMPTY && guard < OIT_MAX_TRAVERSAL; ++guard)
@@ -27,7 +39,7 @@ void main()
             unpackHalf2x16(fragment.colorHi)
         );
 
-        if(count < OIT_MAX_LAYERS)
+        if(count < OIT_MAX_LAYERS && fragment.depth <= reference + 1e-5)
         {
             // Insertion sort, far to near
             uint at = count;

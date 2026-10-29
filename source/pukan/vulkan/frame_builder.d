@@ -88,6 +88,8 @@ final class FrameSet
         VkDescriptorBufferInfo oitCounter,
         VkDescriptorBufferInfo lights,
         VkDescriptorImageInfo shadowMap,
+        VkDescriptorImageInfo sceneDepth,
+        VkDescriptorImageInfo depthMS,
     )
     {
         buffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -105,6 +107,8 @@ final class FrameSet
             bufferWriteDescriptor(descriptorSet, FRAME_OIT_COUNTER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitCounter),
             bufferWriteDescriptor(descriptorSet, FRAME_LIGHTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, lights),
             imageWriteDescriptor(descriptorSet, FRAME_SHADOW_MAP, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shadowMap),
+            imageWriteDescriptor(descriptorSet, FRAME_SCENE_DEPTH, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneDepth),
+            imageWriteDescriptor(descriptorSet, FRAME_DEPTH_MS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, depthMS),
         ];
         device.updateDescriptorSets(writes);
     }
@@ -287,7 +291,7 @@ struct DepthBuf
             mipLevels: 1,
             arrayLayers: 1,
             initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
-            usage: VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            usage: VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             sharingMode: VK_SHARING_MODE_EXCLUSIVE,
             samples: samples,
         };

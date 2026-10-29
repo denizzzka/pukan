@@ -317,6 +317,18 @@ final class PipelineFactory
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
+            VkDescriptorSetLayoutBinding(
+                binding: FRAME_SCENE_DEPTH,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
+            VkDescriptorSetLayoutBinding(
+                binding: FRAME_DEPTH_MS,
+                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
         ];
         frameSetLayout = device.createDescriptorSetLayout(frameBindings);
     }
