@@ -72,6 +72,11 @@ when the Vulkan device exposes those formats; otherwise the loader reports the
 missing format instead of rendering an untextured mesh. `libwebp` is required
 when building pukan.
 
+`compressed_array_mesh.tres` and `compressed_mesh.tscn` use the ready-made
+`AnimatedCube` glTF sample from the glTF sample models, imported by Godot 4.7
+with mesh compression enabled. The mesh stores quantized positions, 16-bit UVs,
+octahedral normals and a tangent angle instead of float attributes.
+
 `fixtures.pck` is an unencrypted Godot 4 PCK v2 created by
 `generated/pack_fixtures.py`. It contains `res://procedural.tscn`,
 `res://procedural_mesh.res` and `res://checker.png`. Load it with:

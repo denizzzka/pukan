@@ -4,8 +4,8 @@ import dlib.math: Vector2f, Vector3f, Vector4f;
 import pukan.exceptions: PukanException;
 import pukan.godot_scene.value;
 import pukan.pbr.mesh: MeshGeometry, Vector4us;
-import std.math: abs;
 import std.conv: to;
+import std.math: PI, abs, cos, sin;
 
 enum GodotPrimitive
 {
@@ -95,8 +95,7 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
         if(surfaceVersion != 1)
             throw new PukanException("unsupported mesh surface format version " ~ surfaceVersion.to!string);
 
-        if((format & flagCompressAttributes) != 0)
-            throw new PukanException("attribute-compressed mesh surfaces are not supported yet");
+        const compressed = (format & flagCompressAttributes) != 0;
 
         if((format & flag2dVertices) != 0)
             throw new PukanException("2D mesh surfaces are not supported");
@@ -136,16 +135,22 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
         const hasBones = (format & arrayBones) != 0;
         const hasWeights = (format & arrayWeights) != 0;
 
-        const vertexStride = 3 * float.sizeof;
-        const normalBase = vertexCount * vertexStride;
-        const normalStride = (hasNormal ? 4 : 0) + (hasTangent ? 4 : 0);
-        const attributeStride = (hasColor ? 4 : 0) + (hasUv ? 8 : 0) + (hasUv2 ? 8 : 0);
+        if(compressed && hasTangent && !hasNormal)
+            throw new PukanException("compressed mesh tangents require normals");
+
+        const positionStride = compressed ? 4 * ushort.sizeof : 3 * float.sizeof;
+        const normalBase = vertexCount * positionStride;
+        const normalStride = compressed
+            ? (hasNormal ? 4 : 0)
+            : (hasNormal ? 4 : 0) + (hasTangent ? 4 : 0);
+        const uvSize = compressed ? 4 : 8;
+        const attributeStride = (hasColor ? 4 : 0) + (hasUv ? uvSize : 0) + (hasUv2 ? uvSize : 0);
         const boneSize = (format & flag8BoneWeights) ? 16 : 8;
         const skinStride = (hasBones ? boneSize : 0) + (hasWeights ? boneSize : 0);
 
         const colorOffset = 0;
         const uvOffset = hasColor ? 4 : 0;
-        const uv2Offset = uvOffset + (hasUv ? 8 : 0);
+        const uv2Offset = uvOffset + (hasUv ? uvSize : 0);
         const bonesOffset = 0;
         const weightsOffset = hasBones ? boneSize : 0;
 
@@ -166,16 +171,39 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
         decoded.geometry.joints.length = hasBones ? vertexCount : 0;
         decoded.geometry.weights.length = hasWeights ? vertexCount : 0;
 
+        const uvScale = propertyAs!Vector4f(surface, "uv_scale", Vector4f(0, 0, 0, 0));
+
         foreach(i; 0 .. vertexCount)
         {
-            const vertex = vertexData.ptr + i * vertexStride;
-            const position = cast(const float*) vertex;
-            decoded.geometry.positions[i] = Vector3f(position[0], position[1], position[2]);
+            const vertex = vertexData.ptr + i * positionStride;
+
+            if(compressed)
+            {
+                const packed = cast(const ushort*) vertex;
+                const normalized = Vector3f(
+                    packed[0] / 65535.0f,
+                    packed[1] / 65535.0f,
+                    packed[2] / 65535.0f,
+                );
+
+                decoded.geometry.positions[i] = Vector3f(
+                    decoded.aabb.position.x + normalized.x * decoded.aabb.size.x,
+                    decoded.aabb.position.y + normalized.y * decoded.aabb.size.y,
+                    decoded.aabb.position.z + normalized.z * decoded.aabb.size.z,
+                );
+            }
+            else
+            {
+                const position = cast(const float*) vertex;
+                decoded.geometry.positions[i] = Vector3f(position[0], position[1], position[2]);
+            }
+
+            Vector3f normal;
 
             if(hasNormal)
             {
                 const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride);
-                const normal = octahedronDecode(Vector2f(
+                normal = octahedronDecode(Vector2f(
                     (packed & 0xFFFF) / 65535.0f,
                     ((packed >> 16) & 0xFFFF) / 65535.0f,
                 ));
@@ -184,13 +212,32 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
 
             if(hasTangent)
             {
-                const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride + (hasNormal ? 4 : 0));
-                float sign;
-                const tangent = octahedronTangentDecode(Vector2f(
-                    (packed & 0xFFFF) / 65535.0f,
-                    ((packed >> 16) & 0xFFFF) / 65535.0f,
-                ), sign);
-                decoded.geometry.tangents[i] = Vector4f(tangent.x, tangent.y, tangent.z, sign);
+                if(compressed)
+                {
+                    const positionPacked = cast(const ushort*) vertex;
+                    const angle01 = positionPacked[3] / 65535.0f;
+                    const sign = angle01 > 0.5f ? 1.0f : -1.0f;
+                    const angle = abs(angle01 * 2.0f - 1.0f) * PI;
+                    const c = cos(angle);
+                    const s = sin(angle);
+                    const omc = 1.0f - c;
+                    const tangent = Vector3f(
+                        omc * normal.x * normal.x + c,
+                        omc * normal.x * normal.y - s * normal.z,
+                        omc * normal.x * normal.z + s * normal.y,
+                    );
+                    decoded.geometry.tangents[i] = Vector4f(tangent.x, tangent.y, tangent.z, sign);
+                }
+                else
+                {
+                    const packed = *cast(const uint*) (vertexData.ptr + normalBase + i * normalStride + (hasNormal ? 4 : 0));
+                    float sign;
+                    const tangent = octahedronTangentDecode(Vector2f(
+                        (packed & 0xFFFF) / 65535.0f,
+                        ((packed >> 16) & 0xFFFF) / 65535.0f,
+                    ), sign);
+                    decoded.geometry.tangents[i] = Vector4f(tangent.x, tangent.y, tangent.z, sign);
+                }
             }
 
             const attribute = attributeData.ptr + i * attributeStride;
@@ -207,8 +254,21 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
 
             if(hasUv)
             {
-                const uv = cast(const float*) (attribute + uvOffset);
-                decoded.geometry.texCoords[i] = Vector2f(uv[0], uv[1]);
+                if(compressed)
+                {
+                    const packed = cast(const ushort*) (attribute + uvOffset);
+                    auto uv = Vector2f(packed[0] / 65535.0f, packed[1] / 65535.0f);
+
+                    if(uvScale.x != 0.0f || uvScale.y != 0.0f)
+                        uv = Vector2f((uv.x - 0.5f) * uvScale.x, (uv.y - 0.5f) * uvScale.y);
+
+                    decoded.geometry.texCoords[i] = uv;
+                }
+                else
+                {
+                    const uv = cast(const float*) (attribute + uvOffset);
+                    decoded.geometry.texCoords[i] = Vector2f(uv[0], uv[1]);
+                }
             }
 
             if(hasBones || hasWeights)
@@ -323,4 +383,32 @@ private string fixturePath(string relative)
 {
     import std.path: buildPath, dirName;
     return buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets", "godot_samples", relative);
+}
+
+unittest
+{
+    import pukan.godot_scene.text: parseGodotTextFile;
+    import std.path: buildPath, dirName;
+
+    const path = buildPath(__FILE_FULL_PATH__.dirName, "..", "..", "..", "demo", "assets",
+        "godot_samples", "generated", "compressed_array_mesh.tres");
+    auto document = parseGodotTextFile(path);
+    auto surfaces = decodeArrayMesh(document.resourceProperties["_surfaces"]);
+
+    assert(surfaces.length == 1);
+    assert(surfaces[0].geometry.positions.length == 36);
+    assert(surfaces[0].geometry.normals.length == 36);
+    assert(surfaces[0].geometry.tangents.length == 36);
+    assert(surfaces[0].geometry.texCoords.length == 36);
+    assert(surfaces[0].geometry.indices.length == 36);
+
+    foreach(position; surfaces[0].geometry.positions)
+    {
+        assert(position.x >= -1.001f && position.x <= 1.001f);
+        assert(position.y >= -1.001f && position.y <= 1.001f);
+        assert(position.z >= -1.001f && position.z <= 1.001f);
+    }
+
+    assert(surfaces[0].geometry.texCoords[0].x >= -1.001f);
+    assert(surfaces[0].geometry.texCoords[0].x <= 1.001f);
 }

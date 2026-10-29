@@ -64,8 +64,8 @@ or the pack.
       position, normal and tangent regions in `vertex_data`, interleaved
       `attribute_data` and `skin_data`, octahedral normals and tangents, RGBA8
       colors, float32 UVs and 16/32-bit indices.
-- [ ] Attribute-compressed surface decoding: quantized positions, half-float
-      UVs and octahedron TBN.
+- [x] Attribute-compressed surface decoding: quantized positions, 16-bit UVs,
+      octahedron normal and tangent angle.
 - [ ] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
 - [x] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
       `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
@@ -205,8 +205,8 @@ Fixtures live in `demo/assets/godot_samples/`.
       chains, an imported `.ctex`, binary resources and `project.binary`.
 - [x] Generated `external.tscn` with an external `.tres` mesh, an external
       material and both override forms.
-- [ ] Attribute-compressed `ArrayMesh` fixture, produced by the glTF importer
-      with mesh compression enabled.
+- [x] `compressed_array_mesh.tres` and `compressed_mesh.tscn`, produced by the
+      glTF importer from the AnimatedCube sample with mesh compression enabled.
 - [ ] `combined.tscn` instancing the three, for composition checks.
 - [x] README with source URLs, commit, licenses and the regeneration script.
 
