@@ -57,6 +57,24 @@ Vector3f parseVector(string text)
     return Vector3f(values[0], values[1], values[2]);
 }
 
+/// Names the content the loader saw but does not render
+void printSkippedTypes(string label, size_t[string] counts)
+{
+    import std.algorithm: sort;
+    import std.array: join;
+    import std.format: format;
+
+    if(counts.length == 0)
+        return;
+
+    string[] parts;
+    foreach(type, count; counts)
+        parts ~= format("%s x%d", type, count);
+
+    parts.sort;
+    writeln(label, ": ", parts.join(", "));
+}
+
 enum width = 800;
 enum height = 600;
 enum cameraFov = 45.0f;
@@ -202,6 +220,9 @@ void main(string[] args)
         ", lights ", godotScene.lights.length,
         ", instances ", godotScene.instanceCount,
         ", gltf assets ", scene.gltfFactory.cachedAssetCount);
+
+    printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
+    printSkippedTypes("resources not rendered", godotScene.skippedResourceTypes);
 
     foreach(bounds; godotScene.instanceBounds)
         writeln("instance aabb ", bounds.min.x, " ", bounds.min.y, " ", bounds.min.z,

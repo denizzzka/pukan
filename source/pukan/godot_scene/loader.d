@@ -147,6 +147,8 @@ private final class GodotLoader
 
     size_t skippedNodes;
     size_t skippedResources;
+    size_t[string] skippedNodeTypes;
+    size_t[string] skippedResourceTypes;
 
     this(LogicalDevice device, PbrFactory pbr, GltfFactory gltfFactory, GodotLoadOptions options)
     {
@@ -231,6 +233,8 @@ private final class GodotLoader
         );
         scene.skippedNodes = skippedNodes;
         scene.skippedResources = skippedResources;
+        scene.skippedNodeTypes = skippedNodeTypes;
+        scene.skippedResourceTypes = skippedResourceTypes;
         scene.geometryCount = geometryCache.length;
         scene.lights = lights;
         scene.camera = camera;
@@ -595,7 +599,87 @@ private final class GodotLoader
         if(section.type == "MeshInstance3D")
             createMeshInstance(document, section, node, parent);
 
+        if(isUnsupportedVisualNode(section.type))
+        {
+            ++skippedNodes;
+            ++skippedNodeTypes[section.type];
+
+            bool[string] visited;
+            foreach(_, ref value; section.properties)
+                countSkippedResource(document, value, visited);
+        }
+
         return node;
+    }
+
+    /// Node types that draw or light something in Godot but have no loader support
+    private static bool isUnsupportedVisualNode(string type)
+    {
+        switch(type)
+        {
+            case "WorldEnvironment":
+            case "ReflectionProbe":
+            case "LightmapGI":
+            case "VoxelGI":
+            case "FogVolume":
+            case "Decal":
+            case "GridMap":
+            case "MultiMeshInstance3D":
+            case "GPUParticles3D":
+            case "CPUParticles3D":
+            case "Label3D":
+            case "Sprite3D":
+            case "AnimatedSprite3D":
+                return true;
+
+            default:
+                return type.startsWith("CSG");
+        }
+    }
+
+    /// Resources behind an unsupported node, counted by type so the report names them
+    private void countSkippedResource(
+        ref GodotTextDocument document,
+        in GodotVariant value,
+        ref bool[string] visited,
+    )
+    {
+        if(value.type !is typeid(GodotObjectRef))
+            return;
+
+        const reference = asObjectRef(value, "resource");
+
+        if(reference.kind == GodotRefKind.subResource)
+        {
+            const key = "sub:" ~ reference.id;
+            if(key in visited)
+                return;
+            visited[key] = true;
+
+            auto resource = findSubResource(document, reference.id);
+            if(resource is null)
+                return;
+
+            ++skippedResources;
+            ++skippedResourceTypes[resource.type];
+
+            foreach(_, ref property; resource.properties)
+                countSkippedResource(document, property, visited);
+        }
+        else if(reference.kind == GodotRefKind.extResource)
+        {
+            const key = "ext:" ~ reference.id;
+            if(key in visited)
+                return;
+            visited[key] = true;
+
+            auto external = findExternal(document, reference.id);
+            if(external is null)
+                return;
+
+            ++skippedResources;
+            ++skippedResourceTypes[external.type];
+        }
     }
 
     private static bool isGltfPath(string path)

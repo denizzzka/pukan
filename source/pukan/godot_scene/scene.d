@@ -106,6 +106,10 @@ final class GodotScene : DrawableByVulkan, Blended
     string name;
     size_t skippedNodes;
     size_t skippedResources;
+    /// Unsupported node types, by name
+    size_t[string] skippedNodeTypes;
+    /// Resources referenced by those nodes, by type
+    size_t[string] skippedResourceTypes;
     /// Distinct GPU geometries shared by the meshes
     size_t geometryCount;
 
