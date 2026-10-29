@@ -1,7 +1,14 @@
-struct PointLight
+const uint LIGHT_DIRECTIONAL = 0u;
+const uint LIGHT_POINT = 1u;
+const uint LIGHT_SPOT = 2u;
+
+struct Light
 {
-    vec4 positionRadius; // xyz = world position, w = radius
-    vec4 color;          // rgb = colour
+    // Point and spot: xyz = world position, w = radius. Directional: xyz = direction to the light.
+    vec4 positionRadius;
+    vec4 directionOuterCos; // spot: xyz = beam direction, w = cosine of the outer angle
+    vec4 colorIntensity;    // rgb = colour times intensity
+    vec4 params;            // x = type, y = cosine of the inner angle
 };
 
 struct FrameData
@@ -9,10 +16,7 @@ struct FrameData
     mat4 invViewProj;
     mat4 viewProj;
     vec4 cameraPosition;
-    vec4 lightDirection;
-    vec4 lightColor;
-    vec4 exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = point light count
-    PointLight pointLights[8];
+    vec4 exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
 };
 
 #include "frame_bindings.h"
@@ -21,3 +25,14 @@ layout(set = 1, binding = FRAME_UNIFORM) uniform FrameBlock
 {
     FrameData frame;
 } frameUbo;
+
+layout(set = 1, binding = FRAME_LIGHTS) readonly buffer LightBuffer
+{
+    Light lights[];
+};
+
+/// The first light of the list is the sun
+vec3 sunDirection()
+{
+    return normalize(lights[0].positionRadius.xyz);
+}

@@ -134,7 +134,7 @@ void main()
     if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
         emissive *= texture(emissiveTexture, fragTextureCoord).rgb;
 
-    const vec3 lightDirection = normalize(frameUbo.frame.lightDirection.xyz);
+    const vec3 lightDirection = sunDirection();
 
     color = base.rgb * (0.6 + 0.6 * max(dot(normal, lightDirection), 0.0)) + emissive;
 #else

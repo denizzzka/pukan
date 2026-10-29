@@ -121,11 +121,9 @@ longer depend on a per-draw order. Missing:
 
 ## Lighting
 
-The frame carries one directional light and up to eight point lights; there are
-no shadows and no spot lights. Missing:
+The frame carries a light list in a storage buffer: the sun, then point and spot
+lights, sixteen entries in total. There are no shadows. Missing:
 
-- [ ] Move the light list into a storage buffer, add spot lights and make the
-      sun one entry of it instead of a fixed uniform.
 - [ ] Shadow maps. A cascaded directional map first, then an atlas for the
       local lights; both need a depth-only pass, so they follow the pass
       composition above.

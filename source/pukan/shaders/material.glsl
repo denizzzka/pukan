@@ -346,14 +346,7 @@ vec3 shadePbr(Surface s)
 {
     const vec3 N = normalize(s.normal);
     const vec3 V = normalize(frameUbo.frame.cameraPosition.xyz - s.position);
-    const vec3 L = normalize(frameUbo.frame.lightDirection.xyz);
-    const vec3 H = normalize(V + L);
-    const vec3 lightColor = frameUbo.frame.lightColor.rgb;
-
-    const float NdotL = max(dot(N, L), 0.0);
     const float NdotV = max(dot(N, V), 0.0);
-    const float NdotH = max(dot(N, H), 0.0);
-    const float VdotH = max(dot(V, H), 0.0);
 
     const float metallic = clamp(s.metallic, 0.0, 1.0);
     // A normal that changes faster than a pixel widens the lobe, so distant
@@ -362,11 +355,7 @@ vec3 shadePbr(Surface s)
 
     const float a = roughness * roughness;
     const float a2 = a * a;
-    const float denominator = NdotH * NdotH * (a2 - 1.0) + 1.0;
-    const float D = a2 / (MATERIAL_PI * denominator * denominator);
-
     const float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
-    const float G = (NdotL / (NdotL * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
 
 #ifdef CORE
     const vec3 F0 = mix(s.dielectricF0, s.albedo, metallic);
@@ -383,40 +372,6 @@ vec3 shadePbr(Surface s)
 
     const vec3 F90 = vec3(mix(s.dielectricF90, 1.0, metallic));
 #endif
-    const vec3 F = F0 + (F90 - F0) * pow(1.0 - VdotH, 5.0);
-
-#ifdef CORE
-    const vec3 specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
-#else
-    vec3 specular;
-
-    if(s.anisotropy > 0.0)
-    {
-        const float at = mix(a, 1.0, s.anisotropy * s.anisotropy);
-        const float ab = a;
-
-        const vec3 anisotropicT = normalize(s.tangent * s.anisotropyDirection.x + s.bitangent * s.anisotropyDirection.y);
-        const vec3 anisotropicB = normalize(cross(N, anisotropicT));
-
-        const float TdotL = dot(anisotropicT, L);
-        const float BdotL = dot(anisotropicB, L);
-        const float TdotV = dot(anisotropicT, V);
-        const float BdotV = dot(anisotropicB, V);
-        const float TdotH = dot(anisotropicT, H);
-        const float BdotH = dot(anisotropicB, H);
-
-        const float anisotropicD = D_GGX_anisotropic(NdotH, TdotH, BdotH, at, ab);
-        const float anisotropicV = V_GGX_anisotropic(NdotL, NdotV, BdotV, TdotV, TdotL, BdotL, at, ab);
-
-        specular = F * anisotropicV * anisotropicD;
-    }
-    else
-        specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
-#endif
-
-    const vec3 kD = (1.0 - F) * (1.0 - metallic);
-
-    vec3 brdf = kD * s.albedo / MATERIAL_PI + specular;
 
 #ifdef CORE
     const float clearcoat = 0.0;
@@ -424,61 +379,122 @@ vec3 shadePbr(Surface s)
 #else
     const float clearcoat = clamp(s.clearcoat, 0.0, 1.0);
     const float clearcoatRoughness = clamp(s.clearcoatRoughness, 0.04, 1.0);
-    float coatFresnel = 0.0;
-
-    if(clearcoat > 0.0)
-    {
-        const vec3 Nc = normalize(s.clearcoatNormal);
-        const float NdotLc = max(dot(Nc, L), 0.0);
-        const float NdotVc = max(dot(Nc, V), 0.0);
-        const float NdotHc = max(dot(Nc, H), 0.0);
-
-        const float aC = clearcoatRoughness * clearcoatRoughness;
-        const float aC2 = aC * aC;
-        const float denominatorC = NdotHc * NdotHc * (aC2 - 1.0) + 1.0;
-        const float Dc = aC2 / (MATERIAL_PI * denominatorC * denominatorC);
-
-        const float kC = (clearcoatRoughness + 1.0) * (clearcoatRoughness + 1.0) / 8.0;
-        const float Gc = (NdotLc / (NdotLc * (1.0 - kC) + kC)) * (NdotVc / (NdotVc * (1.0 - kC) + kC));
-
-        coatFresnel = 0.04 + 0.96 * pow(1.0 - NdotVc, 5.0);
-
-        const vec3 clearcoatBrdf = vec3(Dc * Gc / max(4.0 * NdotLc * NdotVc, 0.001));
-        brdf = mix(brdf, clearcoatBrdf, clearcoat * coatFresnel);
-    }
+    const float NdotVc = max(dot(normalize(s.clearcoatNormal), V), 0.0);
+    const float coatFresnel = clearcoat > 0.0 ? 0.04 + 0.96 * pow(1.0 - NdotVc, 5.0) : 0.0;
 #endif
 
-    vec3 direct = brdf * lightColor * NdotL;
+    const uint lightCount = uint(frameUbo.frame.exposureParams.w);
+    vec3 direct = vec3(0.0);
 
-    // Point lights reuse the GGX lobe of the sun; clearcoat and sheen stay on it
-    for(uint i = 0u; i < uint(frameUbo.frame.exposureParams.w); ++i)
+    for(uint i = 0u; i < lightCount; ++i)
     {
-        const vec4 positionRadius = frameUbo.frame.pointLights[i].positionRadius;
-        const vec3 toLight = positionRadius.xyz - s.position;
-        const float distance = length(toLight);
-        const vec3 Lp = toLight / max(distance, 0.001);
-        const float NdotLp = max(dot(N, Lp), 0.0);
+        const Light light = lights[i];
+        const uint type = uint(light.params.x);
 
-        if(NdotLp <= 0.0)
+        const vec3 toLight = type == LIGHT_DIRECTIONAL
+            ? light.positionRadius.xyz
+            : light.positionRadius.xyz - s.position;
+        const float distance = length(toLight);
+
+        const vec3 L = type == LIGHT_DIRECTIONAL
+            ? normalize(toLight)
+            : toLight / max(distance, 0.001);
+        const float NdotL = max(dot(N, L), 0.0);
+
+        if(NdotL <= 0.0)
             continue;
 
-        const float ratio = distance / max(positionRadius.w, 0.001);
-        const float attenuation = pow(clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0), 2.0)
-            / (distance * distance + 1.0);
+        float attenuation = 1.0;
 
-        const vec3 Hp = normalize(V + Lp);
-        const float NdotHp = max(dot(N, Hp), 0.0);
-        const float VdotHp = max(dot(V, Hp), 0.0);
+        if(type != LIGHT_DIRECTIONAL)
+        {
+            const float radius = max(light.positionRadius.w, 0.001);
+            const float ratio = distance / radius;
 
-        const float denominatorP = NdotHp * NdotHp * (a2 - 1.0) + 1.0;
-        const float Dp = a2 / (MATERIAL_PI * denominatorP * denominatorP);
-        const float Gp = (NdotLp / (NdotLp * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
-        const vec3 Fp = F0 + (F90 - F0) * pow(1.0 - VdotHp, 5.0);
-        const vec3 kDp = (1.0 - Fp) * (1.0 - metallic);
-        const vec3 specularP = Dp * Gp * Fp / max(4.0 * NdotLp * NdotV, 0.001);
+            attenuation = pow(clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0), 2.0)
+                / (distance * distance + 1.0);
 
-        direct += (kDp * s.albedo / MATERIAL_PI + specularP)
-            * frameUbo.frame.pointLights[i].color.rgb * NdotLp * attenuation;
+            if(type == LIGHT_SPOT)
+            {
+                const float cosAngle = dot(normalize(light.directionOuterCos.xyz), -L);
+                attenuation *= clamp(
+                    (cosAngle - light.directionOuterCos.w) / max(light.params.y - light.directionOuterCos.w, 1e-4),
+                    0.0, 1.0);
+            }
+        }
+
+        const vec3 H = normalize(V + L);
+        const float NdotH = max(dot(N, H), 0.0);
+        const float VdotH = max(dot(V, H), 0.0);
+
+        const float denominator = NdotH * NdotH * (a2 - 1.0) + 1.0;
+        const float D = a2 / (MATERIAL_PI * denominator * denominator);
+        const float G = (NdotL / (NdotL * (1.0 - k) + k)) * (NdotV / (NdotV * (1.0 - k) + k));
+
+        const vec3 F = F0 + (F90 - F0) * pow(1.0 - VdotH, 5.0);
+
+#ifdef CORE
+        const vec3 specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
+#else
+        vec3 specular;
+
+        if(s.anisotropy > 0.0)
+        {
+            const float at = mix(a, 1.0, s.anisotropy * s.anisotropy);
+            const float ab = a;
+
+            const vec3 anisotropicT = normalize(s.tangent * s.anisotropyDirection.x + s.bitangent * s.anisotropyDirection.y);
+            const vec3 anisotropicB = normalize(cross(N, anisotropicT));
+
+            const float TdotL = dot(anisotropicT, L);
+            const float BdotL = dot(anisotropicB, L);
+            const float TdotV = dot(anisotropicT, V);
+            const float BdotV = dot(anisotropicB, V);
+            const float TdotH = dot(anisotropicT, H);
+            const float BdotH = dot(anisotropicB, H);
+
+            const float anisotropicD = D_GGX_anisotropic(NdotH, TdotH, BdotH, at, ab);
+            const float anisotropicV = V_GGX_anisotropic(NdotL, NdotV, BdotV, TdotV, TdotL, BdotL, at, ab);
+
+            specular = F * anisotropicV * anisotropicD;
+        }
+        else
+            specular = D * G * F / max(4.0 * NdotL * NdotV, 0.001);
+#endif
+
+        const vec3 kD = (1.0 - F) * (1.0 - metallic);
+        vec3 brdf = kD * s.albedo / MATERIAL_PI + specular;
+
+#ifndef CORE
+        if(clearcoat > 0.0)
+        {
+            const vec3 Nc = normalize(s.clearcoatNormal);
+            const float NdotLc = max(dot(Nc, L), 0.0);
+            const float NdotHc = max(dot(Nc, H), 0.0);
+
+            const float aC = clearcoatRoughness * clearcoatRoughness;
+            const float aC2 = aC * aC;
+            const float denominatorC = NdotHc * NdotHc * (aC2 - 1.0) + 1.0;
+            const float Dc = aC2 / (MATERIAL_PI * denominatorC * denominatorC);
+
+            const float kC = (clearcoatRoughness + 1.0) * (clearcoatRoughness + 1.0) / 8.0;
+            const float Gc = (NdotLc / (NdotLc * (1.0 - kC) + kC)) * (NdotVc / (NdotVc * (1.0 - kC) + kC));
+
+            const vec3 clearcoatBrdf = vec3(Dc * Gc / max(4.0 * NdotLc * NdotVc, 0.001));
+            brdf = mix(brdf, clearcoatBrdf, clearcoat * coatFresnel);
+        }
+#endif
+
+        direct += brdf * light.colorIntensity.rgb * NdotL * attenuation;
+
+#ifndef CORE
+        if(maxComponent(s.sheenColor) > 0.0)
+        {
+            const float sheenRoughness = clamp(s.sheenRoughness, 0.0001, 1.0);
+            direct += s.sheenColor * D_Charlie(sheenRoughness, NdotH) * V_Neubelt(NdotV, NdotL)
+                * light.colorIntensity.rgb * NdotL * attenuation;
+        }
+#endif
     }
 
     const vec3 R = reflect(-V, N);
@@ -504,20 +520,17 @@ vec3 shadePbr(Surface s)
 
     const float coating = 1.0 - clearcoat * coatFresnel;
 
-    vec3 sheenDirect = vec3(0.0);
     vec3 sheenAmbient = vec3(0.0);
 
 #ifndef CORE
     if(maxComponent(s.sheenColor) > 0.0)
     {
         const float sheenRoughness = clamp(s.sheenRoughness, 0.0001, 1.0);
-        sheenDirect = s.sheenColor * D_Charlie(sheenRoughness, NdotH) * V_Neubelt(NdotV, NdotL);
         sheenAmbient = s.sheenColor * sheenEnvironmentBRDF(N, V, sheenRoughness) * reflection;
     }
 #endif
 
     vec3 color = direct
-        + sheenDirect * lightColor * NdotL
         + (ambient + sheenAmbient) * coating
         + s.emissive * coating;
 
@@ -586,7 +599,7 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
 
     if(mode == MATERIAL_MODE_LIT)
     {
-        const vec3 lightDirection = normalize(frameUbo.frame.lightDirection.xyz);
+        const vec3 lightDirection = sunDirection();
         return albedo * (0.6 + 0.6 * max(dot(unitNormal, lightDirection), 0.0)) + emissive;
     }
 

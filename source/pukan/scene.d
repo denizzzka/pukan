@@ -51,20 +51,49 @@ class Scene
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
-    /// Point lights uploaded with the frame, on top of the directional sun
-    PointLight[maxPointLights] pointLights;
-    uint pointLightCount;
+    /// Uploaded with the frame; the first entry is the sun
+    private Light[maxLights] lights;
+    private uint lightCount;
+    private MemoryBufferMappedToCPU[] lightBufs;
 
     void addPointLight(Vector3f position, Vector3f color, float radius)
     {
+        addLight(Light(
+            Vector4f(position.x, position.y, position.z, radius),
+            Vector4f(0, 0, 0, 0),
+            Vector4f(color.x, color.y, color.z, 0),
+            Vector4f(cast(float) LightType.point, 0, 0, 0),
+        ));
+    }
+
+    void addSpotLight(
+        Vector3f position,
+        Vector3f direction,
+        Vector3f color,
+        float radius,
+        float innerAngle,
+        float outerAngle,
+    )
+    {
+        import std.math: cos;
+
+        const beam = direction.normalized;
+
+        addLight(Light(
+            Vector4f(position.x, position.y, position.z, radius),
+            Vector4f(beam.x, beam.y, beam.z, cos(outerAngle)),
+            Vector4f(color.x, color.y, color.z, 0),
+            Vector4f(cast(float) LightType.spot, cos(innerAngle), 0, 0),
+        ));
+    }
+
+    private void addLight(Light light)
+    {
         import std.exception: enforce;
 
-        enforce(pointLightCount < maxPointLights, "too many point lights");
+        enforce(lightCount < maxLights, "too many lights");
 
-        pointLights[pointLightCount++] = PointLight(
-            Vector4f(position.x, position.y, position.z, radius),
-            Vector4f(color.x, color.y, color.z, 0),
-        );
+        lights[lightCount++] = light;
     }
 
     /// Whether transmissive meshes get a second pass after a copy of the frame.
@@ -85,6 +114,15 @@ class Scene
         windowSizeChanged = wsc;
         this.surfaceFormat = surfaceFormat;
         this.presentMode = presentMode;
+
+        const sun = Vector3f(0.35f, 0.5f, 0.8f).normalized;
+        lights[0] = Light(
+            Vector4f(sun.x, sun.y, sun.z, 0),
+            Vector4f(0, 0, 0, 0),
+            Vector4f(1, 1, 1, 1),
+            Vector4f(cast(float) LightType.directional, 0, 0, 0),
+        );
+        lightCount = 1;
 
         device.physicalDevice.instance.useSurface(surface);
 
@@ -123,6 +161,10 @@ class Scene
         foreach(ref oit; oitFrames)
             if(oit)
                 destroy(oit);
+
+        foreach(ref buffer; lightBufs)
+            if(buffer)
+                destroy(buffer);
 
         if(oitResolve)
             destroy(oitResolve);
@@ -169,6 +211,11 @@ class Scene
         }
         oitFrames = null;
 
+        foreach(ref buffer; lightBufs)
+            if(buffer)
+                destroy(buffer);
+        lightBufs.length = swapChain.frames.length;
+
         foreach(ref frame; swapChain.frames)
             frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
 
@@ -177,6 +224,13 @@ class Scene
         foreach(i, ref frame; swapChain.frames)
         {
             auto sceneColor = imageInfo(frame.sceneColor);
+
+            lightBufs[i] = device.create!MemoryBufferMappedToCPU(maxLights * Light.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            auto lightInfo = VkDescriptorBufferInfo(
+                buffer: lightBufs[i].buf,
+                offset: 0,
+                range: maxLights * Light.sizeof,
+            );
 
             oitFrames[i] = new OitFrame(device, oitResolve.pass, frame.imageView, swapChain.imageExtent);
 
@@ -196,6 +250,7 @@ class Scene
                     oitHeads,
                     oitFragments,
                     oitCounter,
+                    lightInfo,
                 );
         }
     }
@@ -421,21 +476,21 @@ class Scene
     {
         const viewProj = wtb.proj * wtb.view;
         const camera = translation(wtb.view.inverse);
-        const light = Vector3f(0.35f, 0.5f, 0.8f).normalized;
 
         FrameUniforms data;
         data.invViewProj = viewProj.inverse;
         data.viewProj = viewProj;
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
-        data.lightDirection = Vector4f(light.x, light.y, light.z, 0);
-        data.lightColor = Vector4f(1, 1, 1, 1);
         data.exposureParams = Vector4f(
             exposure,
             iblIntensity,
             transmissionPassEnabled ? 1 : 0,
-            cast(float) pointLightCount,
+            cast(float) lightCount,
         );
-        data.pointLights[] = pointLights[];
+
+        auto lightBuffer = lightBufs[frameIndex(frame)];
+        const lightBytes = lightCount * Light.sizeof;
+        (cast(Light[]) lightBuffer.cpuBuf[0 .. lightBytes])[] = lights[0 .. lightCount];
 
         frame.frameSets[eye].update(data);
     }
@@ -726,24 +781,32 @@ struct WorldTransformation
     Matrix4f proj; /// view to projection (to projective/homogeneous coordinates)
 }
 
-enum maxPointLights = 8;
+enum maxLights = 16;
 
-/// Uploaded with the frame; the shader adds them to the directional sun
-struct PointLight
+enum LightType : uint
 {
-    Vector4f positionRadius; // xyz = world position, w = radius
-    Vector4f color;          // rgb = colour, already scaled by intensity
+    directional,
+    point,
+    spot,
 }
+
+/// Mirrors the Light struct in frame.glsl
+struct Light
+{
+    Vector4f positionRadius;    // point/spot: xyz = world position, w = radius; directional: xyz = direction
+    Vector4f directionOuterCos; // spot: xyz = beam direction, w = cosine of the outer angle
+    Vector4f colorIntensity;    // rgb = colour, already scaled by intensity
+    Vector4f params;            // x = type, y = cosine of the inner angle
+}
+
+static assert(Light.sizeof == 64);
 
 struct FrameUniforms
 {
     Matrix4x4f invViewProj;
     Matrix4x4f viewProj;
     Vector4f cameraPosition;
-    Vector4f lightDirection;
-    Vector4f lightColor;
-    Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = point light count
-    PointLight[maxPointLights] pointLights;
+    Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
 }
 
 ///

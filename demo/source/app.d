@@ -254,6 +254,15 @@ void main(string[] args) {
     scene.addPointLight(Vector3f(-0.8f, 0.4f, 0.8f), Vector3f(0.15f, 0.45f, 1.0f) * 6.0f, 4.0f);
     scene.addPointLight(Vector3f(0.0f, 1.1f, 1.4f), Vector3f(0.3f, 0.9f, 0.35f) * 4.0f, 5.0f);
 
+    scene.addSpotLight(
+        Vector3f(0.0f, 0.8f, -1.6f),
+        Vector3f(0.0f, -0.15f, 1.0f),
+        Vector3f(1.0f, 0.9f, 0.75f) * 6.0f,
+        8.0f,
+        18f.degtorad,
+        32f.degtorad,
+    );
+
 
     {
         GltfLoadOptions loadOptions;

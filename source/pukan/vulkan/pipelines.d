@@ -300,6 +300,12 @@ final class PipelineFactory
                 descriptorCount: 1,
                 stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
             ),
+            VkDescriptorSetLayoutBinding(
+                binding: FRAME_LIGHTS,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+            ),
         ];
         frameSetLayout = device.createDescriptorSetLayout(frameBindings);
     }
