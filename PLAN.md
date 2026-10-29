@@ -281,6 +281,21 @@ against the plain version it replaces.
 Not parallelized: present, event polling, swapchain maintenance, pipeline and
 shader creation.
 
+## Shader preloading
+
+Long term: every glTF pipeline variant is built when the factory is created,
+whether the loaded scene draws it or not, while a streaming scene needs the
+opposite. The scene should be able to name the shaders and pipeline variants it
+will use before the first frame, so a loader can warm them while the scene loads
+and no first draw stalls on a compile.
+
+- [ ] A scene query that collects the shader and pipeline variants the loaded
+      materials, lighting modes and passes need, without creating them.
+- [ ] Preload the reported set on a worker and make the first use wait on a
+      fence instead of compiling inside the frame.
+- [ ] Keep the on-demand path as a fallback for materials that appear after the
+      query.
+
 ## OpenXR
 
 The most distant item: VR owns the frame shape, so it waits until the renderer
