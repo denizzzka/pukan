@@ -112,10 +112,12 @@ struct FlyCamera
         position += direction.normalized * distance;
     }
 
-    /// Moves in the screen plane by the two world distances
+    /// Moves in the screen plane; with the horizontal look axis the vertical
+    /// part goes along world up, so it reaches the zenith and the nadir
     void pan(float rightDistance, float upDistance)
     {
-        position += right * rightDistance + up * upDistance;
+        position += right * rightDistance;
+        position += (lookAxis == LookAxis.horizontal ? worldUp : up) * upDistance;
     }
 
     /// Wheel notches: positive zooms in by narrowing the field of view
@@ -343,6 +345,28 @@ unittest
     camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(1, 0, 0));
     camera.pan(2, 0);
     assert(isClose(camera.position.z, 2, 1e-4f, 1e-4f));
+}
+
+unittest
+{
+    // The horizontal axis pans the vertical part straight to the zenith,
+    // whatever the pitch and the roll
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, -1, -1));
+    camera.rollBy(0.6f);
+    camera.lookAxis = LookAxis.horizontal;
+
+    camera.pan(0, 1);
+    assert(isClose(camera.position.x, 0, 1e-4f, 1e-4f));
+    assert(isClose(camera.position.y, 1, 1e-4f, 1e-4f));
+    assert(isClose(camera.position.z, 0, 1e-4f, 1e-4f));
+
+    // The screen axis keeps the pan in the camera plane
+    camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, -1, -1));
+    camera.lookAxis = LookAxis.screen;
+
+    camera.pan(0, 1);
+    assert(camera.position.y > 0);
+    assert(camera.position.z < 0);
 }
 
 unittest
