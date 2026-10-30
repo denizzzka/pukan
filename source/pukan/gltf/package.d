@@ -11,7 +11,7 @@ import pukan.gltf.material: applyGltfMaterial;
 import pukan.mesh: mirrors;
 import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
-import pukan.misc: Boxf;
+import pukan.misc: Boxf, isVisible;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -869,6 +869,10 @@ class GlTF : DrawableByVulkan, Blended
 
             foreach(mesh; node.meshes)
             {
+                //TODO: cull skinned meshes by their posed bounds
+                if(!mesh.hasSkin && !isVisible(mesh.localAABB, trans))
+                    continue;
+
                 const clip = Vector4f(0, 0, 0, 1) * trans;
                 draws ~= MeshDraw(mesh, trans, clip.w);
             }
@@ -884,9 +888,39 @@ class GlTF : DrawableByVulkan, Blended
         if(phase == DrawPhase.blended)
             draws.sort!((a, b) => a.depth > b.depth);
 
-        foreach(draw; draws)
-            if(matchesPhase(draw.mesh, phase))
-                draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+        if(phase == DrawPhase.surface || phase == DrawPhase.shadow)
+        {
+            MeshClass[] order;
+            Matrix4x4f[][MeshClass] groups;
+
+            foreach(draw; draws)
+            {
+                if(!matchesPhase(draw.mesh, phase))
+                    continue;
+
+                //TODO: batch skinned meshes that share a pose
+                if(draw.mesh.hasSkin)
+                {
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+                    continue;
+                }
+
+                if(auto group = draw.mesh in groups)
+                    *group ~= draw.trans;
+                else
+                {
+                    order ~= draw.mesh;
+                    groups[draw.mesh] = [draw.trans];
+                }
+            }
+
+            foreach(mesh; order)
+                mesh.drawBatch(buf, selectPipeline(mesh, phase), groups[mesh], frameSet);
+        }
+        else
+            foreach(draw; draws)
+                if(matchesPhase(draw.mesh, phase))
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
     }
 
     private static bool matchesPhase(const MeshClass mesh, DrawPhase phase)

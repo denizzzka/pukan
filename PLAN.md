@@ -416,9 +416,13 @@ there are no cascades and no local-light shadows. Missing:
 
 - [ ] Cascaded directional maps and an atlas for the local lights; the current
       map is one perspective map around the scene centre and only the sun uses it.
+- [ ] Cache the sun's shadow map while the casters and the sun stay put, so a
+      static level does not redraw an unchanged map every frame.
 - [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.
 - [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
 - [ ] Light culling by distance and screen size.
+- [ ] Shadowmasking: baked directional occlusion that dynamic lights sample, so
+      a lit surface can stay in a baked shadow.
 
 ## Deferred shading
 
@@ -482,21 +486,27 @@ against the plain version it replaces.
         switches state instead of re-encoding indices. Requires the Vulkan 1.3
         `extendedDynamicState` feature.
 
+- **Frustum culling**
+  - [x] Conservative local-AABB test against the draw matrix in the Godot and
+        glTF paths, in the colour and shadow passes, so an off-screen mesh
+        costs no draw.
+  - [ ] Skinned meshes: derive the bounds from the posed skeleton instead of
+        skipping them.
+  - [ ] Cull whole instances and subtrees before walking their children.
+
 - **Instanced static primitives**
-  - [ ] Batch any mesh that shares vertex and index buffers, pipeline variant
-        and texture set into one instanced draw, not glTF primitives only: the
-        loader is the first producer, not the boundary. The transform moves from
-        the push constant into an instance buffer, and the material becomes a
-        palette the fragment shader indexes by the instance instead of a
-        descriptor set per mesh. One batch carries one texture set, so materials
-        with different textures split it. The sphere and cylinder renderers
-        already issue instanced draws from compute-built commands and stay as
-        they are.
+  - [x] Batch static meshes that share vertex and index buffers, pipeline
+        variant and descriptor set into one instanced draw, not glTF primitives
+        only: the loader is the first producer, not the boundary. The transform
+        moves from the push constant into a per-frame instance buffer read as
+        vertex attributes. One batch carries one descriptor set, so meshes with
+        different materials split it. The sphere and cylinder renderers already
+        issue instanced draws from compute-built commands and stay as they are.
   - [ ] Skinned meshes join the same batch while they share a pose, which is one
         joint matrix buffer: the shader applies the instance transform after
         skinning, so a crowd in lockstep costs one draw. Different poses split
         into batches, each still instanced.
-  - [ ] Drop the texture set from the batch key: index textures from the
+  - [ ] Drop the descriptor set from the batch key: index textures from the
         material through one descriptor array sampled with
         `descriptorIndexing`, and store image and sampler indices in the
         material. Bounded by the after-bind descriptor limits and by the

@@ -4,7 +4,7 @@ import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.mesh: mirrors;
-import pukan.misc: Boxf;
+import pukan.misc: Boxf, isVisible;
 import pukan.pbr.accessor: BufferPieceOnGPU;
 import pukan.pbr.mesh: PbrMesh;
 import pukan.pbr.pipelines: LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
@@ -323,6 +323,10 @@ final class GodotScene : DrawableByVulkan, Blended
 
             foreach(mesh; node.meshes)
             {
+                //TODO: cull skinned meshes by their posed bounds
+                if(!mesh.hasSkin && !isVisible(mesh.localAABB, trans))
+                    continue;
+
                 const clip = Vector4f(0, 0, 0, 1) * trans;
                 draws ~= MeshDraw(mesh, trans, clip.w);
             }
@@ -337,9 +341,39 @@ final class GodotScene : DrawableByVulkan, Blended
         if(phase == DrawPhase.blended)
             draws.sort!((a, b) => a.depth > b.depth);
 
-        foreach(draw; draws)
-            if(matchesPhase(draw.mesh, phase))
-                draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+        if(phase == DrawPhase.surface || phase == DrawPhase.shadow)
+        {
+            PbrMesh[] order;
+            Matrix4x4f[][PbrMesh] groups;
+
+            foreach(draw; draws)
+            {
+                if(!matchesPhase(draw.mesh, phase))
+                    continue;
+
+                //TODO: batch skinned meshes that share a pose
+                if(draw.mesh.hasSkin)
+                {
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+                    continue;
+                }
+
+                if(auto group = draw.mesh in groups)
+                    *group ~= draw.trans;
+                else
+                {
+                    order ~= draw.mesh;
+                    groups[draw.mesh] = [draw.trans];
+                }
+            }
+
+            foreach(mesh; order)
+                mesh.drawBatch(buf, selectPipeline(mesh, phase), groups[mesh], frameSet);
+        }
+        else
+            foreach(draw; draws)
+                if(matchesPhase(draw.mesh, phase))
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
 
         void drawInstances(GodotNode node, Matrix4x4f trans)
         {

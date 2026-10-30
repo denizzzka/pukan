@@ -2,16 +2,16 @@
 
 #include "frame.glsl"
 
-layout(push_constant) uniform PushConsts
-{
-    mat4 trans;
-};
-
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 vertTextureCoord;
 layout(location = 2) in vec3 vertNormal;
 layout(location = 3) in vec4 vertTangent;
 layout(location = 6) in vec4 vertColor;
+
+layout(location = 7) in vec4 instance0;
+layout(location = 8) in vec4 instance1;
+layout(location = 9) in vec4 instance2;
+layout(location = 10) in vec4 instance3;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTextureCoord;
@@ -21,6 +21,9 @@ layout(location = 4) out vec4 fragTangent;
 
 void main()
 {
+    // Instance attributes are the matrix columns
+    const mat4 trans = mat4(instance0, instance1, instance2, instance3);
+
 #ifdef SHADOW
     gl_Position = trans * vec4(position, 1.0);
     return;

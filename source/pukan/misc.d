@@ -114,7 +114,7 @@ VkFormat linearFormat(VkFormat format) @safe nothrow pure
     }
 }
 
-import dlib.math: Vector3f;
+import dlib.math: Matrix4x4f, Vector3f, Vector4f, translationMatrix;
 
 //TODO: try dlib.geometry.aabb.AABB instead: it provides intersectsAABB and
 // closestPoint, but has no comparison for two boxes
@@ -122,6 +122,67 @@ struct Boxf
 {
     Vector3f min;
     Vector3f max;
+}
+
+/// Conservative clip-space test; a box without bounds is always visible
+bool isVisible(in Boxf box, in Matrix4x4f mvp) @safe nothrow pure
+{
+    import std.math: abs, isNaN;
+
+    foreach(axis; 0 .. 3)
+        if(box.min[axis].isNaN || box.max[axis].isNaN)
+            return true;
+
+    const center = (box.min + box.max) * 0.5f;
+    const extent = (box.max - box.min) * 0.5f;
+
+    // `v * mvp` is the row vector times the matrix, so each clip coordinate
+    // is the dot of the vertex with one matrix row
+    Vector4f row(size_t index) @safe nothrow pure
+    {
+        return Vector4f(
+            mvp.arrayof[index],
+            mvp.arrayof[4 + index],
+            mvp.arrayof[8 + index],
+            mvp.arrayof[12 + index],
+        );
+    }
+
+    bool outside(Vector4f p) @safe nothrow pure
+    {
+        const distance = p.x * center.x + p.y * center.y + p.z * center.z + p.w
+            + abs(p.x) * extent.x + abs(p.y) * extent.y + abs(p.z) * extent.z;
+
+        return distance < 0.0f;
+    }
+
+    const w = row(3);
+
+    foreach(axis; 0 .. 3)
+    {
+        const axisRow = row(axis);
+
+        if(outside(axisRow + w) || outside(w - axisRow))
+            return false;
+    }
+
+    return true;
+}
+
+unittest
+{
+    const unit = Boxf(Vector3f(0, 0, 0), Vector3f(1, 1, 1));
+
+    assert(isVisible(unit, Matrix4x4f.identity));
+    assert(!isVisible(Boxf(Vector3f(2, 0, 0), Vector3f(3, 1, 1)), Matrix4x4f.identity));
+    assert(!isVisible(Boxf(Vector3f(0, -3, 0), Vector3f(1, -2, 1)), Matrix4x4f.identity));
+
+    // Rows carry the clip planes, so a translation reaches them
+    assert(!isVisible(unit, Vector3f(100, 0, 0).translationMatrix));
+    assert(isVisible(unit, Vector3f(-0.5f, 0, 0).translationMatrix));
+
+    Boxf unknown;
+    assert(isVisible(unknown, Matrix4x4f.identity));
 }
 
 void expandAABB(ref Boxf box, in Vector3f v)

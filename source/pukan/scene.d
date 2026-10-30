@@ -6,6 +6,7 @@ import pukan.pbr.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
+import pukan.pbr.instancing: InstanceArena, currentInstanceArena;
 import pukan.screenshot: Screenshot;
 import pukan.shadow: ShadowMap, ShadowPass;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
@@ -163,6 +164,7 @@ class Scene
     private Light[maxLights] lights;
     private uint lightCount;
     private MemoryBufferMappedToCPU[] lightBufs;
+    private InstanceArena[] instanceArenas;
 
     void addPointLight(Vector3f position, Vector3f color, float radius)
     {
@@ -332,6 +334,10 @@ class Scene
             if(buffer)
                 destroy(buffer);
 
+        foreach(ref arena; instanceArenas)
+            if(arena)
+                destroy(arena);
+
         foreach(ref map; shadowMaps)
             if(map)
                 destroy(map);
@@ -403,6 +409,13 @@ class Scene
             if(buffer)
                 destroy(buffer);
         lightBufs.length = swapChain.frames.length;
+
+        foreach(ref arena; instanceArenas)
+            if(arena)
+                destroy(arena);
+        instanceArenas.length = swapChain.frames.length;
+        foreach(i; 0 .. instanceArenas.length)
+            instanceArenas[i] = new InstanceArena(device);
 
         // The maps do not depend on the swapchain, so a replacement keeps them
         if(shadowMaps.length != swapChain.frames.length)
@@ -722,6 +735,9 @@ class Scene
     {
         auto commandBuffer = frame.commandBuffer;
 
+        currentInstanceArena = instanceArenas[frameIndex(frame)];
+        currentInstanceArena.reset();
+
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;
 
@@ -816,6 +832,9 @@ class Scene
     )
     {
         auto commandBuffer = frame.commandBuffer;
+
+        currentInstanceArena = instanceArenas[frameIndex(frame)];
+        currentInstanceArena.reset();
 
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;

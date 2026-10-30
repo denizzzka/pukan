@@ -3,6 +3,7 @@ module pukan.pbr.factory;
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import material_bindings;
 import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines;
+import pukan.pbr.mesh: staticInstanceBinding;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -115,6 +116,11 @@ private ShaderVertexInput staticVertexInput()
                 stride: 4,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: staticInstanceBinding,
+                stride: Matrix4x4f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_INSTANCE,
+            ),
         ],
         [
             VkVertexInputAttributeDescription(
@@ -141,6 +147,30 @@ private ShaderVertexInput staticVertexInput()
                 binding: 4,
                 location: 6,
                 format: VK_FORMAT_R8G8B8A8_UNORM,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 5,
+                location: 7,
+                format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                offset: 0,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 5,
+                location: 8,
+                format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                offset: 4 * float.sizeof,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 5,
+                location: 9,
+                format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                offset: 8 * float.sizeof,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: 5,
+                location: 10,
+                format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                offset: 12 * float.sizeof,
             ),
         ],
     );
@@ -329,12 +359,7 @@ class PbrFactory
                         stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
                     ),
                 ],
-                VkPushConstantRange(
-                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                    offset: 0,
-                    size: Matrix4x4f.sizeof,
-                ),
-                staticVertexInput(),
+                vertexInput: staticVertexInput(),
             ),
             fragmentStage!"mesh_shadow_frag.spv"(device),
         ];
@@ -436,12 +461,7 @@ class PbrFactory
                         stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
                     ),
                 ],
-                VkPushConstantRange(
-                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                    offset: 0,
-                    size: Matrix4x4f.sizeof,
-                ),
-                staticVertexInput(),
+                vertexInput: staticVertexInput(),
             ),
             fragmentStage!fragmentSpv(device),
         ];

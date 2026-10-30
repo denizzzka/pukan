@@ -2,5 +2,6 @@ module pukan.pbr;
 
 public import pukan.pbr.accessor;
 public import pukan.pbr.factory;
+public import pukan.pbr.instancing;
 public import pukan.pbr.mesh;
 public import pukan.pbr.pipelines;

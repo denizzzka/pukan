@@ -3,11 +3,15 @@ module pukan.pbr.mesh;
 import dlib.math;
 import material_bindings;
 import pukan.pbr.accessor;
+import pukan.pbr.instancing: InstanceBatch, currentInstanceArena;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
 import pukan.misc: Boxf, expandAABB;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+
+/// Vertex input binding of the per-instance transform matrix
+enum staticInstanceBinding = 5;
 
 struct IndicesDescr
 {
@@ -227,6 +231,63 @@ final class PbrGeometry
             vkCmdDraw(buf, vertexCount, 1, 0, 0);
     }
 
+    package(pukan) void drawInstanced(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        InstanceBatch batch,
+        VkFrontFace frontFace,
+        VkDescriptorSet descriptorSet,
+    )
+    {
+        assert(buffers.length == staticInstanceBinding);
+
+        if(buffers.length)
+            vkCmdBindVertexBuffers2(
+                buf,
+                0,
+                cast(uint) buffers.length,
+                buffers.ptr,
+                offsets.ptr,
+                sizes.ptr,
+                strides.ptr,
+            );
+
+        VkDeviceSize instanceOffset;
+        VkDeviceSize instanceSize = batch.size;
+        VkDeviceSize instanceStride = Matrix4x4f.sizeof;
+        vkCmdBindVertexBuffers2(
+            buf,
+            staticInstanceBinding,
+            1,
+            &batch.buffer,
+            &instanceOffset,
+            &instanceSize,
+            &instanceStride,
+        );
+
+        if(indexCount)
+            vkCmdBindIndexBuffer(buf, indexBuffer, indexOffset, indexType);
+
+        if(descriptorSet)
+            vkCmdBindDescriptorSets(
+                buf,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineLayout,
+                0,
+                1,
+                &descriptorSet,
+                0,
+                null,
+            );
+
+        vkCmdSetFrontFace(buf, frontFace);
+
+        if(indexCount)
+            vkCmdDrawIndexed(buf, indexCount, batch.count, 0, 0, batch.firstInstance);
+        else
+            vkCmdDraw(buf, vertexCount, batch.count, 0, batch.firstInstance);
+    }
+
     package(pukan) auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
     {
         import std.math: isNaN;
@@ -347,6 +408,55 @@ final class PbrMesh : Mesh
     package(pukan) auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
     {
         geometry.calcAABB(gpuBuffs, box);
+    }
+
+    /// Mesh-space bounds; NaN when the source did not provide them
+    @property Boxf localAABB() const
+    {
+        return geometry.vert.aabb;
+    }
+
+    override void draw(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans, VkDescriptorSet frameSet)
+    {
+        if(hasSkin)
+        {
+            super.draw(buf, pipeline, trans, frameSet);
+            return;
+        }
+
+        Matrix4x4f[1] instances = trans;
+        drawBatch(buf, pipeline, instances[], frameSet);
+    }
+
+    /// Draws static instances that share this mesh in one call
+    package(pukan) void drawBatch(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        const Matrix4x4f[] transforms,
+        VkDescriptorSet frameSet,
+    )
+    in(transforms.length > 0)
+    {
+        assert(!hasSkin);
+        assert(currentInstanceArena !is null, "static draw outside Scene recording");
+
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+
+        if(frameSet)
+            vkCmdBindDescriptorSets(
+                buf,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineLayout,
+                1,
+                1,
+                &frameSet,
+                0,
+                null,
+            );
+
+        auto batch = currentInstanceArena.append(transforms);
+
+        geometry.drawInstanced(buf, pipeline, batch, frontFace, descriptorSet);
     }
 
     package(pukan) void bindTexture(size_t binding, MaterialFlag flag, VkDescriptorImageInfo image)
