@@ -612,6 +612,25 @@ and no first draw stalls on a compile.
 - [ ] Keep the on-demand path as a fallback for materials that appear after the
       query.
 
+## Build-time feature selection
+
+The README asks for builds assembled from the features a project uses.
+
+- [ ] Compile a second lit fragment pair without `shadowFactor`, selected at
+      draw time from `Scene.shadowsEnabled`. Only lit doubles: 4 more SPVs and
+      24 pipelines. Duplicating the whole `mesh_pbr` family would add hundreds
+      of pipelines for a runtime toggle that already skips the fetch, so it
+      waits for the general variant selection.
+- [ ] Clarify the shader configuration space. List the axes that now multiply
+      `mesh_pbr` (lighting mode, shadows, OIT, transmission, Godot vs glTF,
+      core vs extended PBR) and choose for each a separate SPV, a
+      specialization constant, or a runtime branch. Explore splitting the
+      shader into feature blocks and composing only the needed ones at load
+      when a pipeline is created, for better performance: measure whether the
+      driver prunes dead branches from specialization constants, and whether
+      composing and compiling at load is affordable next to shipping SPVs.
+      This is the same shape as Godot's per-variant shader compilation.
+
 ## OpenXR
 
 The most distant item: VR owns the frame shape, so it waits until the renderer
