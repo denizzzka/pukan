@@ -6,7 +6,7 @@ public import pukan.gltf.factory: GltfFactory;
 import pukan.pbr.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, transmissionPass;
+import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.mesh: mirrors;
 import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
@@ -827,6 +827,9 @@ class GlTF : DrawableByVulkan, Blended
 
     bool isBlended() const
     {
+        if(plainShading)
+            return false;
+
         foreach(mesh; meshes)
             if(mesh.alphaMode == AlphaMode.blend)
                 return true;
@@ -888,8 +891,8 @@ class GlTF : DrawableByVulkan, Blended
 
     private static bool matchesPhase(const MeshClass mesh, DrawPhase phase)
     {
-        const blended = mesh.alphaMode == AlphaMode.blend;
-        const transmissive = mesh.material.transmission.x > 0.0f;
+        const blended = !plainShading && mesh.alphaMode == AlphaMode.blend;
+        const transmissive = !plainShading && mesh.material.transmission.x > 0.0f;
         // Without its own pass, a transmissive mesh draws where the opaque ones do
         const ownPass = transmissive && transmissionPass;
 
@@ -912,6 +915,9 @@ class GlTF : DrawableByVulkan, Blended
             return mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow;
 
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
+
+        if(plainShading)
+            return mesh.doubleSided ? modes.lit.doubleSided : modes.lit.opaque;
 
         if(mesh.material.mode == MaterialMode.unlit || lightingMode == LightingMode.unlit)
             return selectVariant(modes.unlit, mesh);

@@ -7,7 +7,7 @@ import pukan.mesh: mirrors;
 import pukan.misc: Boxf;
 import pukan.pbr.accessor: BufferPieceOnGPU;
 import pukan.pbr.mesh: PbrMesh;
-import pukan.pbr.pipelines: LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, transmissionPass;
+import pukan.pbr.pipelines: LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase;
@@ -197,6 +197,9 @@ final class GodotScene : DrawableByVulkan, Blended
 
     bool isBlended() const
     {
+        if(plainShading)
+            return false;
+
         foreach(mesh; meshes)
             if(mesh.alphaMode == AlphaMode.blend)
                 return true;
@@ -378,8 +381,8 @@ final class GodotScene : DrawableByVulkan, Blended
 
     private static bool matchesPhase(const PbrMesh mesh, DrawPhase phase)
     {
-        const blended = mesh.alphaMode == AlphaMode.blend;
-        const transmissive = mesh.material.transmission.x > 0.0f;
+        const blended = !plainShading && mesh.alphaMode == AlphaMode.blend;
+        const transmissive = !plainShading && mesh.material.transmission.x > 0.0f;
         const ownPass = transmissive && transmissionPass;
 
         if(phase == DrawPhase.shadow)
@@ -403,6 +406,9 @@ final class GodotScene : DrawableByVulkan, Blended
             return mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow;
 
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
+
+        if(plainShading)
+            return mesh.doubleSided ? modes.lit.doubleSided : modes.lit.opaque;
 
         if(mesh.material.mode == MaterialMode.unlit || lightingMode == LightingMode.unlit)
             return selectVariant(modes.unlit, mesh);

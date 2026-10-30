@@ -1,5 +1,6 @@
 import dlib.math: Matrix4x4f, Vector3f;
 import pukan;
+import pukan.pbr.pipelines: plainShading;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
@@ -142,6 +143,7 @@ void main(string[] args)
     string eyeOption;
     string targetOption;
     bool noShadows;
+    bool plainMode;
     float fovOption = cameraFov;
     float farOption = cameraFar;
     float speedOption = cameraSpeed;
@@ -157,6 +159,7 @@ void main(string[] args)
         "eye", "override the camera position, x,y,z", &eyeOption,
         "target", "override the camera target, x,y,z", &targetOption,
         "no-shadows", "do not cast shadows", &noShadows,
+        "plain", "draw every surface in the plain lit mode", &plainMode,
         "fov", "vertical field of view in degrees", &fovOption,
         "far", "far clipping distance", &farOption,
         "speed", "camera movement speed in units per second", &speedOption,
@@ -167,6 +170,11 @@ void main(string[] args)
         defaultGetoptPrinter("pukan Godot scene demo", getoptResult.options);
         return;
     }
+
+    plainShading = plainMode;
+
+    if(plainShading)
+        writeln("plain shading: on");
 
     enforce(glfwInit());
     scope(exit) glfwTerminate();

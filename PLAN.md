@@ -100,7 +100,7 @@ or the pack.
       `application/run/main_scene` from `project.binary`.
 - [x] `--screenshot path` and `--screenshot-frame N` in both demos; the engine
       saves the next rendered frame through `Scene.captureFrame`.
-- [ ] A light render switch for `demo_godot`: draw every surface in the plain
+- [x] A light render switch for `demo_godot`: draw every surface in the plain
       lit mode, without transmission, transparency or the authored material
       variants. Shadows keep their own switch.
 

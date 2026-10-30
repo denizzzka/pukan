@@ -32,6 +32,9 @@ bool transmissionPass = true;
 /// for the resolve pass instead of blending in place
 bool oitPass = true;
 
+/// Draw-time switch: every surface uses the plain lit pipeline as opaque
+bool plainShading;
+
 struct PbrSkyPipelines
 {
     PbrPipelineVariants ibl;
