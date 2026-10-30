@@ -32,7 +32,7 @@ struct FlyCamera
     Vector3f position = Vector3f(0, 0, 0);
     /// Rotation from camera space to world space
     Quaternionf orientation = Quaternionf(0, 0, 0, 1);
-    LookAxis lookAxis = LookAxis.screen;
+    LookAxis lookAxis = LookAxis.horizontal;
     float fov = 45.0f;
 
     /// A camera at `eye` whose -Z axis points at `target`
@@ -229,6 +229,7 @@ unittest
 
     // A quarter turn of the mouse reaches the zenith without breaking the view
     camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+    camera.lookAxis = LookAxis.screen;
     camera.look(0, -degtorad(90.0f) / 0.003f);
     assert(camera.forward.y > 0.999f);
     requireOrthonormal(camera.view);
@@ -289,8 +290,9 @@ unittest
 
 unittest
 {
-    // With a roll the horizontal drag turns around the screen vertical, as A/D do
+    // With a roll the screen mode turns around the camera up, as A/D do
     auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+    camera.lookAxis = LookAxis.screen;
     camera.rollBy(0.6f);
 
     const up = camera.up;
@@ -334,6 +336,7 @@ unittest
 unittest
 {
     FlyCamera camera;
+    assert(camera.lookAxis == LookAxis.horizontal);
 
     camera.zoom(1);
     assert(camera.fov < 45);

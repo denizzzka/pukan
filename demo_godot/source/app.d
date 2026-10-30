@@ -338,7 +338,7 @@ void main(string[] args)
 
     camera.speed = speedOption;
 
-    writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis");
+    writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;

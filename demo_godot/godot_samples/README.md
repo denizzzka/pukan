@@ -235,7 +235,7 @@ middle mouse pan in the screen plane
 wheel        zoom, the field of view moves between 10 and 120 degrees
 Q / E        roll around the view axis
 R            reset the roll
-H            look axis: screen (follows the roll) or horizontal (level horizon)
+H            look axis: horizontal (level horizon) or screen (follows the roll)
 ```
 
 `--speed` sets the movement speed in units per second. Runs with `--frames` or

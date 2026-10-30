@@ -265,7 +265,7 @@ void main(string[] args) {
     camera.speed = 1.0f;
 
     if(!benchMode)
-        writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis");
+        writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     scene.addPointLight(Vector3f(0.9f, 0.35f, 1.1f), Vector3f(1.0f, 0.25f, 0.15f) * 6.0f, 4.0f);
     scene.addPointLight(Vector3f(-0.8f, 0.4f, 0.8f), Vector3f(0.15f, 0.45f, 1.0f) * 6.0f, 4.0f);
