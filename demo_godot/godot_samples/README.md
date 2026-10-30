@@ -186,7 +186,8 @@ are ignored for now.
 ./demo_godot/pukan_demo_godot --scene demo_godot/godot_samples/platformer/stage/stage.tscn --frames 2
 ```
 
-Add `--eye 75,55,75 --target 35,5,10 --fov 60 --far 400` to see the whole level.
+Start outside the level with
+`--eye 75,55,75 --target 35,5,10 --fov 60 --far 400`, then fly in with WASD.
 
 ## Landscape
 
@@ -221,3 +222,19 @@ resources not rendered: Environment x1, Material x1, Sky x1
 Shadows are on in `demo_godot`, but the shadow frustum is a fixed 10 units
 around the origin, far smaller than this map, so the terrain shows none. The
 background is transparent, so the model is lit by the sun only.
+
+## Camera
+
+The demo opens a free camera, seeded from `--eye` and `--target` or, with
+`--scene-camera`, from the scene `Camera3D`:
+
+```
+WASD        move; Shift four times faster, Alt four times slower
+right mouse look
+wheel       zoom, the field of view moves between 10 and 120 degrees
+Q / E       roll around the view axis
+R           reset the roll
+```
+
+`--speed` sets the movement speed in units per second. Runs with `--frames` or
+`--screenshot` stay static unless input arrives, so their output is repeatable.

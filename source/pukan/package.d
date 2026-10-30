@@ -2,6 +2,7 @@ module pukan;
 
 public import pukan.background;
 public import pukan.compressed_texture;
+public import pukan.fly_camera;
 public import pukan.gltf;
 public import pukan.godot_scene;
 public import pukan.material;

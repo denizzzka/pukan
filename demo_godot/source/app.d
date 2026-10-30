@@ -80,6 +80,84 @@ enum height = 600;
 enum cameraFov = 45.0f;
 enum cameraNear = 0.01f;
 enum cameraFar = 100.0f;
+enum cameraSpeed = 8.0f;
+enum rollSpeed = 1.5f;
+
+/// Input gathered by the GLFW callbacks, applied once per frame
+private struct CameraInput
+{
+    double cursorX;
+    double cursorY;
+    bool cursorKnown;
+    float lookX = 0;
+    float lookY = 0;
+    float zoom = 0;
+    bool resetHeld;
+}
+
+private CameraInput cameraInput;
+
+extern(C) void onCursorPos(GLFWwindow* window, double x, double y) nothrow @nogc
+{
+    if(cameraInput.cursorKnown && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+    {
+        cameraInput.lookX += cast(float) (x - cameraInput.cursorX);
+        cameraInput.lookY += cast(float) (y - cameraInput.cursorY);
+    }
+
+    cameraInput.cursorX = x;
+    cameraInput.cursorY = y;
+    cameraInput.cursorKnown = true;
+}
+
+extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
+{
+    cameraInput.zoom += cast(float) yoffset;
+}
+
+void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
+{
+    float pressure(int key) nothrow @nogc
+    {
+        return glfwGetKey(window, key) == GLFW_PRESS ? 1.0f : 0.0f;
+    }
+
+    const local = Vector3f(
+        pressure(GLFW_KEY_D) - pressure(GLFW_KEY_A),
+        0,
+        pressure(GLFW_KEY_W) - pressure(GLFW_KEY_S),
+    );
+
+    auto speed = camera.speed;
+    if(pressure(GLFW_KEY_LEFT_SHIFT) + pressure(GLFW_KEY_RIGHT_SHIFT) > 0)
+        speed *= 4;
+    if(pressure(GLFW_KEY_LEFT_ALT) + pressure(GLFW_KEY_RIGHT_ALT) > 0)
+        speed *= 0.25f;
+
+    if(dt > 0)
+    {
+        camera.move(local, speed * dt);
+        camera.rollBy((pressure(GLFW_KEY_Q) - pressure(GLFW_KEY_E)) * rollSpeed * dt);
+    }
+
+    const reset = pressure(GLFW_KEY_R) > 0;
+    if(reset && !cameraInput.resetHeld)
+        camera.resetRoll();
+    cameraInput.resetHeld = reset;
+
+    if(cameraInput.lookX != 0 || cameraInput.lookY != 0)
+    {
+        camera.look(cameraInput.lookX, cameraInput.lookY);
+        cameraInput.lookX = 0;
+        cameraInput.lookY = 0;
+    }
+
+    if(cameraInput.zoom != 0)
+    {
+        camera.zoom(cameraInput.zoom);
+        cameraInput.zoom = 0;
+    }
+}
 
 void main(string[] args)
 {
@@ -94,6 +172,7 @@ void main(string[] args)
     bool noShadows;
     float fovOption = cameraFov;
     float farOption = cameraFar;
+    float speedOption = cameraSpeed;
 
     auto getoptResult = getopt(
         args,
@@ -108,6 +187,7 @@ void main(string[] args)
         "no-shadows", "do not cast shadows", &noShadows,
         "fov", "vertical field of view in degrees", &fovOption,
         "far", "far clipping distance", &farOption,
+        "speed", "camera movement speed in units per second", &speedOption,
     );
 
     if(getoptResult.helpWanted)
@@ -125,6 +205,9 @@ void main(string[] args)
     auto window = glfwCreateWindow(width, height, "pukan Godot scene".toStringz, null, null);
     enforce(window, "Cannot create a window");
     scope(exit) glfwDestroyWindow(window);
+
+    glfwSetCursorPosCallback(window, &onCursorPos);
+    glfwSetScrollCallback(window, &onScroll);
 
     auto vk = Instance.createWith!appEntities("pukan Godot scene", 1, glfwExtraExtensions!appEntities());
     scope(exit) destroy(vk);
@@ -270,36 +353,47 @@ void main(string[] args)
     if(targetOption.length)
         target = parseVector(targetOption);
 
-    Vector3f up = Vector3f(0, 1, 0);
-    float fov = fovOption;
+    FlyCamera camera;
     float nearPlane = cameraNear;
     float farPlane = farOption;
 
-    Matrix4x4f view;
-
     if(useSceneCamera && godotScene.hasCamera)
     {
-        view = godotScene.camera.view;
-        fov = godotScene.camera.fov;
+        camera = FlyCamera.fromView(godotScene.camera.view);
+        camera.fov = godotScene.camera.fov;
         nearPlane = godotScene.camera.nearPlane;
         farPlane = godotScene.camera.farPlane;
     }
     else
-        view = cameraView(eye, target, up);
+    {
+        camera = FlyCamera.lookingAt(eye, target);
+        camera.fov = fovOption;
+    }
+
+    camera.speed = speedOption;
+
+    writeln("camera: WASD move, right mouse look, wheel zoom, Q/E roll, R reset roll");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
+    double lastTime = glfwGetTime();
 
     while(!glfwWindowShouldClose(window) && (frames == 0 || frameIndex < frames))
     {
         ++frameIndex;
         glfwPollEvents();
 
+        const now = glfwGetTime();
+        const dt = cast(float) (now - lastTime < 0.1 ? now - lastTime : 0.1);
+        lastTime = now;
+
+        updateCamera(camera, window, dt);
+
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
-        wtb.view = view;
+        wtb.view = camera.view;
         wtb.proj = vulkanPerspectiveMatrix(
-            fov,
+            camera.fov,
             cast(float) scene.swapChain.imageExtent.width / scene.swapChain.imageExtent.height,
             nearPlane,
             farPlane,

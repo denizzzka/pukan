@@ -22,8 +22,8 @@ Matrix4x4f cameraTransform(Vector3f eye, Vector3f target, Vector3f up)
     const forward = (target - eye).normalized;
     auto realUp = up;
 
-    // A view along the up axis has no right axis, so any other axis serves
-    if(abs(forward.dot(realUp)) > 0.999f)
+    // A view parallel to the up axis has no right axis, so any other axis serves
+    if(cross(forward, realUp).length < 1e-6f)
         realUp = abs(forward.y) > 0.9f ? Vector3f(0, 0, 1) : Vector3f(0, 1, 0);
 
     const right = cross(forward, realUp).normalized;
@@ -68,6 +68,26 @@ unittest
     assert(abs(x.length - 1) < 1e-5f);
     assert(abs(y.length - 1) < 1e-5f);
     assert(abs(x.dot(y)) < 1e-5f);
+}
+
+unittest
+{
+    import dlib.math: rotationQuaternion;
+
+    // Approaching the pole must keep the roll instead of snapping to another up
+    const worldUp = Vector3f(0, 1, 0);
+    const a = Vector3f(0.05f, 1, 0).normalized;
+    const b = Vector3f(0.042f, 1, 0).normalized;
+
+    const viewA = cameraTransform(Vector3f(0, 0, 0), a,
+        rotationQuaternion(a, 0.7f).rotate(worldUp));
+    const viewB = cameraTransform(Vector3f(0, 0, 0), b,
+        rotationQuaternion(b, 0.7f).rotate(worldUp));
+
+    const upA = Vector3f(viewA.a12, viewA.a22, viewA.a32);
+    const upB = Vector3f(viewB.a12, viewB.a22, viewB.a32);
+
+    assert(upA.dot(upB) > 0.99f);
 }
 
 /// Perspective projection for Vulkan, whose clip space has Y pointing down,
