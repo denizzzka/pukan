@@ -117,8 +117,8 @@ or the pack.
 - [ ] Size the sun's shadow map to the loaded scene. `Scene` still uses a fixed
       24 degree perspective cone 10 units from the origin, so only small arenas
       get shadows; expose the distance or fit an orthographic frustum to the
-      scene bounds, and check it on `truck_town`. Cascades stay a separate item
-      in `## Lighting`.
+      scene bounds, and check it on `truck_town`, whose town lies outside the
+      current cone. Cascades stay a separate item in `## Lighting`.
 
 #### Phase 3: binary resources and packed production projects
 

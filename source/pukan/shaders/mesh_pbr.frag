@@ -177,8 +177,10 @@ void main()
         emissive *= texture(emissiveTexture, uv).rgb;
 
     const vec3 lightDirection = sunDirection();
+    const float direct = max(dot(normal, lightDirection), 0.0)
+        * shadowFactor(fragPosition, normal);
 
-    color = base.rgb * (0.6 + 0.6 * max(dot(normal, lightDirection), 0.0)) + emissive;
+    color = base.rgb * (0.6 + 0.6 * direct) + emissive;
 #else
     {
         vec3 normal = normalize(fragNormal);
