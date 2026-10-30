@@ -84,6 +84,10 @@ or the pack.
       scale/offset in the Godot shader variant.
 - [x] Textures from `.png`, `.jpg`, `.webp`, `.tga` and `.hdr` through the
       existing image loader; `.ctex` belongs to phase 3.
+- [ ] Per-material sampler state: read `texture_filter` and `texture_repeat`
+      from `BaseMaterial3D` and bind a matching `VkSampler`. The loader uses
+      one linear repeat sampler, so the platformer atlas bleeds green texels
+      into the cube seams, where its material asks for nearest and clamp.
 - [x] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
       phase, AABB and name.
 - [x] `GodotScene`: runtime material override.
