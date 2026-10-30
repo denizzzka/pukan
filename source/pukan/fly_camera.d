@@ -66,11 +66,12 @@ struct FlyCamera
         return cameraView(position, position + forward, up);
     }
 
-    /// `dx` and `dy` are cursor pixels; moving right turns right, moving down looks down
+    /// `dx` and `dy` are cursor pixels; moving right turns right, moving down looks down.
+    /// Both axes are the camera's own, so a roll turns the mouse with the view
     void look(float dx, float dy, float sensitivity = 0.003f)
     {
-        auto yaw = rotationQuaternion(worldUp, -dx * sensitivity);
-        orientation = (yaw * orientation).normalized();
+        const yaw = rotationQuaternion(cameraUp, -dx * sensitivity);
+        orientation = (orientation * yaw).normalized();
 
         const pitch = rotationQuaternion(cameraRight, -dy * sensitivity);
         orientation = (orientation * pitch).normalized();
@@ -218,9 +219,12 @@ unittest
     assert(camera.forward.y > 0.999f);
     requireOrthonormal(camera.view);
 
-    // Turning there spins the horizon but keeps the view orthonormal
+    // At the zenith the screen axes take over: the turn keeps the camera up
+    const zenithUp = camera.up;
     camera.look(100, 0);
-    assert(camera.forward.y > 0.999f);
+    assert(isClose(camera.up.x, zenithUp.x, 1e-4f, 1e-4f));
+    assert(isClose(camera.up.y, zenithUp.y, 1e-4f, 1e-4f));
+    assert(isClose(camera.up.z, zenithUp.z, 1e-4f, 1e-4f));
     requireOrthonormal(camera.view);
 
     camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
@@ -239,6 +243,24 @@ unittest
     camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
     camera.move(Vector3f(1, 0, 1), 2);
     assert(isClose(camera.position.length, 2, 1e-4f, 1e-4f));
+}
+
+unittest
+{
+    // With a roll the horizontal drag turns around the screen vertical, as A/D do
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+    camera.rollBy(0.6f);
+
+    const up = camera.up;
+    const right = camera.right;
+
+    camera.look(100, 0);
+
+    assert(isClose(camera.up.x, up.x, 1e-4f, 1e-4f));
+    assert(isClose(camera.up.y, up.y, 1e-4f, 1e-4f));
+    assert(isClose(camera.up.z, up.z, 1e-4f, 1e-4f));
+    assert(dot(camera.forward, right) > 0);
+    requireOrthonormal(camera.view);
 }
 
 unittest
