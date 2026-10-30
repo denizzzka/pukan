@@ -15,6 +15,15 @@ private enum minFov = 10.0f;
 private enum maxFov = 120.0f;
 private enum zoomStep = 0.9f;
 
+/// Axis that horizontal mouse movement turns the view around
+enum LookAxis
+{
+    /// Camera up, so the view follows a roll
+    screen,
+    /// World up, so the horizon stays level while the camera is upright
+    horizontal,
+}
+
 /// Free-flying camera stored as a quaternion, so it passes the poles freely
 struct FlyCamera
 {
@@ -23,6 +32,7 @@ struct FlyCamera
     Vector3f position = Vector3f(0, 0, 0);
     /// Rotation from camera space to world space
     Quaternionf orientation = Quaternionf(0, 0, 0, 1);
+    LookAxis lookAxis = LookAxis.screen;
     float fov = 45.0f;
 
     /// A camera at `eye` whose -Z axis points at `target`
@@ -67,11 +77,15 @@ struct FlyCamera
     }
 
     /// `dx` and `dy` are cursor pixels; moving right turns right, moving down looks down.
-    /// Both axes are the camera's own, so a roll turns the mouse with the view
+    /// An inverted camera falls back to the screen axis so the mouse still follows
     void look(float dx, float dy, float sensitivity = 0.003f)
     {
-        const yaw = rotationQuaternion(cameraUp, -dx * sensitivity);
-        orientation = (orientation * yaw).normalized();
+        const yaw = -dx * sensitivity;
+
+        if(lookAxis == LookAxis.horizontal && dot(up, worldUp) >= 0)
+            orientation = (rotationQuaternion(worldUp, yaw) * orientation).normalized();
+        else
+            orientation = (orientation * rotationQuaternion(cameraUp, yaw)).normalized();
 
         const pitch = rotationQuaternion(cameraRight, -dy * sensitivity);
         orientation = (orientation * pitch).normalized();
@@ -243,6 +257,34 @@ unittest
     camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
     camera.move(Vector3f(1, 0, 1), 2);
     assert(isClose(camera.position.length, 2, 1e-4f, 1e-4f));
+}
+
+unittest
+{
+    // Horizontal mode turns around the world up and keeps the pitch
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, -0.2f, -1));
+    camera.rollBy(0.6f);
+    camera.lookAxis = LookAxis.horizontal;
+
+    const pitch = camera.forward.y;
+    camera.look(100, 0);
+
+    assert(isClose(camera.forward.y, pitch, 1e-4f, 1e-4f));
+    requireOrthonormal(camera.view);
+}
+
+unittest
+{
+    // Turned upside down, the horizontal mode still turns with the mouse
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+    camera.rollBy(degtorad(180.0f));
+    camera.lookAxis = LookAxis.horizontal;
+
+    const right = camera.right;
+    camera.look(100, 0);
+
+    assert(dot(camera.forward, right) > 0);
+    requireOrthonormal(camera.view);
 }
 
 unittest

@@ -95,6 +95,7 @@ private struct CameraInput
     float panY = 0;
     float zoom = 0;
     bool resetHeld;
+    bool lookAxisHeld;
 }
 
 private CameraInput cameraInput;
@@ -158,6 +159,16 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
     if(reset && !cameraInput.resetHeld)
         camera.resetRoll();
     cameraInput.resetHeld = reset;
+
+    const toggleAxis = pressure(GLFW_KEY_H) > 0;
+    if(toggleAxis && !cameraInput.lookAxisHeld)
+    {
+        camera.lookAxis = camera.lookAxis == LookAxis.screen ? LookAxis.horizontal : LookAxis.screen;
+        writeln(camera.lookAxis == LookAxis.horizontal
+            ? "look axis: horizontal (world up)"
+            : "look axis: screen (camera up)");
+    }
+    cameraInput.lookAxisHeld = toggleAxis;
 
     if(cameraInput.lookX != 0 || cameraInput.lookY != 0)
     {
@@ -394,7 +405,7 @@ void main(string[] args)
 
     camera.speed = speedOption;
 
-    writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll");
+    writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
