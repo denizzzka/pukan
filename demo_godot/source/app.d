@@ -270,6 +270,7 @@ void main(string[] args)
     scope(exit) destroy(scene);
 
     scene.shadowsEnabled = !noShadows;
+    scene.shadowMapCache = true;
 
     if(scenePath.length == 0 && packPath.length == 0)
         scenePath = "demo_godot/godot_samples/generated/procedural.tscn";

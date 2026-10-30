@@ -142,6 +142,8 @@ class Scene
 
     /// The sun casts a shadow map before the main pass
     bool shadowsEnabled = true;
+    /// Render the sun's view once and reuse it until invalidated
+    bool shadowMapCache;
     enum shadowMapSize = 1024;
     enum shadowFov = 24.0f;
     enum shadowDistance = 10.0f;
@@ -149,6 +151,7 @@ class Scene
     Matrix4x4f shadowViewProj;
     private ShadowPass shadowPass;
     private ShadowMap[] shadowMaps;
+    private bool[] shadowMapValid;
     private VkSampler shadowSampler;
     private VkSampler resolveSampler;
     private OitResolve oitResolve;
@@ -208,6 +211,14 @@ class Scene
             Vector4f(color.x * intensity, color.y * intensity, color.z * intensity, 0),
             Vector4f(cast(float) LightType.directional, 0, 0, 0),
         );
+
+        invalidateShadowMap();
+    }
+
+    /// Renders the sun's view again on the next frame; call it after moving casters
+    void invalidateShadowMap()
+    {
+        shadowMapValid[] = false;
     }
 
     /// Number of lights already added, including the sun
@@ -385,6 +396,9 @@ class Scene
 
     private void createFrameSets()
     {
+        shadowMapValid.length = swapChain.frames.length;
+        shadowMapValid[] = false;
+
         VkDescriptorImageInfo imageInfo(Texture texture)
         {
             return VkDescriptorImageInfo(
@@ -910,8 +924,14 @@ class Scene
         if(!shadowsEnabled || drawShadow is null)
             return;
 
-        auto map = shadowMaps[frameIndex(frame)];
+        const index = frameIndex(frame);
+
+        if(shadowMapCache && shadowMapValid[index])
+            return;
+
+        auto map = shadowMaps[index];
         shadowPass.record(frame.commandBuffer, map.renderedFrameBuffer, map.renderExtent, drawShadow);
+        shadowMapValid[index] = true;
     }
 
     /// Empties the per-pixel lists before the opaque and blended draws fill them

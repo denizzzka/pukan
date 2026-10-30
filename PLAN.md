@@ -416,7 +416,7 @@ there are no cascades and no local-light shadows. Missing:
 
 - [ ] Cascaded directional maps and an atlas for the local lights; the current
       map is one perspective map around the scene centre and only the sun uses it.
-- [ ] Cache the sun's shadow map while the casters and the sun stay put, so a
+- [x] Cache the sun's shadow map while the casters and the sun stay put, so a
       static level does not redraw an unchanged map every frame.
 - [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.
 - [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
