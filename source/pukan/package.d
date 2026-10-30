@@ -1,6 +1,7 @@
 module pukan;
 
 public import pukan.background;
+public import pukan.camera_controls;
 public import pukan.compressed_texture;
 public import pukan.fly_camera;
 public import pukan.gltf;

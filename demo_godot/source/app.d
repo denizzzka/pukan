@@ -83,113 +83,46 @@ enum cameraFar = 100.0f;
 enum cameraSpeed = 8.0f;
 enum rollSpeed = 1.5f;
 
-/// Input gathered by the GLFW callbacks, applied once per frame
-private struct CameraInput
-{
-    double cursorX;
-    double cursorY;
-    bool cursorKnown;
-    float lookX = 0;
-    float lookY = 0;
-    float panX = 0;
-    float panY = 0;
-    float zoom = 0;
-    bool resetHeld;
-    bool lookAxisHeld;
-}
-
-private CameraInput cameraInput;
+private CameraControls controls;
 
 extern(C) void onCursorPos(GLFWwindow* window, double x, double y) nothrow @nogc
 {
-    if(cameraInput.cursorKnown)
-    {
-        const dx = cast(float) (x - cameraInput.cursorX);
-        const dy = cast(float) (y - cameraInput.cursorY);
-
-        if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
-        {
-            cameraInput.lookX += dx;
-            cameraInput.lookY += dy;
-        }
-
-        if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS)
-        {
-            cameraInput.panX += dx;
-            cameraInput.panY += dy;
-        }
-    }
-
-    cameraInput.cursorX = x;
-    cameraInput.cursorY = y;
-    cameraInput.cursorKnown = true;
+    controls.cursorMoved(x, y,
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS,
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
 }
 
 extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
 {
-    cameraInput.zoom += cast(float) yoffset;
+    controls.scroll(cast(float) yoffset);
 }
 
 void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
 {
-    float pressure(int key) nothrow @nogc
+    bool pressed(int key) nothrow @nogc
     {
-        return glfwGetKey(window, key) == GLFW_PRESS ? 1.0f : 0.0f;
+        return glfwGetKey(window, key) == GLFW_PRESS;
     }
 
-    const local = Vector3f(
-        pressure(GLFW_KEY_D) - pressure(GLFW_KEY_A),
-        0,
-        pressure(GLFW_KEY_W) - pressure(GLFW_KEY_S),
-    );
+    CameraControlState state;
+    state.forward = pressed(GLFW_KEY_W);
+    state.back = pressed(GLFW_KEY_S);
+    state.left = pressed(GLFW_KEY_A);
+    state.right = pressed(GLFW_KEY_D);
+    state.rollLeft = pressed(GLFW_KEY_Q);
+    state.rollRight = pressed(GLFW_KEY_E);
+    state.fast = pressed(GLFW_KEY_LEFT_SHIFT) || pressed(GLFW_KEY_RIGHT_SHIFT);
+    state.slow = pressed(GLFW_KEY_LEFT_ALT) || pressed(GLFW_KEY_RIGHT_ALT);
+    state.resetRoll = pressed(GLFW_KEY_R);
+    state.toggleLookAxis = pressed(GLFW_KEY_H);
 
-    auto speed = camera.speed;
-    if(pressure(GLFW_KEY_LEFT_SHIFT) + pressure(GLFW_KEY_RIGHT_SHIFT) > 0)
-        speed *= 4;
-    if(pressure(GLFW_KEY_LEFT_ALT) + pressure(GLFW_KEY_RIGHT_ALT) > 0)
-        speed *= 0.25f;
+    const lookAxis = camera.lookAxis;
+    controls.update(camera, state, dt);
 
-    if(dt > 0)
-    {
-        camera.move(local, speed * dt);
-        camera.rollBy((pressure(GLFW_KEY_Q) - pressure(GLFW_KEY_E)) * rollSpeed * dt);
-    }
-
-    const reset = pressure(GLFW_KEY_R) > 0;
-    if(reset && !cameraInput.resetHeld)
-        camera.resetRoll();
-    cameraInput.resetHeld = reset;
-
-    const toggleAxis = pressure(GLFW_KEY_H) > 0;
-    if(toggleAxis && !cameraInput.lookAxisHeld)
-    {
-        camera.lookAxis = camera.lookAxis == LookAxis.screen ? LookAxis.horizontal : LookAxis.screen;
+    if(camera.lookAxis != lookAxis)
         writeln(camera.lookAxis == LookAxis.horizontal
             ? "look axis: horizontal (world up)"
             : "look axis: screen (camera up)");
-    }
-    cameraInput.lookAxisHeld = toggleAxis;
-
-    if(cameraInput.lookX != 0 || cameraInput.lookY != 0)
-    {
-        camera.look(cameraInput.lookX, cameraInput.lookY);
-        cameraInput.lookX = 0;
-        cameraInput.lookY = 0;
-    }
-
-    if(cameraInput.panX != 0 || cameraInput.panY != 0)
-    {
-        const step = speed * 0.005f;
-        camera.pan(cameraInput.panX * step, -cameraInput.panY * step);
-        cameraInput.panX = 0;
-        cameraInput.panY = 0;
-    }
-
-    if(cameraInput.zoom != 0)
-    {
-        camera.zoom(cameraInput.zoom);
-        cameraInput.zoom = 0;
-    }
 }
 
 void main(string[] args)
