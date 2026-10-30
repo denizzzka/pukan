@@ -70,6 +70,12 @@ struct CameraControls
         zoomNotches += notches;
     }
 
+    /// Drops the stored position, so the next cursor move starts without a delta
+    void forgetCursor() nothrow @nogc
+    {
+        cursorKnown = false;
+    }
+
     void update(ref FlyCamera camera, in CameraControlState state, float dt)
     {
         auto speed = camera.speed;
@@ -164,6 +170,12 @@ unittest
     // A move without the button held is ignored
     const yaw = camera.forward.x;
     controls.cursorMoved(300, 100, false, false);
+    controls.update(camera, state, 0);
+    assert(isClose(camera.forward.x, yaw, 1e-5f, 1e-5f));
+
+    // A jump after forgetting the position does not turn the camera
+    controls.forgetCursor();
+    controls.cursorMoved(900, 700, true, false);
     controls.update(camera, state, 0);
     assert(isClose(camera.forward.x, yaw, 1e-5f, 1e-5f));
 }

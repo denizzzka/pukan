@@ -85,6 +85,9 @@ enum cameraSpeed = 8.0f;
 enum rollSpeed = 1.5f;
 
 private CameraControls controls;
+private bool cursorCaptured;
+private double savedCursorX;
+private double savedCursorY;
 
 extern(C) void onCursorPos(GLFWwindow* window, double x, double y) nothrow @nogc
 {
@@ -103,6 +106,28 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
     bool pressed(int key) nothrow @nogc
     {
         return glfwGetKey(window, key) == GLFW_PRESS;
+    }
+
+    // A held look or pan button owns the cursor, so neither stops at a border
+    const captured =
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS
+        || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+
+    if(captured != cursorCaptured)
+    {
+        cursorCaptured = captured;
+        controls.forgetCursor();
+
+        if(captured)
+        {
+            glfwGetCursorPos(window, &savedCursorX, &savedCursorY);
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+        else
+        {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            glfwSetCursorPos(window, savedCursorX, savedCursorY);
+        }
     }
 
     CameraControlState state;

@@ -218,12 +218,6 @@ assert that a mesh is never shared between two different handedness values.
       transform to invert, so the eye and target pair only has to exist for the
       command line.
 
-#### Camera controls
-
-- [ ] Capture the cursor while the right button looks, so a long turn does not
-      stop at the window border. Set `GLFW_CURSOR_DISABLED` while the button is
-      held and restore the cursor on release without a jump.
-
 #### GridMap
 
 - [x] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on

@@ -385,6 +385,28 @@ void main(string[] args) {
                 return glfwGetKey(window, key) == GLFW_PRESS;
             }
 
+            // A held look or pan button owns the cursor, so neither stops at a border
+            const captured =
+                glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS
+                || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+
+            if(captured != cursorCaptured)
+            {
+                cursorCaptured = captured;
+                controls.forgetCursor();
+
+                if(captured)
+                {
+                    glfwGetCursorPos(window, &savedCursorX, &savedCursorY);
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                }
+                else
+                {
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    glfwSetCursorPos(window, savedCursorX, savedCursorY);
+                }
+            }
+
             CameraControlState controlState;
             controlState.forward = pressed(GLFW_KEY_W);
             controlState.back = pressed(GLFW_KEY_S);
@@ -735,6 +757,9 @@ private string[] benchSampleNames = [
 
 FlyCamera camera;
 CameraControls controls;
+bool cursorCaptured;
+double savedCursorX;
+double savedCursorY;
 
 bool skyChanged;
 bool shadowsOn = true;
