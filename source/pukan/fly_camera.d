@@ -87,6 +87,12 @@ struct FlyCamera
         position += direction.normalized * distance;
     }
 
+    /// Moves in the screen plane by the two world distances
+    void pan(float rightDistance, float upDistance)
+    {
+        position += right * rightDistance + up * upDistance;
+    }
+
     /// Wheel notches: positive zooms in by narrowing the field of view
     void zoom(float notches)
     {
@@ -233,6 +239,20 @@ unittest
     camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
     camera.move(Vector3f(1, 0, 1), 2);
     assert(isClose(camera.position.length, 2, 1e-4f, 1e-4f));
+}
+
+unittest
+{
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+
+    camera.pan(2, 1);
+    assert(isClose(camera.position.x, 2, 1e-4f, 1e-4f));
+    assert(isClose(camera.position.y, 1, 1e-4f, 1e-4f));
+
+    // After a quarter turn the pan follows the new screen axes
+    camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(1, 0, 0));
+    camera.pan(2, 0);
+    assert(isClose(camera.position.z, 2, 1e-4f, 1e-4f));
 }
 
 unittest

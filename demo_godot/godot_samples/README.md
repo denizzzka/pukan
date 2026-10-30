@@ -229,11 +229,12 @@ The demo opens a free camera, seeded from `--eye` and `--target` or, with
 `--scene-camera`, from the scene `Camera3D`:
 
 ```
-WASD        move; Shift four times faster, Alt four times slower
-right mouse look
-wheel       zoom, the field of view moves between 10 and 120 degrees
-Q / E       roll around the view axis
-R           reset the roll
+WASD         move; Shift four times faster, Alt four times slower
+right mouse  look
+middle mouse pan in the screen plane
+wheel        zoom, the field of view moves between 10 and 120 degrees
+Q / E        roll around the view axis
+R            reset the roll
 ```
 
 `--speed` sets the movement speed in units per second. Runs with `--frames` or

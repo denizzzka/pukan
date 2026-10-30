@@ -91,6 +91,8 @@ private struct CameraInput
     bool cursorKnown;
     float lookX = 0;
     float lookY = 0;
+    float panX = 0;
+    float panY = 0;
     float zoom = 0;
     bool resetHeld;
 }
@@ -99,10 +101,22 @@ private CameraInput cameraInput;
 
 extern(C) void onCursorPos(GLFWwindow* window, double x, double y) nothrow @nogc
 {
-    if(cameraInput.cursorKnown && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+    if(cameraInput.cursorKnown)
     {
-        cameraInput.lookX += cast(float) (x - cameraInput.cursorX);
-        cameraInput.lookY += cast(float) (y - cameraInput.cursorY);
+        const dx = cast(float) (x - cameraInput.cursorX);
+        const dy = cast(float) (y - cameraInput.cursorY);
+
+        if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+        {
+            cameraInput.lookX += dx;
+            cameraInput.lookY += dy;
+        }
+
+        if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS)
+        {
+            cameraInput.panX += dx;
+            cameraInput.panY += dy;
+        }
     }
 
     cameraInput.cursorX = x;
@@ -150,6 +164,14 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
         camera.look(cameraInput.lookX, cameraInput.lookY);
         cameraInput.lookX = 0;
         cameraInput.lookY = 0;
+    }
+
+    if(cameraInput.panX != 0 || cameraInput.panY != 0)
+    {
+        const step = speed * 0.005f;
+        camera.pan(cameraInput.panX * step, -cameraInput.panY * step);
+        cameraInput.panX = 0;
+        cameraInput.panY = 0;
     }
 
     if(cameraInput.zoom != 0)
@@ -372,7 +394,7 @@ void main(string[] args)
 
     camera.speed = speedOption;
 
-    writeln("camera: WASD move, right mouse look, wheel zoom, Q/E roll, R reset roll");
+    writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
