@@ -232,7 +232,7 @@ The demo opens a free camera, seeded from `--eye` and `--target` or, with
 WASD         move; Shift four times faster, Alt four times slower
 right mouse  look
 middle mouse pan in the screen plane
-wheel        zoom, the field of view moves between 10 and 120 degrees
+wheel        zoom towards the cursor, the field of view moves between 10 and 120 degrees
 Q / E        roll around the view axis
 R            reset the roll
 H            look axis: horizontal (level horizon) or screen (follows the roll)

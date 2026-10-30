@@ -116,6 +116,12 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
     state.resetRoll = pressed(GLFW_KEY_R);
     state.toggleLookAxis = pressed(GLFW_KEY_H);
 
+    int viewportWidth;
+    int viewportHeight;
+    glfwGetWindowSize(window, &viewportWidth, &viewportHeight);
+    state.viewportWidth = cast(float) viewportWidth;
+    state.viewportHeight = cast(float) viewportHeight;
+
     const lookAxis = camera.lookAxis;
     controls.update(camera, state, dt);
 

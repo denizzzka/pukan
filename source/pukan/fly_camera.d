@@ -91,6 +91,16 @@ struct FlyCamera
         orientation = (orientation * pitch).normalized();
     }
 
+    /// Turns by the given radians, right and down positive, without a cursor step
+    void turn(float rightRadians, float downRadians)
+    {
+        if(rightRadians != 0)
+            orientation = (orientation * rotationQuaternion(cameraUp, -rightRadians)).normalized();
+
+        if(downRadians != 0)
+            orientation = (orientation * rotationQuaternion(cameraRight, -downRadians)).normalized();
+    }
+
     /// Moves along `local` (x right, y world up, z forward) by `distance` units
     void move(Vector3f local, float distance)
     {
@@ -304,6 +314,20 @@ unittest
     assert(isClose(camera.up.y, up.y, 1e-4f, 1e-4f));
     assert(isClose(camera.up.z, up.z, 1e-4f, 1e-4f));
     assert(dot(camera.forward, right) > 0);
+    requireOrthonormal(camera.view);
+}
+
+unittest
+{
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+
+    camera.turn(0.2f, 0);
+    assert(camera.forward.x > 0);
+    assert(isClose(camera.forward.y, 0, 1e-5f, 1e-5f));
+
+    camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+    camera.turn(0, 0.2f);
+    assert(camera.forward.y < 0);
     requireOrthonormal(camera.view);
 }
 

@@ -397,6 +397,12 @@ void main(string[] args) {
             controlState.resetRoll = pressed(GLFW_KEY_R);
             controlState.toggleLookAxis = pressed(GLFW_KEY_H);
 
+            int viewportWidth;
+            int viewportHeight;
+            glfwGetWindowSize(window, &viewportWidth, &viewportHeight);
+            controlState.viewportWidth = cast(float) viewportWidth;
+            controlState.viewportHeight = cast(float) viewportHeight;
+
             const lookAxis = camera.lookAxis;
             controls.update(camera, controlState, dt);
 

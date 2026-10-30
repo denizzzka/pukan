@@ -1,7 +1,8 @@
 module pukan.camera_controls;
 
-import dlib.math: Vector3f;
+import dlib.math: Vector3f, degtorad;
 import pukan.fly_camera: FlyCamera, LookAxis;
+import std.math: atan, tan;
 
 /// Key and mouse state one frame of a fly camera needs
 struct CameraControlState
@@ -11,6 +12,9 @@ struct CameraControlState
     bool fast, slow;
     bool resetRoll;
     bool toggleLookAxis;
+    /// Window size in the same units as the cursor, for zooming towards it
+    float viewportWidth = 0;
+    float viewportHeight = 0;
 }
 
 /// Turns cursor and key state into FlyCamera motion; the host maps its window
@@ -115,7 +119,28 @@ struct CameraControls
 
         if(zoomNotches != 0)
         {
+            const oldFov = camera.fov;
             camera.zoom(zoomNotches);
+            const newFov = camera.fov;
+
+            // Turn towards the cursor so the point under it keeps its place
+            if(newFov != oldFov && cursorKnown && state.viewportWidth > 0 && state.viewportHeight > 0)
+            {
+                const halfTan = tan(degtorad(oldFov * 0.5f));
+                const aspect = state.viewportWidth / state.viewportHeight;
+                const ndcX = cast(float) (2.0 * cursorX / state.viewportWidth - 1.0);
+                const ndcY = cast(float) (2.0 * cursorY / state.viewportHeight - 1.0);
+                const ratio = tan(degtorad(newFov * 0.5f)) / halfTan;
+
+                const angleX = atan(ndcX * halfTan * aspect);
+                const angleY = atan(ndcY * halfTan);
+
+                camera.turn(
+                    angleX - atan(tan(angleX) * ratio),
+                    angleY - atan(tan(angleY) * ratio),
+                );
+            }
+
             zoomNotches = 0;
         }
     }
@@ -183,6 +208,34 @@ unittest
 
     assert(isClose(camera.position.x, 100 * 2 * controls.panPerPixel, 1e-4f, 1e-4f));
     assert(isClose(camera.position.y, -50 * 2 * controls.panPerPixel, 1e-4f, 1e-4f));
+}
+
+unittest
+{
+    import std.math: isClose;
+
+    // Zooming in turns towards the cursor, and the cursor point keeps its place
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+
+    CameraControls controls;
+    controls.cursorMoved(150, 100, false, false);
+
+    CameraControlState state;
+    state.viewportWidth = 200;
+    state.viewportHeight = 200;
+
+    controls.scroll(1);
+    controls.update(camera, state, 0);
+
+    assert(camera.fov < 45);
+    assert(isClose(camera.forward.x, 0.02181f, 1e-4f, 1e-4f));
+    assert(isClose(camera.forward.y, 0, 1e-4f, 1e-4f));
+
+    // Zooming out moves the view the other way so the cursor point still holds
+    camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+    controls.scroll(-1);
+    controls.update(camera, state, 0);
+    assert(camera.forward.x < 0);
 }
 
 unittest
