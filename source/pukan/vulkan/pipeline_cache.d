@@ -10,9 +10,6 @@ import std.uuid: UUID;
 /// Layout of the container around a driver pipeline cache blob
 enum pipelineCacheFormatVersion = 1;
 
-/// Default bounds for a file-backed cache directory
-enum defaultPipelineCacheMaxBytes = 64 * 1024 * 1024;
-enum defaultPipelineCacheMaxRecords = 4096;
 
 /// Identifies a pipeline variant by a digest of the state that defines it
 struct PipelineVariantKey
@@ -193,6 +190,9 @@ abstract class PipelineCacheStore
 /// Writes cache files under the user's cache directory
 final class FilePipelineCacheStore: PipelineCacheStore
 {
+    enum defaultMaxBytes = 64 * 1024 * 1024;
+    enum defaultMaxRecords = 4096;
+
     private string directory;
     private size_t maxBytes;
     private size_t maxRecords;
@@ -200,8 +200,8 @@ final class FilePipelineCacheStore: PipelineCacheStore
     this(
         string directory,
         UUID pipelineCacheUUID,
-        size_t maxBytes = defaultPipelineCacheMaxBytes,
-        size_t maxRecords = defaultPipelineCacheMaxRecords,
+        size_t maxBytes = defaultMaxBytes,
+        size_t maxRecords = defaultMaxRecords,
     )
     in(directory.length > 0)
     in(maxBytes > 0)
