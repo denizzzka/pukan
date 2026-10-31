@@ -16,6 +16,8 @@ abstract class Compute
     protected VkPipelineLayout pipelineLayout;
     protected VkPipeline pipeline;
     protected uint pushConstantSize;
+    /// Set when this run compiled the kernel instead of taking a stored record
+    bool needsRecompilation;
 
     private VkWriteDescriptorSet[] pendingWrites;
 
@@ -55,7 +57,92 @@ abstract class Compute
             basePipelineIndex: -1,
         );
 
-        pipeline = device.createComputePipelines([pipelineCreateInfo])[0];
+        VkPipelineCache pipelineCache;
+        string identity;
+
+        if(auto manager = device.pipelineCacheManager)
+        {
+            identity = computeIdentity(layoutBindings, pushConstant, specialization);
+            pipelineCache = manager.acquire(identity, needsRecompilation);
+        }
+        else
+            needsRecompilation = true;
+
+        scope(exit)
+            if(pipelineCache)
+                device.destroyPipelineCache(pipelineCache);
+
+        pipeline = device.createComputePipelines([pipelineCreateInfo], pipelineCache)[0];
+
+        if(auto manager = device.pipelineCacheManager)
+        {
+            manager.storeResult(identity, pipelineCache);
+
+            debug
+                Instance.log_info(
+                    "pipeline cache: " ~ identity ~
+                    (needsRecompilation ? " compiled" : " cached"));
+        }
+    }
+
+    /**
+        What a kernel is for the store: its class, bindings, push constant and
+        specialization data. Shader bytes stay out, the driver keys those.
+    */
+    private string computeIdentity(
+        VkDescriptorSetLayoutBinding[] layoutBindings,
+        VkPushConstantRange pushConstant,
+        VkSpecializationInfo* specialization,
+    ) const
+    {
+        import std.ascii: isAlphaNum;
+        import std.digest.sha: SHA256, toHexString;
+
+        const name = typeid(this).name;
+
+        SHA256 hash;
+
+        void addValue(T)(in T value)
+        {
+            hash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
+        }
+
+        void addString(string value)
+        {
+            addValue(value.length);
+            hash.put(cast(const ubyte[]) value);
+        }
+
+        void addArray(T)(const(T)[] values)
+        {
+            addValue(values.length);
+
+            foreach(ref value; values)
+                addValue(value);
+        }
+
+        addString(name);
+        addArray(layoutBindings);
+        addValue(pushConstant);
+
+        if(specialization !is null)
+        {
+            addValue(specialization.dataSize);
+
+            if(specialization.dataSize)
+                hash.put((cast(const ubyte*) specialization.pData)[0 .. specialization.dataSize]);
+
+            addArray(specialization.pMapEntries[0 .. specialization.mapEntryCount]);
+        }
+
+        string prefix;
+
+        foreach(c; name)
+            prefix ~= c.isAlphaNum || c == '_' || c == '-' ? c : '_';
+
+        const digest = hash.finish;
+
+        return cast(string) (prefix ~ "-" ~ toHexString(digest)[0 .. 32]);
     }
 
     protected void bindBuffer(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorBufferInfo bufferInfo)

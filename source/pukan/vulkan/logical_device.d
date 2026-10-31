@@ -23,6 +23,8 @@ class LogicalDevice
     private const(char)*[] enabledExtensions;
     private bool[ImageFormatRequest] supportedImageFormats;
     private Mutex queueMutex;
+    /// Optional persistent caches shared by graphics pipelines and compute kernels
+    PipelineCacheManager pipelineCacheManager;
 
     package this(PhysicalDevice pd, const(char*)[] extension_list, VkPhysicalDeviceFeatures enabledFeatures,
         ChainMask enabledChainMask, FeatureChain chain, VkQueueFlags requiredQueueFlags)

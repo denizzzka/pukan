@@ -341,6 +341,76 @@ private final class PipelineCacheWriter
 }
 
 //TODO: move to pukan: technique and pipeline caching is engine policy, not a Vulkan wrapper
+/// Persistent driver caches shared by graphics pipelines and compute kernels
+final class PipelineCacheManager
+{
+    private LogicalDevice device;
+    private PipelineCacheStore store;
+    private PipelineCacheWriter writer;
+
+    this(LogicalDevice device, PipelineCacheStore store)
+    {
+        this.device = device;
+        this.store = store;
+
+        if(store)
+            writer = new PipelineCacheWriter(store);
+    }
+
+    ~this()
+    {
+        if(writer)
+            destroy(writer);
+    }
+
+    /// Whether variants are persisted at all
+    bool enabled() const => store !is null;
+
+    /// Driver cache for one variant, seeded with its stored record
+    VkPipelineCache acquire(string identity, out bool needsRecompilation)
+    {
+        ubyte[] payload;
+        needsRecompilation = false;
+
+        if(store)
+            while(true)
+            {
+                try
+                {
+                    payload = store.load(identity);
+                    break;
+                }
+                catch(PipelineCacheLoadException e)
+                {
+                    // One retry: the bad record is dropped and written again
+                    if(needsRecompilation)
+                        throw e;
+
+                    store.invalidate(identity);
+                    needsRecompilation = true;
+                }
+            }
+
+        if(payload is null)
+            needsRecompilation = true;
+
+        return device.createPipelineCache(payload);
+    }
+
+    /// Hands the driver blob to the writer, which saves it outside the frame
+    void storeResult(string identity, VkPipelineCache pipelineCache)
+    {
+        if(writer is null)
+            return;
+
+        auto payload = device.pipelineCacheData(pipelineCache);
+
+        if(payload.length > 0)
+            writer.put(identity, payload);
+    }
+}
+
+//TODO: move to pukan: technique and pipeline caching is engine policy, not a Vulkan wrapper
 /// Creates pipelines once per technique and render target
 final class PipelineFactory
 {
@@ -371,8 +441,7 @@ final class PipelineFactory
     private Technique[] techniques;
     private RenderTarget[] targets;
     private GraphicsPipelineCfg[PipelineKey] cache;
-    private PipelineCacheStore store;
-    private PipelineCacheWriter writer;
+    private PipelineCacheManager cacheManager;
 
     debug
     {
@@ -391,13 +460,10 @@ final class PipelineFactory
     private VkDescriptorSetLayout frameSetLayout;
     private VkDescriptorSetLayoutBinding[] frameBindings;
 
-    this(LogicalDevice device, PipelineCacheStore store = null)
+    this(LogicalDevice device, PipelineCacheManager cacheManager = null)
     {
         this.device = device;
-        this.store = store;
-
-        if(store)
-            writer = new PipelineCacheWriter(store);
+        this.cacheManager = cacheManager;
 
         frameBindings = [
             VkDescriptorSetLayoutBinding(
@@ -478,9 +544,6 @@ final class PipelineFactory
 
     ~this()
     {
-        if(writer)
-            destroy(writer);
-
         debug logCacheSummary();
     }
 
@@ -759,44 +822,21 @@ final class PipelineFactory
     /// Driver cache for one variant, seeded with its stored record
     private VkPipelineCache acquirePipelineCache(string identity, out bool needsRecompilation)
     {
-        ubyte[] payload;
         needsRecompilation = false;
 
-        if(store)
-            while(true)
-            {
-                try
-                {
-                    payload = store.load(identity);
-                    break;
-                }
-                catch(PipelineCacheLoadException e)
-                {
-                    // One retry: the bad record is dropped and written again
-                    if(needsRecompilation)
-                        throw e;
+        if(cacheManager)
+            return cacheManager.acquire(identity, needsRecompilation);
 
-                    store.invalidate(identity);
-                    needsRecompilation = true;
-                }
-            }
+        needsRecompilation = true;
 
-        if(payload is null)
-            needsRecompilation = true;
-
-        return device.createPipelineCache(payload);
+        return device.createPipelineCache();
     }
 
     /// Hands the driver blob to the writer, which saves it outside the frame
     private void storePipelineCache(string identity, VkPipelineCache pipelineCache)
     {
-        if(writer is null)
-            return;
-
-        auto payload = device.pipelineCacheData(pipelineCache);
-
-        if(payload.length > 0)
-            writer.put(identity, payload);
+        if(cacheManager)
+            cacheManager.storeResult(identity, pipelineCache);
     }
 
     /**

@@ -720,11 +720,10 @@ variant.
 - [x] Measure cold and warm starts of the fixed scene: the warm run's time in
       `vkCreateGraphicsPipelines` against the whole startup.
 
-- [ ] Compute kernels stay outside this cache for now: `Gemm`, the sphere
-      and cylinder generators and `SkinMatrices` build pipelines in `Compute`
-      instead of going through `PipelineFactory`, so each needs a variant
-      identity of its own and a manager that reaches it before sharing the
-      store.
+- [x] Compute kernels share the same store: `Compute` keys a kernel by its
+      class, bindings, push constant and specialization data, and
+      `LogicalDevice.pipelineCacheManager` reaches `Gemm`, the sphere and
+      cylinder generators and `SkinMatrices`.
 
 ## User directories
 

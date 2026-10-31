@@ -38,6 +38,8 @@ class Scene
     PipelineFactory pipelineFactory;
     /// Persists driver pipeline caches between runs, null when none is configured
     PipelineCacheStore pipelineCacheStore;
+    /// Shared by the factory and the compute kernels, null with no store
+    PipelineCacheManager pipelineCacheManager;
     private DescriptorAllocator frameAllocator;
     MeshResources meshResources;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
@@ -185,7 +187,13 @@ class Scene
                 );
         }
 
-        pipelineFactory = new PipelineFactory(device, this.pipelineCacheStore);
+        if(this.pipelineCacheStore)
+        {
+            pipelineCacheManager = new PipelineCacheManager(device, this.pipelineCacheStore);
+            device.pipelineCacheManager = pipelineCacheManager;
+        }
+
+        pipelineFactory = new PipelineFactory(device, pipelineCacheManager);
         frameAllocator = pipelineFactory.createFrameAllocator();
         meshResources = new MeshResources(device);
         ibl = createIblTextures(device);
@@ -291,6 +299,12 @@ class Scene
 
         if(pipelineFactory)
             destroy(pipelineFactory);
+
+        if(pipelineCacheManager)
+        {
+            device.pipelineCacheManager = null;
+            destroy(pipelineCacheManager);
+        }
     }
 
     private void createFrameSets()
