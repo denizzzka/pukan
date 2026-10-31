@@ -461,13 +461,16 @@ long-term work.
       normal projection, so this is groundwork for the next item rather than a
       fix. Measure the change on the truck town window flicker before keeping
       it.
-- [ ] Make reverse Z a compile-time option, selected with a `version` and
-      keeping the current convention as the default and as the fallback for
-      hardware without usable float depth. Flip the projection, the clear
-      depth, every depth compare, the OIT sorting and the `min`/`max` in the
-      resolve, and retune the shadow bias; decide separately whether the sun's
-      shadow map follows or stays conventional. Ship one build per convention
-      rather than a runtime switch, with no two conventions in one binary.
+- [ ] Make reverse Z a compile-time choice of the swapchain, or of whichever
+      object owns the presented frame, rather than a project-wide switch: the
+      depth target and the projection rendered into it share one convention,
+      and every pass that reads that target follows it. Keep the current
+      convention as the default and as the fallback for hardware without
+      usable float depth. Flip the projection, the clear depth, every depth
+      compare, the OIT sorting and the `min`/`max` in the resolve, and retune
+      the shadow bias; decide separately whether the sun's shadow map follows
+      or stays conventional. Ship one build per convention rather than a
+      runtime switch, with no two conventions on one target.
 - [ ] Test both builds on the fixed scene: the truck town windows must stop
       flickering at distance, and the OIT, transmission and shadow results must
       match the normal-Z build apart from precision.
@@ -724,6 +727,16 @@ variant.
       class, bindings, push constant and specialization data, and
       `LogicalDevice.pipelineCacheManager` reaches `Gemm`, the sphere and
       cylinder generators and `SkinMatrices`.
+- [ ] Bound the cache growth. Every variant keeps its own record and nothing
+      removes old ones, so the directory only grows with the number of variants
+      and material sets. Cap the total size and the record count, and evict the
+      least recently used entries first: file mtimes already mark the last use,
+      so a sweep at startup on the worker can drop the oldest records without
+      an index. Never evict a record this run is about to write or has just
+      written, and make the manifest skip files the sweep removed.
+- [ ] Test the sweep with a small cap: a fixed scene fits, a cap below its size
+      evicts the oldest variants, and the next run recompiles only those
+      instead of the whole set.
 
 ## User directories
 
@@ -796,6 +809,24 @@ The README asks for builds assembled from the features a project uses.
       and the ambient tint when the scene has no environment, and turn the
       tonemap mode into a variant or a specialization constant instead of a
       runtime branch. A build without environments should carry neither.
+
+## Offscreen output
+
+`demo` and `demo_godot` render through a `SwapChain` tied to a GLFW window, so
+a run needs a display and a visible window. Debugging wants the same frame
+written into images in memory instead.
+
+- [ ] A second window type behind the same interface: an offscreen target that
+      owns colour and depth images, a fake surface format and a present that
+      does nothing. The scene reads only the target extent and format, so the
+      swapchain can treat both kinds alike.
+- [ ] An option for both demos, such as `--offscreen`, that selects it with a
+      fixed extent and a frame count.
+- [ ] Screenshots from the offscreen target through the existing
+      `Scene.captureFrame` path, with no window, compositor or present
+      dependency.
+- [ ] Use it for benchmarks and CI: the fixed scene then measures GPU work
+      without present timing or vsync, and the run needs no display server.
 
 ## OpenXR
 
