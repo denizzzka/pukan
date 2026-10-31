@@ -676,6 +676,23 @@ final class PipelineFactory
         }
     }
 
+    /// Returns a ready variant without creating one
+    bool tryAcquire(TechniqueId id, RenderPass renderPass, uint subpass, out GraphicsPipelineCfg cfg)
+    {
+        synchronized(mutex)
+        {
+            const key = PipelineKey(id, targetId(renderPass, subpass));
+
+            if(auto found = key in cache)
+            {
+                cfg = *found;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
     /// Queues a variant for the preload thread; a ready or queued variant is ignored
     void request(TechniqueId id, RenderPass renderPass, uint subpass = 0)
     {

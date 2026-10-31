@@ -505,6 +505,20 @@ class PbrFactory
         );
     }
 
+    /// Queues every variant of both families, for the all warmup policy
+    void warmAll()
+    {
+        pipelineCfgs.warmAll();
+        godotPipelines.warmAll();
+    }
+
+    /// Throws when any variant of either family is missing
+    void validateAll()
+    {
+        pipelineCfgs.validateAll();
+        godotPipelines.validateAll();
+    }
+
     /// A private allocator, so loads can run on different threads.
     DescriptorAllocator createAllocator()
     {

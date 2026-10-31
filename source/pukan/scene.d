@@ -2,7 +2,7 @@ module pukan.scene;
 
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
-import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupPerScene;
+import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
@@ -267,6 +267,8 @@ class Scene
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
         pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, sunShadow.pass);
+        static if(pipelineWarmupEverything)
+            pbrFactory.warmAll();
         gltfFactory = new GltfFactory(pbrFactory);
         godotFactory = new GodotFactory(pbrFactory, gltfFactory);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
@@ -1011,6 +1013,8 @@ class Scene
             if(!pipelinesReady)
             {
                 pipelineFactory.waitForRequests();
+                static if(pipelineWarmupEverything)
+                    pbrFactory.validateAll();
                 pipelinesReady = true;
             }
         }

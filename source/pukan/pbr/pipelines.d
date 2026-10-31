@@ -26,6 +26,7 @@ else
 enum bool pipelineWarmupEnabled = pipelineWarmupPolicy != PipelineWarmupPolicy.off;
 enum bool pipelineWarmupPerScene = pipelineWarmupPolicy == PipelineWarmupPolicy.scene ||
     pipelineWarmupPolicy == PipelineWarmupPolicy.required;
+enum bool pipelineWarmupEverything = pipelineWarmupPolicy == PipelineWarmupPolicy.all;
 
 /// A pipeline variant created on first use
 struct LazyPipeline
@@ -52,11 +53,17 @@ struct LazyPipeline
                       pipelineWarmupPolicy == PipelineWarmupPolicy.scene)
                 cfg = factory.acquire(technique, pass, subpass);
             else
-                throw new PukanException(
-                    "pipeline variant was not preloaded: " ~
-                    factory.techniqueName(technique) ~
-                    " for " ~ pass.imageFormat.to!string ~
-                    ", subpass " ~ subpass.to!string);
+            {
+                GraphicsPipelineCfg ready;
+                if(factory.tryAcquire(technique, pass, subpass, ready))
+                    cfg = ready;
+                else
+                    throw new PukanException(
+                        "pipeline variant was not preloaded: " ~
+                        factory.techniqueName(technique) ~
+                        " for " ~ pass.imageFormat.to!string ~
+                        ", subpass " ~ subpass.to!string);
+            }
         }
 
         return cfg;
@@ -131,4 +138,78 @@ final class PbrPipelines
     /// Alpha-tested variants for masked cutouts
     LazyPipeline skinnedMaskShadow;
     LazyPipeline unskinnedMaskShadow;
+
+    /// Queues every variant of this family for the preload thread
+    void warmAll()
+    {
+        warmAll(skinned);
+        warmAll(unskinned);
+
+        skinnedShadow.request();
+        unskinnedShadow.request();
+        skinnedMaskShadow.request();
+        unskinnedMaskShadow.request();
+    }
+
+    /// Throws when a variant is still missing after the preload queue drains
+    void validateAll()
+    {
+        validateAll(skinned);
+        validateAll(unskinned);
+
+        skinnedShadow.get();
+        unskinnedShadow.get();
+        skinnedMaskShadow.get();
+        unskinnedMaskShadow.get();
+    }
+
+    private static void warmAll(ref PbrModePipelines modes)
+    {
+        warmAll(modes.pbr);
+        warmAll(modes.pbrCore);
+        warmAll(modes.lit);
+        warmAll(modes.unlit);
+    }
+
+    private static void warmAll(ref PbrSkyPipelines skies)
+    {
+        warmAll(skies.ibl);
+        warmAll(skies.analytic);
+        warmAll(skies.none);
+    }
+
+    private static void warmAll(ref PbrPipelineVariants variants)
+    {
+        variants.opaque.request();
+        variants.doubleSided.request();
+        variants.blend.request();
+        variants.doubleSidedBlend.request();
+        variants.oit.request();
+        variants.doubleSidedOit.request();
+    }
+
+    private static void validateAll(ref PbrModePipelines modes)
+    {
+        validateAll(modes.pbr);
+        validateAll(modes.pbrCore);
+        validateAll(modes.lit);
+        validateAll(modes.unlit);
+    }
+
+    private static void validateAll(ref PbrSkyPipelines skies)
+    {
+        validateAll(skies.ibl);
+        validateAll(skies.analytic);
+        validateAll(skies.none);
+    }
+
+    private static void validateAll(ref PbrPipelineVariants variants)
+    {
+        variants.opaque.get();
+        variants.doubleSided.get();
+        variants.blend.get();
+        variants.doubleSidedBlend.get();
+        variants.oit.get();
+        variants.doubleSidedOit.get();
+    }
 }

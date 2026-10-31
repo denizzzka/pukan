@@ -839,9 +839,8 @@ Open questions:
 
 ### Pipeline warmup policy
 
-- [ ] Compile-time policy `off | scene | all | required`, default `scene`.
-- [ ] `all`: warm every reachable `PbrPipelines` field for the target and
-      validate the full set before the first frame.
+The compile-time policy is `off | scene | all | required`, default `scene`.
+
 - [ ] `required`: warm only the variants in the required set and throw for a
       variant outside it, with technique and target in the message.
 - [ ] `Variants!(Modules...)`: the requirements-like union of `alias
