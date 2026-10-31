@@ -13,6 +13,8 @@ import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.pipeline_cache: FilePipelineCacheStore, PipelineCacheStore;
+import std.uuid: UUID;
 
 class Scene
 {
@@ -34,6 +36,10 @@ class Scene
 
     import pukan.primitives_tree: PrimitivesFactory;
     PipelineFactory pipelineFactory;
+    /// Persists driver pipeline caches between runs, null when none is configured
+    PipelineCacheStore pipelineCacheStore;
+    /// Shared by the factory and the compute kernels, null with no store
+    PipelineCacheManager pipelineCacheManager;
     private DescriptorAllocator frameAllocator;
     MeshResources meshResources;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
@@ -146,6 +152,7 @@ class Scene
         WindowSizeChangeDetectedCallback wsc,
         VkSurfaceFormatKHR surfaceFormat,
         VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR,
+        PipelineCacheStore pipelineCacheStore = null,
     )
     {
         device = dev;
@@ -167,7 +174,26 @@ class Scene
 
         renderPass = device.create!DefaultRenderPass(surfaceFormat.format);
 
-        pipelineFactory = new PipelineFactory(device);
+        if(pipelineCacheStore)
+            this.pipelineCacheStore = pipelineCacheStore;
+        else
+        {
+            const cacheDirectory = FilePipelineCacheStore.defaultDirectory();
+
+            if(cacheDirectory.length > 0)
+                this.pipelineCacheStore = new FilePipelineCacheStore(
+                    cacheDirectory,
+                    UUID(device.physicalDevice.properties.pipelineCacheUUID),
+                );
+        }
+
+        if(this.pipelineCacheStore)
+        {
+            pipelineCacheManager = new PipelineCacheManager(device, this.pipelineCacheStore);
+            device.pipelineCacheManager = pipelineCacheManager;
+        }
+
+        pipelineFactory = new PipelineFactory(device, pipelineCacheManager);
         frameAllocator = pipelineFactory.createFrameAllocator();
         meshResources = new MeshResources(device);
         ibl = createIblTextures(device);
@@ -270,6 +296,15 @@ class Scene
 
         if(meshResources)
             destroy(meshResources);
+
+        if(pipelineFactory)
+            destroy(pipelineFactory);
+
+        if(pipelineCacheManager)
+        {
+            device.pipelineCacheManager = null;
+            destroy(pipelineCacheManager);
+        }
     }
 
     private void createFrameSets()

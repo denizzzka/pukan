@@ -16,6 +16,8 @@ abstract class Compute
     protected VkPipelineLayout pipelineLayout;
     protected VkPipeline pipeline;
     protected uint pushConstantSize;
+    /// Set when this run compiled the kernel instead of taking a stored record
+    bool needsRecompilation;
 
     private VkWriteDescriptorSet[] pendingWrites;
 
@@ -55,7 +57,62 @@ abstract class Compute
             basePipelineIndex: -1,
         );
 
-        pipeline = device.createComputePipelines([pipelineCreateInfo])[0];
+        VkPipelineCache pipelineCache;
+        PipelineVariantKey identity;
+        const name = typeid(this).name;
+
+        if(auto manager = device.pipelineCacheManager)
+        {
+            identity = computeIdentity(name, layoutBindings, pushConstant, specialization);
+            pipelineCache = manager.acquire(identity, needsRecompilation);
+        }
+        else
+            needsRecompilation = true;
+
+        scope(exit)
+            if(pipelineCache)
+                device.destroyPipelineCache(pipelineCache);
+
+        pipeline = device.createComputePipelines([pipelineCreateInfo], pipelineCache)[0];
+
+        if(auto manager = device.pipelineCacheManager)
+        {
+            manager.storeResult(identity, pipelineCache);
+
+            debug
+                Instance.log_info(
+                    "pipeline cache: " ~ name ~ "-" ~ identity.toString() ~
+                    (needsRecompilation ? " compiled" : " cached"));
+        }
+    }
+
+    /**
+        What a kernel is for the store: its class, bindings, push constant and
+        specialization data. Shader bytes stay out, the driver keys those.
+    */
+    private static PipelineVariantKey computeIdentity(
+        string name,
+        VkDescriptorSetLayoutBinding[] layoutBindings,
+        VkPushConstantRange pushConstant,
+        VkSpecializationInfo* specialization,
+    )
+    {
+        PipelineVariantKeyBuilder builder;
+        builder.addString(name);
+        builder.addArray(layoutBindings);
+        builder.add(pushConstant);
+
+        if(specialization !is null)
+        {
+            builder.add(specialization.dataSize);
+
+            if(specialization.dataSize)
+                builder.addArray((cast(const ubyte*) specialization.pData)[0 .. specialization.dataSize]);
+
+            builder.addArray(specialization.pMapEntries[0 .. specialization.mapEntryCount]);
+        }
+
+        return builder.finish;
     }
 
     protected void bindBuffer(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorBufferInfo bufferInfo)

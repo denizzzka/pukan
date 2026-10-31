@@ -1,9 +1,10 @@
 # Godot scene fixtures
 
 Three scenes come from the official Godot demo projects, one is generated
-here, and one is a small project exported as a PCK. They cover the text scene
-format, the binary RSRC format, ArrayMesh surfaces, primitive meshes,
-StandardMaterial3D, external glTF scenes, skeletons, a landscape and animation.
+here, one is a small project exported as a PCK, and `cutout_shadow/` is written
+for this repository. They cover the text scene format, the binary RSRC format,
+ArrayMesh surfaces, primitive meshes, StandardMaterial3D, external glTF scenes,
+skeletons, a landscape and animation.
 
 ## Sources
 
@@ -27,6 +28,12 @@ The demo projects are MIT licensed, see `LICENSE.godot-demo-projects.md`.
 `lights_and_shadows/checker.LICENSE.md`. The truck town tree and lamp models
 are CC-BY 4.0 by Ricardo Sanchez and RitiWox; their `license.txt` files carry
 the attribution.
+
+## Cutout shadow
+
+`cutout_shadow/` is not upstream: a checkered alpha-scissor quad and an opaque
+box stand on one plane, so masked cutouts show up in the shadow map next to a
+solid rectangle. See `cutout_shadow/README.md`.
 
 ## Generated scene
 
@@ -238,5 +245,7 @@ R            reset the roll
 H            look axis: horizontal (level horizon) or screen (follows the roll)
 ```
 
-`--speed` sets the movement speed in units per second. Runs with `--frames` or
-`--screenshot` stay static unless input arrives, so their output is repeatable.
+`--speed` sets the movement speed in units per second. `--near` and `--far` set
+the clipping distances; with `--scene-camera` the scene camera supplies them
+instead. Runs with `--frames` or `--screenshot` stay static unless input
+arrives, so their output is repeatable.

@@ -637,6 +637,22 @@ stay in front. Long term:
       as the first transmission attempt did. Per material or as a fallback when
       the scene has no colour copy.
 
+## Retro look
+
+Material textures are filtered today: the glTF sampler defaults, the shared
+material sampler and the 1x1 fallback all ask for linear filtering and mipmaps,
+so an asset authored for a low-resolution look is smoothed before it reaches the
+screen.
+
+- [ ] A retro preset that asks the samplers for `VK_FILTER_NEAREST` and
+      `VK_SAMPLER_MIPMAP_MODE_NEAREST`: the defaults in `gltfSampler`, the
+      material sampler in `scene.d` and `createFakeTexture1x1`, plus nearest
+      level generation in the `vkCmdBlitImage` chain. A glTF sampler that names
+      a filter keeps it; only the unspecified ones follow the preset.
+- [ ] Leave the samplers that are not a style choice alone: IBL, the shadow
+      comparison and the resolve copies stay linear, or the image breaks
+      instead of turning crisp.
+
 ## Lighting
 
 The frame carries a light list in a storage buffer: the sun, then point and spot
@@ -652,13 +668,46 @@ cascades and no local-light shadows. Missing:
       tile metadata in the frame data and per-tile cache validity.
 - [x] Cache the sun's shadow map while the casters and the sun stay put, so a
       static level does not redraw an unchanged map every frame.
-- [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.
+- [x] Caster coverage: masked cutouts cast through an alpha-tested shadow
+      variant.
+- [ ] Caster coverage: the non-glTF primitives do not cast yet.
 - [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
 - [ ] Light culling by distance and screen size.
 - [ ] Calibrate AgX against Godot; `Environment.tonemap_mode = 4` falls back to
       ACES today, and the background bypasses exposure and tonemap entirely.
 - [ ] Shadowmasking: baked directional occlusion that dynamic lights sample, so
       a lit surface can stay in a baked shadow.
+
+## Depth buffer
+
+The scene pass and the sun's shadow map share `DepthBuf.format`,
+`D24_UNORM_S8_UINT`. The stencil bits are unused: every attachment is created
+with `DONT_CARE` and the pipelines keep stencil testing off. Depth precision is
+what makes the truck town windows flicker at distance, and both steps below are
+long-term work.
+
+- [ ] Switch the depth attachment to `D32_SFLOAT` on its own, keeping the
+      current Z convention. It costs the same 32 bits per sample as the 24-bit
+      format with stencil and drops a stencil the engine never uses. Alone it
+      buys little: float depth keeps its relative precision near 1.0 with a
+      normal projection, so this is groundwork for the next item rather than a
+      fix. Measure the change on the truck town window flicker before keeping
+      it.
+- [ ] Make reverse Z a compile-time choice of the swapchain, or of whichever
+      object owns the presented frame, rather than a project-wide switch: the
+      depth target and the projection rendered into it share one convention,
+      and every pass that reads that target follows it. Keep the current
+      convention as the default and as the fallback for hardware without
+      usable float depth. Flip the projection, the clear depth, every depth
+      compare, the OIT sorting and the `min`/`max` in the resolve, and retune
+      the shadow bias; decide separately whether the sun's shadow map follows
+      or stays conventional. Ship one build per convention rather than a
+      runtime switch, with no two conventions on one target. Check it on the
+      truck town house windows at distance and while the camera turns: the
+      wall and the window decals must stop flickering.
+- [ ] Test both builds on the fixed scene: the truck town windows must stop
+      flickering at distance, and the OIT, transmission and shadow results must
+      match the normal-Z build apart from precision.
 
 ## Deferred shading
 
@@ -833,6 +882,40 @@ against the plain version it replaces.
 Not parallelized: present, event polling, swapchain maintenance, pipeline and
 shader creation.
 
+## User directories
+
+`FilePipelineCacheStore.defaultDirectory` reads `XDG_CACHE_HOME` or `HOME` on
+POSIX and `LOCALAPPDATA` on Windows. Config, data, logs and screenshots need
+the same answer, and the right one differs per platform and packaging (Flatpak,
+Snap, macOS application containers), so it belongs in one place rather than in
+each caller.
+
+- [ ] Pick one library, or write the small wrapper, that resolves the cache,
+      config, data and log roots per platform; `xdgpaths` covers the XDG case.
+- [ ] Route the pipeline cache, config, data, logs and screenshots through it.
+- [ ] Keep the roots overridable from the environment and from a command-line
+      switch, so a portable build and tests do not share state with an
+      installed copy.
+
+## Pipeline libraries
+
+Long term, optional: `VK_KHR_pipeline_library` together with
+`VK_EXT_graphics_pipeline_library`, so 10 vertex and 100 fragment variants
+become 10 + 100 libraries that link into 1,000 pipelines instead of 1,000
+compilations. The first extension alone only lets a finished pipeline be linked
+as a library; the split into vertex input, pre-rasterization, fragment shader
+and fragment output stages comes from the second. Both stay behind the device
+requirements, with the monolithic path as the fallback.
+
+- [ ] Spike: measure linking against compiling on the fixed scene, 10x100
+      variants, cold and with the pipeline cache warm. Linking is cheaper than
+      compiling, but it is not free, and the count only matters while startup
+      still stalls.
+- [ ] Split `PipelineKey` along the same four stages and cache the libraries in
+      the same store, so the combinatorial explosion shrinks in the cache too.
+- [ ] Evaluate `VK_EXT_shader_object` as the other way to the same end, with no
+      link at all: bind the shaders and keep the state dynamic.
+
 ## Shader preloading
 
 Long term: every glTF pipeline variant is built when the factory is created,
@@ -870,6 +953,24 @@ The README asks for builds assembled from the features a project uses.
       and the ambient tint when the scene has no environment, and turn the
       tonemap mode into a variant or a specialization constant instead of a
       runtime branch. A build without environments should carry neither.
+
+## Offscreen output
+
+`demo` and `demo_godot` render through a `SwapChain` tied to a GLFW window, so
+a run needs a display and a visible window. Debugging wants the same frame
+written into images in memory instead.
+
+- [ ] A second window type behind the same interface: an offscreen target that
+      owns colour and depth images, a fake surface format and a present that
+      does nothing. The scene reads only the target extent and format, so the
+      swapchain can treat both kinds alike.
+- [ ] An option for both demos, such as `--offscreen`, that selects it with a
+      fixed extent and a frame count.
+- [ ] Screenshots from the offscreen target through the existing
+      `Scene.captureFrame` path, with no window, compositor or present
+      dependency.
+- [ ] Use it for benchmarks and CI: the fixed scene then measures GPU work
+      without present timing or vsync, and the run needs no display server.
 
 ## OpenXR
 

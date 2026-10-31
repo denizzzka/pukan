@@ -11,6 +11,8 @@ glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/mesh_pbr_sta
 glslc ${TGT} ${INCLUDES} -DSHADOW -fshader-stage=vertex source/pukan/shaders/mesh_pbr.vert -o compiled_shaders/mesh_pbr_shadow_vert.spv
 glslc ${TGT} ${INCLUDES} -DSHADOW -fshader-stage=vertex source/pukan/shaders/mesh_pbr_static.vert -o compiled_shaders/mesh_pbr_static_shadow_vert.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_shadow.frag -o compiled_shaders/mesh_shadow_frag.spv
+glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_shadow_mask.frag -o compiled_shaders/mesh_shadow_mask_frag.spv
+glslc ${TGT} ${INCLUDES} -DGODOT_MATERIAL -fshader-stage=frag source/pukan/shaders/mesh_shadow_mask.frag -o compiled_shaders/mesh_shadow_mask_frag_godot.spv
 
 pbr_frag() {
     local name="$1"

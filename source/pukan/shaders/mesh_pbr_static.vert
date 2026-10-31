@@ -25,6 +25,7 @@ void main()
     const mat4 trans = mat4(instance0, instance1, instance2, instance3);
 
 #ifdef SHADOW
+    fragTextureCoord = vertTextureCoord;
     gl_Position = trans * vec4(position, 1.0);
     return;
 #endif

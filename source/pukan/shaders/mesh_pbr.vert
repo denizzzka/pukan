@@ -37,6 +37,7 @@ void main()
         jointMatrices[jointIndices.w] * weight.w;
 
     gl_Position = trans * (shadowSkinMatrix * vec4(position, 1.0));
+    fragTextureCoord = vertTextureCoord;
     return;
 #endif
 

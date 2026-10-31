@@ -6,6 +6,7 @@ import std.exception: enforce;
 import std.math: abs;
 import std.meta: AliasSeq;
 import std.random;
+import std.uuid: UUID;
 import std.stdio;
 
 debug alias DebugEntities = LayerSettings;
@@ -63,6 +64,25 @@ void main()
 
     auto device = selected.createLogicalDevice();
     scope(exit) destroy(device);
+
+    const cacheDirectory = FilePipelineCacheStore.defaultDirectory();
+    PipelineCacheManager cacheManager;
+
+    if(cacheDirectory.length)
+    {
+        cacheManager = new PipelineCacheManager(
+            device,
+            new FilePipelineCacheStore(
+                cacheDirectory,
+                UUID(device.physicalDevice.properties.pipelineCacheUUID),
+            ),
+        );
+        device.pipelineCacheManager = cacheManager;
+    }
+
+    scope(exit)
+        if(cacheManager)
+            destroy(cacheManager);
 
     string formatReason;
     enforce(device.supportsImageFormat(sampled, formatReason),

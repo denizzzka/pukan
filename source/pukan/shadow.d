@@ -11,7 +11,6 @@ import pukan.vulkan.renderpass: RenderPass;
 final class ShadowPass : RenderPass
 {
     LogicalDevice device;
-    VkFormat depthFormat;
 
     this(LogicalDevice device, VkFormat depthFormat)
     {
@@ -264,7 +263,7 @@ final class SunShadow
     {
         this.device = device;
         this.mapSize = mapSize;
-        pass = new ShadowPass(device, DefaultRenderPass.depthFormat);
+        pass = new ShadowPass(device, DepthBuf.format);
 
         VkSamplerCreateInfo info = {
             sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
