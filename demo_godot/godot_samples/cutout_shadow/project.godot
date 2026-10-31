@@ -1,0 +1,6 @@
+config_version=5
+
+[application]
+
+config/name="pukan cutout shadow fixture"
+run/main_scene="res://cutout_shadow.tscn"
