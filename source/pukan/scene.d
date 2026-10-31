@@ -26,7 +26,7 @@ class Scene
     SwapChain swapChain;
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
-    Checkerboard background;
+    Background background;
     VkPresentModeKHR presentMode;
 
     VkQueue graphicsQueue;
@@ -66,6 +66,11 @@ class Scene
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
+    /// Ambient tint and energy applied to the IBL term
+    Vector4f ambientLight = Vector4f(1, 1, 1, 1);
+    /// Godot tonemap mode: linear, Reinhard, Filmic, ACES, AgX
+    uint tonemapMode = 3;
+    float tonemapWhite = 1.0f;
     /// Uploaded with the frame; the first entry is the sun
     private Light[maxLights] lights;
     private uint lightCount;
@@ -167,7 +172,7 @@ class Scene
         meshResources = new MeshResources(device);
         ibl = createIblTextures(device);
 
-        background = new Checkerboard(device, pipelineFactory, renderPass);
+        background = new Background(device, pipelineFactory, renderPass);
 
         oitResolve = new OitResolve(device, pipelineFactory, surfaceFormat.format);
         depthResolve = new DepthResolve(device, pipelineFactory);
@@ -583,6 +588,8 @@ class Scene
         }
 
         data.shadowParams = Vector4f(sunShadow.enabled ? 1 : 0, 0, 0, 0);
+        data.ambientParams = ambientLight;
+        data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
         data.exposureParams = Vector4f(
             exposure,
             iblIntensity,
@@ -618,7 +625,7 @@ class Scene
 
         renderPass.recordCommandBuffer(
             commandBuffer,
-            (ref VkCommandBuffer buf) { background.draw(buf); },
+            (ref VkCommandBuffer buf) { background.draw(buf, swapChain.imageExtent); },
             (ref VkCommandBuffer buf) {
                 drawScene(buf, DrawPhase.surface);
                 drawScene(buf, DrawPhase.blended);
@@ -716,7 +723,7 @@ class Scene
 
         renderPass.recordCommandBuffer(
             commandBuffer,
-            (ref VkCommandBuffer buf) { background.draw(buf); },
+            (ref VkCommandBuffer buf) { background.draw(buf, swapChain.imageExtent); },
             (ref VkCommandBuffer buf) { drawStereoEyes(buf, drawScene); },
         );
 
@@ -1010,6 +1017,8 @@ struct FrameUniforms
     Vector4f cameraPosition;
     Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
     Vector4f shadowParams;   // x = 1 while the sun's shadow map is used
+    Vector4f ambientParams;  // rgb = ambient tint, a = ambient energy
+    Vector4f tonemapParams;  // x = mode, y = white
 }
 
 ///

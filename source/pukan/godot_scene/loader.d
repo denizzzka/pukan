@@ -6,6 +6,7 @@ import pukan.compressed_texture: CompressedFamily, familySupported, formatSuppor
 import pukan.exceptions: PukanException;
 import pukan.godot_scene.binary: parseGodotResourceData;
 import pukan.godot_scene.ctex: GodotCtexImage, isTwoChannelNormal, loadCtex;
+import pukan.godot_scene.environment: GodotEnvironment, readGodotEnvironment, readGodotSky;
 import pukan.godot_scene.material: GodotMaterialData, readGodotMaterial;
 import pukan.godot_scene.paths: normalizeResourcePath;
 import pukan.godot_scene.remap: resolveGodotPath;
@@ -316,6 +317,7 @@ private final class GodotLoader
     Texture[string] textureCache;
     VkSampler[SamplerKey] samplerCache;
     VkSampler[] samplers;
+    GodotEnvironment environment;
     DrawableByVulkan[] instances;
     GodotSkin[] skins;
     VkDescriptorImageInfo fakeTextureInfo;
@@ -412,6 +414,7 @@ private final class GodotLoader
             samplers,
             instances,
             skins,
+            environment,
             root.name,
         );
         scene.skippedNodes = skippedNodes;
@@ -733,6 +736,10 @@ private final class GodotLoader
                 node.hasCamera = true;
                 break;
 
+            case "WorldEnvironment":
+                readEnvironmentNode(document, properties);
+                break;
+
             default:
                 break;
         }
@@ -771,7 +778,12 @@ private final class GodotLoader
                             instances ~= node.instance;
 
                             if(auto child = cast(GodotScene) node.instance)
+                            {
                                 mergeSkipped(child);
+
+                                if(child.environment.present && !environment.present)
+                                    environment = child.environment;
+                            }
                         }
                         else
                             ++skippedResources;
@@ -828,7 +840,6 @@ private final class GodotLoader
     {
         switch(type)
         {
-            case "WorldEnvironment":
             case "ReflectionProbe":
             case "LightmapGI":
             case "VoxelGI":
@@ -1262,6 +1273,103 @@ private final class GodotLoader
         mesh.shadowsOnly = castShadowMode == 3;
         node.meshes ~= mesh;
         meshes ~= mesh;
+    }
+
+    private bool resolveResource(
+        ref GodotTextDocument document,
+        GodotObjectRef reference,
+        out string type,
+        out GodotVariant[string] properties,
+        out string documentPath,
+    )
+    {
+        type = null;
+        properties = null;
+        documentPath = null;
+
+        if(reference.kind == GodotRefKind.subResource)
+        {
+            auto resource = findSubResource(document, reference.id);
+            if(resource is null)
+                return false;
+
+            type = resource.type;
+            properties = resource.properties;
+            return true;
+        }
+
+        if(reference.kind == GodotRefKind.extResource)
+        {
+            auto external = findExternal(document, reference.id);
+            if(external is null || !isResourcePath(external.path))
+                return false;
+
+            documentPath = project.key(external.path);
+            auto resource = project.document(documentPath);
+            type = resource.resourceType;
+            properties = resource.resourceProperties;
+            return true;
+        }
+
+        if(reference.kind == GodotRefKind.resource)
+        {
+            documentPath = project.key(reference.id);
+            auto resource = project.document(documentPath);
+            type = resource.resourceType;
+            properties = resource.resourceProperties;
+            return true;
+        }
+
+        return false;
+    }
+
+    private void readEnvironmentNode(ref GodotTextDocument document, in GodotVariant[string] properties)
+    {
+        auto value = "environment" in properties;
+        if(value is null || isNil(*value) || (*value).type !is typeid(GodotObjectRef))
+            return;
+
+        string type;
+        GodotVariant[string] environmentProperties;
+        string documentPath;
+
+        if(!resolveResource(document, asObjectRef(*value, "environment"), type, environmentProperties, documentPath))
+            return;
+
+        if(type != "Environment")
+            return;
+
+        auto environment = readGodotEnvironment(type, environmentProperties);
+        auto environmentDocument = documentPath.length ? project.document(documentPath) : document;
+
+        if(auto skyValue = "sky" in environmentProperties)
+            if(!isNil(*skyValue) && (*skyValue).type is typeid(GodotObjectRef))
+            {
+                string skyType;
+                GodotVariant[string] skyProperties;
+                string skyPath;
+
+                if(resolveResource(environmentDocument, asObjectRef(*skyValue, "sky"), skyType, skyProperties, skyPath))
+                {
+                    if(skyType != "Sky")
+                        environment.sky = readGodotSky(skyType, skyProperties);
+                    else if(auto materialValue = "sky_material" in skyProperties)
+                        if(!isNil(*materialValue) && (*materialValue).type is typeid(GodotObjectRef))
+                        {
+                            auto skyDocument = skyPath.length ? project.document(skyPath) : document;
+
+                            string materialType;
+                            GodotVariant[string] materialProperties;
+                            string materialPath;
+
+                            if(resolveResource(skyDocument, asObjectRef(*materialValue, "sky_material"),
+                                materialType, materialProperties, materialPath))
+                                environment.sky = readGodotSky(materialType, materialProperties);
+                        }
+                }
+            }
+
+        this.environment = environment;
     }
 
     private GodotMaterialData resolveMaterial(

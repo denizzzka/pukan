@@ -114,9 +114,10 @@ or the pack.
       light list; add a `Scene.setSun` path for the directional one.
 - [x] `Camera3D` exposed on the loaded scene; the demo decides whether to use
       it.
-- [ ] `WorldEnvironment`, `Environment` and `Sky`: background colour, ambient
-      light and tonemap; IBL, fog, SDFGI and volumetrics stay unsupported at
-      first.
+- [x] `WorldEnvironment`, `Environment` and `Sky`: background colour, sky
+      gradient, ambient tint, exposure and tonemap modes. Parsed in
+      `godot_scene/environment.d`; AgX currently falls back to ACES. IBL
+      regenerated from the sky, fog, SDFGI and volumetrics stay unsupported.
 - [ ] Layers, visibility ranges and `cast_shadow` modes.
 - [x] Size the sun's shadow map to the loaded scene: `demo_godot` fits an
       orthographic frustum to the scene AABB. `SunShadow` owns the pass, the
@@ -422,6 +423,8 @@ cascades and no local-light shadows. Missing:
 - [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.
 - [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
 - [ ] Light culling by distance and screen size.
+- [ ] Calibrate AgX against Godot; `Environment.tonemap_mode = 4` falls back to
+      ACES today, and the background bypasses exposure and tonemap entirely.
 - [ ] Shadowmasking: baked directional occlusion that dynamic lights sample, so
       a lit surface can stay in a baked shadow.
 
@@ -631,6 +634,10 @@ The README asks for builds assembled from the features a project uses.
       driver prunes dead branches from specialization constants, and whether
       composing and compiling at load is affordable next to shipping SPVs.
       This is the same shape as Godot's per-variant shader compilation.
+- [ ] Make the environment optional in `material.glsl`: compile out `toneMap`
+      and the ambient tint when the scene has no environment, and turn the
+      tonemap mode into a variant or a specialization constant instead of a
+      runtime branch. A build without environments should carry neither.
 
 ## OpenXR
 

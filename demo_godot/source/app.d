@@ -1,4 +1,4 @@
-import dlib.math: Matrix4x4f, Vector3f;
+import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.pbr.pipelines: plainShading;
 import pukan.vulkan.bindings;
@@ -351,6 +351,51 @@ void main(string[] args)
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
     scene.sunShadow.fit(godotScene.calcAABB());
+
+    if(godotScene.environment.present)
+    {
+        const environment = godotScene.environment;
+
+        final switch(environment.backgroundMode)
+        {
+            case GodotBackgroundMode.clearColor:
+            case GodotBackgroundMode.color:
+                scene.background.setColor(environment.backgroundColor, environment.backgroundEnergy);
+                break;
+
+            case GodotBackgroundMode.sky:
+                if(environment.sky.present)
+                    scene.background.setSky(
+                        environment.sky.topColor,
+                        environment.sky.horizonColor,
+                        environment.sky.groundHorizonColor,
+                        environment.sky.groundBottomColor,
+                        environment.sky.energy,
+                    );
+                else
+                    scene.background.setColor(environment.backgroundColor, environment.backgroundEnergy);
+                break;
+
+            case GodotBackgroundMode.canvas:
+            case GodotBackgroundMode.keep:
+            case GodotBackgroundMode.cameraFeed:
+                break;
+        }
+
+        Vector3f ambientColor = environment.ambientColor;
+        if(environment.ambientSource == GodotAmbientSource.background)
+            ambientColor = environment.backgroundColor;
+
+        scene.ambientLight = Vector4f(
+            ambientColor.x,
+            ambientColor.y,
+            ambientColor.z,
+            environment.ambientSource == GodotAmbientSource.disabled ? 0.0f : environment.ambientEnergy,
+        );
+        scene.exposure = environment.exposure;
+        scene.tonemapMode = environment.tonemapMode;
+        scene.tonemapWhite = environment.white;
+    }
 
     Vector3f eye = Vector3f(0, 3.0f, -8.0f);
     Vector3f target = Vector3f(0, 1.5f, 0);

@@ -383,7 +383,8 @@ void main()
 #endif
 
         color = shadePbr(surface);
-        color = toneMap(color * frameUbo.frame.exposureParams.x);
+        color = toneMap(color * frameUbo.frame.exposureParams.x,
+            uint(frameUbo.frame.tonemapParams.x), frameUbo.frame.tonemapParams.y);
     }
 #endif
 

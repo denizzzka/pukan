@@ -2,6 +2,7 @@ module pukan.godot_scene.scene;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
+import pukan.godot_scene.environment: GodotEnvironment;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.mesh: mirrors;
 import pukan.misc: Boxf, isVisible, mergeAabb, transformAabb;
@@ -116,6 +117,7 @@ final class GodotScene : DrawableByVulkan, Blended
     GodotLight[] lights;
     GodotCamera camera;
     bool hasCamera;
+    GodotEnvironment environment;
     private DrawableByVulkan[] instances;
     private GodotSkin[] skins;
 
@@ -130,6 +132,7 @@ final class GodotScene : DrawableByVulkan, Blended
         VkSampler[] samplers,
         DrawableByVulkan[] instances,
         GodotSkin[] skins,
+        GodotEnvironment environment,
         string name,
     )
     {
@@ -143,6 +146,7 @@ final class GodotScene : DrawableByVulkan, Blended
         this.samplers = samplers;
         this.instances = instances;
         this.skins = skins;
+        this.environment = environment;
         this.name = name;
     }
 
