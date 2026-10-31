@@ -837,6 +837,19 @@ Open questions:
 - Keep the disk cache record when a pipeline is evicted, so the rebuild is
   cheap; dropping it would trade memory for compile time.
 
+### Pipeline warmup policy
+
+- [ ] Compile-time policy `off | scene | all | required`, default `scene`.
+- [ ] `off`: no query, no worker, no barrier; first use creates.
+- [ ] `scene`: current per-object warm, on-demand fallback.
+- [ ] `all`: warm every reachable `PbrPipelines` field for the target and
+      validate the full set before the first frame.
+- [ ] `required`: warm only the variants in the required set and throw for a
+      variant outside it, with technique and target in the message.
+- [ ] `Variants!(Modules...)`: the requirements-like union of `alias
+      pipelineVariants` that defines the `required` set. Until it lands,
+      `required` uses the scene query as its set.
+
 ### Pipeline cache strategies
 
 The store is currently one file per variant, keyed by a digest of the variant
