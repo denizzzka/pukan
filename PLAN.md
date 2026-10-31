@@ -470,7 +470,9 @@ long-term work.
       compare, the OIT sorting and the `min`/`max` in the resolve, and retune
       the shadow bias; decide separately whether the sun's shadow map follows
       or stays conventional. Ship one build per convention rather than a
-      runtime switch, with no two conventions on one target.
+      runtime switch, with no two conventions on one target. Check it on the
+      truck town house windows at distance and while the camera turns: the
+      wall and the window decals must stop flickering.
 - [ ] Test both builds on the fixed scene: the truck town windows must stop
       flickering at distance, and the OIT, transmission and shadow results must
       match the normal-Z build apart from precision.
@@ -647,97 +649,6 @@ against the plain version it replaces.
 
 Not parallelized: present, event polling, swapchain maintenance, pipeline and
 shader creation.
-
-## Pipeline cache
-
-`PipelineFactory` keeps its map of created pipelines only for the lifetime of
-the process, so without a store every run recompiles every variant. Persisting
-the driver cache is what turns a warm start into a few milliseconds per
-variant.
-
-- [x] An abstract store of the cache blob, so the backend is a choice:
-      `load(identity)`, `save(identity, data)` and a manifest of the variants it
-      holds, which the caller walks to drive a progress bar. The implementation
-      writes files under the user's cache directory; the file system page cache
-      already keeps a warm read in RAM, so no separate in-process copy is
-      planned.
-- [x] The header stores the `pipelineCacheUUID` from
-      `VkPhysicalDeviceProperties` and compares it on load. The driver blob
-      carries the same UUID in `VkPipelineCacheHeaderVersionOne` and the
-      implementation must ignore a blob that does not match, but it does so
-      silently with `VK_SUCCESS`: `VK_ERROR_INVALID_PIPELINE_CACHE_DATA` is only
-      a reserved slot of a disabled extension, so the check has to be ours.
-      Vendor and device ids are not duplicated, because the UUID implies both.
-      Progress counts variants from the manifest, whatever the store keeps on
-      disk.
-- [x] The manifest keys a variant by what `PipelineKey` already holds
-      (technique and render target) plus the creation state around it:
-      specialization constants, vertex input, dynamic state and formats. Shader
-      bytes stay out of the key, because the driver keys its own entries by the
-      SPIR-V it is handed: a recompiled shader becomes a driver miss and a
-      compile. Hashing shaders here would start a shader cache, and none is
-      planned.
-- [x] Every pipeline variant carries a `needsRecompilation` flag, set when the
-      variant has to be compiled instead of taken from the cache: its record is
-      missing or loading the record threw. Nothing clears it: a variant is
-      created once per run, so the flag stays as the mark that this run compiled
-      it.
-- [x] A load exception is caught where the variant is requested: its record is
-      invalidated, the flag is set, and the pipeline is created again, which
-      compiles it and writes a fresh record. If the flag is already set when the
-      exception arrives again, the one retry has already happened, so the
-      exception is rethrown instead of looping. A driver blob has no operation
-      that removes a single entry, so invalidating one variant means one cache
-      per variant rather than one per device; the spike prices the driver-side
-      sharing that costs.
-- [x] A cached file is accepted only when three values agree: the container
-      format version, the `pipelineCacheUUID` and the payload length. The header
-      starts with a magic and the format version, and only then the UUID and the
-      length, so a future layout change is recognized before any other field is
-      read; the format version has to come first precisely because the rest of
-      the layout depends on it. A file that fails any of the three is not used
-      silently: loading a cached pipeline throws `PipelineCacheLoadException`, so
-      the caller sees a stale or half-written file instead of a cold start that
-      looks normal. The length is only a cheap way to notice that something is
-      off, not a guarantee: it catches an obviously truncated file and nothing
-      subtler.
-- [x] The container format version is part of the file path, so a layout change
-      starts a fresh directory instead of reading a blob written in an older
-      layout. The variant key records what a pipeline is, not how this library
-      assembles the creation info; a change in that code is a driver miss, a
-      compile and a rewritten record, not a wrong pipeline.
-- [x] Files hold the driver blob and the header as raw bytes, with no portable
-      encoding: they are only read back on the machine that wrote them and
-      executed by the same driver. A different byte order or struct layout
-      breaks the fields themselves, and the checks then reject the file, which
-      forces a recompile instead of letting a wrong pipeline through.
-- [x] Create each `VkPipelineCache` when its variant is first requested, seed it
-      through `VkPipelineCacheCreateInfo.initialData` from that variant's file,
-      and write it back with `vkGetPipelineCacheData` once the pipeline is
-      created, on a worker, never inside the frame.
-- [x] Assert in the test build that a cached variant loads with no error from
-      the driver: every `VkResult` is checked along the way. The assertion is
-      only insurance, because the algorithm is meant to be reliable by itself;
-      nothing after it may run on a wrongly loaded or missing pipeline, so the
-      variant either yields a valid handle or trips the assert.
-- [x] Measure cold and warm starts of the fixed scene: the warm run's time in
-      `vkCreateGraphicsPipelines` against the whole startup.
-
-- [x] Compute kernels share the same store: `Compute` keys a kernel by its
-      class, bindings, push constant and specialization data, and
-      `LogicalDevice.pipelineCacheManager` reaches `Gemm`, the sphere and
-      cylinder generators and `SkinMatrices`.
-- [x] Bound the cache growth. Every variant keeps its own record and nothing
-      removes old ones, so the directory only grows with the number of variants
-      and material sets. `FilePipelineCacheStore` takes a byte cap and a record
-      cap (64 MiB and 4096 by default) and evicts the least recently used
-      entries first: file mtimes mark the last use, so a sweep at startup on
-      the worker drops the oldest records without an index. The sweep runs
-      before this run's saves, and a read that races with it falls back to a
-      miss, so nothing written by the run is evicted.
-- [x] Test the sweep with a small cap: a fixed scene fits, a cap below its size
-      evicts the oldest variants, and the next run recompiles only those
-      instead of the whole set.
 
 ## User directories
 
