@@ -11,6 +11,7 @@ public import pukan.vulkan.image;
 public import pukan.vulkan.logical_device;
 public import pukan.vulkan.memory;
 public import pukan.vulkan.pipelines;
+public import pukan.vulkan.pipeline_cache;
 public import pukan.vulkan.renderpass;
 public import pukan.vulkan.surface;
 public import pukan.vulkan.shaders;

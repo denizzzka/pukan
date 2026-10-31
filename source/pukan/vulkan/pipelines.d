@@ -6,6 +6,16 @@ import pukan.exceptions: PukanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
+import pukan.vulkan.pipeline_cache: PipelineCacheLoadException, PipelineCacheStore;
+import core.sync.condition: Condition;
+import core.sync.mutex: Mutex;
+import core.thread: Thread;
+import std.conv: to;
+
+debug
+{
+    import core.time: Duration;
+}
 
 package mixin template Pipelines()
 {
@@ -28,7 +38,10 @@ package mixin template Pipelines()
             vkDestroyPipelineLayout(this.device, layout, this.alloc);
     }
 
-    VkPipeline[] createGraphicsPipelines(VkGraphicsPipelineCreateInfo[] infos)
+    VkPipeline[] createGraphicsPipelines(
+        VkGraphicsPipelineCreateInfo[] infos,
+        VkPipelineCache pipelineCache = null,
+    )
     out(r; r.length == infos.length)
     {
         synchronized(this)
@@ -38,7 +51,7 @@ package mixin template Pipelines()
 
             vkCreateGraphicsPipelines(
                 this.device,
-                null, // pipelineCache
+                pipelineCache,
                 cast(uint) infos.length,
                 infos.ptr,
                 this.alloc,
@@ -49,7 +62,10 @@ package mixin template Pipelines()
         }
     }
 
-    VkPipeline[] createComputePipelines(VkComputePipelineCreateInfo[] infos)
+    VkPipeline[] createComputePipelines(
+        VkComputePipelineCreateInfo[] infos,
+        VkPipelineCache pipelineCache = null,
+    )
     out(r; r.length == infos.length)
     {
         synchronized(this)
@@ -59,7 +75,7 @@ package mixin template Pipelines()
 
             vkCreateComputePipelines(
                 this.device,
-                null, // pipelineCache
+                pipelineCache,
                 cast(uint) infos.length,
                 infos.ptr,
                 this.alloc,
@@ -68,6 +84,41 @@ package mixin template Pipelines()
 
             return pipelines[prevLen .. $];
         }
+    }
+
+    /// Creates a driver cache, seeded with a stored blob when one is given
+    VkPipelineCache createPipelineCache(const(ubyte)[] initialData = null)
+    {
+        VkPipelineCacheCreateInfo info = {
+            sType: VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+            initialDataSize: initialData.length,
+            pInitialData: initialData.ptr,
+        };
+
+        VkPipelineCache cache;
+        vkCreatePipelineCache(this.device, &info, this.alloc, &cache).vkCheck;
+
+        return cache;
+    }
+
+    /// Reads the driver blob of a cache, for persistence
+    ubyte[] pipelineCacheData(VkPipelineCache cache)
+    {
+        size_t size;
+        vkGetPipelineCacheData(this.device, cache, &size, null).vkCheck;
+
+        ubyte[] data;
+        data.length = size;
+
+        if(size)
+            vkGetPipelineCacheData(this.device, cache, &size, data.ptr).vkCheck;
+
+        return data[0 .. size];
+    }
+
+    void destroyPipelineCache(VkPipelineCache cache)
+    {
+        vkDestroyPipelineCache(this.device, cache, this.alloc);
     }
 }
 
@@ -90,6 +141,8 @@ struct GraphicsPipelineCfg
 {
     VkPipeline graphicsPipeline;
     VkPipelineLayout pipelineLayout;
+    /// Set when this run compiled the variant instead of taking a stored record
+    bool needsRecompilation;
 }
 
 struct TechniqueId
@@ -213,6 +266,80 @@ final class DescriptorAllocator
     }
 }
 
+/// Writes cache blobs on one background thread, never inside the frame
+private final class PipelineCacheWriter
+{
+    private struct Job
+    {
+        string identity;
+        ubyte[] payload;
+    }
+
+    private PipelineCacheStore store;
+    private Job[] jobs;
+    private Mutex mutex;
+    private Condition condition;
+    private bool stopping;
+    private Thread thread;
+
+    this(PipelineCacheStore store)
+    {
+        this.store = store;
+        mutex = new Mutex;
+        condition = new Condition(mutex);
+
+        thread = new Thread(&run);
+        thread.isDaemon = true;
+        thread.start();
+    }
+
+    ~this()
+    {
+        mutex.lock();
+        stopping = true;
+        condition.notify();
+        mutex.unlock();
+
+        thread.join();
+    }
+
+    void put(string identity, ubyte[] payload)
+    {
+        mutex.lock();
+        jobs ~= Job(identity, payload);
+        condition.notify();
+        mutex.unlock();
+    }
+
+    private void run()
+    {
+        while(true)
+        {
+            Job job;
+
+            mutex.lock();
+
+            while(jobs.length == 0 && !stopping)
+                condition.wait();
+
+            if(jobs.length == 0)
+            {
+                mutex.unlock();
+                break;
+            }
+
+            job = jobs[0];
+            jobs = jobs[1 .. $];
+            mutex.unlock();
+
+            try
+                store.save(job.identity, job.payload);
+            catch(Exception e)
+                Instance.log_info("pipeline cache: " ~ job.identity ~ " not saved: " ~ e.msg);
+        }
+    }
+}
+
 //TODO: move to pukan: technique and pipeline caching is engine policy, not a Vulkan wrapper
 /// Creates pipelines once per technique and render target
 final class PipelineFactory
@@ -244,6 +371,18 @@ final class PipelineFactory
     private Technique[] techniques;
     private RenderTarget[] targets;
     private GraphicsPipelineCfg[PipelineKey] cache;
+    private PipelineCacheStore store;
+    private PipelineCacheWriter writer;
+
+    debug
+    {
+        /// Variants this run compiled because no usable record existed
+        size_t compiledVariants;
+        /// Variants created from a stored record
+        size_t cachedVariants;
+        /// Time spent loading records and creating pipelines
+        Duration pipelineCreationTime;
+    }
 
     private VkDescriptorSetLayout[] setLayouts;
     private VkDescriptorSetLayoutBinding[][] setLayoutBindings;
@@ -252,9 +391,13 @@ final class PipelineFactory
     private VkDescriptorSetLayout frameSetLayout;
     private VkDescriptorSetLayoutBinding[] frameBindings;
 
-    this(LogicalDevice device)
+    this(LogicalDevice device, PipelineCacheStore store = null)
     {
         this.device = device;
+        this.store = store;
+
+        if(store)
+            writer = new PipelineCacheWriter(store);
 
         frameBindings = [
             VkDescriptorSetLayoutBinding(
@@ -331,6 +474,25 @@ final class PipelineFactory
             ),
         ];
         frameSetLayout = device.createDescriptorSetLayout(frameBindings);
+    }
+
+    ~this()
+    {
+        if(writer)
+            destroy(writer);
+
+        debug logCacheSummary();
+    }
+
+    debug
+    {
+        private void logCacheSummary()
+        {
+            Instance.log_info(
+                "pipeline cache: " ~ compiledVariants.to!string ~ " compiled, " ~
+                cachedVariants.to!string ~ " cached, " ~
+                pipelineCreationTime.total!"msecs".to!string ~ " ms in pipeline creation");
+        }
     }
 
     DescriptorAllocator createFrameAllocator()
@@ -446,6 +608,10 @@ final class PipelineFactory
     {
         import pukan.vulkan.defaults: multisampling;
 
+        debug import core.time: MonoTime;
+
+        debug const start = MonoTime.currTime;
+
         ref technique = techniques[id.value];
         const state = technique.description.state;
 
@@ -553,10 +719,143 @@ final class PipelineFactory
             basePipelineIndex: -1,
         };
 
+        const identity = variantIdentity(id, renderPass, subpass);
+
+        bool needsRecompilation;
+        auto pipelineCache = acquirePipelineCache(identity, needsRecompilation);
+        scope(exit) device.destroyPipelineCache(pipelineCache);
+
+        auto pipeline = device.createGraphicsPipelines([pipelineCreateInfo], pipelineCache)[0];
+
+        storePipelineCache(identity, pipelineCache);
+
+        debug
+        {
+            const elapsed = MonoTime.currTime - start;
+
+            pipelineCreationTime += elapsed;
+
+            if(needsRecompilation)
+                ++compiledVariants;
+            else
+            {
+                ++cachedVariants;
+                assert(pipeline != VkPipeline.init, "a cached pipeline variant is not valid");
+            }
+
+            Instance.log_info(
+                "pipeline cache: " ~ identity ~
+                (needsRecompilation ? " compiled" : " cached") ~
+                " in " ~ elapsed.total!"usecs".to!string ~ " us");
+        }
+
         return GraphicsPipelineCfg(
-            graphicsPipeline: device.createGraphicsPipelines([pipelineCreateInfo])[0],
+            graphicsPipeline: pipeline,
             pipelineLayout: technique.pipelineLayout,
+            needsRecompilation: needsRecompilation,
         );
+    }
+
+    /// Driver cache for one variant, seeded with its stored record
+    private VkPipelineCache acquirePipelineCache(string identity, out bool needsRecompilation)
+    {
+        ubyte[] payload;
+        needsRecompilation = false;
+
+        if(store)
+            while(true)
+            {
+                try
+                {
+                    payload = store.load(identity);
+                    break;
+                }
+                catch(PipelineCacheLoadException e)
+                {
+                    // One retry: the bad record is dropped and written again
+                    if(needsRecompilation)
+                        throw e;
+
+                    store.invalidate(identity);
+                    needsRecompilation = true;
+                }
+            }
+
+        if(payload is null)
+            needsRecompilation = true;
+
+        return device.createPipelineCache(payload);
+    }
+
+    /// Hands the driver blob to the writer, which saves it outside the frame
+    private void storePipelineCache(string identity, VkPipelineCache pipelineCache)
+    {
+        if(writer is null)
+            return;
+
+        auto payload = device.pipelineCacheData(pipelineCache);
+
+        if(payload.length > 0)
+            writer.put(identity, payload);
+    }
+
+    /**
+        What a variant is for the store, not how its creation info is
+        assembled. Shader bytes stay out, the driver keys those itself.
+    */
+    private string variantIdentity(TechniqueId id, RenderPass renderPass, uint subpass) const
+    {
+        import std.ascii: isAlphaNum;
+        import std.digest.sha: SHA256, toHexString;
+
+        ref const technique = techniques[id.value];
+
+        SHA256 hash;
+
+        void addValue(T)(in T value)
+        {
+            hash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
+        }
+
+        void addString(string value)
+        {
+            addValue(value.length);
+            hash.put(cast(const ubyte[]) value);
+        }
+
+        void addArray(T)(const(T)[] values)
+        {
+            addValue(values.length);
+
+            foreach(ref value; values)
+                addValue(value);
+        }
+
+        addString(technique.description.name);
+        addValue(technique.description.state);
+        addArray(technique.description.dynamicStates);
+
+        foreach(ref stage; technique.description.stages)
+        {
+            addValue(stage.stage);
+            addValue(stage.pushConstantRange);
+            addArray(stage.vertexInput.bindings);
+            addArray(stage.vertexInput.attributes);
+        }
+
+        addValue(renderPass.imageFormat);
+        addValue(renderPass.depthFormat);
+        addValue(renderPass.samples);
+        addValue(subpass);
+
+        string prefix;
+
+        foreach(c; technique.description.name)
+            prefix ~= c.isAlphaNum || c == '_' || c == '-' ? c : '_';
+
+        const digest = hash.finish;
+
+        return cast(string) (prefix ~ "-" ~ toHexString(digest)[0 .. 32]);
     }
 
     private static ShaderVertexInput techniqueVertexInput(ShaderInfo[] stages)

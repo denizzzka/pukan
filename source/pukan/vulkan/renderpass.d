@@ -10,6 +10,8 @@ abstract class RenderPass
     alias this = vkRenderPass;
 
     VkFormat imageFormat;
+    /// VK_FORMAT_UNDEFINED when the pass has no depth attachment
+    VkFormat depthFormat = VK_FORMAT_UNDEFINED;
     /// Samples every pipeline of this pass must be created with
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 }
@@ -17,7 +19,6 @@ abstract class RenderPass
 class DefaultRenderPass : RenderPass
 {
     LogicalDevice device;
-    enum VkFormat depthFormat = DepthBuf.format;
     /// Second pass over the same attachments, loading the colour the first one
     /// left, for draws that sample that colour
     VkRenderPass transmissionPass;
@@ -28,6 +29,7 @@ class DefaultRenderPass : RenderPass
     {
         device = dev;
         this.imageFormat = imageFormat;
+        depthFormat = DepthBuf.format;
 
         samples = VK_SAMPLE_COUNT_4_BIT;
 
