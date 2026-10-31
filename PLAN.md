@@ -124,6 +124,22 @@ stay in front. Long term:
       as the first transmission attempt did. Per material or as a fallback when
       the scene has no colour copy.
 
+## Retro look
+
+Material textures are filtered today: the glTF sampler defaults, the shared
+material sampler and the 1x1 fallback all ask for linear filtering and mipmaps,
+so an asset authored for a low-resolution look is smoothed before it reaches the
+screen.
+
+- [ ] A retro preset that asks the samplers for `VK_FILTER_NEAREST` and
+      `VK_SAMPLER_MIPMAP_MODE_NEAREST`: the defaults in `gltfSampler`, the
+      material sampler in `scene.d` and `createFakeTexture1x1`, plus nearest
+      level generation in the `vkCmdBlitImage` chain. A glTF sampler that names
+      a filter keeps it; only the unspecified ones follow the preset.
+- [ ] Leave the samplers that are not a style choice alone: IBL, the shadow
+      comparison and the resolve copies stay linear, or the image breaks
+      instead of turning crisp.
+
 ## Lighting
 
 The frame carries a light list in a storage buffer: the sun, then point and spot
