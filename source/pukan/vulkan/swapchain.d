@@ -76,6 +76,10 @@ class SwapChain
     int currentFrameIdx;
     VkQueue presentQueue;
 
+    /// True when the images are owned rather than presented to a surface
+    bool offscreen;
+    private ImageMemory[] ownedImages;
+
     private ubyte framesSinceSwapchainReplacement = 0;
 
     this(
@@ -188,6 +192,49 @@ class SwapChain
             frame = new Frame(frameBuilder, images[i], imageExtent, imageFormat, renderPass, renderPass.samples);
     }
 
+    /// Creates color images instead of a swapchain; nothing is presented
+    this(
+        LogicalDevice device,
+        FrameBuilder fb,
+        VkExtent2D extent,
+        VkFormat format,
+        RenderPass renderPass,
+    )
+    in(extent.width > 0 && extent.height > 0)
+    {
+        this.device = device;
+        frameBuilder = fb;
+        imageFormat = format;
+        imageExtent = extent;
+        presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        offscreen = true;
+
+        images.length = maxFramesInFlight;
+        frames.length = maxFramesInFlight;
+
+        foreach(i; 0 .. maxFramesInFlight)
+        {
+            VkImageCreateInfo cinf = {
+                sType: VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                imageType: VK_IMAGE_TYPE_2D,
+                format: format,
+                tiling: VK_IMAGE_TILING_OPTIMAL,
+                extent: VkExtent3D(extent.width, extent.height, 1),
+                mipLevels: 1,
+                arrayLayers: 1,
+                samples: VK_SAMPLE_COUNT_1_BIT,
+                usage: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                sharingMode: VK_SHARING_MODE_EXCLUSIVE,
+                initialLayout: VK_IMAGE_LAYOUT_UNDEFINED,
+            };
+
+            auto image = device.create!ImageMemory(cinf, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            ownedImages ~= image;
+            images[i] = image.image;
+            frames[i] = new Frame(fb, image.image, extent, format, renderPass, renderPass.samples);
+        }
+    }
+
     ~this()
     {
         foreach(ref frame; frames)
@@ -195,7 +242,12 @@ class SwapChain
 
         destroy(oldSwapChain);
 
-        if(swapchain)
+        if(offscreen)
+        {
+            foreach(ref image; ownedImages)
+                destroy(image);
+        }
+        else if(swapchain)
             vkDestroySwapchainKHR(device.device, swapchain, device.alloc);
     }
 
@@ -217,12 +269,21 @@ class SwapChain
     /// imageIndex result is "random" index value, not related to currentFrameIdx
     VkResult acquireNextImage(out uint imageIndex)
     {
+        if(offscreen)
+        {
+            imageIndex = cast(uint) currentFrameIdx;
+            return VK_SUCCESS;
+        }
+
         return vkAcquireNextImageKHR(device, swapchain, ulong.max /* timeout */, currSync.imageAvailable, null /* fence */, &imageIndex);
     }
 
-    /// Starts displaying frame on the screen
+    /// Starts displaying frame on the screen; a no-op for an offscreen target
     VkResult queueImageForPresentation(Frame frame, ref uint imageIndex)
     {
+        if(offscreen)
+            return VK_SUCCESS;
+
         auto sync = frame.syncPrimitives;
 
         VkSwapchainKHR[1] swapChains = [swapchain];
@@ -257,4 +318,7 @@ class SwapChain
             }
         }
     }
+
+    /// True when the target has no surface and does not present
+    bool isOffscreen() const => offscreen;
 }

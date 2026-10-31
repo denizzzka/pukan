@@ -169,6 +169,7 @@ void main(string[] args)
     string targetOption;
     bool noShadows;
     bool plainMode;
+    bool offscreen;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
     float farOption = cameraFar;
@@ -186,6 +187,7 @@ void main(string[] args)
         "target", "override the camera target, x,y,z", &targetOption,
         "no-shadows", "do not cast shadows", &noShadows,
         "plain", "draw every surface in the plain lit mode", &plainMode,
+        "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
         "fov", "vertical field of view in degrees", &fovOption,
         "near", "near clipping distance", &nearOption,
         "far", "far clipping distance", &farOption,
@@ -200,33 +202,52 @@ void main(string[] args)
 
     plainShading = plainMode;
 
+    if(offscreen && frames == 0)
+        frames = 1;
+
     if(plainShading)
         writeln("plain shading: on");
 
-    enforce(glfwInit());
-    scope(exit) glfwTerminate();
+    if(!offscreen)
+        enforce(glfwInit());
+    scope(exit)
+    {
+        if(!offscreen)
+            glfwTerminate();
+    }
 
-    enforce(glfwVulkanSupported());
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    GLFWwindow* window;
+    if(!offscreen)
+    {
+        enforce(glfwVulkanSupported());
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    auto window = glfwCreateWindow(width, height, "pukan Godot scene".toStringz, null, null);
-    enforce(window, "Cannot create a window");
-    scope(exit) glfwDestroyWindow(window);
+        window = glfwCreateWindow(width, height, "pukan Godot scene".toStringz, null, null);
+        enforce(window, "Cannot create a window");
+        glfwSetCursorPosCallback(window, &onCursorPos);
+        glfwSetScrollCallback(window, &onScroll);
+    }
+    scope(exit)
+    {
+        if(window)
+            glfwDestroyWindow(window);
+    }
 
-    glfwSetCursorPosCallback(window, &onCursorPos);
-    glfwSetScrollCallback(window, &onScroll);
-
-    auto vk = Instance.createWith!appEntities("pukan Godot scene", 1, glfwExtraExtensions!appEntities());
+    const(char)*[] instanceExtensions = offscreen ? null : glfwExtraExtensions!appEntities();
+    auto vk = Instance.createWith!appEntities("pukan Godot scene", 1, instanceExtensions);
     scope(exit) destroy(vk);
 
     VkSurfaceKHR surface;
-    static import glfw3.internal;
-    glfwCreateWindowSurface(
-        vk.instance,
-        window,
-        cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
-        cast(ulong*) &surface,
-    );
+    if(!offscreen)
+    {
+        static import glfw3.internal;
+        glfwCreateWindowSurface(
+            vk.instance,
+            window,
+            cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
+            cast(ulong*) &surface,
+        );
+    }
 
     bool surfaceCheck(ref DeviceContext ctx, out string reason)
     {
@@ -260,14 +281,19 @@ void main(string[] args)
     }
 
     DeviceFilter filter;
-    filter.checks ~= DeviceCheck("surface", &surfaceCheck);
+    if(!offscreen)
+        filter.checks ~= DeviceCheck("surface", &surfaceCheck);
 
     auto selected = vk.findSuitablePhysicalDevice!appRequirements(filter);
     auto physDevice = selected.device();
 
-    string surfaceReason;
-    const surfaceFormat = physDevice.chooseSurfaceFormat(surface, surfaceReason);
-    enforce(surfaceFormat.format != VK_FORMAT_UNDEFINED, surfaceReason);
+    VkSurfaceFormatKHR surfaceFormat;
+    if(!offscreen)
+    {
+        string surfaceReason;
+        surfaceFormat = physDevice.chooseSurfaceFormat(surface, surfaceReason);
+        enforce(surfaceFormat.format != VK_FORMAT_UNDEFINED, surfaceReason);
+    }
 
     auto device = selected.createLogicalDevice!(Texture)();
     scope(exit)
@@ -282,6 +308,9 @@ void main(string[] args)
 
     void windowSizeChanged()
     {
+        if(window is null)
+            return;
+
         int w;
         int h;
         glfwGetFramebufferSize(window, &w, &h);
@@ -293,7 +322,11 @@ void main(string[] args)
         }
     }
 
-    scope scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat);
+    Scene scene;
+    if(offscreen)
+        scene = new Scene(device, VkExtent2D(width, height), VK_FORMAT_R8G8B8A8_SRGB);
+    else
+        scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat);
     scope(exit) destroy(scene);
 
     scene.sunShadow.enabled = !noShadows;
@@ -427,22 +460,27 @@ void main(string[] args)
 
     camera.speed = speedOption;
 
-    writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
+    if(!offscreen)
+        writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
-    double lastTime = glfwGetTime();
+    import core.time: MonoTime;
+    const start = MonoTime.currTime;
+    double lastTime = offscreen ? 0.0 : glfwGetTime();
 
-    while(!glfwWindowShouldClose(window) && (frames == 0 || frameIndex < frames))
+    while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
         ++frameIndex;
-        glfwPollEvents();
+        if(!offscreen)
+            glfwPollEvents();
 
-        const now = glfwGetTime();
+        const now = offscreen ? (MonoTime.currTime - start).total!"msecs" * 0.001 : glfwGetTime();
         const dt = cast(float) (now - lastTime < 0.1 ? now - lastTime : 0.1);
         lastTime = now;
 
-        updateCamera(camera, window, dt);
+        if(!offscreen)
+            updateCamera(camera, window, dt);
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();

@@ -157,6 +157,40 @@ class Scene
         PipelineCacheStore pipelineCacheStore = null,
     )
     {
+        this(dev, surf, wsc, surfaceFormat, presentMode, pipelineCacheStore, false, VkExtent2D.init);
+    }
+
+    /// Renders into owned images without a surface or a window
+    this(
+        LogicalDevice dev,
+        VkExtent2D extent,
+        VkFormat format,
+        PipelineCacheStore pipelineCacheStore = null,
+    )
+    {
+        this(
+            dev,
+            null,
+            null,
+            VkSurfaceFormatKHR(format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
+            VK_PRESENT_MODE_FIFO_KHR,
+            pipelineCacheStore,
+            true,
+            extent,
+        );
+    }
+
+    private this(
+        LogicalDevice dev,
+        VkSurfaceKHR surf,
+        WindowSizeChangeDetectedCallback wsc,
+        VkSurfaceFormatKHR surfaceFormat,
+        VkPresentModeKHR presentMode,
+        PipelineCacheStore pipelineCacheStore,
+        bool offscreen,
+        VkExtent2D offscreenExtent,
+    )
+    {
         device = dev;
         surface = surf;
         windowSizeChanged = wsc;
@@ -172,7 +206,8 @@ class Scene
         );
         lightCount = 1;
 
-        device.physicalDevice.instance.useSurface(surface);
+        if(surface)
+            device.physicalDevice.instance.useSurface(surface);
 
         renderPass = device.create!DefaultRenderPass(surfaceFormat.format);
 
@@ -223,7 +258,9 @@ class Scene
         }
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
-        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, null, surfaceFormat.colorSpace, presentMode);
+        swapChain = offscreen
+            ? new SwapChain(device, frameBuilder, offscreenExtent, surfaceFormat.format, renderPass)
+            : new SwapChain(device, frameBuilder, surface, renderPass, null, surfaceFormat.colorSpace, presentMode);
         createFrameSets();
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
@@ -490,6 +527,10 @@ class Scene
     /// Hands the colour to the presentation engine when nothing samples it
     private void presentColor(ref Frame frame)
     {
+        // An offscreen image has no presentation layout
+        if(swapChain.isOffscreen())
+            return;
+
         imageBarrier(
             frame.commandBuffer, frame.image,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
@@ -931,6 +972,9 @@ class Scene
 
     void recreateSwapChain()
     {
+        if(swapChain.isOffscreen())
+            return;
+
         swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain, surfaceFormat.colorSpace, presentMode);
         createFrameSets();
     }
@@ -995,7 +1039,7 @@ class Scene
         frame.commandBuffer.endCommandBuffer;
 
         {
-            frameBuilder.placeDrawnFrameToGraphicsQueue(frame);
+            frameBuilder.placeDrawnFrameToGraphicsQueue(frame, !swapChain.isOffscreen());
 
             auto ret = swapChain.queueImageForPresentation(frame, imageIndex);
 

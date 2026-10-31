@@ -65,6 +65,7 @@ void main(string[] args) {
     uint frames;
     bool core;
     bool noShadows;
+    bool offscreen;
     string materialMode = "authored";
     string[] sampleNames;
     string screenshotPath;
@@ -77,6 +78,7 @@ void main(string[] args) {
         "bench", "run the fixed benchmark scene and print metrics", &bench,
         "core", "ignore the KHR material extensions", &core,
         "no-shadows", "do not cast shadows", &noShadows,
+        "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
         "screenshot", "save the captured frame to this PNG", &screenshotPath,
@@ -102,6 +104,9 @@ void main(string[] args) {
         scenePitch = 0;
     }
 
+    if(offscreen && frames == 0)
+        frames = 1;
+
     version(linux)
     version(DigitalMars)
     {
@@ -111,35 +116,48 @@ void main(string[] args) {
 
     immutable name = "D/pukan3D/GLFW project";
 
-    enforce(glfwInit());
-    scope(exit) glfwTerminate();
-
-    enforce(glfwVulkanSupported());
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    //~ glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-    if(benchMode)
+    if(!offscreen)
+        enforce(glfwInit());
+    scope(exit)
     {
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-        glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+        if(!offscreen)
+            glfwTerminate();
     }
 
-    const windowWidth = stereo ? width * 2 : width;
-    auto window = glfwCreateWindow(windowWidth, height, name.toStringz, null, null);
-    enforce(window, "Cannot create a window");
-    glfwSetScrollCallback(window, &onScroll);
-    glfwSetMouseButtonCallback(window, &onMouseButton);
-    glfwSetKeyCallback(window, &onKey);
-    glfwSetCursorPosCallback(window, &onCursorPos);
-    glfwGetCursorPos(window, &cursorX, &cursorY);
+    if(!offscreen)
+    {
+        enforce(glfwVulkanSupported());
+
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        //~ glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+        if(benchMode)
+        {
+            glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+            glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+        }
+    }
+
+    GLFWwindow* window;
+    if(!offscreen)
+    {
+        const windowWidth = stereo ? width * 2 : width;
+        window = glfwCreateWindow(windowWidth, height, name.toStringz, null, null);
+        enforce(window, "Cannot create a window");
+        glfwSetScrollCallback(window, &onScroll);
+        glfwSetMouseButtonCallback(window, &onMouseButton);
+        glfwSetKeyCallback(window, &onKey);
+        glfwSetCursorPosCallback(window, &onCursorPos);
+        glfwGetCursorPos(window, &cursorX, &cursorY);
+    }
 
     //~ glfwSetWindowUserPointer(demo.window, demo);
     //~ glfwSetWindowRefreshCallback(demo.window, &demo_refresh_callback);
     //~ glfwSetFramebufferSizeCallback(demo.window, &demo_resize_callback);
     //~ glfwSetKeyCallback(demo.window, &demo_key_callback);
 
-    auto vk = Instance.createWith!appEntities(name, 1, glfwExtraExtensions!appEntities());
+    const(char)*[] instanceExtensions = offscreen ? null : glfwExtraExtensions!appEntities();
+    auto vk = Instance.createWith!appEntities(name, 1, instanceExtensions);
     scope(exit) destroy(vk);
 
     //~ debug
@@ -152,15 +170,17 @@ void main(string[] args) {
     //~ vk.printAllDevices();
     //~ vk.printAllAvailableLayers();
 
-    static import glfw3.internal;
-
     VkSurfaceKHR surface;
-    glfwCreateWindowSurface(
-        vk.instance,
-        window,
-        cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
-        cast(ulong*) &surface
-    );
+    if(!offscreen)
+    {
+        static import glfw3.internal;
+        glfwCreateWindowSurface(
+            vk.instance,
+            window,
+            cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
+            cast(ulong*) &surface
+        );
+    }
 
     bool surfaceCheck(ref DeviceContext ctx, out string reason)
     {
@@ -194,14 +214,19 @@ void main(string[] args) {
     }
 
     DeviceFilter filter;
-    filter.checks ~= DeviceCheck("surface", &surfaceCheck);
+    if(!offscreen)
+        filter.checks ~= DeviceCheck("surface", &surfaceCheck);
 
     auto selected = vk.findSuitablePhysicalDevice!appRequirements(filter);
     auto physDevice = selected.device();
 
-    string surfaceReason;
-    const surfaceFormat = physDevice.chooseSurfaceFormat(surface, surfaceReason);
-    enforce(surfaceFormat.format != VK_FORMAT_UNDEFINED, surfaceReason);
+    VkSurfaceFormatKHR surfaceFormat;
+    if(!offscreen)
+    {
+        string surfaceReason;
+        surfaceFormat = physDevice.chooseSurfaceFormat(surface, surfaceReason);
+        enforce(surfaceFormat.format != VK_FORMAT_UNDEFINED, surfaceReason);
+    }
     //~ debug
     //~ {
         //~ writeln("");
@@ -227,6 +252,9 @@ void main(string[] args) {
 
     void windowSizeChanged()
     {
+        if(window is null)
+            return;
+
         int width;
         int height;
 
@@ -246,13 +274,17 @@ void main(string[] args) {
         }
     }
 
-    scope scene = new Scene(
-        device,
-        surface,
-        &windowSizeChanged,
-        surfaceFormat,
-        benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
-    );
+    Scene scene;
+    if(offscreen)
+        scene = new Scene(device, VkExtent2D(stereo ? width * 2 : width, height), VK_FORMAT_R8G8B8A8_SRGB);
+    else
+        scene = new Scene(
+            device,
+            surface,
+            &windowSizeChanged,
+            surfaceFormat,
+            benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
+        );
     scope(exit) destroy(scene);
 
     shadowsOn = !noShadows;
@@ -265,7 +297,7 @@ void main(string[] args) {
     camera.fov = cameraFovY;
     camera.speed = 1.0f;
 
-    if(!benchMode)
+    if(!benchMode && !offscreen)
         writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     scene.addPointLight(Vector3f(0.9f, 0.35f, 1.1f), Vector3f(1.0f, 0.25f, 0.15f) * 6.0f, 4.0f);
@@ -358,7 +390,7 @@ void main(string[] args) {
 
     // Main loop
     uint frameCount;
-    while (!glfwWindowShouldClose(window) && (frames == 0 || frameCount < frames))
+    while ((offscreen ? frameCount < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameCount < frames))
     {
         frameCount++;
 
@@ -367,10 +399,11 @@ void main(string[] args) {
         if(benchMode && frameCount == benchWarmupFrames + 1)
             device.resetUploadedBytes();
 
-        frameTime = glfwGetTime();
-        glfwPollEvents();
+        if(!offscreen)
+            glfwPollEvents();
 
         const curr = sw.peek.total!"msecs" * 0.001;
+        frameTime = offscreen ? curr : glfwGetTime();
 
         static float prevCurr = 0.0f;
         const dt = curr - prevCurr;
@@ -379,7 +412,7 @@ void main(string[] args) {
         if(!benchMode && !sceneDragging && interactionTimer.idleFor(frameTime, autoResumeDelay))
             sceneYaw += autoRotationSpeed * dt;
 
-        if(!benchMode)
+        if(!offscreen && !benchMode)
         {
             bool pressed(int key) nothrow @nogc
             {
@@ -616,7 +649,7 @@ void main(string[] args) {
             }
         }
 
-        if(!benchMode)
+        if(!offscreen && !benchMode)
         {
             import core.thread.osthread: Thread;
             import core.time;

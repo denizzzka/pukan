@@ -1051,17 +1051,16 @@ The README asks for builds assembled from the features a project uses.
 a run needs a display and a visible window. Debugging wants the same frame
 written into images in memory instead.
 
-- [ ] A second window type behind the same interface: an offscreen target that
-      owns colour and depth images, a fake surface format and a present that
-      does nothing. The scene reads only the target extent and format, so the
-      swapchain can treat both kinds alike.
-- [ ] An option for both demos, such as `--offscreen`, that selects it with a
-      fixed extent and a frame count.
-- [ ] Screenshots from the offscreen target through the existing
-      `Scene.captureFrame` path, with no window, compositor or present
-      dependency.
+- [x] An offscreen mode of `SwapChain` that owns colour images, uses a fixed
+      format and extent, and presents nothing. The scene reads only the target
+      extent and format, so it treats both targets alike.
+- [x] `--offscreen` in both demos, with a fixed extent and `--frames`.
+- [x] Screenshots through the existing `Scene.captureFrame` path, with no
+      window, compositor or present dependency.
 - [ ] Use it for benchmarks and CI: the fixed scene then measures GPU work
       without present timing or vsync, and the run needs no display server.
+- [ ] Put the swapchain and the offscreen target behind one interface instead
+      of the `SwapChain` mode flag.
 
 ## OpenXR
 

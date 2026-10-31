@@ -45,7 +45,7 @@ class FrameBuilder
     }
 
     ///
-    void placeDrawnFrameToGraphicsQueue(Frame frame)
+    void placeDrawnFrameToGraphicsQueue(Frame frame, bool waitForImage = true)
     {
         auto sync = frame.syncPrimitives;
 
@@ -55,16 +55,18 @@ class FrameBuilder
             sType: VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
             pWaitDstStageMask: &waitStages,
-
-            waitSemaphoreCount: cast(uint) sync.imageAvailableSemaphores.length,
-            pWaitSemaphores: sync.imageAvailableSemaphores.ptr,
-
-            commandBufferCount: 1,
-            pCommandBuffers: &(frame.commandBuffer()),
-
-            signalSemaphoreCount: cast(uint) sync.renderFinishedSemaphores.length,
-            pSignalSemaphores: sync.renderFinishedSemaphores.ptr,
         };
+
+        if(waitForImage)
+        {
+            submitInfo.waitSemaphoreCount = cast(uint) sync.imageAvailableSemaphores.length;
+            submitInfo.pWaitSemaphores = sync.imageAvailableSemaphores.ptr;
+            submitInfo.signalSemaphoreCount = cast(uint) sync.renderFinishedSemaphores.length;
+            submitInfo.pSignalSemaphores = sync.renderFinishedSemaphores.ptr;
+        }
+
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &(frame.commandBuffer());
 
         graphicsQueue.syncSubmit(submitInfo);
     }
