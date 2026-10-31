@@ -377,6 +377,25 @@ cache is what turns a warm start into a few milliseconds per variant.
 - [ ] Measure cold and warm starts of the fixed scene: the warm run's time in
       `vkCreateGraphicsPipelines` against the whole startup.
 
+## Pipeline libraries
+
+Long term, optional: `VK_KHR_pipeline_library` together with
+`VK_EXT_graphics_pipeline_library`, so 10 vertex and 100 fragment variants
+become 10 + 100 libraries that link into 1,000 pipelines instead of 1,000
+compilations. The first extension alone only lets a finished pipeline be linked
+as a library; the split into vertex input, pre-rasterization, fragment shader
+and fragment output stages comes from the second. Both stay behind the device
+requirements, with the monolithic path as the fallback.
+
+- [ ] Spike: measure linking against compiling on the fixed scene, 10x100
+      variants, cold and with the pipeline cache warm. Linking is cheaper than
+      compiling, but it is not free, and the count only matters while startup
+      still stalls.
+- [ ] Split `PipelineKey` along the same four stages and cache the libraries in
+      the same store, so the combinatorial explosion shrinks in the cache too.
+- [ ] Evaluate `VK_EXT_shader_object` as the other way to the same end, with no
+      link at all: bind the shaders and keep the state dynamic.
+
 ## Shader preloading
 
 Long term: every glTF pipeline variant is built when the factory is created,
