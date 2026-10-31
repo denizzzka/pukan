@@ -2,12 +2,67 @@ module pukan.vulkan.pipeline_cache;
 
 import pukan.exceptions: PukanException;
 import std.conv: to;
+import std.digest.sha: SHA256, toHexString;
 import std.exception: enforce;
 import std.path: buildPath, baseName, extension, stripExtension;
 import std.uuid: UUID;
 
 /// Layout of the container around a driver pipeline cache blob
 enum pipelineCacheFormatVersion = 1;
+
+/// Identifies a pipeline variant by a digest of the state that defines it
+struct PipelineVariantKey
+{
+    ubyte[32] digest;
+
+    string toString() const
+    {
+        return cast(string) toHexString(digest.dup);
+    }
+
+    int opCmp(ref const PipelineVariantKey rhs) const nothrow @safe
+    {
+        return digest[] < rhs.digest[] ? -1 : digest[] > rhs.digest[] ? 1 : 0;
+    }
+
+    size_t toHash() const nothrow @safe
+    {
+        return hashOf(digest);
+    }
+}
+
+/// Feeds the creation state of one variant into a `PipelineVariantKey`
+struct PipelineVariantKeyBuilder
+{
+    private SHA256 hash;
+
+    void add(T)(in T value)
+    {
+        hash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
+    }
+
+    void addString(string value)
+    {
+        add(value.length);
+        hash.put(cast(const ubyte[]) value);
+    }
+
+    void addArray(T)(const(T)[] values)
+    {
+        add(values.length);
+
+        foreach(ref value; values)
+            add(value);
+    }
+
+    PipelineVariantKey finish()
+    {
+        PipelineVariantKey key;
+        key.digest = hash.finish;
+
+        return key;
+    }
+}
 
 /**
     Fixed part of every cache file, stored as raw bytes.
@@ -56,7 +111,7 @@ abstract class PipelineCacheStore
     }
 
     /// Returns the blob of a variant, null when the store holds no record
-    ubyte[] load(string identity)
+    ubyte[] load(PipelineVariantKey identity)
     {
         const bytes = readRecord(identity);
 
@@ -90,7 +145,7 @@ abstract class PipelineCacheStore
     }
 
     /// Replaces the record of a variant with a driver blob
-    void save(string identity, const(ubyte)[] payload)
+    void save(PipelineVariantKey identity, const(ubyte)[] payload)
     {
         const header = PipelineCacheHeader.create(pipelineCacheUUID, payload.length);
 
@@ -103,26 +158,26 @@ abstract class PipelineCacheStore
     }
 
     /// Drops the record of a variant, if any
-    void invalidate(string identity)
+    void invalidate(PipelineVariantKey identity)
     {
         removeRecord(identity);
     }
 
-    /// Identities the store holds, for progress reporting
-    abstract string[] manifest() const;
+    /// Variants the store holds, for progress reporting
+    abstract PipelineVariantKey[] manifest() const;
 
     protected:
     /// Reads the whole record, null when there is none
-    abstract ubyte[] readRecord(string identity);
+    abstract ubyte[] readRecord(PipelineVariantKey identity);
 
     /// Writes the whole record, replacing any previous one
-    abstract void writeRecord(string identity, const(ubyte)[] record);
+    abstract void writeRecord(PipelineVariantKey identity, const(ubyte)[] record);
 
-    abstract void removeRecord(string identity);
+    abstract void removeRecord(PipelineVariantKey identity);
 
-    private static string message(string identity, string reason)
+    private static string message(PipelineVariantKey identity, string reason)
     {
-        return "pipeline cache record " ~ identity ~ ": " ~ reason;
+        return "pipeline cache record " ~ identity.toString() ~ ": " ~ reason;
     }
 }
 
@@ -171,7 +226,7 @@ final class FilePipelineCacheStore: PipelineCacheStore
         return buildPath(base, "pukan", "pipelines-v" ~ formatVersion.to!string);
     }
 
-    override string[] manifest() const
+    override PipelineVariantKey[] manifest() const
     {
         import std.algorithm: filter, map, sort;
         import std.array: array;
@@ -180,18 +235,20 @@ final class FilePipelineCacheStore: PipelineCacheStore
         if(!directory.exists)
             return null;
 
-        auto identities = directory.dirEntries(SpanMode.shallow)
+        auto keys = directory.dirEntries(SpanMode.shallow)
             .filter!(entry => entry.isFile && entry.name.extension == ".pipelinecache")
             .map!(entry => entry.name.baseName.stripExtension)
+            .filter!(name => isKeyName(name))
+            .map!(name => parseKey(name))
             .array;
 
-        identities.sort;
+        keys.sort;
 
-        return identities;
+        return keys;
     }
 
     protected:
-    override ubyte[] readRecord(string identity)
+    override ubyte[] readRecord(PipelineVariantKey identity)
     {
         import std.file: exists, read;
 
@@ -203,7 +260,7 @@ final class FilePipelineCacheStore: PipelineCacheStore
         return cast(ubyte[]) read(path);
     }
 
-    override void writeRecord(string identity, const(ubyte)[] record)
+    override void writeRecord(PipelineVariantKey identity, const(ubyte)[] record)
     {
         import std.file: exists, mkdirRecurse, rename, write;
 
@@ -218,7 +275,7 @@ final class FilePipelineCacheStore: PipelineCacheStore
         rename(tmp, path);
     }
 
-    override void removeRecord(string identity)
+    override void removeRecord(PipelineVariantKey identity)
     {
         import std.file: exists, remove;
 
@@ -228,8 +285,26 @@ final class FilePipelineCacheStore: PipelineCacheStore
             path.remove();
     }
 
-    private string filePath(string identity) const
+    private string filePath(PipelineVariantKey identity) const
     {
-        return buildPath(directory, identity ~ ".pipelinecache");
+        return buildPath(directory, identity.toString() ~ ".pipelinecache");
+    }
+
+    private static bool isKeyName(string name)
+    {
+        import std.algorithm: all;
+        import std.ascii: isHexDigit;
+
+        return name.length == PipelineVariantKey.digest.length * 2 && name.all!isHexDigit;
+    }
+
+    private static PipelineVariantKey parseKey(string name)
+    {
+        import std.digest: fromHexString;
+
+        PipelineVariantKey key;
+        key.digest[] = fromHexString(name);
+
+        return key;
     }
 }

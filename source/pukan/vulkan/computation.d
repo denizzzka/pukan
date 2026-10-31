@@ -58,11 +58,12 @@ abstract class Compute
         );
 
         VkPipelineCache pipelineCache;
-        string identity;
+        PipelineVariantKey identity;
+        const name = typeid(this).name;
 
         if(auto manager = device.pipelineCacheManager)
         {
-            identity = computeIdentity(layoutBindings, pushConstant, specialization);
+            identity = computeIdentity(name, layoutBindings, pushConstant, specialization);
             pipelineCache = manager.acquire(identity, needsRecompilation);
         }
         else
@@ -80,7 +81,7 @@ abstract class Compute
 
             debug
                 Instance.log_info(
-                    "pipeline cache: " ~ identity ~
+                    "pipeline cache: " ~ name ~ "-" ~ identity.toString() ~
                     (needsRecompilation ? " compiled" : " cached"));
         }
     }
@@ -89,60 +90,29 @@ abstract class Compute
         What a kernel is for the store: its class, bindings, push constant and
         specialization data. Shader bytes stay out, the driver keys those.
     */
-    private string computeIdentity(
+    private static PipelineVariantKey computeIdentity(
+        string name,
         VkDescriptorSetLayoutBinding[] layoutBindings,
         VkPushConstantRange pushConstant,
         VkSpecializationInfo* specialization,
-    ) const
+    )
     {
-        import std.ascii: isAlphaNum;
-        import std.digest.sha: SHA256, toHexString;
-
-        const name = typeid(this).name;
-
-        SHA256 hash;
-
-        void addValue(T)(in T value)
-        {
-            hash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
-        }
-
-        void addString(string value)
-        {
-            addValue(value.length);
-            hash.put(cast(const ubyte[]) value);
-        }
-
-        void addArray(T)(const(T)[] values)
-        {
-            addValue(values.length);
-
-            foreach(ref value; values)
-                addValue(value);
-        }
-
-        addString(name);
-        addArray(layoutBindings);
-        addValue(pushConstant);
+        PipelineVariantKeyBuilder builder;
+        builder.addString(name);
+        builder.addArray(layoutBindings);
+        builder.add(pushConstant);
 
         if(specialization !is null)
         {
-            addValue(specialization.dataSize);
+            builder.add(specialization.dataSize);
 
             if(specialization.dataSize)
-                hash.put((cast(const ubyte*) specialization.pData)[0 .. specialization.dataSize]);
+                builder.addArray((cast(const ubyte*) specialization.pData)[0 .. specialization.dataSize]);
 
-            addArray(specialization.pMapEntries[0 .. specialization.mapEntryCount]);
+            builder.addArray(specialization.pMapEntries[0 .. specialization.mapEntryCount]);
         }
 
-        string prefix;
-
-        foreach(c; name)
-            prefix ~= c.isAlphaNum || c == '_' || c == '-' ? c : '_';
-
-        const digest = hash.finish;
-
-        return cast(string) (prefix ~ "-" ~ toHexString(digest)[0 .. 32]);
+        return builder.finish;
     }
 
     protected void bindBuffer(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorBufferInfo bufferInfo)

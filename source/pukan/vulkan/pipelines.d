@@ -6,7 +6,7 @@ import pukan.exceptions: PukanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
-import pukan.vulkan.pipeline_cache: PipelineCacheLoadException, PipelineCacheStore;
+import pukan.vulkan.pipeline_cache: PipelineCacheLoadException, PipelineCacheStore, PipelineVariantKey, PipelineVariantKeyBuilder;
 import core.sync.condition: Condition;
 import core.sync.mutex: Mutex;
 import core.thread: Thread;
@@ -271,7 +271,7 @@ private final class PipelineCacheWriter
 {
     private struct Job
     {
-        string identity;
+        PipelineVariantKey identity;
         ubyte[] payload;
     }
 
@@ -303,7 +303,7 @@ private final class PipelineCacheWriter
         thread.join();
     }
 
-    void put(string identity, ubyte[] payload)
+    void put(PipelineVariantKey identity, ubyte[] payload)
     {
         mutex.lock();
         jobs ~= Job(identity, payload);
@@ -335,7 +335,7 @@ private final class PipelineCacheWriter
             try
                 store.save(job.identity, job.payload);
             catch(Exception e)
-                Instance.log_info("pipeline cache: " ~ job.identity ~ " not saved: " ~ e.msg);
+                Instance.log_info("pipeline cache: " ~ job.identity.toString() ~ " not saved: " ~ e.msg);
         }
     }
 }
@@ -367,7 +367,7 @@ final class PipelineCacheManager
     bool enabled() const => store !is null;
 
     /// Driver cache for one variant, seeded with its stored record
-    VkPipelineCache acquire(string identity, out bool needsRecompilation)
+    VkPipelineCache acquire(PipelineVariantKey identity, out bool needsRecompilation)
     {
         ubyte[] payload;
         needsRecompilation = false;
@@ -398,7 +398,7 @@ final class PipelineCacheManager
     }
 
     /// Hands the driver blob to the writer, which saves it outside the frame
-    void storeResult(string identity, VkPipelineCache pipelineCache)
+    void storeResult(PipelineVariantKey identity, VkPipelineCache pipelineCache)
     {
         if(writer is null)
             return;
@@ -807,7 +807,7 @@ final class PipelineFactory
             }
 
             Instance.log_info(
-                "pipeline cache: " ~ identity ~
+                "pipeline cache: " ~ technique.description.name ~ "-" ~ identity.toString() ~
                 (needsRecompilation ? " compiled" : " cached") ~
                 " in " ~ elapsed.total!"usecs".to!string ~ " us");
         }
@@ -820,7 +820,7 @@ final class PipelineFactory
     }
 
     /// Driver cache for one variant, seeded with its stored record
-    private VkPipelineCache acquirePipelineCache(string identity, out bool needsRecompilation)
+    private VkPipelineCache acquirePipelineCache(PipelineVariantKey identity, out bool needsRecompilation)
     {
         needsRecompilation = false;
 
@@ -833,7 +833,7 @@ final class PipelineFactory
     }
 
     /// Hands the driver blob to the writer, which saves it outside the frame
-    private void storePipelineCache(string identity, VkPipelineCache pipelineCache)
+    private void storePipelineCache(PipelineVariantKey identity, VkPipelineCache pipelineCache)
     {
         if(cacheManager)
             cacheManager.storeResult(identity, pipelineCache);
@@ -843,59 +843,29 @@ final class PipelineFactory
         What a variant is for the store, not how its creation info is
         assembled. Shader bytes stay out, the driver keys those itself.
     */
-    private string variantIdentity(TechniqueId id, RenderPass renderPass, uint subpass) const
+    private PipelineVariantKey variantIdentity(TechniqueId id, RenderPass renderPass, uint subpass) const
     {
-        import std.ascii: isAlphaNum;
-        import std.digest.sha: SHA256, toHexString;
-
         ref const technique = techniques[id.value];
 
-        SHA256 hash;
-
-        void addValue(T)(in T value)
-        {
-            hash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
-        }
-
-        void addString(string value)
-        {
-            addValue(value.length);
-            hash.put(cast(const ubyte[]) value);
-        }
-
-        void addArray(T)(const(T)[] values)
-        {
-            addValue(values.length);
-
-            foreach(ref value; values)
-                addValue(value);
-        }
-
-        addString(technique.description.name);
-        addValue(technique.description.state);
-        addArray(technique.description.dynamicStates);
+        PipelineVariantKeyBuilder builder;
+        builder.addString(technique.description.name);
+        builder.add(technique.description.state);
+        builder.addArray(technique.description.dynamicStates);
 
         foreach(ref stage; technique.description.stages)
         {
-            addValue(stage.stage);
-            addValue(stage.pushConstantRange);
-            addArray(stage.vertexInput.bindings);
-            addArray(stage.vertexInput.attributes);
+            builder.add(stage.stage);
+            builder.add(stage.pushConstantRange);
+            builder.addArray(stage.vertexInput.bindings);
+            builder.addArray(stage.vertexInput.attributes);
         }
 
-        addValue(renderPass.imageFormat);
-        addValue(renderPass.depthFormat);
-        addValue(renderPass.samples);
-        addValue(subpass);
+        builder.add(renderPass.imageFormat);
+        builder.add(renderPass.depthFormat);
+        builder.add(renderPass.samples);
+        builder.add(subpass);
 
-        string prefix;
-
-        foreach(c; technique.description.name)
-            prefix ~= c.isAlphaNum || c == '_' || c == '-' ? c : '_';
-
-        const digest = hash.finish;
-
-        return cast(string) (prefix ~ "-" ~ toHexString(digest)[0 .. 32]);
+        return builder.finish;
     }
 
     private static ShaderVertexInput techniqueVertexInput(ShaderInfo[] stages)
