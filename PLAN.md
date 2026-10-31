@@ -446,6 +446,32 @@ cascades and no local-light shadows. Missing:
 - [ ] Shadowmasking: baked directional occlusion that dynamic lights sample, so
       a lit surface can stay in a baked shadow.
 
+## Depth buffer
+
+The scene pass and the sun's shadow map share `DepthBuf.format`,
+`D24_UNORM_S8_UINT`. The stencil bits are unused: every attachment is created
+with `DONT_CARE` and the pipelines keep stencil testing off. Depth precision is
+what makes the truck town windows flicker at distance, and both steps below are
+long-term work.
+
+- [ ] Switch the depth attachment to `D32_SFLOAT` on its own, keeping the
+      current Z convention. It costs the same 32 bits per sample as the 24-bit
+      format with stencil and drops a stencil the engine never uses. Alone it
+      buys little: float depth keeps its relative precision near 1.0 with a
+      normal projection, so this is groundwork for the next item rather than a
+      fix. Measure the change on the truck town window flicker before keeping
+      it.
+- [ ] Make reverse Z a compile-time option, selected with a `version` and
+      keeping the current convention as the default and as the fallback for
+      hardware without usable float depth. Flip the projection, the clear
+      depth, every depth compare, the OIT sorting and the `min`/`max` in the
+      resolve, and retune the shadow bias; decide separately whether the sun's
+      shadow map follows or stays conventional. Ship one build per convention
+      rather than a runtime switch, with no two conventions in one binary.
+- [ ] Test both builds on the fixed scene: the truck town windows must stop
+      flickering at distance, and the OIT, transmission and shadow results must
+      match the normal-Z build apart from precision.
+
 ## Deferred shading
 
 The other way to separate geometry from materials: batch geometry by pipeline
