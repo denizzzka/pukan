@@ -185,6 +185,51 @@ unittest
     assert(isVisible(unknown, Matrix4x4f.identity));
 }
 
+/// Orthographic projection for Vulkan: Y points down and depth spans [0, 1]
+Matrix4x4f vulkanOrthographicMatrix(
+    float left,
+    float right,
+    float bottom,
+    float top,
+    float nearPlane,
+    float farPlane,
+)
+{
+    Matrix4x4f result = Matrix4x4f.identity;
+
+    // A light view looks down -Z, so a positive depth is a negative view z
+    result.a11 = 2.0f / (right - left);
+    result.a22 = -2.0f / (top - bottom);
+    result.a33 = -1.0f / (farPlane - nearPlane);
+    result.a14 = -(right + left) / (right - left);
+    result.a24 = (top + bottom) / (top - bottom);
+    result.a34 = -nearPlane / (farPlane - nearPlane);
+
+    return result;
+}
+
+unittest
+{
+    import std.math: isClose;
+
+    const projection = vulkanOrthographicMatrix(-1, 1, -1, 1, 2, 12);
+
+    const center = Vector4f(0, 0, -7, 1) * projection;
+    assert(isClose(center.x, 0, 1e-5f, 1e-5f));
+    assert(isClose(center.y, 0, 1e-5f, 1e-5f));
+    assert(center.z > 0 && center.z < 1);
+
+    const near = Vector4f(0, 0, -2, 1) * projection;
+    assert(isClose(near.z, 0, 1e-5f, 1e-5f));
+
+    const far = Vector4f(0, 0, -12, 1) * projection;
+    assert(isClose(far.z, 1, 1e-5f, 1e-5f));
+
+    // Vulkan clip space points Y down
+    const top = Vector4f(0, 1, -7, 1) * projection;
+    assert(isClose(top.y, -1, 1e-5f, 1e-5f));
+}
+
 void expandAABB(ref Boxf box, in Vector3f v)
 {
     if(v.x < box.min.x) box.min.x = v.x;
@@ -198,4 +243,60 @@ void expandAABB(ref Boxf box, in Vector3f v)
     if(v.z < box.min.z) box.min.z = v.z;
     else
     if(v.z > box.max.z) box.max.z = v.z;
+}
+
+/// Merges `other` into `box`; a box without bounds takes the other one
+void mergeAabb(ref Boxf box, in Boxf other)
+{
+    import std.math: isNaN;
+
+    if(other.min.x.isNaN)
+        return;
+
+    if(box.min.x.isNaN)
+    {
+        box = other;
+        return;
+    }
+
+    import std.algorithm: max, min;
+
+    box.min.x = min(box.min.x, other.min.x);
+    box.min.y = min(box.min.y, other.min.y);
+    box.min.z = min(box.min.z, other.min.z);
+    box.max.x = max(box.max.x, other.max.x);
+    box.max.y = max(box.max.y, other.max.y);
+    box.max.z = max(box.max.z, other.max.z);
+}
+
+/// Corners of an axis-aligned box transformed by an affine matrix
+Boxf transformAabb(in Boxf box, in Matrix4x4f transform)
+{
+    import std.math: isNaN;
+
+    if(box.min.x.isNaN)
+        return Boxf.init;
+
+    Boxf result;
+
+    foreach(i; 0 .. 8)
+    {
+        const corner = Vector3f(
+            (i & 1) ? box.max.x : box.min.x,
+            (i & 2) ? box.max.y : box.min.y,
+            (i & 4) ? box.max.z : box.min.z,
+        );
+        const p = Vector4f(corner.x, corner.y, corner.z, 1) * transform;
+        const v = Vector3f(p.x, p.y, p.z);
+
+        if(i == 0)
+        {
+            result.min = v;
+            result.max = v;
+        }
+        else
+            expandAABB(result, v);
+    }
+
+    return result;
 }

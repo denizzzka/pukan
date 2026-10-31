@@ -484,7 +484,7 @@ void main(string[] args) {
             writefln("lighting: %s", lightingMode);
         }
 
-        scene.shadowsEnabled = shadowsOn;
+        scene.sunShadow.enabled = shadowsOn;
 
         if(shadowsChanged)
         {
@@ -556,7 +556,7 @@ void main(string[] args) {
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
                     },
                     (buf) {
-                        tree.root.payload = Bone(scene.shadowViewProj * wtb.model);
+                        tree.root.payload = Bone(scene.sunShadow.viewProj * wtb.model);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );
@@ -576,7 +576,7 @@ void main(string[] args) {
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
                     (buf) {
-                        tree.root.payload = Bone(scene.shadowViewProj * wtb.model);
+                        tree.root.payload = Bone(scene.sunShadow.viewProj * wtb.model);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );

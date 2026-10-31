@@ -294,8 +294,8 @@ void main(string[] args)
     scope scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat);
     scope(exit) destroy(scene);
 
-    scene.shadowsEnabled = !noShadows;
-    scene.shadowMapCache = true;
+    scene.sunShadow.enabled = !noShadows;
+    scene.sunShadow.cache = true;
 
     if(scenePath.length == 0 && packPath.length == 0)
         scenePath = "demo_godot/godot_samples/generated/procedural.tscn";
@@ -350,6 +350,7 @@ void main(string[] args)
 
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
+    scene.sunShadow.fit(godotScene.calcAABB());
 
     Vector3f eye = Vector3f(0, 3.0f, -8.0f);
     Vector3f target = Vector3f(0, 1.5f, 0);
@@ -429,7 +430,7 @@ void main(string[] args)
                 },
                 null,
                 (buf) {
-                    godotScene.drawingBufferFilling(buf, scene.shadowViewProj * wtb.model, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
+                    godotScene.drawingBufferFilling(buf, scene.sunShadow.viewProj * wtb.model, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                 },
             );
         });

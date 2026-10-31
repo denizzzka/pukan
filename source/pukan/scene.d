@@ -1,6 +1,6 @@
 module pukan.scene;
 
-import dlib.math: perspectiveMatrix, translation, Matrix4x4f, Vector3f, Vector4f;
+import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.pbr.pipelines: oitPass, transmissionPass;
 import pukan.ibl: createIblTextures, IblTextures;
@@ -8,97 +8,11 @@ import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
 import pukan.pbr.instancing: InstanceArena, currentInstanceArena;
 import pukan.screenshot: Screenshot;
-import pukan.shadow: ShadowMap, ShadowPass;
+import pukan.shadow: SunShadow;
 import pukan.primitives_tree.cylinder: CylinderRenderer;
 import pukan.primitives_tree.sphere: SphereRenderer;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-
-/// Transform of a camera placed at `eye` and looking at `target`
-Matrix4x4f cameraTransform(Vector3f eye, Vector3f target, Vector3f up)
-{
-    import dlib.math: cross;
-    import std.math: abs;
-
-    const forward = (target - eye).normalized;
-    auto realUp = up;
-
-    // A view parallel to the up axis has no right axis, so any other axis serves
-    if(cross(forward, realUp).length < 1e-6f)
-        realUp = abs(forward.y) > 0.9f ? Vector3f(0, 0, 1) : Vector3f(0, 1, 0);
-
-    const right = cross(forward, realUp).normalized;
-    realUp = cross(right, forward);
-
-    Matrix4x4f result = Matrix4x4f.identity;
-    // Each column is a world axis of the camera
-    result.a11 = right.x;    result.a21 = right.y;    result.a31 = right.z;
-    result.a12 = realUp.x;   result.a22 = realUp.y;   result.a32 = realUp.z;
-    result.a13 = -forward.x; result.a23 = -forward.y; result.a33 = -forward.z;
-    result.a14 = eye.x;      result.a24 = eye.y;      result.a34 = eye.z;
-    return result;
-}
-
-/// View matrix of a camera whose -Z axis points at `target`
-Matrix4x4f cameraView(Vector3f eye, Vector3f target, Vector3f up)
-{
-    return cameraTransform(eye, target, up).inverse;
-}
-
-unittest
-{
-    import dlib.math: lookAtMatrix;
-    import std.math: abs;
-
-    const eye = Vector3f(3, 4, -5);
-    const target = Vector3f(0, 1, 0);
-    const up = Vector3f(0, 1, 0);
-
-    // The inverse of the camera transform matches dlib for a normal view
-    const expected = lookAtMatrix(eye, target, up);
-    const view = cameraView(eye, target, up);
-
-    foreach(i; 0 .. 16)
-        assert(abs(view.arrayof[i] - expected.arrayof[i]) < 1e-5f);
-
-    // A view along the up axis must not assert and still give an orthonormal basis
-    const vertical = cameraView(Vector3f(0, 10, 0), Vector3f(0, 0, 0), up);
-    const x = Vector3f(vertical.a11, vertical.a12, vertical.a13);
-    const y = Vector3f(vertical.a21, vertical.a22, vertical.a23);
-
-    assert(abs(x.length - 1) < 1e-5f);
-    assert(abs(y.length - 1) < 1e-5f);
-    assert(abs(x.dot(y)) < 1e-5f);
-}
-
-unittest
-{
-    import dlib.math: rotationQuaternion;
-
-    // Approaching the pole must keep the roll instead of snapping to another up
-    const worldUp = Vector3f(0, 1, 0);
-    const a = Vector3f(0.05f, 1, 0).normalized;
-    const b = Vector3f(0.042f, 1, 0).normalized;
-
-    const viewA = cameraTransform(Vector3f(0, 0, 0), a,
-        rotationQuaternion(a, 0.7f).rotate(worldUp));
-    const viewB = cameraTransform(Vector3f(0, 0, 0), b,
-        rotationQuaternion(b, 0.7f).rotate(worldUp));
-
-    const upA = Vector3f(viewA.a12, viewA.a22, viewA.a32);
-    const upB = Vector3f(viewB.a12, viewB.a22, viewB.a32);
-
-    assert(upA.dot(upB) > 0.99f);
-}
-
-/// Perspective projection for Vulkan, whose clip space has Y pointing down,
-/// unlike the OpenGL convention that dlib builds
-Matrix4x4f vulkanPerspectiveMatrix(float fovY, float aspectRatio, float nearPlane, float farPlane)
-{
-    auto result = perspectiveMatrix(fovY, aspectRatio, nearPlane, farPlane);
-    result.a22 = -result.a22;
-    return result;
-}
 
 class Scene
 {
@@ -140,19 +54,8 @@ class Scene
     /// Path of the frame saved by the last `captureFrame` call
     string lastScreenshotPath;
 
-    /// The sun casts a shadow map before the main pass
-    bool shadowsEnabled = true;
-    /// Render the sun's view once and reuse it until invalidated
-    bool shadowMapCache;
-    enum shadowMapSize = 1024;
-    enum shadowFov = 24.0f;
-    enum shadowDistance = 10.0f;
-    /// Light view-projection the shadow map and the PBR sampling share
-    Matrix4x4f shadowViewProj;
-    private ShadowPass shadowPass;
-    private ShadowMap[] shadowMaps;
-    private bool[] shadowMapValid;
-    private VkSampler shadowSampler;
+    /// The sun's shadow map and its cache
+    SunShadow sunShadow;
     private VkSampler resolveSampler;
     private OitResolve oitResolve;
     private DepthResolve depthResolve;
@@ -212,13 +115,7 @@ class Scene
             Vector4f(cast(float) LightType.directional, 0, 0, 0),
         );
 
-        invalidateShadowMap();
-    }
-
-    /// Renders the sun's view again on the next frame; call it after moving casters
-    void invalidateShadowMap()
-    {
-        shadowMapValid[] = false;
+        sunShadow.invalidate();
     }
 
     /// Number of lights already added, including the sun
@@ -275,24 +172,7 @@ class Scene
         oitResolve = new OitResolve(device, pipelineFactory, surfaceFormat.format);
         depthResolve = new DepthResolve(device, pipelineFactory);
 
-        shadowPass = new ShadowPass(device, DefaultRenderPass.depthFormat);
-
-        {
-            VkSamplerCreateInfo samplerInfo = {
-                sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                magFilter: VK_FILTER_LINEAR,
-                minFilter: VK_FILTER_LINEAR,
-                mipmapMode: VK_SAMPLER_MIPMAP_MODE_NEAREST,
-                addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                compareEnable: VK_TRUE,
-                compareOp: VK_COMPARE_OP_LESS_OR_EQUAL,
-                borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-                unnormalizedCoordinates: VK_FALSE,
-            };
-            vkCall(device.device, &samplerInfo, device.alloc, &shadowSampler);
-        }
+        sunShadow = new SunShadow(device);
 
         {
             VkSamplerCreateInfo samplerInfo = {
@@ -316,7 +196,7 @@ class Scene
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
-        pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, shadowPass);
+        pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, sunShadow.pass);
         gltfFactory = new GltfFactory(pbrFactory);
         godotFactory = new GodotFactory(pbrFactory, gltfFactory);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
@@ -349,18 +229,11 @@ class Scene
             if(arena)
                 destroy(arena);
 
-        foreach(ref map; shadowMaps)
-            if(map)
-                destroy(map);
-
-        if(shadowSampler)
-            vkDestroySampler(device.device, shadowSampler, device.alloc);
+        if(sunShadow)
+            destroy(sunShadow);
 
         if(resolveSampler)
             vkDestroySampler(device.device, resolveSampler, device.alloc);
-
-        if(shadowPass)
-            destroy(shadowPass);
 
         if(depthResolve)
             destroy(depthResolve);
@@ -396,9 +269,6 @@ class Scene
 
     private void createFrameSets()
     {
-        shadowMapValid.length = swapChain.frames.length;
-        shadowMapValid[] = false;
-
         VkDescriptorImageInfo imageInfo(Texture texture)
         {
             return VkDescriptorImageInfo(
@@ -431,15 +301,7 @@ class Scene
         foreach(i; 0 .. instanceArenas.length)
             instanceArenas[i] = new InstanceArena(device);
 
-        // The maps do not depend on the swapchain, so a replacement keeps them
-        if(shadowMaps.length != swapChain.frames.length)
-        {
-            foreach(ref map; shadowMaps)
-                if(map)
-                    destroy(map);
-
-            shadowMaps.length = swapChain.frames.length;
-        }
+        sunShadow.recreate(swapChain.frames.length);
 
         foreach(ref frame; swapChain.frames)
             frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
@@ -452,8 +314,7 @@ class Scene
 
             lightBufs[i] = device.create!MemoryBufferMappedToCPU(maxLights * Light.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
-            shadowMaps[i] = new ShadowMap(device, shadowPass, shadowMapSize);
-            auto shadowInfo = shadowMaps[i].imageInfo(shadowSampler);
+            auto shadowInfo = sunShadow.imageInfo(i);
             auto lightInfo = VkDescriptorBufferInfo(
                 buffer: lightBufs[i].buf,
                 offset: 0,
@@ -709,23 +570,19 @@ class Scene
         data.viewProj = viewProj;
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
 
-        // The light matrices are only needed while the shadow pass runs
-        if(shadowsEnabled)
+        // The light matrix is only needed while the shadow pass runs
+        if(sunShadow.enabled)
         {
             const sun = Vector3f(
                 lights[0].positionRadius.x,
                 lights[0].positionRadius.y,
                 lights[0].positionRadius.z,
-            ).normalized;
-
-            const shadowEye = sun * shadowDistance;
-            const shadowView = cameraView(shadowEye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-            const shadowProj = vulkanPerspectiveMatrix(shadowFov, 1.0f, 1.0f, shadowDistance * 2.0f);
-            shadowViewProj = shadowProj * shadowView;
-            data.shadowViewProj = shadowViewProj;
+            );
+            sunShadow.update(sun);
+            data.shadowViewProj = sunShadow.viewProj;
         }
 
-        data.shadowParams = Vector4f(shadowsEnabled ? 1 : 0, 0, 0, 0);
+        data.shadowParams = Vector4f(sunShadow.enabled ? 1 : 0, 0, 0, 0);
         data.exposureParams = Vector4f(
             exposure,
             iblIntensity,
@@ -921,17 +778,7 @@ class Scene
     /// Renders the sun's view of the opaque scene before the main pass
     private void recordShadow(ref Frame frame, void delegate(ref VkCommandBuffer) drawShadow)
     {
-        if(!shadowsEnabled || drawShadow is null)
-            return;
-
-        const index = frameIndex(frame);
-
-        if(shadowMapCache && shadowMapValid[index])
-            return;
-
-        auto map = shadowMaps[index];
-        shadowPass.record(frame.commandBuffer, map.renderedFrameBuffer, map.renderExtent, drawShadow);
-        shadowMapValid[index] = true;
+        sunShadow.record(frameIndex(frame), frame.commandBuffer, drawShadow);
     }
 
     /// Empties the per-pixel lists before the opaque and blended draws fill them

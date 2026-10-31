@@ -4,7 +4,7 @@ import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.mesh: mirrors;
-import pukan.misc: Boxf, isVisible;
+import pukan.misc: Boxf, isVisible, mergeAabb, transformAabb;
 import pukan.pbr.accessor: BufferPieceOnGPU;
 import pukan.pbr.mesh: PbrMesh;
 import pukan.pbr.pipelines: LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
@@ -12,7 +12,7 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase;
 import pukan.vulkan.textures: Texture;
-import std.algorithm: max, min, sort;
+import std.algorithm: sort;
 
 enum GodotLightKind
 {
@@ -187,7 +187,7 @@ final class GodotScene : DrawableByVulkan, Blended
     }
     size_t instanceCount() const => instances.length;
 
-    Boxf[] instanceBounds() const
+    Boxf[] instanceBounds()
     {
         Boxf[] result;
 
@@ -219,49 +219,32 @@ final class GodotScene : DrawableByVulkan, Blended
         return false;
     }
 
-    Boxf calcAABB() const
+    Boxf calcAABB()
     {
         Boxf result;
 
-        foreach(mesh; meshes)
-            mesh.calcAABB(gpuBuffs, result);
-
-        foreach(instance; instances)
+        void collect(Matrix4x4f trans, GodotNode node)
         {
-            Boxf other;
+            if(!node.visible)
+                return;
 
-            if(auto gltf = cast(GlTF) instance)
-                other = gltf.calcAABB;
-            else if(auto scene = cast(GodotScene) instance)
-                other = scene.calcAABB;
-            else
-                continue;
+            trans *= node.local;
 
-            mergeAabb(result, other);
+            foreach(mesh; node.meshes)
+                mergeAabb(result, transformAabb(mesh.localAABB, trans));
+
+            if(auto gltf = cast(GlTF) node.instance)
+                mergeAabb(result, transformAabb(gltf.calcAABB, trans));
+            else if(auto scene = cast(GodotScene) node.instance)
+                mergeAabb(result, transformAabb(scene.calcAABB, trans));
+
+            foreach(child; node.children)
+                collect(trans, child);
         }
+
+        collect(Matrix4x4f.identity, root);
 
         return result;
-    }
-
-    private static void mergeAabb(ref Boxf box, in Boxf other)
-    {
-        import std.math: isNaN;
-
-        if(other.min.x.isNaN)
-            return;
-
-        if(box.min.x.isNaN)
-        {
-            box = other;
-            return;
-        }
-
-        box.min.x = min(box.min.x, other.min.x);
-        box.min.y = min(box.min.y, other.min.y);
-        box.min.z = min(box.min.z, other.min.z);
-        box.max.x = max(box.max.x, other.max.x);
-        box.max.y = max(box.max.y, other.max.y);
-        box.max.z = max(box.max.z, other.max.z);
     }
 
     void uploadToGPUImmediate(

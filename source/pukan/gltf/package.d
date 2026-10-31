@@ -11,7 +11,7 @@ import pukan.gltf.material: applyGltfMaterial;
 import pukan.mesh: mirrors;
 import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
-import pukan.misc: Boxf, isVisible;
+import pukan.misc: Boxf, isVisible, mergeAabb, transformAabb;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -383,16 +383,26 @@ class GlTF : DrawableByVulkan, Blended
         }
     }
 
-    auto calcAABB() const
+    auto calcAABB()
     {
-        import pukan.misc: Boxf;
+        Boxf result;
 
-        Boxf r;
+        void collect(Node node, Matrix4x4f trans)
+        {
+            assert(node.trans !is null);
 
-        foreach(m; meshes)
-            m.calcAABB(asset.gpuBuffs, r);
+            trans *= node.trans.calcMatrix;
 
-        return r;
+            foreach(mesh; node.meshes)
+                mergeAabb(result, transformAabb(mesh.localAABB, trans));
+
+            foreach(child; node.children)
+                collect(cast(Node) child, trans);
+        }
+
+        collect(rootSceneNode, Matrix4x4f.identity);
+
+        return result;
     }
 
     //TODO: private

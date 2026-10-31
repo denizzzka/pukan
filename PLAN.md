@@ -118,11 +118,10 @@ or the pack.
       light and tonemap; IBL, fog, SDFGI and volumetrics stay unsupported at
       first.
 - [ ] Layers, visibility ranges and `cast_shadow` modes.
-- [ ] Size the sun's shadow map to the loaded scene. `Scene` still uses a fixed
-      24 degree perspective cone 10 units from the origin, so only small arenas
-      get shadows; expose the distance or fit an orthographic frustum to the
-      scene bounds, and check it on `truck_town`, whose town lies outside the
-      current cone. Cascades stay a separate item in `## Lighting`.
+- [x] Size the sun's shadow map to the loaded scene: `demo_godot` fits an
+      orthographic frustum to the scene AABB. `SunShadow` owns the pass, the
+      per-frame maps, the sampler and the cache. Cascades stay a separate item
+      in `## Lighting`.
 
 #### Phase 3: binary resources and packed production projects
 
@@ -409,11 +408,15 @@ stay in front. Long term:
 
 The frame carries a light list in a storage buffer: the sun, then point and spot
 lights, sixteen entries in total. The sun casts a single 1024x1024 shadow map
-with a normal offset and one filtered comparison; only opaque glTF meshes cast,
-there are no cascades and no local-light shadows. Missing:
+with a normal offset and one filtered comparison; it is fitted to the loaded
+scene when the app supplies its bounds. Only the sun casts; there are no
+cascades and no local-light shadows. Missing:
 
-- [ ] Cascaded directional maps and an atlas for the local lights; the current
-      map is one perspective map around the scene centre and only the sun uses it.
+- [ ] Cascaded directional maps; the sun keeps one fitted orthographic map until
+      then.
+- [ ] Local-light shadows on top of `SunShadow`: an atlas of spot tiles first,
+      then point lights as a cubemap or six tiles, with per-light matrices,
+      tile metadata in the frame data and per-tile cache validity.
 - [x] Cache the sun's shadow map while the casters and the sun stay put, so a
       static level does not redraw an unchanged map every frame.
 - [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.

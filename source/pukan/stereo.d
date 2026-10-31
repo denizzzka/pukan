@@ -1,7 +1,7 @@
 module pukan.stereo;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f, cross, frustumMatrix;
-import pukan.scene: cameraView;
+import pukan.camera: cameraView;
 import pukan.vulkan.bindings: VkExtent2D;
 import std.math: PI, abs, tan;
 

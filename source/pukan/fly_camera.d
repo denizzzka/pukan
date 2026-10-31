@@ -1,7 +1,7 @@
 module pukan.fly_camera;
 
 import dlib.math: Matrix4x4f, Quaternionf, Vector3f, cross, degtorad, dot, rotationQuaternion;
-import pukan.scene: cameraTransform, cameraView;
+import pukan.camera: cameraTransform, cameraView;
 import std.algorithm: clamp;
 import std.math: isClose, pow;
 
