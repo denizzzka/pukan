@@ -251,6 +251,8 @@ final class SunShadow
     uint mapSize = 1024;
     /// Light view-projection the pass and the PBR shaders share
     Matrix4x4f viewProj = Matrix4x4f.identity;
+    /// NDC depth bias that keeps the world-space offset constant
+    float depthBias = 0.0015f;
 
     private Boxf bounds;
     private bool hasBounds;
@@ -336,6 +338,7 @@ final class SunShadow
             const view = cameraView(eye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
             const proj = vulkanPerspectiveMatrix(fallbackFov, 1.0f, 1.0f, fallbackDistance * 2.0f);
             viewProj = proj * view;
+            depthBias = 0.0015f;
             return;
         }
 
@@ -383,6 +386,9 @@ final class SunShadow
             yMin - padding, yMax + padding,
             nearPlane, farPlane,
         ) * view;
+
+        // A fixed depth offset in world units: the orthographic range is large
+        depthBias = 0.03f / (farPlane - nearPlane);
     }
 
     VkDescriptorImageInfo imageInfo(size_t frameIndex)

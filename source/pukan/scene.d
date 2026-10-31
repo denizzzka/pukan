@@ -587,7 +587,7 @@ class Scene
             data.shadowViewProj = sunShadow.viewProj;
         }
 
-        data.shadowParams = Vector4f(sunShadow.enabled ? 1 : 0, 0, 0, 0);
+        data.shadowParams = Vector4f(sunShadow.enabled ? 1 : 0, sunShadow.depthBias, 0, 0);
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
         data.exposureParams = Vector4f(

@@ -405,7 +405,7 @@ float shadowFactor(vec3 position, vec3 normal)
         return 1.0;
 
     // The sampler filters linearly, so one tap averages a 2x2 comparison
-    return texture(shadowMap, vec3(uv, ndc.z - 0.0015));
+    return texture(shadowMap, vec3(uv, ndc.z - frameUbo.frame.shadowParams.y));
 }
 
 vec3 shadePbr(Surface s)
