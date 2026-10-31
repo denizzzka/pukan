@@ -2,7 +2,7 @@ module pukan.scene;
 
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
-import pukan.pbr.pipelines: oitPass, transmissionPass;
+import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupPerScene;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
@@ -230,7 +230,7 @@ class Scene
             device.pipelineCacheManager = pipelineCacheManager;
         }
 
-        pipelineFactory = new PipelineFactory(device, pipelineCacheManager);
+        pipelineFactory = new PipelineFactory(device, pipelineCacheManager, pipelineWarmupEnabled);
         frameAllocator = pipelineFactory.createFrameAllocator();
         meshResources = new MeshResources(device);
         ibl = createIblTextures(device);
@@ -276,8 +276,9 @@ class Scene
     ~this()
     {
         // A worker may still read a pass or shader module below
-        if(pipelineFactory)
-            pipelineFactory.waitForRequests();
+        static if(pipelineWarmupEnabled)
+            if(pipelineFactory)
+                pipelineFactory.waitForRequests();
 
         if(pendingScreenshot)
             destroy(pendingScreenshot);
@@ -1005,10 +1006,13 @@ class Scene
     {
         import pukan.exceptions: PukanExceptionWithCode;
 
-        if(!pipelinesReady)
+        static if(pipelineWarmupEnabled)
         {
-            pipelineFactory.waitForRequests();
-            pipelinesReady = true;
+            if(!pipelinesReady)
+            {
+                pipelineFactory.waitForRequests();
+                pipelinesReady = true;
+            }
         }
 
         retireOitFrames();

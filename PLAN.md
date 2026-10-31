@@ -840,8 +840,6 @@ Open questions:
 ### Pipeline warmup policy
 
 - [ ] Compile-time policy `off | scene | all | required`, default `scene`.
-- [ ] `off`: no query, no worker, no barrier; first use creates.
-- [ ] `scene`: current per-object warm, on-demand fallback.
 - [ ] `all`: warm every reachable `PbrPipelines` field for the target and
       validate the full set before the first frame.
 - [ ] `required`: warm only the variants in the required set and throw for a

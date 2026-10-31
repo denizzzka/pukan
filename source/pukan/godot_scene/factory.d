@@ -8,6 +8,7 @@ import pukan.godot_scene.scene: GodotScene;
 import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.pbr.factory: PbrFactory;
+import pukan.pbr.pipelines: pipelineWarmupPerScene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.meta: AliasSeq;
@@ -48,7 +49,8 @@ class GodotFactory
         assert(pbr.device);
 
         auto scene = loadGodotScene(filename, pbr, gltfFactory, loadOptions);
-        scene.warmPipelines(preloadShadows);
+        static if(pipelineWarmupPerScene)
+            scene.warmPipelines(preloadShadows);
 
         return scene;
     }
@@ -69,7 +71,8 @@ class GodotFactory
         }
 
         auto scene = loadGodotScene(source, scenePath, pbr, gltfFactory, loadOptions);
-        scene.warmPipelines(preloadShadows);
+        static if(pipelineWarmupPerScene)
+            scene.warmPipelines(preloadShadows);
 
         return scene;
     }

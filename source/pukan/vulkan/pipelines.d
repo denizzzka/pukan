@@ -505,7 +505,7 @@ final class PipelineFactory
     private VkDescriptorSetLayout frameSetLayout;
     private VkDescriptorSetLayoutBinding[] frameBindings;
 
-    this(LogicalDevice device, PipelineCacheManager cacheManager = null)
+    this(LogicalDevice device, PipelineCacheManager cacheManager = null, bool preload = true)
     {
         this.device = device;
         this.cacheManager = cacheManager;
@@ -588,9 +588,13 @@ final class PipelineFactory
 
         mutex = new Mutex;
         condition = new Condition(mutex);
-        preloadThread = new Thread(&preloadRun);
-        preloadThread.isDaemon = true;
-        preloadThread.start();
+
+        if(preload)
+        {
+            preloadThread = new Thread(&preloadRun);
+            preloadThread.isDaemon = true;
+            preloadThread.start();
+        }
     }
 
     ~this()
@@ -675,6 +679,9 @@ final class PipelineFactory
     /// Queues a variant for the preload thread; a ready or queued variant is ignored
     void request(TechniqueId id, RenderPass renderPass, uint subpass = 0)
     {
+        if(preloadThread is null)
+            return;
+
         synchronized(mutex)
         {
             const key = PipelineKey(id, targetId(renderPass, subpass));
@@ -691,6 +698,9 @@ final class PipelineFactory
     /// Blocks until the preload thread has built every queued variant
     void waitForRequests()
     {
+        if(preloadThread is null)
+            return;
+
         synchronized(mutex)
             while(pending.length > 0 || building > 0)
                 condition.wait();

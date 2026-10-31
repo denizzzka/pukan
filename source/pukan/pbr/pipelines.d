@@ -1,7 +1,31 @@
 module pukan.pbr.pipelines;
 
+import pukan.exceptions: PukanException;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, TechniqueId;
 import pukan.vulkan.renderpass: RenderPass;
+import std.conv: to;
+
+/// When pipeline variants are built
+enum PipelineWarmupPolicy
+{
+    off,
+    scene,
+    all,
+    required,
+}
+
+version(PipelineWarmupOff)
+    enum pipelineWarmupPolicy = PipelineWarmupPolicy.off;
+else version(PipelineWarmupAll)
+    enum pipelineWarmupPolicy = PipelineWarmupPolicy.all;
+else version(PipelineWarmupRequired)
+    enum pipelineWarmupPolicy = PipelineWarmupPolicy.required;
+else
+    enum pipelineWarmupPolicy = PipelineWarmupPolicy.scene;
+
+enum bool pipelineWarmupEnabled = pipelineWarmupPolicy != PipelineWarmupPolicy.off;
+enum bool pipelineWarmupPerScene = pipelineWarmupPolicy == PipelineWarmupPolicy.scene ||
+    pipelineWarmupPolicy == PipelineWarmupPolicy.required;
 
 /// A pipeline variant created on first use
 struct LazyPipeline
@@ -23,10 +47,22 @@ struct LazyPipeline
     GraphicsPipelineCfg get()
     {
         if(cfg.graphicsPipeline is null)
-            cfg = factory.acquire(technique, pass, subpass);
+        {
+            static if(pipelineWarmupPolicy == PipelineWarmupPolicy.off ||
+                      pipelineWarmupPolicy == PipelineWarmupPolicy.scene)
+                cfg = factory.acquire(technique, pass, subpass);
+            else
+                throw new PukanException(
+                    "pipeline variant was not preloaded: " ~
+                    factory.techniqueName(technique) ~
+                    " for " ~ pass.imageFormat.to!string ~
+                    ", subpass " ~ subpass.to!string);
+        }
 
         return cfg;
     }
+
+    bool ready() const => cfg.graphicsPipeline !is null;
 
     void request()
     {

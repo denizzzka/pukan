@@ -3,6 +3,7 @@ module pukan.gltf.factory;
 import pukan.gltf;
 import pukan.gltf.loader: GltfAsset, GltfLoadOptions, createGltfInstance, loadGltfAsset;
 import pukan.pbr.factory: PbrFactory;
+import pukan.pbr.pipelines: pipelineWarmupPerScene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.conv: to;
@@ -80,7 +81,8 @@ class GltfFactory
             loadOptions,
         );
 
-        instance.warmPipelines(preloadShadows);
+        static if(pipelineWarmupPerScene)
+            instance.warmPipelines(preloadShadows);
 
         return instance;
     }
