@@ -30,6 +30,9 @@ struct GodotMaterialData
     int roughnessChannel;
     int occlusionChannel;
     Vector4f uvTransform = Vector4f(1, 1, 0, 0);
+    /// Godot's texture_filter, linear with mipmaps by default
+    uint textureFilter = 3;
+    bool textureRepeat = true;
     string documentPath;
 }
 
@@ -72,6 +75,10 @@ GodotMaterialData readGodotMaterial(
     result.metallicChannel = cast(int) propertyLong(properties, "metallic_texture_channel", 0);
     result.roughnessChannel = cast(int) propertyLong(properties, "roughness_texture_channel", 0);
     result.occlusionChannel = cast(int) propertyLong(properties, "ao_texture_channel", 0);
+    result.textureFilter = cast(uint) propertyLong(properties, "texture_filter", 3);
+
+    if(auto value = "texture_repeat" in properties)
+        result.textureRepeat = asBool(*value, "texture_repeat");
 
     if(auto value = "metallic_texture" in properties)
     {

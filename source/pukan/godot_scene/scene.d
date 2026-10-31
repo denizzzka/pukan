@@ -100,6 +100,7 @@ final class GodotScene : DrawableByVulkan, Blended
     private PbrMesh[] meshes;
     private BufferPieceOnGPU[] gpuBuffs;
     private Texture[] textures;
+    private VkSampler[] samplers;
     private bool uploaded;
 
     string name;
@@ -126,6 +127,7 @@ final class GodotScene : DrawableByVulkan, Blended
         PbrMesh[] meshes,
         BufferPieceOnGPU[] gpuBuffs,
         Texture[] textures,
+        VkSampler[] samplers,
         DrawableByVulkan[] instances,
         GodotSkin[] skins,
         string name,
@@ -138,6 +140,7 @@ final class GodotScene : DrawableByVulkan, Blended
         this.meshes = meshes;
         this.gpuBuffs = gpuBuffs;
         this.textures = textures;
+        this.samplers = samplers;
         this.instances = instances;
         this.skins = skins;
         this.name = name;
@@ -152,6 +155,10 @@ final class GodotScene : DrawableByVulkan, Blended
         foreach(ref texture; textures)
             if(texture)
                 destroy(texture);
+
+        foreach(sampler; samplers)
+            if(sampler)
+                vkDestroySampler(device.device, sampler, device.alloc);
 
         foreach(instance; instances)
             destroyInstance(instance);

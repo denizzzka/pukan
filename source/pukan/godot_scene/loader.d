@@ -26,7 +26,7 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.image: identityComponentMapping, loadImageToMemory, loadImageWithMips;
 import pukan.vulkan.pipelines: DescriptorAllocator;
-import pukan.vulkan.textures: Texture;
+import pukan.vulkan.textures: Texture, requiredAnisotropy;
 import std.algorithm: canFind, endsWith;
 import std.conv: to;
 import std.file: exists, getcwd;
@@ -223,6 +223,77 @@ unittest
     assert(turned.a13 == 1 && turned.a31 == -1 && turned.a22 == 1);
 }
 
+/// Godot's BaseMaterial3D texture_filter values, as a sampler pair
+private struct SamplerKey
+{
+    uint filter;
+    bool repeat;
+}
+
+/// Sampler state of a Godot material; `anisotropic` is false when unsupported
+private VkSamplerCreateInfo samplerState(uint filter, bool repeat, bool anisotropic)
+{
+    VkSamplerCreateInfo info = {
+        sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        magFilter: VK_FILTER_LINEAR,
+        minFilter: VK_FILTER_LINEAR,
+        mipmapMode: VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        addressModeU: repeat ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        addressModeV: repeat ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        addressModeW: repeat ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        anisotropyEnable: anisotropic ? VK_TRUE : VK_FALSE,
+        maxAnisotropy: anisotropic ? requiredAnisotropy : 0.0f,
+        compareEnable: VK_FALSE,
+        compareOp: VK_COMPARE_OP_ALWAYS,
+        borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        unnormalizedCoordinates: VK_FALSE,
+        // Without mipmaps the base level alone is sampled
+        maxLod: 0.0f,
+    };
+
+    switch(filter)
+    {
+        case 0:
+            info.magFilter = VK_FILTER_NEAREST;
+            info.minFilter = VK_FILTER_NEAREST;
+            break;
+
+        case 1:
+            break;
+
+        case 2, 4:
+            info.magFilter = VK_FILTER_NEAREST;
+            info.minFilter = VK_FILTER_NEAREST;
+            info.maxLod = VK_LOD_CLAMP_NONE;
+            break;
+
+        default:
+            info.maxLod = VK_LOD_CLAMP_NONE;
+            break;
+    }
+
+    return info;
+}
+
+unittest
+{
+    const nearest = samplerState(0, false, false);
+    assert(nearest.magFilter == VK_FILTER_NEAREST);
+    assert(nearest.minFilter == VK_FILTER_NEAREST);
+    assert(nearest.addressModeU == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+    assert(nearest.maxLod == 0.0f);
+    assert(nearest.anisotropyEnable == VK_FALSE);
+
+    const linear = samplerState(3, true, false);
+    assert(linear.magFilter == VK_FILTER_LINEAR);
+    assert(linear.addressModeV == VK_SAMPLER_ADDRESS_MODE_REPEAT);
+    assert(linear.maxLod == VK_LOD_CLAMP_NONE);
+
+    const anisotropic = samplerState(4, true, true);
+    assert(anisotropic.anisotropyEnable == VK_TRUE);
+    assert(anisotropic.maxAnisotropy == requiredAnisotropy);
+}
+
 private final class GodotLoader
 {
     LogicalDevice device;
@@ -233,7 +304,6 @@ private final class GodotLoader
 
     CommandPool commandPool;
     VkCommandBuffer commandBuffer;
-    VkSamplerCreateInfo samplerInfo;
 
     GodotProject project;
     string scenePath;
@@ -244,6 +314,8 @@ private final class GodotLoader
     PbrGeometry[string] geometryCache;
     Texture[] textures;
     Texture[string] textureCache;
+    VkSampler[SamplerKey] samplerCache;
+    VkSampler[] samplers;
     DrawableByVulkan[] instances;
     GodotSkin[] skins;
     VkDescriptorImageInfo fakeTextureInfo;
@@ -266,21 +338,28 @@ private final class GodotLoader
             imageView: pbr.resources.fakeTexture.imageView,
             sampler: pbr.resources.fakeTexture.sampler,
         );
+    }
 
-        samplerInfo = VkSamplerCreateInfo(
-            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-            magFilter: VK_FILTER_LINEAR,
-            minFilter: VK_FILTER_LINEAR,
-            mipmapMode: VK_SAMPLER_MIPMAP_MODE_LINEAR,
-            addressModeU: VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            addressModeV: VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            addressModeW: VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            anisotropyEnable: VK_FALSE,
-            compareEnable: VK_FALSE,
-            compareOp: VK_COMPARE_OP_ALWAYS,
-            borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-            unnormalizedCoordinates: VK_FALSE,
-        );
+    /// Shared sampler of a material filter and wrap mode
+    private VkSampler samplerFor(uint filter, bool repeat)
+    {
+        const key = SamplerKey(filter, repeat);
+
+        if(auto cached = key in samplerCache)
+            return *cached;
+
+        const ctx = device.deviceContext();
+        const anisotropic = ctx.enabled.samplerAnisotropy == VK_TRUE
+            && ctx.properties.limits.maxSamplerAnisotropy >= requiredAnisotropy;
+
+        auto info = samplerState(filter, repeat, anisotropic);
+        VkSampler sampler;
+        vkCall(device.device, &info, device.alloc, &sampler);
+
+        samplerCache[key] = sampler;
+        samplers ~= sampler;
+
+        return sampler;
     }
 
     GodotScene run(string filename)
@@ -330,6 +409,7 @@ private final class GodotLoader
             meshes,
             gpuBuffs,
             textures,
+            samplers,
             instances,
             skins,
             root.name,
@@ -1410,23 +1490,25 @@ private final class GodotLoader
 
         if(hasUv)
         {
+            auto sampler = samplerFor(material.textureFilter, material.textureRepeat);
+
             bind(mesh, material.documentPath, material.baseColorTexture, material.hasBaseColorTexture,
-                MATERIAL_BASE_COLOR, MaterialFlag.baseColorTexture, true);
+                MATERIAL_BASE_COLOR, MaterialFlag.baseColorTexture, true, sampler);
 
             bind(mesh, material.documentPath, material.normalTexture, material.hasNormalTexture,
-                MATERIAL_NORMAL, MaterialFlag.normalTexture, false);
+                MATERIAL_NORMAL, MaterialFlag.normalTexture, false, sampler);
 
             bind(mesh, material.documentPath, material.occlusionTexture, material.hasOcclusionTexture,
-                MATERIAL_OCCLUSION, MaterialFlag.occlusionTexture, false);
+                MATERIAL_OCCLUSION, MaterialFlag.occlusionTexture, false, sampler);
 
             bind(mesh, material.documentPath, material.emissiveTexture, material.hasEmissiveTexture,
-                MATERIAL_EMISSIVE, MaterialFlag.emissiveTexture, true);
+                MATERIAL_EMISSIVE, MaterialFlag.emissiveTexture, true, sampler);
 
             bind(mesh, material.documentPath, material.metallicTexture, material.hasMetallicTexture,
-                MATERIAL_GODOT_METALLIC, MaterialFlag.godotMetallicTexture, false);
+                MATERIAL_GODOT_METALLIC, MaterialFlag.godotMetallicTexture, false, sampler);
 
             bind(mesh, material.documentPath, material.roughnessTexture, material.hasRoughnessTexture,
-                MATERIAL_GODOT_ROUGHNESS, MaterialFlag.godotRoughnessTexture, false);
+                MATERIAL_GODOT_ROUGHNESS, MaterialFlag.godotRoughnessTexture, false, sampler);
         }
 
         if(surface.geometry.tangents.length && material.hasNormalTexture)
@@ -1446,6 +1528,7 @@ private final class GodotLoader
         size_t binding,
         MaterialFlag flag,
         bool srgb,
+        VkSampler sampler,
     )
     {
         if(!present)
@@ -1461,7 +1544,7 @@ private final class GodotLoader
         mesh.bindTexture(binding, flag, VkDescriptorImageInfo(
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             imageView: texture.imageView,
-            sampler: texture.sampler,
+            sampler: sampler,
         ));
     }
 
@@ -1520,7 +1603,7 @@ private final class GodotLoader
                     ctex.width, ctex.height, ctex.levels, format,
                 );
                 auto texture = device.create!Texture(
-                    memory, samplerInfo,
+                    memory,
                     ctex.raAsRg ? raAsRgMapping : identityComponentMapping,
                 );
                 texture.normalTwoChannel = ctex.raAsRg || isTwoChannelNormal(format);
@@ -1541,7 +1624,7 @@ private final class GodotLoader
             format = linearFormat(format);
 
         auto memory = loadImageToMemory(device, commandPool, commandBuffer, image, format);
-        auto texture = device.create!Texture(memory, samplerInfo);
+        auto texture = device.create!Texture(memory);
 
         textureCache[cacheKey] = texture;
         textures ~= texture;

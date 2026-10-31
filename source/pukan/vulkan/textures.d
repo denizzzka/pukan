@@ -21,6 +21,7 @@ class Texture
     LogicalDevice device;
     ImageMemory textureImageMemory;
     VkImageView imageView;
+    /// Null when the owner binds its own sampler
     VkSampler sampler;
     /// Godot normal map stores only X and Y and reconstructs Z
     bool normalTwoChannel;
@@ -45,6 +46,22 @@ class Texture
         );
 
         vkCall(device.device, cast() &samplerInfo, device.alloc, &sampler);
+    }
+
+    /// A texture without its own sampler; the owner binds the one it needs
+    this(LogicalDevice device, ImageMemory image, VkComponentMapping components = identityComponentMapping)
+    {
+        this.device = device;
+        textureImageMemory = image;
+
+        createImageView(
+            imageView,
+            device,
+            textureImageMemory.format,
+            textureImageMemory.image,
+            textureImageMemory.mipLevels,
+            components,
+        );
     }
 
     ~this()
