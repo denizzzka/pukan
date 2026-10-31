@@ -245,5 +245,7 @@ R            reset the roll
 H            look axis: horizontal (level horizon) or screen (follows the roll)
 ```
 
-`--speed` sets the movement speed in units per second. Runs with `--frames` or
-`--screenshot` stay static unless input arrives, so their output is repeatable.
+`--speed` sets the movement speed in units per second. `--near` and `--far` set
+the clipping distances; with `--scene-camera` the scene camera supplies them
+instead. Runs with `--frames` or `--screenshot` stay static unless input
+arrives, so their output is repeatable.

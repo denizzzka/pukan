@@ -170,6 +170,7 @@ void main(string[] args)
     bool noShadows;
     bool plainMode;
     float fovOption = cameraFov;
+    float nearOption = cameraNear;
     float farOption = cameraFar;
     float speedOption = cameraSpeed;
 
@@ -186,6 +187,7 @@ void main(string[] args)
         "no-shadows", "do not cast shadows", &noShadows,
         "plain", "draw every surface in the plain lit mode", &plainMode,
         "fov", "vertical field of view in degrees", &fovOption,
+        "near", "near clipping distance", &nearOption,
         "far", "far clipping distance", &farOption,
         "speed", "camera movement speed in units per second", &speedOption,
     );
@@ -406,7 +408,7 @@ void main(string[] args)
         target = parseVector(targetOption);
 
     FlyCamera camera;
-    float nearPlane = cameraNear;
+    float nearPlane = nearOption;
     float farPlane = farOption;
 
     if(useSceneCamera && godotScene.hasCamera)
