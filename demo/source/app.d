@@ -256,6 +256,7 @@ void main(string[] args) {
     scope(exit) destroy(scene);
 
     shadowsOn = !noShadows;
+    scene.gltfFactory.preloadShadows = shadowsOn;
 
     camera = FlyCamera.lookingAt(
         Vector3f(0, 0.2f, -initialCameraDistance),

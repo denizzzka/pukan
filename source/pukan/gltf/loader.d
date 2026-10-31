@@ -670,7 +670,7 @@ GlTF createGltfInstance(
     DescriptorAllocator allocator,
     MaterialBuffer materialBuffer,
     LogicalDevice device,
-    ref PbrPipelines pipelines,
+    PbrPipelines pipelines,
     Texture fakeTexture,
     VkBuffer vertexFallback,
     bool computeJointsOnGPU,

@@ -408,7 +408,7 @@ class CylinderRenderer : DrawablePrimitive
 
         const technique = pipelines.declare(RenderTechnique(
             name: "cylinders",
-            stages: shaderStages(device),
+            stages: shaderStages(),
             // The instance basis is left-handed, so its winding is reversed.
             state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
         ), 1);
@@ -426,11 +426,10 @@ class CylinderRenderer : DrawablePrimitive
         generator = new CylinderMeshGenerator(device, lod.maxLevel);
     }
 
-    private static ShaderInfo[] shaderStages(LogicalDevice device)
+    private static ShaderDecl[] shaderStages()
     {
         return [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("cylinder_vert.spv"),
+            shaderStage!"cylinder_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 null,
                 VkPushConstantRange(
@@ -440,8 +439,7 @@ class CylinderRenderer : DrawablePrimitive
                 ),
                 vertexInput(),
             ),
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("cylinder_frag.spv"),
+            shaderStage!"cylinder_frag.spv"(
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 [
                     VkDescriptorSetLayoutBinding(

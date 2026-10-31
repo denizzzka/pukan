@@ -125,13 +125,12 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
         );
     }
 
-    static ShaderInfo[] shaderStages(LogicalDevice device)
+    static ShaderDecl[] shaderStages()
     {
         static if(hasNormal!VertexT)
         {
             return [
-                device.uploadShaderToGPU(
-                    cast(ubyte[]) import("mesh_lit_vert.spv"),
+                shaderStage!"mesh_lit_vert.spv"(
                     VK_SHADER_STAGE_VERTEX_BIT,
                     null,
                     VkPushConstantRange(
@@ -141,8 +140,7 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
                     ),
                     vertexInput(),
                 ),
-                device.uploadShaderToGPU(
-                    cast(ubyte[]) import("mesh_lit_frag.spv"),
+                shaderStage!"mesh_lit_frag.spv"(
                     VK_SHADER_STAGE_FRAGMENT_BIT,
                     fragmentBindings(),
                 ),
@@ -151,8 +149,7 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
         else
         {
             return [
-                device.uploadShaderToGPU(
-                    cast(ubyte[]) import("mesh_static_vert.spv"),
+                shaderStage!"mesh_static_vert.spv"(
                     VK_SHADER_STAGE_VERTEX_BIT,
                     [
                         VkDescriptorSetLayoutBinding(
@@ -169,8 +166,7 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
                     ),
                     vertexInput(),
                 ),
-                device.uploadShaderToGPU(
-                    cast(ubyte[]) import("mesh_frag.spv"),
+                shaderStage!"mesh_frag.spv"(
                     VK_SHADER_STAGE_FRAGMENT_BIT,
                     fragmentBindings(),
                 ),

@@ -197,7 +197,7 @@ struct FixedState
 struct RenderTechnique
 {
     string name;
-    ShaderInfo[] stages;
+    ShaderDecl[] stages;
     FixedState state;
     VkDynamicState[] dynamicStates;
 }
@@ -470,6 +470,24 @@ final class PipelineFactory
     private GraphicsPipelineCfg[PipelineKey] cache;
     private PipelineCacheManager cacheManager;
 
+    /// Guards the variant cache, the target list and the preload queue
+    private Mutex mutex;
+    private Condition condition;
+    private bool stopping;
+    private Thread preloadThread;
+
+    private struct Pending
+    {
+        PipelineKey key;
+        TechniqueId technique;
+        RenderPass pass;
+        uint subpass;
+    }
+
+    private Pending[] pending;
+    private bool[PipelineKey] requested;
+    private size_t building;
+
     debug
     {
         /// Variants this run compiled because no usable record existed
@@ -567,10 +585,26 @@ final class PipelineFactory
             ),
         ];
         frameSetLayout = device.createDescriptorSetLayout(frameBindings);
+
+        mutex = new Mutex;
+        condition = new Condition(mutex);
+        preloadThread = new Thread(&preloadRun);
+        preloadThread.isDaemon = true;
+        preloadThread.start();
     }
 
     ~this()
     {
+        if(preloadThread)
+        {
+            mutex.lock();
+            stopping = true;
+            condition.notifyAll();
+            mutex.unlock();
+
+            preloadThread.join();
+        }
+
         debug logCacheSummary();
     }
 
@@ -592,40 +626,110 @@ final class PipelineFactory
 
     TechniqueId declare(RenderTechnique technique, uint setsPerPool = 16)
     {
-        Technique entry;
-        entry.description = technique;
+        TechniqueId result;
 
-        auto bindings = createLayoutBinding(technique.stages);
-        auto setLayout = internSetLayout(bindings);
+        synchronized(mutex)
+        {
+            Technique entry;
+            entry.description = technique;
 
-        entry.pipelineLayout = internPipelineLayout(setLayout, pushConstantRanges(technique.stages));
+            auto bindings = createLayoutBinding(technique.stages);
+            auto setLayout = internSetLayout(bindings);
 
-        entry.setLayout = setLayout;
-        entry.bindings = bindings;
-        entry.setsPerPool = setsPerPool;
-        entry.allocator = new DescriptorAllocator(device, setLayout, bindings, setsPerPool);
+            entry.pipelineLayout = internPipelineLayout(setLayout, pushConstantRanges(technique.stages));
 
-        techniques ~= entry;
+            entry.setLayout = setLayout;
+            entry.bindings = bindings;
+            entry.setsPerPool = setsPerPool;
+            entry.allocator = new DescriptorAllocator(device, setLayout, bindings, setsPerPool);
 
-        return TechniqueId(cast(uint)(techniques.length - 1));
+            techniques ~= entry;
+
+            result = TechniqueId(cast(uint)(techniques.length - 1));
+        }
+
+        return result;
     }
 
     GraphicsPipelineCfg acquire(TechniqueId id, RenderPass renderPass, uint subpass = 0)
     {
-        const key = PipelineKey(id, targetId(renderPass, subpass));
-
-        if(auto found = key in cache)
-            return *found;
-
-        try
-            cache[key] = createPipeline(id, renderPass, subpass);
-        catch(PukanException e)
+        synchronized(mutex)
         {
-            e.msg = "technique " ~ techniqueName(id) ~ ": " ~ e.msg;
-            throw e;
-        }
+            const key = PipelineKey(id, targetId(renderPass, subpass));
 
-        return cache[key];
+            if(auto found = key in cache)
+                return *found;
+
+            try
+                cache[key] = createPipeline(id, renderPass, subpass);
+            catch(PukanException e)
+            {
+                e.msg = "technique " ~ techniqueName(id) ~ ": " ~ e.msg;
+                throw e;
+            }
+
+            return cache[key];
+        }
+    }
+
+    /// Queues a variant for the preload thread; a ready or queued variant is ignored
+    void request(TechniqueId id, RenderPass renderPass, uint subpass = 0)
+    {
+        synchronized(mutex)
+        {
+            const key = PipelineKey(id, targetId(renderPass, subpass));
+
+            if((key in cache) || (key in requested))
+                return;
+
+            requested[key] = true;
+            pending ~= Pending(key, id, renderPass, subpass);
+            condition.notify();
+        }
+    }
+
+    /// Blocks until the preload thread has built every queued variant
+    void waitForRequests()
+    {
+        synchronized(mutex)
+            while(pending.length > 0 || building > 0)
+                condition.wait();
+    }
+
+    private void preloadRun()
+    {
+        while(true)
+        {
+            Pending job;
+
+            mutex.lock();
+
+            while(pending.length == 0 && !stopping)
+                condition.wait();
+
+            if(pending.length == 0)
+            {
+                mutex.unlock();
+                break;
+            }
+
+            job = pending[0];
+            pending = pending[1 .. $];
+            ++building;
+            mutex.unlock();
+
+            try
+                acquire(job.technique, job.pass, job.subpass);
+            catch(Exception e)
+                Instance.log_info("pipeline preload failed: " ~ e.msg);
+
+            mutex.lock();
+            --building;
+            requested.remove(job.key);
+            if(pending.length == 0 && building == 0)
+                condition.notifyAll();
+            mutex.unlock();
+        }
     }
 
     DescriptorAllocator descriptorAllocator(TechniqueId id)
@@ -706,8 +810,8 @@ final class PipelineFactory
         const state = technique.description.state;
 
         VkPipelineShaderStageCreateInfo[] stages;
-        foreach(ref stage; technique.description.stages)
-            stages ~= stage.createShaderStageInfo;
+        foreach(ref decl; technique.description.stages)
+            stages ~= device.uploadShaderDecl(decl).createShaderStageInfo;
 
         VkDynamicState[] dynamicStates = [
             VK_DYNAMIC_STATE_VIEWPORT,
@@ -895,7 +999,7 @@ final class PipelineFactory
         return builder.finish;
     }
 
-    private static ShaderVertexInput techniqueVertexInput(ShaderInfo[] stages)
+    private static ShaderVertexInput techniqueVertexInput(ShaderDecl[] stages)
     {
         ShaderVertexInput result;
         bool found;
@@ -911,7 +1015,7 @@ final class PipelineFactory
         return result;
     }
 
-    private static VkPushConstantRange[] pushConstantRanges(ShaderInfo[] stages)
+    private static VkPushConstantRange[] pushConstantRanges(ShaderDecl[] stages)
     {
         VkPushConstantRange[] ranges;
 

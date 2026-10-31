@@ -69,6 +69,8 @@ class Scene
     /// Lists of a replaced swapchain, kept until its commands are done
     private OitFrame[][] retiredOitFrames;
     private uint framesSinceOitRetire;
+    /// Set after the first frame has waited for the preload queue
+    private bool pipelinesReady;
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
@@ -236,6 +238,10 @@ class Scene
 
     ~this()
     {
+        // A worker may still read a pass or shader module below
+        if(pipelineFactory)
+            pipelineFactory.waitForRequests();
+
         if(pendingScreenshot)
             destroy(pendingScreenshot);
 
@@ -954,6 +960,12 @@ class Scene
     void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
     {
         import pukan.exceptions: PukanExceptionWithCode;
+
+        if(!pipelinesReady)
+        {
+            pipelineFactory.waitForRequests();
+            pipelinesReady = true;
+        }
 
         retireOitFrames();
 

@@ -34,6 +34,8 @@ class GodotFactory
     private PbrFactory pbr;
     private GltfFactory gltfFactory;
     GodotLoadOptions loadOptions;
+    /// Whether loading also queues the shadow variants
+    bool preloadShadows = true;
 
     this(PbrFactory pbr, GltfFactory gltfFactory)
     {
@@ -44,7 +46,11 @@ class GodotFactory
     GodotScene create(string filename)
     {
         assert(pbr.device);
-        return loadGodotScene(filename, pbr, gltfFactory, loadOptions);
+
+        auto scene = loadGodotScene(filename, pbr, gltfFactory, loadOptions);
+        scene.warmPipelines(preloadShadows);
+
+        return scene;
     }
 
     /// Loads a `res://` scene from an unencrypted PCK pack
@@ -62,6 +68,9 @@ class GodotFactory
                 throw new PukanException(packPath ~ ": pack has no application/run/main_scene");
         }
 
-        return loadGodotScene(source, scenePath, pbr, gltfFactory, loadOptions);
+        auto scene = loadGodotScene(source, scenePath, pbr, gltfFactory, loadOptions);
+        scene.warmPipelines(preloadShadows);
+
+        return scene;
     }
 }

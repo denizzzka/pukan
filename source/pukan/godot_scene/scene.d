@@ -8,10 +8,10 @@ import pukan.mesh: mirrors;
 import pukan.misc: Boxf, isVisible, mergeAabb, transformAabb;
 import pukan.pbr.accessor: BufferPieceOnGPU;
 import pukan.pbr.mesh: PbrMesh;
-import pukan.pbr.pipelines: LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
+import pukan.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
-import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase;
+import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase, PipelineWarmup;
 import pukan.vulkan.textures: Texture;
 import std.algorithm: sort;
 
@@ -92,7 +92,7 @@ class GodotNode
 }
 
 /// One loaded Godot scene tree and its GPU resources
-final class GodotScene : DrawableByVulkan, Blended
+final class GodotScene : DrawableByVulkan, Blended, PipelineWarmup
 {
     private PbrPipelines pipelines;
     private LogicalDevice device;
@@ -122,7 +122,7 @@ final class GodotScene : DrawableByVulkan, Blended
     private GodotSkin[] skins;
 
     package(pukan) this(
-        ref PbrPipelines pipelines,
+        PbrPipelines pipelines,
         LogicalDevice device,
         MaterialBuffer materialBuffer,
         GodotNode root,
@@ -429,43 +429,79 @@ final class GodotScene : DrawableByVulkan, Blended
         return !blended && !ownPass;
     }
 
-    private GraphicsPipelineCfg selectPipeline(const PbrMesh mesh, DrawPhase phase)
+    private LazyPipeline* selectPipelineSlot(
+        const PbrMesh mesh,
+        DrawPhase phase,
+        LightingMode mode = lightingMode,
+        bool oit = oitPass,
+    )
     {
         if(phase == DrawPhase.shadow)
             return mesh.alphaMode == AlphaMode.mask
-                ? (mesh.hasSkin ? pipelines.skinnedMaskShadow : pipelines.unskinnedMaskShadow)
-                : (mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow);
+                ? (mesh.hasSkin ? &pipelines.skinnedMaskShadow : &pipelines.unskinnedMaskShadow)
+                : (mesh.hasSkin ? &pipelines.skinnedShadow : &pipelines.unskinnedShadow);
 
-        auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
+        auto modes = mesh.hasSkin ? &pipelines.skinned : &pipelines.unskinned;
 
         if(plainShading)
-            return mesh.doubleSided ? modes.lit.doubleSided : modes.lit.opaque;
+            return mesh.doubleSided ? &modes.lit.doubleSided : &modes.lit.opaque;
 
-        if(mesh.material.mode == MaterialMode.unlit || lightingMode == LightingMode.unlit)
-            return selectVariant(modes.unlit, mesh);
+        if(mesh.material.mode == MaterialMode.unlit || mode == LightingMode.unlit)
+            return selectVariantSlot(modes.unlit, mesh, oit);
 
         if(mesh.material.mode == MaterialMode.lit)
-            return selectVariant(modes.lit, mesh);
+            return selectVariantSlot(modes.lit, mesh, oit);
 
-        auto pbr = mesh.material.needsExtendedShading ? modes.pbr : modes.pbrCore;
+        auto pbr = mesh.material.needsExtendedShading ? &modes.pbr : &modes.pbrCore;
 
-        auto variants = lightingMode == LightingMode.analytic ? pbr.analytic
-            : lightingMode == LightingMode.none ? pbr.none
-            : pbr.ibl;
+        auto variants = mode == LightingMode.analytic ? &pbr.analytic
+            : mode == LightingMode.none ? &pbr.none
+            : &pbr.ibl;
 
-        return selectVariant(variants, mesh);
+        return selectVariantSlot(*variants, mesh, oit);
     }
 
-    private static GraphicsPipelineCfg selectVariant(PbrPipelineVariants variants, const PbrMesh mesh)
+    private static LazyPipeline* selectVariantSlot(ref PbrPipelineVariants variants, const PbrMesh mesh, bool oit)
     {
         if(mesh.alphaMode == AlphaMode.blend)
         {
-            if(oitPass)
-                return mesh.doubleSided ? variants.doubleSidedOit : variants.oit;
+            if(oit)
+                return mesh.doubleSided ? &variants.doubleSidedOit : &variants.oit;
 
-            return mesh.doubleSided ? variants.doubleSidedBlend : variants.blend;
+            return mesh.doubleSided ? &variants.doubleSidedBlend : &variants.blend;
         }
 
-        return mesh.doubleSided ? variants.doubleSided : variants.opaque;
+        return mesh.doubleSided ? &variants.doubleSided : &variants.opaque;
+    }
+
+    private GraphicsPipelineCfg selectPipeline(const PbrMesh mesh, DrawPhase phase)
+    {
+        return selectPipelineSlot(mesh, phase).get();
+    }
+
+    void warmPipelines(bool shadows)
+    {
+        foreach(mesh; meshes)
+        {
+            foreach(mode; [LightingMode.ibl, LightingMode.analytic, LightingMode.none, LightingMode.unlit])
+                foreach(oit; [true, false])
+                {
+                    if(matchesPhase(mesh, DrawPhase.surface))
+                        selectPipelineSlot(mesh, DrawPhase.surface, mode, oit).request();
+
+                    if(matchesPhase(mesh, DrawPhase.transmission))
+                        selectPipelineSlot(mesh, DrawPhase.transmission, mode, oit).request();
+
+                    if(matchesPhase(mesh, DrawPhase.blended))
+                        selectPipelineSlot(mesh, DrawPhase.blended, mode, oit).request();
+                }
+
+            if(shadows && matchesPhase(mesh, DrawPhase.shadow))
+                selectPipelineSlot(mesh, DrawPhase.shadow).request();
+        }
+
+        foreach(instance; instances)
+            if(auto warm = cast(PipelineWarmup) instance)
+                warm.warmPipelines(shadows);
     }
 }

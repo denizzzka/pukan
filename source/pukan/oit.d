@@ -82,13 +82,11 @@ final class OitResolve
         pass = new OitResolvePass(device, imageFormat);
 
         auto stages = [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("fullscreen_vert.spv"),
+            shaderStage!"fullscreen_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [],
             ),
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("oit_resolve_frag.spv"),
+            shaderStage!"oit_resolve_frag.spv"(
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 [],
                 VkPushConstantRange(
@@ -220,13 +218,11 @@ final class DepthResolve
         pass = new DepthResolvePass(device, VK_FORMAT_R32_SFLOAT);
 
         auto stages = [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("fullscreen_vert.spv"),
+            shaderStage!"fullscreen_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [],
             ),
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("depth_resolve_frag.spv"),
+            shaderStage!"depth_resolve_frag.spv"(
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 [],
             ),

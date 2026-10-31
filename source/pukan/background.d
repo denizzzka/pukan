@@ -5,6 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: DefaultRenderPass;
+import pukan.vulkan.shaders: shaderStage;
 
 /// What the render pass clears to before the scene draws
 enum BackgroundMode: uint
@@ -30,13 +31,11 @@ class Background
         const technique = pipelines.declare(RenderTechnique(
             name: "background",
             stages: [
-                device.uploadShaderToGPU(
-                    cast(ubyte[]) import("checkerboard_vert.spv"),
+                shaderStage!"checkerboard_vert.spv"(
                     VK_SHADER_STAGE_VERTEX_BIT,
                     null,
                 ),
-                device.uploadShaderToGPU(
-                    cast(ubyte[]) import("checkerboard_frag.spv"),
+                shaderStage!"checkerboard_frag.spv"(
                     VK_SHADER_STAGE_FRAGMENT_BIT,
                     null,
                     VkPushConstantRange(

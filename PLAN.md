@@ -924,12 +924,103 @@ opposite. The scene should be able to name the shaders and pipeline variants it
 will use before the first frame, so a loader can warm them while the scene loads
 and no first draw stalls on a compile.
 
-- [ ] A scene query that collects the shader and pipeline variants the loaded
-      materials, lighting modes and passes need, without creating them.
-- [ ] Preload the reported set on a worker and make the first use wait on a
-      fence instead of compiling inside the frame.
-- [ ] Keep the on-demand path as a fallback for materials that appear after the
-      query.
+Current state: `PbrFactory` used to create 192 material pipelines and 6 shadow
+pipelines in its constructor, before a scene was loaded, and turn every embedded
+`.spv` into a `VkShaderModule` there too. It now declares the techniques and
+builds a variant on first use or on a preload request; only the variants the
+loaded scene can select are built. `PipelineCacheStore` decides whether a
+variant is compiled or taken from a stored `VkPipelineCache` blob, but it cannot
+replace the SPIR-V: `vkCreateGraphicsPipelines` still needs the shader module
+and the full create info on a hit.
+
+- [x] Make `PbrFactory` declare techniques without creating pipelines or shader
+      modules. It used to store `GraphicsPipelineCfg` values, so declaration
+      and creation were the same step.
+- [x] Collect the variants a loaded scene needs, without creating them.
+- [x] Warm the reported set on a worker and let the first use wait on a
+      condition instead of compiling inside the frame. `VkFence` does not
+      apply: pipeline creation is host-synchronous.
+- [x] Keep on-demand creation as the fallback for variants that appear after
+      the query.
+- [x] Keep the shader source loading through `import` for now. File loading is
+      a separate item below and must be done before shipping third-party
+      shaders.
+
+### Declaration site
+
+- [x] Replace `cast(ubyte[]) import("x.spv")` at the call sites with a
+      `ShaderDecl` inside `RenderTechnique.stages`, so the shader file name sits
+      next to its bindings:
+      `shaderStage!"x.spv"(stage, bindings, pushConstant, vertexInput)`.
+- [x] `ShaderDecl` holds the file name, stage, layout bindings, push constant
+      range, vertex input and, while `import` is the source, the embedded bytes.
+      `PipelineFactory.createPipeline` resolves each declaration to a
+      `ShaderInfo`, so no other place repeats the name.
+- [ ] Under `PukanEmbedShaders` the bytes stay in the binary; when file loading
+      lands, the same declaration reads them from a `ShaderSource` instead.
+
+### Lazy pipelines
+
+- [x] `PbrPipelines` used to be stored by value in every `GlTF`; it is now a
+      shared object, so a warmed set is shared between instances.
+- [x] Register render targets under the factory mutex, so `request` and the
+      worker never mutate the target list concurrently.
+- [x] `selectPipeline` caches the shared `GraphicsPipelineCfg` in `LazyPipeline`;
+      after the first resolve every draw is a plain read.
+
+### Runtime shader loading
+
+Deferred, but required before third-party shaders can be shipped: embedding
+every blob in the binary is wrong when each is used once per process, and
+`import` cannot cover shaders the library does not know at its own build time.
+
+- [ ] Load SPIR-V from the shader directory at runtime and keep it out of the
+      binary by default. Keep `import` as an opt-in build,
+      `-version=PukanEmbedShaders`, for self-contained binaries.
+- [ ] Add a `ShaderSource` interface with `FileShaderSource` (a list of search
+      roots) as the default; a pack or memory source can implement it.
+- [ ] Add `uploadShader(string path, ...)` for runtime names and keep
+      `uploadShaderToGPU(bytes, ...)` for callers that already hold SPIR-V.
+- [ ] Add `shaderBinary(string name)()` to `vulkan/shaders.d`: under
+      `PukanEmbedShaders` return `import(name)`, otherwise read the file once
+      and cache the bytes.
+- [ ] Search roots: an explicit absolute path first, then user roots added with
+      `addShaderDirectory`, then `PUKAN_SHADER_DIR`, `<exe dir>/compiled_shaders`
+      and `<cwd>/compiled_shaders`. The error lists every path tried.
+- [ ] Cache `VkShaderModule` in `loadedShaders` by name and stage, so a second
+      request neither reads the file nor creates the module again.
+- [ ] Deploy `compiled_shaders/` with the application. The demos run from the
+      repository root; an installed app copies the directory next to its
+      binary.
+- [ ] Do not store `.spv` files in the pipeline cache directory: `trim()`
+      evicts records by LRU and the store is tied to `pipelineCacheUUID`.
+
+### Shader set and third-party shaders
+
+- [ ] `Shader!"name"` is a compile-time entity, like `Requirement`: it carries
+      `shaderName` and, under `PukanEmbedShaders`, `static immutable ubyte[]
+      bytes = import(name)`. The `import` happens in the module that declares
+      the entity, so a user module embeds its own shaders at application build
+      time, not at library build time.
+- [ ] Each entity that owns shaders declares `alias shaders = AliasSeq!(...)`,
+      the same way it declares `alias requirements`. `Shaders!(Modules...)`
+      unions those aliases with `NoDuplicates`, like `Requirements!(Modules...)`.
+      Reuse only the union helper, not the device requirement pipeline.
+- [ ] The application writes `alias appShaders = Shaders!(Scene, MyEffects)` and
+      installs it before `new Scene`: `device.installShaders!appShaders`.
+      `installShaders` fills a `name -> bytes` registry; the resolver looks
+      there first and falls back to the file source.
+- [ ] A library user can load their own SPIR-V by path or from memory and
+      declare a `RenderTechnique` with it. `uploadShaderToGPU` already takes
+      bytes; add `uploadShader(path, ...)` and a `ShaderSource` for packs.
+- [ ] Include a digest of each stage's SPIR-V in `PipelineVariantKey`. User
+      techniques can share a name, state and bindings while using different
+      shaders, and the store must not let their records overwrite each other.
+- [ ] Keep `ShaderSource` alive for the lifetime of the device; it owns the
+      search roots and any pack handles.
+- [ ] Use `VK_EXT_pipeline_creation_cache_control` with
+      `VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT` in the
+      preloader to tell a cache hit from a compile without paying for it.
 
 ## Build-time feature selection
 

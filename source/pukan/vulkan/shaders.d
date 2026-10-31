@@ -28,7 +28,7 @@ package mixin template Shaders()
     private ShaderInfo[ShaderKey] loadedShaders;
 
     ShaderInfo uploadShaderToGPU(
-        ubyte[] sprivBinary,
+        const(ubyte)[] sprivBinary,
         VkShaderStageFlagBits stage,
         VkDescriptorSetLayoutBinding[] layoutBindings,
         VkPushConstantRange pushConstant = VkPushConstantRange.init,
@@ -61,7 +61,7 @@ package mixin template Shaders()
             VkShaderModuleCreateInfo cinf = {
                 sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 codeSize: sprivBinary.length,
-                pCode: cast(uint*) sprivBinary.ptr,
+                pCode: cast(const uint*) sprivBinary.ptr,
             };
 
             ShaderInfo add;
@@ -75,6 +75,18 @@ package mixin template Shaders()
 
             return add;
         }
+    }
+
+    /// Creates the module of a declared stage, sharing it with every other user
+    ShaderInfo uploadShaderDecl(ShaderDecl decl)
+    {
+        return uploadShaderToGPU(
+            decl.binary,
+            decl.stage,
+            decl.layoutBindings,
+            decl.pushConstantRange,
+            decl.vertexInput,
+        );
     }
 
     //TODO: remove?
@@ -135,7 +147,40 @@ struct ShaderInfo
     }
 }
 
-VkDescriptorSetLayoutBinding[] createLayoutBinding(ShaderInfo[] shaders)
+/**
+    Declares a pipeline stage without creating its `VkShaderModule`.
+
+    The file name stays next to the stage bindings. The SPIR-V is still
+    embedded with `import`; file loading replaces `binary` later.
+*/
+struct ShaderDecl
+{
+    string file;
+    VkShaderStageFlagBits stage;
+    VkDescriptorSetLayoutBinding[] layoutBindings;
+    VkPushConstantRange pushConstantRange;
+    ShaderVertexInput vertexInput;
+    const(ubyte)[] binary;
+}
+
+ShaderDecl shaderStage(string name)(
+    VkShaderStageFlagBits stage,
+    VkDescriptorSetLayoutBinding[] layoutBindings,
+    VkPushConstantRange pushConstant = VkPushConstantRange.init,
+    ShaderVertexInput vertexInput = ShaderVertexInput.init,
+)
+{
+    return ShaderDecl(
+        file: name,
+        stage: stage,
+        layoutBindings: layoutBindings,
+        pushConstantRange: pushConstant,
+        vertexInput: vertexInput,
+        binary: cast(const ubyte[]) import(name),
+    );
+}
+
+VkDescriptorSetLayoutBinding[] createLayoutBinding(ShaderDecl[] shaders)
 {
     VkDescriptorSetLayoutBinding[] ret;
 

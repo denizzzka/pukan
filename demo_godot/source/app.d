@@ -298,6 +298,7 @@ void main(string[] args)
 
     scene.sunShadow.enabled = !noShadows;
     scene.sunShadow.cache = true;
+    scene.godotFactory.preloadShadows = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
         scenePath = "demo_godot/godot_samples/generated/procedural.tscn";

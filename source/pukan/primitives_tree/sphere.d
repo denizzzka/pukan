@@ -330,7 +330,7 @@ class SphereRenderer : DrawablePrimitive
 
         const technique = pipelines.declare(RenderTechnique(
             name: "spheres",
-            stages: shaderStages(device),
+            stages: shaderStages(),
         ), 1);
 
         auto allocator = pipelines.descriptorAllocator(technique);
@@ -346,11 +346,10 @@ class SphereRenderer : DrawablePrimitive
         generator = new IcosphereGenerator(device, lod.maxLevel);
     }
 
-    private static ShaderInfo[] shaderStages(LogicalDevice device)
+    private static ShaderDecl[] shaderStages()
     {
         return [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("sphere_vert.spv"),
+            shaderStage!"sphere_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -367,8 +366,7 @@ class SphereRenderer : DrawablePrimitive
                 ),
                 vertexInput(),
             ),
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("sphere_frag.spv"),
+            shaderStage!"sphere_frag.spv"(
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 [
                     VkDescriptorSetLayoutBinding(

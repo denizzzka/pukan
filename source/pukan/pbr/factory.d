@@ -2,7 +2,7 @@ module pukan.pbr.factory;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import material_bindings;
-import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines;
+import pukan.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines;
 import pukan.pbr.mesh: staticInstanceBinding;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
@@ -240,8 +240,11 @@ class PbrFactory
         this.pipelines = pipelines;
         this.resources = resources;
 
-        auto skinnedPbr = shaderStages!"mesh_pbr_frag.spv"(device);
-        auto staticPbr = staticShaderStages!"mesh_pbr_frag.spv"(device);
+        pipelineCfgs = new PbrPipelines;
+        godotPipelines = new PbrPipelines;
+
+        auto skinnedPbr = shaderStages!"mesh_pbr_frag.spv"();
+        auto staticPbr = staticShaderStages!"mesh_pbr_frag.spv"();
 
         // A descriptor allocator needs a technique, but none of its pipelines.
         technique = pipelines.declare(RenderTechnique(
@@ -249,44 +252,44 @@ class PbrFactory
             stages: skinnedPbr,
         ), 20);
 
-        pipelineCfgs.skinned.pbr.ibl = createVariants("PBR", skinnedPbr, shaderStages!"mesh_pbr_frag_oit.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbr.analytic = createVariants("PBR analytic sky", shaderStages!"mesh_pbr_frag_analytic.spv"(device), shaderStages!"mesh_pbr_frag_oit_analytic.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbr.none = createVariants("PBR no sky", shaderStages!"mesh_pbr_frag_nosky.spv"(device), shaderStages!"mesh_pbr_frag_oit_nosky.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbrCore.ibl = createVariants("PBR core", shaderStages!"mesh_pbr_frag_core.spv"(device), shaderStages!"mesh_pbr_frag_core_oit.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbrCore.analytic = createVariants("PBR core analytic sky", shaderStages!"mesh_pbr_frag_core_analytic.spv"(device), shaderStages!"mesh_pbr_frag_core_oit_analytic.spv"(device), renderPass);
-        pipelineCfgs.skinned.pbrCore.none = createVariants("PBR core no sky", shaderStages!"mesh_pbr_frag_core_nosky.spv"(device), shaderStages!"mesh_pbr_frag_core_oit_nosky.spv"(device), renderPass);
-        pipelineCfgs.skinned.lit = createVariants("PBR lit", shaderStages!"mesh_pbr_frag_lit.spv"(device), shaderStages!"mesh_pbr_frag_lit_oit.spv"(device), renderPass);
-        pipelineCfgs.skinned.unlit = createVariants("PBR unlit", shaderStages!"mesh_pbr_frag_unlit.spv"(device), shaderStages!"mesh_pbr_frag_unlit_oit.spv"(device), renderPass);
+        pipelineCfgs.skinned.pbr.ibl = createVariants("PBR", skinnedPbr, shaderStages!"mesh_pbr_frag_oit.spv"(), renderPass);
+        pipelineCfgs.skinned.pbr.analytic = createVariants("PBR analytic sky", shaderStages!"mesh_pbr_frag_analytic.spv"(), shaderStages!"mesh_pbr_frag_oit_analytic.spv"(), renderPass);
+        pipelineCfgs.skinned.pbr.none = createVariants("PBR no sky", shaderStages!"mesh_pbr_frag_nosky.spv"(), shaderStages!"mesh_pbr_frag_oit_nosky.spv"(), renderPass);
+        pipelineCfgs.skinned.pbrCore.ibl = createVariants("PBR core", shaderStages!"mesh_pbr_frag_core.spv"(), shaderStages!"mesh_pbr_frag_core_oit.spv"(), renderPass);
+        pipelineCfgs.skinned.pbrCore.analytic = createVariants("PBR core analytic sky", shaderStages!"mesh_pbr_frag_core_analytic.spv"(), shaderStages!"mesh_pbr_frag_core_oit_analytic.spv"(), renderPass);
+        pipelineCfgs.skinned.pbrCore.none = createVariants("PBR core no sky", shaderStages!"mesh_pbr_frag_core_nosky.spv"(), shaderStages!"mesh_pbr_frag_core_oit_nosky.spv"(), renderPass);
+        pipelineCfgs.skinned.lit = createVariants("PBR lit", shaderStages!"mesh_pbr_frag_lit.spv"(), shaderStages!"mesh_pbr_frag_lit_oit.spv"(), renderPass);
+        pipelineCfgs.skinned.unlit = createVariants("PBR unlit", shaderStages!"mesh_pbr_frag_unlit.spv"(), shaderStages!"mesh_pbr_frag_unlit_oit.spv"(), renderPass);
 
-        pipelineCfgs.unskinned.pbr.ibl = createVariants("PBR static", staticPbr, staticShaderStages!"mesh_pbr_frag_oit.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbr.analytic = createVariants("PBR static analytic sky", staticShaderStages!"mesh_pbr_frag_analytic.spv"(device), staticShaderStages!"mesh_pbr_frag_oit_analytic.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbr.none = createVariants("PBR static no sky", staticShaderStages!"mesh_pbr_frag_nosky.spv"(device), staticShaderStages!"mesh_pbr_frag_oit_nosky.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbrCore.ibl = createVariants("PBR static core", staticShaderStages!"mesh_pbr_frag_core.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbrCore.analytic = createVariants("PBR static core analytic sky", staticShaderStages!"mesh_pbr_frag_core_analytic.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_analytic.spv"(device), renderPass);
-        pipelineCfgs.unskinned.pbrCore.none = createVariants("PBR static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_nosky.spv"(device), renderPass);
-        pipelineCfgs.unskinned.lit = createVariants("PBR static lit", staticShaderStages!"mesh_pbr_frag_lit.spv"(device), staticShaderStages!"mesh_pbr_frag_lit_oit.spv"(device), renderPass);
-        pipelineCfgs.unskinned.unlit = createVariants("PBR static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(device), staticShaderStages!"mesh_pbr_frag_unlit_oit.spv"(device), renderPass);
+        pipelineCfgs.unskinned.pbr.ibl = createVariants("PBR static", staticPbr, staticShaderStages!"mesh_pbr_frag_oit.spv"(), renderPass);
+        pipelineCfgs.unskinned.pbr.analytic = createVariants("PBR static analytic sky", staticShaderStages!"mesh_pbr_frag_analytic.spv"(), staticShaderStages!"mesh_pbr_frag_oit_analytic.spv"(), renderPass);
+        pipelineCfgs.unskinned.pbr.none = createVariants("PBR static no sky", staticShaderStages!"mesh_pbr_frag_nosky.spv"(), staticShaderStages!"mesh_pbr_frag_oit_nosky.spv"(), renderPass);
+        pipelineCfgs.unskinned.pbrCore.ibl = createVariants("PBR static core", staticShaderStages!"mesh_pbr_frag_core.spv"(), staticShaderStages!"mesh_pbr_frag_core_oit.spv"(), renderPass);
+        pipelineCfgs.unskinned.pbrCore.analytic = createVariants("PBR static core analytic sky", staticShaderStages!"mesh_pbr_frag_core_analytic.spv"(), staticShaderStages!"mesh_pbr_frag_core_oit_analytic.spv"(), renderPass);
+        pipelineCfgs.unskinned.pbrCore.none = createVariants("PBR static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky.spv"(), staticShaderStages!"mesh_pbr_frag_core_oit_nosky.spv"(), renderPass);
+        pipelineCfgs.unskinned.lit = createVariants("PBR static lit", staticShaderStages!"mesh_pbr_frag_lit.spv"(), staticShaderStages!"mesh_pbr_frag_lit_oit.spv"(), renderPass);
+        pipelineCfgs.unskinned.unlit = createVariants("PBR static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(), staticShaderStages!"mesh_pbr_frag_unlit_oit.spv"(), renderPass);
 
-        auto skinnedPbrGodot = shaderStages!"mesh_pbr_frag_godot.spv"(device);
-        auto staticPbrGodot = staticShaderStages!"mesh_pbr_frag_godot.spv"(device);
+        auto skinnedPbrGodot = shaderStages!"mesh_pbr_frag_godot.spv"();
+        auto staticPbrGodot = staticShaderStages!"mesh_pbr_frag_godot.spv"();
 
-        godotPipelines.skinned.pbr.ibl = createVariants("Godot", skinnedPbrGodot, shaderStages!"mesh_pbr_frag_oit_godot.spv"(device), renderPass);
-        godotPipelines.skinned.pbr.analytic = createVariants("Godot analytic sky", shaderStages!"mesh_pbr_frag_analytic_godot.spv"(device), shaderStages!"mesh_pbr_frag_oit_analytic_godot.spv"(device), renderPass);
-        godotPipelines.skinned.pbr.none = createVariants("Godot no sky", shaderStages!"mesh_pbr_frag_nosky_godot.spv"(device), shaderStages!"mesh_pbr_frag_oit_nosky_godot.spv"(device), renderPass);
-        godotPipelines.skinned.pbrCore.ibl = createVariants("Godot core", shaderStages!"mesh_pbr_frag_core_godot.spv"(device), shaderStages!"mesh_pbr_frag_core_oit_godot.spv"(device), renderPass);
-        godotPipelines.skinned.pbrCore.analytic = createVariants("Godot core analytic sky", shaderStages!"mesh_pbr_frag_core_analytic_godot.spv"(device), shaderStages!"mesh_pbr_frag_core_oit_analytic_godot.spv"(device), renderPass);
-        godotPipelines.skinned.pbrCore.none = createVariants("Godot core no sky", shaderStages!"mesh_pbr_frag_core_nosky_godot.spv"(device), shaderStages!"mesh_pbr_frag_core_oit_nosky_godot.spv"(device), renderPass);
-        godotPipelines.skinned.lit = createVariants("Godot lit", shaderStages!"mesh_pbr_frag_lit_godot.spv"(device), shaderStages!"mesh_pbr_frag_lit_oit_godot.spv"(device), renderPass);
-        godotPipelines.skinned.unlit = createVariants("Godot unlit", shaderStages!"mesh_pbr_frag_unlit_godot.spv"(device), shaderStages!"mesh_pbr_frag_unlit_oit_godot.spv"(device), renderPass);
+        godotPipelines.skinned.pbr.ibl = createVariants("Godot", skinnedPbrGodot, shaderStages!"mesh_pbr_frag_oit_godot.spv"(), renderPass);
+        godotPipelines.skinned.pbr.analytic = createVariants("Godot analytic sky", shaderStages!"mesh_pbr_frag_analytic_godot.spv"(), shaderStages!"mesh_pbr_frag_oit_analytic_godot.spv"(), renderPass);
+        godotPipelines.skinned.pbr.none = createVariants("Godot no sky", shaderStages!"mesh_pbr_frag_nosky_godot.spv"(), shaderStages!"mesh_pbr_frag_oit_nosky_godot.spv"(), renderPass);
+        godotPipelines.skinned.pbrCore.ibl = createVariants("Godot core", shaderStages!"mesh_pbr_frag_core_godot.spv"(), shaderStages!"mesh_pbr_frag_core_oit_godot.spv"(), renderPass);
+        godotPipelines.skinned.pbrCore.analytic = createVariants("Godot core analytic sky", shaderStages!"mesh_pbr_frag_core_analytic_godot.spv"(), shaderStages!"mesh_pbr_frag_core_oit_analytic_godot.spv"(), renderPass);
+        godotPipelines.skinned.pbrCore.none = createVariants("Godot core no sky", shaderStages!"mesh_pbr_frag_core_nosky_godot.spv"(), shaderStages!"mesh_pbr_frag_core_oit_nosky_godot.spv"(), renderPass);
+        godotPipelines.skinned.lit = createVariants("Godot lit", shaderStages!"mesh_pbr_frag_lit_godot.spv"(), shaderStages!"mesh_pbr_frag_lit_oit_godot.spv"(), renderPass);
+        godotPipelines.skinned.unlit = createVariants("Godot unlit", shaderStages!"mesh_pbr_frag_unlit_godot.spv"(), shaderStages!"mesh_pbr_frag_unlit_oit_godot.spv"(), renderPass);
 
-        godotPipelines.unskinned.pbr.ibl = createVariants("Godot static", staticPbrGodot, staticShaderStages!"mesh_pbr_frag_oit_godot.spv"(device), renderPass);
-        godotPipelines.unskinned.pbr.analytic = createVariants("Godot static analytic sky", staticShaderStages!"mesh_pbr_frag_analytic_godot.spv"(device), staticShaderStages!"mesh_pbr_frag_oit_analytic_godot.spv"(device), renderPass);
-        godotPipelines.unskinned.pbr.none = createVariants("Godot static no sky", staticShaderStages!"mesh_pbr_frag_nosky_godot.spv"(device), staticShaderStages!"mesh_pbr_frag_oit_nosky_godot.spv"(device), renderPass);
-        godotPipelines.unskinned.pbrCore.ibl = createVariants("Godot static core", staticShaderStages!"mesh_pbr_frag_core_godot.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_godot.spv"(device), renderPass);
-        godotPipelines.unskinned.pbrCore.analytic = createVariants("Godot static core analytic sky", staticShaderStages!"mesh_pbr_frag_core_analytic_godot.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_analytic_godot.spv"(device), renderPass);
-        godotPipelines.unskinned.pbrCore.none = createVariants("Godot static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky_godot.spv"(device), staticShaderStages!"mesh_pbr_frag_core_oit_nosky_godot.spv"(device), renderPass);
-        godotPipelines.unskinned.lit = createVariants("Godot static lit", staticShaderStages!"mesh_pbr_frag_lit_godot.spv"(device), staticShaderStages!"mesh_pbr_frag_lit_oit_godot.spv"(device), renderPass);
-        godotPipelines.unskinned.unlit = createVariants("Godot static unlit", staticShaderStages!"mesh_pbr_frag_unlit_godot.spv"(device), staticShaderStages!"mesh_pbr_frag_unlit_oit_godot.spv"(device), renderPass);
+        godotPipelines.unskinned.pbr.ibl = createVariants("Godot static", staticPbrGodot, staticShaderStages!"mesh_pbr_frag_oit_godot.spv"(), renderPass);
+        godotPipelines.unskinned.pbr.analytic = createVariants("Godot static analytic sky", staticShaderStages!"mesh_pbr_frag_analytic_godot.spv"(), staticShaderStages!"mesh_pbr_frag_oit_analytic_godot.spv"(), renderPass);
+        godotPipelines.unskinned.pbr.none = createVariants("Godot static no sky", staticShaderStages!"mesh_pbr_frag_nosky_godot.spv"(), staticShaderStages!"mesh_pbr_frag_oit_nosky_godot.spv"(), renderPass);
+        godotPipelines.unskinned.pbrCore.ibl = createVariants("Godot static core", staticShaderStages!"mesh_pbr_frag_core_godot.spv"(), staticShaderStages!"mesh_pbr_frag_core_oit_godot.spv"(), renderPass);
+        godotPipelines.unskinned.pbrCore.analytic = createVariants("Godot static core analytic sky", staticShaderStages!"mesh_pbr_frag_core_analytic_godot.spv"(), staticShaderStages!"mesh_pbr_frag_core_oit_analytic_godot.spv"(), renderPass);
+        godotPipelines.unskinned.pbrCore.none = createVariants("Godot static core no sky", staticShaderStages!"mesh_pbr_frag_core_nosky_godot.spv"(), staticShaderStages!"mesh_pbr_frag_core_oit_nosky_godot.spv"(), renderPass);
+        godotPipelines.unskinned.lit = createVariants("Godot static lit", staticShaderStages!"mesh_pbr_frag_lit_godot.spv"(), staticShaderStages!"mesh_pbr_frag_lit_oit_godot.spv"(), renderPass);
+        godotPipelines.unskinned.unlit = createVariants("Godot static unlit", staticShaderStages!"mesh_pbr_frag_unlit_godot.spv"(), staticShaderStages!"mesh_pbr_frag_unlit_oit_godot.spv"(), renderPass);
 
         {
             const shadowState = FixedState(
@@ -304,58 +307,57 @@ class PbrFactory
 
             const skinnedShadow = pipelines.declare(RenderTechnique(
                 name: "PBR shadow",
-                stages: shadowShaderStages!"mesh_shadow_frag.spv"(device),
+                stages: shadowShaderStages!"mesh_shadow_frag.spv"(),
                 state: shadowState,
                 dynamicStates: dynamicStates,
             ), 20);
             const unskinnedShadow = pipelines.declare(RenderTechnique(
                 name: "PBR static shadow",
-                stages: staticShadowShaderStages!"mesh_shadow_frag.spv"(device),
+                stages: staticShadowShaderStages!"mesh_shadow_frag.spv"(),
                 state: shadowState,
                 dynamicStates: dynamicStates,
             ), 20);
             const skinnedMaskShadow = pipelines.declare(RenderTechnique(
                 name: "PBR mask shadow",
-                stages: shadowShaderStages!"mesh_shadow_mask_frag.spv"(device),
+                stages: shadowShaderStages!"mesh_shadow_mask_frag.spv"(),
                 state: maskShadowState,
                 dynamicStates: dynamicStates,
             ), 20);
             const unskinnedMaskShadow = pipelines.declare(RenderTechnique(
                 name: "PBR static mask shadow",
-                stages: staticShadowShaderStages!"mesh_shadow_mask_frag.spv"(device),
+                stages: staticShadowShaderStages!"mesh_shadow_mask_frag.spv"(),
                 state: maskShadowState,
                 dynamicStates: dynamicStates,
             ), 20);
             const godotSkinnedMaskShadow = pipelines.declare(RenderTechnique(
                 name: "Godot mask shadow",
-                stages: shadowShaderStages!"mesh_shadow_mask_frag_godot.spv"(device),
+                stages: shadowShaderStages!"mesh_shadow_mask_frag_godot.spv"(),
                 state: maskShadowState,
                 dynamicStates: dynamicStates,
             ), 20);
             const godotUnskinnedMaskShadow = pipelines.declare(RenderTechnique(
                 name: "Godot static mask shadow",
-                stages: staticShadowShaderStages!"mesh_shadow_mask_frag_godot.spv"(device),
+                stages: staticShadowShaderStages!"mesh_shadow_mask_frag_godot.spv"(),
                 state: maskShadowState,
                 dynamicStates: dynamicStates,
             ), 20);
 
-            pipelineCfgs.skinnedShadow = pipelines.acquire(skinnedShadow, shadowPass, 0);
-            pipelineCfgs.unskinnedShadow = pipelines.acquire(unskinnedShadow, shadowPass, 0);
-            pipelineCfgs.skinnedMaskShadow = pipelines.acquire(skinnedMaskShadow, shadowPass, 0);
-            pipelineCfgs.unskinnedMaskShadow = pipelines.acquire(unskinnedMaskShadow, shadowPass, 0);
+            pipelineCfgs.skinnedShadow = LazyPipeline(pipelines, skinnedShadow, shadowPass, 0);
+            pipelineCfgs.unskinnedShadow = LazyPipeline(pipelines, unskinnedShadow, shadowPass, 0);
+            pipelineCfgs.skinnedMaskShadow = LazyPipeline(pipelines, skinnedMaskShadow, shadowPass, 0);
+            pipelineCfgs.unskinnedMaskShadow = LazyPipeline(pipelines, unskinnedMaskShadow, shadowPass, 0);
 
             godotPipelines.skinnedShadow = pipelineCfgs.skinnedShadow;
             godotPipelines.unskinnedShadow = pipelineCfgs.unskinnedShadow;
-            godotPipelines.skinnedMaskShadow = pipelines.acquire(godotSkinnedMaskShadow, shadowPass, 0);
-            godotPipelines.unskinnedMaskShadow = pipelines.acquire(godotUnskinnedMaskShadow, shadowPass, 0);
+            godotPipelines.skinnedMaskShadow = LazyPipeline(pipelines, godotSkinnedMaskShadow, shadowPass, 0);
+            godotPipelines.unskinnedMaskShadow = LazyPipeline(pipelines, godotUnskinnedMaskShadow, shadowPass, 0);
         }
     }
 
-    private static ShaderInfo[] shadowShaderStages(string fragmentSpv)(LogicalDevice device)
+    private static ShaderDecl[] shadowShaderStages(string fragmentSpv)()
     {
         return [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("mesh_pbr_shadow_vert.spv"),
+            shaderStage!"mesh_pbr_shadow_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -372,15 +374,14 @@ class PbrFactory
                 ),
                 vertexInput(),
             ),
-            fragmentStage!fragmentSpv(device),
+            fragmentStage!fragmentSpv(),
         ];
     }
 
-    private static ShaderInfo[] staticShadowShaderStages(string fragmentSpv)(LogicalDevice device)
+    private static ShaderDecl[] staticShadowShaderStages(string fragmentSpv)()
     {
         return [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("mesh_pbr_static_shadow_vert.spv"),
+            shaderStage!"mesh_pbr_static_shadow_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -392,15 +393,15 @@ class PbrFactory
                 ],
                 vertexInput: staticVertexInput(),
             ),
-            fragmentStage!fragmentSpv(device),
+            fragmentStage!fragmentSpv(),
         ];
     }
 
-    private PbrPipelineVariants createVariants(string prefix, ShaderInfo[] stages, ShaderInfo[] oitStages, RenderPass renderPass)
+    private PbrPipelineVariants createVariants(string prefix, ShaderDecl[] stages, ShaderDecl[] oitStages, RenderPass renderPass)
     {
         VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE];
 
-        TechniqueId declare(string suffix, ShaderInfo[] techniqueStages, FixedState state)
+        TechniqueId declare(string suffix, ShaderDecl[] techniqueStages, FixedState state)
         {
             return pipelines.declare(RenderTechnique(
                 name: prefix ~ suffix,
@@ -443,21 +444,20 @@ class PbrFactory
         ));
 
         PbrPipelineVariants result;
-        result.opaque = pipelines.acquire(opaque, renderPass, 1);
-        result.doubleSided = pipelines.acquire(doubleSided, renderPass, 1);
-        result.blend = pipelines.acquire(blend, renderPass, 1);
-        result.doubleSidedBlend = pipelines.acquire(doubleSidedBlend, renderPass, 1);
-        result.oit = pipelines.acquire(oit, renderPass, 1);
-        result.doubleSidedOit = pipelines.acquire(doubleSidedOit, renderPass, 1);
+        result.opaque = LazyPipeline(pipelines, opaque, renderPass, 1);
+        result.doubleSided = LazyPipeline(pipelines, doubleSided, renderPass, 1);
+        result.blend = LazyPipeline(pipelines, blend, renderPass, 1);
+        result.doubleSidedBlend = LazyPipeline(pipelines, doubleSidedBlend, renderPass, 1);
+        result.oit = LazyPipeline(pipelines, oit, renderPass, 1);
+        result.doubleSidedOit = LazyPipeline(pipelines, doubleSidedOit, renderPass, 1);
 
         return result;
     }
 
-    private static ShaderInfo[] shaderStages(string fragmentSpv)(LogicalDevice device)
+    private static ShaderDecl[] shaderStages(string fragmentSpv)()
     {
         return [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("mesh_pbr_vert.spv"),
+            shaderStage!"mesh_pbr_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -474,15 +474,14 @@ class PbrFactory
                 ),
                 vertexInput(),
             ),
-            fragmentStage!fragmentSpv(device),
+            fragmentStage!fragmentSpv(),
         ];
     }
 
-    private static ShaderInfo[] staticShaderStages(string fragmentSpv)(LogicalDevice device)
+    private static ShaderDecl[] staticShaderStages(string fragmentSpv)()
     {
         return [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("mesh_pbr_static_vert.spv"),
+            shaderStage!"mesh_pbr_static_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 [
                     VkDescriptorSetLayoutBinding(
@@ -494,14 +493,13 @@ class PbrFactory
                 ],
                 vertexInput: staticVertexInput(),
             ),
-            fragmentStage!fragmentSpv(device),
+            fragmentStage!fragmentSpv(),
         ];
     }
 
-    private static ShaderInfo fragmentStage(string fragmentSpv)(LogicalDevice device)
+    private static ShaderDecl fragmentStage(string fragmentSpv)()
     {
-        return device.uploadShaderToGPU(
-            cast(ubyte[]) import(fragmentSpv),
+        return shaderStage!fragmentSpv(
             VK_SHADER_STAGE_FRAGMENT_BIT,
             fragmentBindings(),
         );

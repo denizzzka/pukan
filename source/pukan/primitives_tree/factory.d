@@ -26,7 +26,7 @@ struct PrimitivesFactory(T)
 
         const technique = pipelines.declare(RenderTechnique(
             name: T.techniqueName(),
-            stages: T.shaderStages(device),
+            stages: T.shaderStages(),
             dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE],
         ), 10);
 

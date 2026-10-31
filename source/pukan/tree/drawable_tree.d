@@ -7,9 +7,9 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.primitives_tree: Bone;
-import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase;
+import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase, PipelineWarmup;
 
-class DrawableTree(Payload) : DrawableByVulkan
+class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
 {
     static class Node : BaseNode
     {
@@ -56,6 +56,14 @@ class DrawableTree(Payload) : DrawableByVulkan
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         forEachDrawablePayload((d) => d.uploadToGPUImmediate(device, commandPool, commandBuffer));
+    }
+
+    void warmPipelines(bool shadows)
+    {
+        forEachDrawablePayload((d) {
+            if(auto warm = cast(PipelineWarmup) d)
+                warm.warmPipelines(shadows);
+        });
     }
 
     void refreshBuffers(VkCommandBuffer buf)

@@ -90,7 +90,7 @@ class LineRenderer : DrawablePrimitive
 
         const technique = pipelines.declare(RenderTechnique(
             name: overlay ? "lines overlay" : "lines",
-            stages: shaderStages(device),
+            stages: shaderStages(),
             state: FixedState(
                 topology: VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
                 cullMode: VK_CULL_MODE_NONE,
@@ -141,11 +141,10 @@ class LineRenderer : DrawablePrimitive
         dst[0 .. lines.length] = lines;
     }
 
-    private static ShaderInfo[] shaderStages(LogicalDevice device)
+    private static ShaderDecl[] shaderStages()
     {
         return [
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("line_vert.spv"),
+            shaderStage!"line_vert.spv"(
                 VK_SHADER_STAGE_VERTEX_BIT,
                 null,
                 VkPushConstantRange(
@@ -155,8 +154,7 @@ class LineRenderer : DrawablePrimitive
                 ),
                 vertexInput(),
             ),
-            device.uploadShaderToGPU(
-                cast(ubyte[]) import("line_frag.spv"),
+            shaderStage!"line_frag.spv"(
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 null,
             ),

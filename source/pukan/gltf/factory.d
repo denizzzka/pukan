@@ -33,6 +33,8 @@ class GltfFactory
     private immutable bool computeJointsOnGPU;
     private GltfAsset[string] assetCache;
     GltfLoadOptions loadOptions;
+    /// Whether loading also queues the shadow variants
+    bool preloadShadows = true;
 
     this(PbrFactory pbr, bool computeJointsOnGPU = true)
     {
@@ -66,7 +68,7 @@ class GltfFactory
 
         auto allocator = pbr.createAllocator();
 
-        return createGltfInstance(
+        auto instance = createGltfInstance(
             asset,
             allocator,
             pbr.resources.materials,
@@ -77,6 +79,10 @@ class GltfFactory
             computeJointsOnGPU,
             loadOptions,
         );
+
+        instance.warmPipelines(preloadShadows);
+
+        return instance;
     }
 
     /// Number of parsed glTF files currently shared by instances

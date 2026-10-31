@@ -341,3 +341,10 @@ interface Blended
 {
     bool isBlended() const;
 }
+
+/// Drawables that can queue the pipeline variants they can select, without
+/// creating them, before the frame
+interface PipelineWarmup
+{
+    void warmPipelines(bool shadows);
+}
