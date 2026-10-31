@@ -269,8 +269,15 @@ final class DescriptorAllocator
 /// Writes cache blobs on one background thread, never inside the frame
 private final class PipelineCacheWriter
 {
+    private enum JobKind
+    {
+        trim,
+        save,
+    }
+
     private struct Job
     {
+        JobKind kind;
         PipelineVariantKey identity;
         ubyte[] payload;
     }
@@ -306,7 +313,16 @@ private final class PipelineCacheWriter
     void put(PipelineVariantKey identity, ubyte[] payload)
     {
         mutex.lock();
-        jobs ~= Job(identity, payload);
+        jobs ~= Job(JobKind.save, identity, payload);
+        condition.notify();
+        mutex.unlock();
+    }
+
+    /// Drops the least recently used records before any save of this run
+    void trim()
+    {
+        mutex.lock();
+        jobs ~= Job(JobKind.trim);
         condition.notify();
         mutex.unlock();
     }
@@ -333,9 +349,17 @@ private final class PipelineCacheWriter
             mutex.unlock();
 
             try
-                store.save(job.identity, job.payload);
+            {
+                if(job.kind == JobKind.trim)
+                    store.trim();
+                else
+                    store.save(job.identity, job.payload);
+            }
             catch(Exception e)
-                Instance.log_info("pipeline cache: " ~ job.identity.toString() ~ " not saved: " ~ e.msg);
+                Instance.log_info(
+                    "pipeline cache: " ~
+                    (job.kind == JobKind.trim ? "trim" : job.identity.toString()) ~
+                    " failed: " ~ e.msg);
         }
     }
 }
@@ -354,7 +378,10 @@ final class PipelineCacheManager
         this.store = store;
 
         if(store)
+        {
             writer = new PipelineCacheWriter(store);
+            writer.trim();
+        }
     }
 
     ~this()

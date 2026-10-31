@@ -10,6 +10,10 @@ import std.uuid: UUID;
 /// Layout of the container around a driver pipeline cache blob
 enum pipelineCacheFormatVersion = 1;
 
+/// Default bounds for a file-backed cache directory
+enum defaultPipelineCacheMaxBytes = 64 * 1024 * 1024;
+enum defaultPipelineCacheMaxRecords = 4096;
+
 /// Identifies a pipeline variant by a digest of the state that defines it
 struct PipelineVariantKey
 {
@@ -166,6 +170,11 @@ abstract class PipelineCacheStore
     /// Variants the store holds, for progress reporting
     abstract PipelineVariantKey[] manifest() const;
 
+    /// Drops the least recently used records until the store fits its bounds
+    void trim()
+    {
+    }
+
     protected:
     /// Reads the whole record, null when there is none
     abstract ubyte[] readRecord(PipelineVariantKey identity);
@@ -185,13 +194,24 @@ abstract class PipelineCacheStore
 final class FilePipelineCacheStore: PipelineCacheStore
 {
     private string directory;
+    private size_t maxBytes;
+    private size_t maxRecords;
 
-    this(string directory, UUID pipelineCacheUUID)
+    this(
+        string directory,
+        UUID pipelineCacheUUID,
+        size_t maxBytes = defaultPipelineCacheMaxBytes,
+        size_t maxRecords = defaultPipelineCacheMaxRecords,
+    )
     in(directory.length > 0)
+    in(maxBytes > 0)
+    in(maxRecords > 0)
     {
         super(pipelineCacheUUID);
 
         this.directory = directory;
+        this.maxBytes = maxBytes;
+        this.maxRecords = maxRecords;
     }
 
     /// Per-user cache directory, null when the environment names none
@@ -247,17 +267,77 @@ final class FilePipelineCacheStore: PipelineCacheStore
         return keys;
     }
 
+    override void trim()
+    {
+        import std.algorithm: sort;
+        import std.datetime: SysTime;
+        import std.file: FileException, SpanMode, dirEntries, exists, getSize, isFile, remove, timeLastModified;
+
+        if(!directory.exists)
+            return;
+
+        struct Record
+        {
+            string path;
+            SysTime used;
+            size_t size;
+        }
+
+        Record[] records;
+
+        foreach(entry; directory.dirEntries(SpanMode.shallow))
+        {
+            if(!entry.isFile || entry.name.extension != ".pipelinecache")
+                continue;
+
+            try
+                records ~= Record(entry.name, entry.name.timeLastModified, entry.name.getSize);
+            catch(FileException)
+                continue;
+        }
+
+        // The oldest mtime goes first; every run rewrites the variants it uses
+        records.sort!((a, b) => a.used < b.used);
+
+        size_t totalBytes;
+        foreach(ref record; records)
+            totalBytes += record.size;
+
+        size_t evicted;
+        size_t remaining = records.length;
+
+        while(evicted < records.length && (totalBytes > maxBytes || remaining > maxRecords))
+        {
+            totalBytes -= records[evicted].size;
+            --remaining;
+            ++evicted;
+        }
+
+        foreach(ref record; records[0 .. evicted])
+        {
+            try
+                record.path.remove;
+            catch(FileException)
+            {
+            }
+        }
+    }
+
     protected:
     override ubyte[] readRecord(PipelineVariantKey identity)
     {
-        import std.file: exists, read;
+        import std.file: FileException, exists, read;
 
         const path = filePath(identity);
 
         if(!path.exists)
             return null;
 
-        return cast(ubyte[]) read(path);
+        // A sweep may remove a record between the check and the read
+        try
+            return cast(ubyte[]) read(path);
+        catch(FileException)
+            return null;
     }
 
     override void writeRecord(PipelineVariantKey identity, const(ubyte)[] record)

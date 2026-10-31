@@ -727,14 +727,15 @@ variant.
       class, bindings, push constant and specialization data, and
       `LogicalDevice.pipelineCacheManager` reaches `Gemm`, the sphere and
       cylinder generators and `SkinMatrices`.
-- [ ] Bound the cache growth. Every variant keeps its own record and nothing
+- [x] Bound the cache growth. Every variant keeps its own record and nothing
       removes old ones, so the directory only grows with the number of variants
-      and material sets. Cap the total size and the record count, and evict the
-      least recently used entries first: file mtimes already mark the last use,
-      so a sweep at startup on the worker can drop the oldest records without
-      an index. Never evict a record this run is about to write or has just
-      written, and make the manifest skip files the sweep removed.
-- [ ] Test the sweep with a small cap: a fixed scene fits, a cap below its size
+      and material sets. `FilePipelineCacheStore` takes a byte cap and a record
+      cap (64 MiB and 4096 by default) and evicts the least recently used
+      entries first: file mtimes mark the last use, so a sweep at startup on
+      the worker drops the oldest records without an index. The sweep runs
+      before this run's saves, and a read that races with it falls back to a
+      miss, so nothing written by the run is evicted.
+- [x] Test the sweep with a small cap: a fixed scene fits, a cap below its size
       evicts the oldest variants, and the next run recompiles only those
       instead of the whole set.
 
