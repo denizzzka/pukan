@@ -414,7 +414,8 @@ final class GodotScene : DrawableByVulkan, Blended
         const ownPass = transmissive && transmissionPass;
 
         if(phase == DrawPhase.shadow)
-            return mesh.castShadow && !blended && !transmissive && mesh.alphaMode == AlphaMode.opaque;
+            return mesh.castShadow && !blended && !transmissive &&
+                (mesh.alphaMode == AlphaMode.opaque || mesh.alphaMode == AlphaMode.mask);
 
         if(mesh.shadowsOnly)
             return false;
@@ -431,7 +432,9 @@ final class GodotScene : DrawableByVulkan, Blended
     private GraphicsPipelineCfg selectPipeline(const PbrMesh mesh, DrawPhase phase)
     {
         if(phase == DrawPhase.shadow)
-            return mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow;
+            return mesh.alphaMode == AlphaMode.mask
+                ? (mesh.hasSkin ? pipelines.skinnedMaskShadow : pipelines.unskinnedMaskShadow)
+                : (mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow);
 
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
 

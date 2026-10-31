@@ -57,4 +57,7 @@ struct PbrPipelines
     PbrModePipelines unskinned;
     GraphicsPipelineCfg skinnedShadow;
     GraphicsPipelineCfg unskinnedShadow;
+    /// Alpha-tested variants for masked cutouts
+    GraphicsPipelineCfg skinnedMaskShadow;
+    GraphicsPipelineCfg unskinnedMaskShadow;
 }

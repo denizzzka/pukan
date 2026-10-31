@@ -947,7 +947,8 @@ class GlTF : DrawableByVulkan, Blended
             return blended && !ownPass;
 
         if(phase == DrawPhase.shadow)
-            return !blended && !transmissive && mesh.alphaMode == AlphaMode.opaque;
+            return !blended && !transmissive &&
+                (mesh.alphaMode == AlphaMode.opaque || mesh.alphaMode == AlphaMode.mask);
 
         return !blended && !ownPass;
     }
@@ -956,7 +957,9 @@ class GlTF : DrawableByVulkan, Blended
     private GraphicsPipelineCfg selectPipeline(const MeshClass mesh, DrawPhase phase)
     {
         if(phase == DrawPhase.shadow)
-            return mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow;
+            return mesh.alphaMode == AlphaMode.mask
+                ? (mesh.hasSkin ? pipelines.skinnedMaskShadow : pipelines.unskinnedMaskShadow)
+                : (mesh.hasSkin ? pipelines.skinnedShadow : pipelines.unskinnedShadow);
 
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
 

@@ -296,31 +296,62 @@ class PbrFactory
                 depthBiasConstantFactor: 1.25f,
                 depthBiasSlopeFactor: 1.75f,
             );
+            // Cutouts are often two-sided cards, so both faces must cast
+            FixedState maskShadowState = shadowState;
+            maskShadowState.cullMode = VK_CULL_MODE_NONE;
 
             VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE];
 
             const skinnedShadow = pipelines.declare(RenderTechnique(
                 name: "PBR shadow",
-                stages: shadowShaderStages(device),
+                stages: shadowShaderStages!"mesh_shadow_frag.spv"(device),
                 state: shadowState,
                 dynamicStates: dynamicStates,
             ), 20);
             const unskinnedShadow = pipelines.declare(RenderTechnique(
                 name: "PBR static shadow",
-                stages: staticShadowShaderStages(device),
+                stages: staticShadowShaderStages!"mesh_shadow_frag.spv"(device),
                 state: shadowState,
+                dynamicStates: dynamicStates,
+            ), 20);
+            const skinnedMaskShadow = pipelines.declare(RenderTechnique(
+                name: "PBR mask shadow",
+                stages: shadowShaderStages!"mesh_shadow_mask_frag.spv"(device),
+                state: maskShadowState,
+                dynamicStates: dynamicStates,
+            ), 20);
+            const unskinnedMaskShadow = pipelines.declare(RenderTechnique(
+                name: "PBR static mask shadow",
+                stages: staticShadowShaderStages!"mesh_shadow_mask_frag.spv"(device),
+                state: maskShadowState,
+                dynamicStates: dynamicStates,
+            ), 20);
+            const godotSkinnedMaskShadow = pipelines.declare(RenderTechnique(
+                name: "Godot mask shadow",
+                stages: shadowShaderStages!"mesh_shadow_mask_frag_godot.spv"(device),
+                state: maskShadowState,
+                dynamicStates: dynamicStates,
+            ), 20);
+            const godotUnskinnedMaskShadow = pipelines.declare(RenderTechnique(
+                name: "Godot static mask shadow",
+                stages: staticShadowShaderStages!"mesh_shadow_mask_frag_godot.spv"(device),
+                state: maskShadowState,
                 dynamicStates: dynamicStates,
             ), 20);
 
             pipelineCfgs.skinnedShadow = pipelines.acquire(skinnedShadow, shadowPass, 0);
             pipelineCfgs.unskinnedShadow = pipelines.acquire(unskinnedShadow, shadowPass, 0);
+            pipelineCfgs.skinnedMaskShadow = pipelines.acquire(skinnedMaskShadow, shadowPass, 0);
+            pipelineCfgs.unskinnedMaskShadow = pipelines.acquire(unskinnedMaskShadow, shadowPass, 0);
 
             godotPipelines.skinnedShadow = pipelineCfgs.skinnedShadow;
             godotPipelines.unskinnedShadow = pipelineCfgs.unskinnedShadow;
+            godotPipelines.skinnedMaskShadow = pipelines.acquire(godotSkinnedMaskShadow, shadowPass, 0);
+            godotPipelines.unskinnedMaskShadow = pipelines.acquire(godotUnskinnedMaskShadow, shadowPass, 0);
         }
     }
 
-    private static ShaderInfo[] shadowShaderStages(LogicalDevice device)
+    private static ShaderInfo[] shadowShaderStages(string fragmentSpv)(LogicalDevice device)
     {
         return [
             device.uploadShaderToGPU(
@@ -341,11 +372,11 @@ class PbrFactory
                 ),
                 vertexInput(),
             ),
-            fragmentStage!"mesh_shadow_frag.spv"(device),
+            fragmentStage!fragmentSpv(device),
         ];
     }
 
-    private static ShaderInfo[] staticShadowShaderStages(LogicalDevice device)
+    private static ShaderInfo[] staticShadowShaderStages(string fragmentSpv)(LogicalDevice device)
     {
         return [
             device.uploadShaderToGPU(
@@ -361,7 +392,7 @@ class PbrFactory
                 ],
                 vertexInput: staticVertexInput(),
             ),
-            fragmentStage!"mesh_shadow_frag.spv"(device),
+            fragmentStage!fragmentSpv(device),
         ];
     }
 

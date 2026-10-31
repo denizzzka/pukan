@@ -436,7 +436,9 @@ cascades and no local-light shadows. Missing:
       tile metadata in the frame data and per-tile cache validity.
 - [x] Cache the sun's shadow map while the casters and the sun stay put, so a
       static level does not redraw an unchanged map every frame.
-- [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.
+- [x] Caster coverage: masked cutouts cast through an alpha-tested shadow
+      variant.
+- [ ] Caster coverage: the non-glTF primitives do not cast yet.
 - [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
 - [ ] Light culling by distance and screen size.
 - [ ] Calibrate AgX against Godot; `Environment.tonemap_mode = 4` falls back to
