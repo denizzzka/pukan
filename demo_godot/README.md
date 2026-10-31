@@ -21,7 +21,22 @@ eye and target place the free camera outside it.
 
 ## Controls
 
-WASD moves, the right mouse button looks, the middle button pans, the wheel
-zooms, Q/E rolls and R resets the roll. `--plain` draws every surface in a
-simple lit mode, `--no-shadows` disables shadows, and `--screenshot path` saves
-a frame.
+Every demo uses the same free camera. The cursor is captured while the right or
+middle mouse button is held and is restored when the button is released.
+
+| Input | Action |
+| --- | --- |
+| Right mouse drag | Look around |
+| Middle mouse drag | Pan the view |
+| Mouse wheel | Zoom towards the cursor |
+| W / S | Move forward / backward |
+| A / D | Strafe left / right |
+| Q / E | Roll left / right |
+| R | Reset the roll |
+| H | Toggle the look axis between horizontal (world up) and screen (camera up) |
+| Shift | Move faster |
+| Alt | Move slower |
+
+`--speed` sets the base camera speed that Shift and Alt scale. `--plain` draws
+every surface in a simple lit mode, `--no-shadows` disables shadows, and
+`--screenshot path` saves a frame.

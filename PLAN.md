@@ -104,6 +104,11 @@ or the pack.
       `application/run/main_scene` from `project.binary`.
 - [x] `--screenshot path` and `--screenshot-frame N` in both demos; the engine
       saves the next rendered frame through `Scene.captureFrame`.
+- [ ] A screenshot key (`PrintScreen`) in `demo_godot`: capture the current
+      frame and write the loaded scene path, the active render flags and the
+      full camera state (position, orientation, `lookAxis`, FOV, near and far
+      planes) into the PNG as `tEXt`/`iTXt` metadata, so the view can be
+      reproduced exactly and two frames compared later.
 - [x] A light render switch for `demo_godot`: draw every surface in the plain
       lit mode, without transmission, transparency or the authored material
       variants. Shadows keep their own switch.
@@ -309,6 +314,233 @@ Fixtures live in `demo_godot/godot_samples/`.
         counted once, and that the skipped counters aggregate;
   - [ ] README and fixture list.
 - [x] README with source URLs, commit, licenses and the regeneration script.
+
+## Mover
+
+Goal: a modular movement system built on Unreal Engine Mover, with the feature
+completeness of CMC's default character set and the API clarity of Godot's
+`CharacterBody3D`. The core is actor-type and shape agnostic: any root scene component,
+any up axis, a capsule, box, sphere, cylinder or no collision at all. A capsule belongs
+only to the optional default character set, which is the first target. Mover replaces the
+CMC monolith with composable modes, transitions and modifiers; CMC only supplies the
+features to match. Networking is a separate, later backend, see `## Networking`.
+
+From Godot:
+
+- a kinematic body and a `moveAndSlide()` collision utility that resolves the slide; the
+  active mode chooses when to call it and with which shape and velocity;
+- explicit `isOnFloor`/`isOnWall`/`isOnCeiling`, floor normal and angle, `upDirection`,
+  `floorSnapLength`, `floorMaxAngle`, `maxSlides`, `safeMargin`, `motionMode`;
+- moving platform velocity, floor locking and last-collision results.
+
+From Unreal CMC (feature reference):
+
+- movement modes: walking, falling, flying, swimming, custom;
+- acceleration, braking, ground friction, air control and gravity scale;
+- jump velocity, jump hold time and multiple jumps;
+- step-up height, floor sweep distance and walkable floor angle;
+- orient rotation to movement, crouch with a height change;
+- root motion for dashes, knockbacks and scripted moves;
+- per-hit blocking results and debug visualization.
+
+From Unreal Mover (architecture):
+
+- modular movement modes with explicit hooks instead of one large update function;
+- transitions between modes as first-class rules;
+- layered moves and movement modifiers, so flight, vehicles, ladders and custom movement
+  compose instead of branching;
+- data-driven mode configuration, so a game adds a mode without editing the controller;
+- input command structs owned by the project, with no built-in keyboard, mouse or gamepad
+  handling;
+- actor-type and shape agnostic: any root scene component, optional collision and any up
+  axis.
+
+Expect more project-side code than CMC: the engine supplies the simulation and the
+command contract, not a binding system.
+
+### Shape and the default character set
+
+Mover is actor-type and shape agnostic. CMC requires an `ACharacter` and a capsule; the
+core here does not. A capsule is the default for the character preset, not a rule of the
+Mover core.
+
+- [ ] `MoverComponent` works with any root scene component, including a non-primitive
+      one, and with no collision at all.
+- [ ] `BodyShape` covers capsule, box, sphere and cylinder, plus `none`. Modes declare
+      which shapes they support, so a car or a projectile uses the same core.
+- [ ] The up axis is configurable per body; the default character set assumes Z up and a
+      vertical capsule, like CMC.
+- [ ] The default character set is an optional preset: capsule plus walking, falling,
+      flying and swimming, matching CMC behavior for humanoids.
+- [ ] Other presets (vehicle, projectile, quadruped, flying pawn) assemble modes without
+      the character set and without a capsule.
+
+### Movement modes as modules
+
+- [ ] `MovementMode` is an interface with hooks such as `onGenerateMove` and
+      `onSimulationTick`, not a switch inside one update function. Walking, falling,
+      flying, swimming and custom are separate modules.
+- [ ] Modes declare the shared settings they need (walkable slope, gravity, speeds);
+      `MoverComponent` deduplicates them, so walking and falling read one instance.
+- [ ] `walking`: ground friction and gravity maintain floor contact; vertical velocity
+      is clamped while grounded, so the body cannot launch itself from a slope. Step-up,
+      floor snap and walkable floor angle apply. Leaving the floor switches to `falling`.
+- [ ] `falling`: gravity plus air control; horizontal input is scaled by `airControl`.
+      Landing switches back to `walking`, and a jump leaves the ground without an
+      intermediate falling frame.
+- [ ] `flying`: no gravity by default, free 3D acceleration and braking, optional
+      vertical input and no floor state. Useful for noclip, spectating and jetpacks.
+- [ ] `swimming`: reduced gravity, fluid friction and buoyancy, with an optional surface
+      transition; floor snap and step-up are disabled.
+- [ ] `custom`: bypasses the built-in motor entirely: no gravity, friction, floor checks
+      or automatic collision response. A `CustomMovement` hook receives the body, input
+      and `dt` and drives the motion, and may call `moveAndSlide` explicitly, for
+      vehicles, ladders, climbing and jetpacks.
+- [ ] `MovementTransition` objects, owned by a mode or global, evaluate state and return
+      the next mode; they are optional. `queueNextMode` handles explicit requests such as
+      scripted changes. Both preserve the body unless the target mode says otherwise, and
+      a custom mode can return control to a built-in one.
+- [ ] Layered moves and `MovementModifier`s apply on top of a mode, so a platform,
+      impulse or stance changes motion without editing the mode.
+- [ ] Per-mode unit tests and a test that cycles through every mode and back.
+
+### Input
+
+Mover does not own device input. It consumes a command struct that the project fills
+from keyboard, mouse, gamepad, touch, AI or a replay. The default CMC character setup
+reads devices for you, which is convenient but rigid; here the mapping stays with the
+game.
+
+- [ ] `MoveInput` is whatever command struct the project chooses; the core only requires
+      a minimal contract (move axis, look delta, jump, crouch, sprint and action
+      triggers). The default character preset ships `CharacterInput` as an example;
+      games add their own fields.
+- [ ] `pukan.mover` never reads GLFW or gamepads. `demo_godot` provides a
+      `CharacterControls` mapper from GLFW keys and mouse to `CharacterInput`.
+- [ ] Optional reference mapper with rebindable actions, dead zones and sensitivity,
+      shipped as a demo utility, not baked into the controller.
+- [ ] Input commands are tick-stamped, fixed-step and serializable; the same struct feeds
+      local play, replay and the network backend.
+- [ ] Support synthetic input for tests, AI and cutscenes without a window.
+- [ ] Document the contract and show a gamepad and touch binding as examples, not as
+      requirements.
+
+### Root motion
+
+Unreal lets an animation own movement for the duration of an action: a dash, a
+knockback hit or a scripted move. The movement step still resolves collision, but the
+animation delta replaces the usual input and physics velocity for that step.
+
+- [ ] Extract the root bone delta per animation step from glTF and Godot animation
+      tracks; sample it on the CPU for movement while skinning stays on the GPU.
+- [ ] `RootMotionMode`: `ignore`, `additive` and `override`. `additive` adds the delta
+      to the motor velocity; `override` replaces it for the action duration.
+- [ ] Apply the delta through the same shape sweep and `moveAndSlide`, so a dash cannot
+      pass through a wall; optionally project onto the floor and keep step-up and floor
+      snap.
+- [ ] A root-motion action is a layered move above `MovementMode`:
+      `Action { animation, rootMotionMode, duration, cancelWindow, targetMode }`. While
+      active it suspends the mode's acceleration, friction and gravity as the policy
+      says, then returns control to the mode at its velocity.
+- [ ] Actions: dash, dodge, attack with knockback, vault and mantle. Knockback can also
+      come from an external impulse through the same override path.
+- [ ] Blend in and out over a short window, keep the body aligned to its up axis, and
+      handle interrupted actions and mode changes without teleporting.
+- [ ] Replay records the active action, animation time and root-motion mode, so a
+      scripted move can be reproduced from the screenshot metadata.
+
+### Design
+
+- [ ] `pukan.mover`: `MoverComponent` owns a `BodyShape` and a `MoveState`; `MoveInput` is
+      the project-filled command contract; `MoverComponent` runs one fixed-step update and
+      hands each move to a `MoverBackend`.
+- [ ] `pukan.character`: optional default preset. It configures `MoverComponent` with a
+      capsule and supplies `CharacterInput`, `CharacterMovementConfig` and the walking,
+      falling, flying and swimming modes for CMC parity.
+- [ ] `MoverComponent` selects the mode, runs transitions and modifiers, and delegates the
+      step to them, with no per-mode branching.
+- [ ] `MoveState` splits sync state (position, velocity, orientation, floor/wall/ceiling
+      flags, ground body) from auxiliary state (movement mode, action, root motion), so
+      local replay can copy a whole state; the later network backend can reuse the same
+      split.
+- [ ] `MoverBackend` interface: a local backend runs a move immediately, and a replay
+      backend can rerun recorded moves. The core never talks to sockets; the network
+      implementation belongs to `## Networking`.
+- [ ] The default character preset places the capsule origin at the feet, so scene
+      transforms and camera offsets match Godot.
+- [ ] `CollisionWorld`: BVH over mesh triangles and primitive colliders (box, sphere,
+      capsule, cylinder, plane), with collision layers and masks.
+- [ ] Queries: ray, sphere and shape sweeps for capsule, box, sphere and cylinder; a
+      swept shape returns time of impact, point, normal, penetration depth, shape and
+      node. Reuse `dlib.geometry` where it fits; add the missing narrowphase.
+- [ ] `CharacterControls` is a demo-side mapper from GLFW keys and mouse to the default
+      preset's `CharacterInput`; the motor consumes the command and never opens a device.
+      The camera rigs read the same command.
+- [ ] Camera rigs: camera-relative move axes, collision-aware spring arm for the third
+      person, smooth follow and interpolation; switch view without touching the motor.
+
+### Phases
+
+#### Phase 1: collision world
+
+- [ ] Build `CollisionWorld` from `GodotScene` mesh triangles and from decoded collision
+      shapes.
+- [ ] Decode `StaticBody3D`, `AnimatableBody3D`, `RigidBody3D` and `Area3D`, their
+      `CollisionShape3D` children, and `BoxShape3D`, `SphereShape3D`, `CapsuleShape3D`,
+      `CylinderShape3D`, `ConvexPolygonShape3D`, `ConcavePolygonShape3D` and
+      `WorldBoundaryShape3D`.
+- [ ] `GridMap` cell collision and `collision_layer`/`collision_mask` filtering.
+- [ ] Fall back to mesh triangles for `MeshInstance3D` without collision shapes, behind
+      a switch for fixtures that have none.
+
+#### Phase 2: kinematic motor
+
+- [ ] Movement mode modules and `MovementTransition`s with per-mode gravity, friction,
+      acceleration and floor rules.
+- [ ] Acceleration, braking, ground friction and air control; sprint and walk speeds.
+- [ ] `moveAndSlide`: iterative collide-and-slide with contact planes, `safeMargin`,
+      `maxSlides`, floor/wall/ceiling classification and blocking-hit results.
+- [ ] Step-up over `maxStepHeight`, floor snap after leaving the ground, walkable floor
+      angle and slope sliding.
+- [ ] Jump with velocity, hold time, multiple jumps, jump buffer and coyote time.
+- [ ] Crouch changes the body shape height (the capsule in the default character set)
+      and checks the ceiling before standing up.
+- [ ] Moving platform velocity, floor locking and platform rotation.
+
+#### Phase 3: input, camera and demo
+
+- [ ] First-person camera with eye height and third-person camera with a spring arm.
+- [ ] `demo_godot`: `--character` and `--third-person`, spawn the default character
+      preset on the platformer stage, show its shape and contacts in a debug mode.
+- [ ] The same `CharacterInput` drives the default character preset and both camera
+      rigs; the demo mapper switches control between them without built-in input maps. A
+      mode switch returns control to the free camera without losing the character state.
+
+#### Phase 4: animation, root motion, replay and verification
+
+- [ ] Root-motion extraction and the layered actions from `### Root motion`; blend
+      trees receive speed and floor state; attach the skeleton to the body root.
+- [ ] Unit tests for every shape pair, sweep, slide, step-up and snap; also test
+      root-motion modes and action cancellation. Golden traces from a fixed input
+      sequence.
+- [ ] Fixed timestep with render interpolation. Record input, body state, active action
+      and camera in the PNG metadata planned for the demo, so a run can be replayed
+      exactly.
+- [ ] Debug draw: body shape, contacts, normals, velocity, floor state, movement mode,
+      active action and root-motion delta; OSD counters once the 2D overlay exists.
+
+Questions:
+
+- Own narrowphase and solver, or a physics library? Start with shape-specific sweeps and
+  a small kinematic solver; the body needs queries, not a rigid-body island solver.
+- Which shapes must the first version support: is a capsule enough for the default
+  character set, or should box and cylinder land with it?
+- Are moving platforms in the first version, and does root motion land before or after
+  them?
+- Should collision come only from `GodotScene`, or also from glTF instances in the
+  same `CollisionWorld`?
+- Which non-character preset proves the core is shape-agnostic: a vehicle, a projectile
+  or a flying pawn?
 
 ## Geometric algebra: PGA and CGA
 
@@ -649,3 +881,51 @@ groundwork.
       owns with the window as a mirror, and the per-eye pose and projection from
       `XrView` instead of the demo's fixed stereo views.
 - [ ] Fall back to the window path when no runtime is installed.
+
+## Networking
+
+Low priority and later. The Mover core and its default character preset must compile and
+run without it. Off by default: a `network` dub configuration sets
+`-version=PukanNetwork`; without it the build carries no sockets, replication code,
+snapshots or rollback buffers.
+
+This is an optional network backend for the Mover core in `## Mover`, not a second
+movement system. `MoverComponent` produces moves from input and state; this layer
+buffers, sends, applies and replays them.
+
+- [ ] One shared tick timeline. The server advances authoritative ticks; the client runs
+      the same fixed-step simulation slightly ahead of the server in prediction mode.
+- [ ] Clients send only input frames, never body state. A frame carries the target tick,
+      the project's input command, the active action and root-motion input.
+- [ ] The server buffers inputs until their tick, simulates that tick with the same
+      `MoverComponent`, and broadcasts the resulting state to every client.
+- [ ] State broadcasts are snapshots, not corrections. The server does not decide that a
+      client is wrong and does not ask for a rollback.
+- [ ] The client records the predicted state per tick. On a received snapshot it compares
+      the authoritative state for that tick with its own prediction; if they differ
+      beyond tolerance, the client rolls back to the snapshot, replays buffered inputs
+      from that tick to the current prediction tick, and continues.
+- [ ] Differences below the tolerance are smoothed instead of rolled back; a large or
+      repeated mismatch exposes a divergence in the simulation.
+- [ ] Keep input history and state history on both sides; redundant input windows cover
+      packet loss, and clock sync keeps ticks aligned.
+- [ ] Handle jitter, reordering, duplicates and late input; choose full or delta
+      snapshots.
+- [ ] Fixed timestep, identical tunables and collision data on both sides. Accept small
+      floating-point divergence and let the client's rollback reconcile it.
+- [ ] Keep simulation separate from rendering: the server runs without Vulkan, and a
+      client can replay a body without drawing.
+- [ ] Telemetry: prediction error, rollback count, replay depth, RTT and packet loss in
+      the debug overlay.
+- [ ] Loopback and simulated-link tests, plus golden replays for prediction, rollback and
+      replay.
+
+Questions:
+
+- Which transport and serialization: raw UDP with fixed-size frames, ENet, or
+  GameNetworkingSockets?
+- Does the server need validation beyond movement consistency, such as speed or
+  teleport checks?
+- How far ahead does the client predict: a fixed tick count or measured RTT?
+- What does the server do when an input for a tick has not arrived: stall, extrapolate,
+  or skip?
