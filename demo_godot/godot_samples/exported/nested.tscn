@@ -1,0 +1,9 @@
+[gd_scene format=4]
+
+[ext_resource type="ArrayMesh" path="res://procedural_mesh.tres" id="1_mesh"]
+
+[node name="NestedRoot" type="Node3D"]
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 1.5, 0)
+mesh = ExtResource("1_mesh")

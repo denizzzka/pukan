@@ -2,10 +2,11 @@ module pukan.gltf.loader;
 
 import dlib.math;
 import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
-import pukan.gltf.accessor;
+import pukan.pbr.accessor;
 import pukan.gltf.animation;
-import pukan.gltf.pipelines: GltfPipelines;
+import pukan.pbr.pipelines: PbrPipelines;
 import pukan.material: MaterialBuffer;
+import pukan.exceptions: PukanException;
 import pukan.misc: linearFormat;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
@@ -15,6 +16,7 @@ import std.conv: to;
 import std.exception: enforce;
 static import std.file;
 static import std.path;
+static import std.uri;
 import vibe.data.json;
 
 /// Options for loading glTF materials
@@ -194,6 +196,20 @@ private VkSamplerAddressMode wrapMode(GltfWrap value)
     }
 }
 
+/// An extension such as EXT_texture_webp supplies the image instead of the texture
+private size_t imageOfTexture(in Json texture)
+{
+    if(auto source = "source" in texture)
+        return source.get!size_t;
+
+    if(auto extensions = "extensions" in texture)
+        foreach(ref extension; *extensions)
+            if(auto source = "source" in extension)
+                return source.get!size_t;
+
+    throw new PukanException("glTF texture has no source image");
+}
+
 /// Images sampled by data maps skip the sRGB decode; shared color images keep it
 private bool[] linearImages(in Json json, bool extensions)
 {
@@ -211,7 +227,8 @@ private bool[] linearImages(in Json json, bool extensions)
 
     size_t imageOf(in Json texture)
     {
-        return (*textures)[texture["index"].get!size_t]["source"].get!size_t;
+        const tx = (*textures)[texture["index"].get!size_t];
+        return imageOfTexture(tx);
     }
 
     foreach(ref material; *materials)
@@ -375,16 +392,32 @@ unittest
     ]);
 }
 
+unittest
+{
+    import std.exception: assertThrown;
+
+    auto json = parseJsonString(`{
+        "textures": [
+            {"source": 3},
+            {"extensions": {"EXT_texture_webp": {"source": 5}}},
+            {"sampler": 0}
+        ]
+    }`);
+
+    const textures = &json["textures"];
+    assert(imageOfTexture((*textures)[0]) == 3);
+    assert(imageOfTexture((*textures)[1]) == 5);
+    assertThrown(imageOfTexture((*textures)[2]));
+
+    // Godot writes nested texture paths as textures%2Fname.webp
+    assert(std.path.buildPath("root", std.uri.decodeComponent("textures%2Fgrass.webp"))
+        == "root" ~ std.path.dirSeparator ~ "textures/grass.webp");
+}
+
 ///
-package GlTF loadGlTF2(
+package GltfAsset loadGltfAsset(
     string filename,
-    DescriptorAllocator allocator,
-    MaterialBuffer materialBuffer,
     LogicalDevice device,
-    ref GltfPipelines pipelines,
-    Texture fakeTexture,
-    VkBuffer vertexFallback,
-    bool computeJointsOnGPU,
     GltfLoadOptions options,
 )
 {
@@ -584,7 +617,7 @@ package GlTF loadGlTF2(
             samplerInfo = gltfSampler((*samplers)[samplerIndex.get!size_t]);
         }
 
-        auto image = ret.images[ tx["source"].get!ushort ];
+        auto image = ret.images[imageOfTexture(tx)];
         ret.textures ~= device.create!Texture(image, samplerInfo);
     }
 
@@ -622,22 +655,41 @@ package GlTF loadGlTF2(
 
     stats.decodeNs += cast(ulong) (MonoTime.currTime - postStart).total!"nsecs";
 
-    auto ctorStart = MonoTime.currTime;
+    auto asset = new GltfAsset;
+    asset.content = ret;
+    asset.nodes = nodes;
+    asset.rootSceneNode = rootSceneNode;
+    asset.gpuBuffs.length = ret.bufferViews.length;
+    asset.loadStats = stats;
+
+    return asset;
+}
+
+GlTF createGltfInstance(
+    GltfAsset asset,
+    DescriptorAllocator allocator,
+    MaterialBuffer materialBuffer,
+    LogicalDevice device,
+    ref PbrPipelines pipelines,
+    Texture fakeTexture,
+    VkBuffer vertexFallback,
+    bool computeJointsOnGPU,
+    GltfLoadOptions options,
+)
+{
     GlTF result;
 
-    if(ret.skins.length > 0)
+    if(asset.content.skins.length > 0)
     {
         if(computeJointsOnGPU)
-            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
+            result = new SkinnedGlTF_skinJointsGPU(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, options);
         else
-            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
+            result = new SkinnedGlTF(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, options);
     }
     else
-        result = new GlTF(pipelines, allocator, materialBuffer, device, ret, nodes, rootSceneNode, fakeTexture, vertexFallback, options);
+        result = new GlTF(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, options);
 
-    stats.decodeNs += cast(ulong) (MonoTime.currTime - ctorStart).total!"nsecs";
-    result.loadStats = stats;
-
+    result.loadStats = asset.loadStats;
     return result;
 }
 
@@ -916,6 +968,28 @@ struct Node
     alias this = payload;
 }
 
+/// Parsed and GPU-resident content of one glTF file, shared by instances
+final class GltfAsset
+{
+    GltfContent content;
+    Node[] nodes;
+    Node rootSceneNode;
+    BufferPieceOnGPU[] gpuBuffs;
+    size_t uploadedBuffers;
+    LoadStats loadStats;
+
+    ~this()
+    {
+        foreach(ref piece; gpuBuffs)
+            if(piece && piece.buffer)
+                destroy(piece.buffer);
+
+        foreach(ref texture; content.textures)
+            if(texture)
+                destroy(texture);
+    }
+}
+
 struct GltfContent
 {
     //FIXME: remove, not needed t store it in GlTF object:
@@ -968,8 +1042,6 @@ struct GltfContent
     }
 }
 
-private string build_path(string dir, string filename) => dir ~ std.path.dirSeparator ~ filename;
-
 private Buffer readBufUri(string dir, in Json fileDescr)
 {
     import std.algorithm.searching: startsWith;
@@ -980,7 +1052,7 @@ private Buffer readBufUri(string dir, in Json fileDescr)
     Buffer ret;
 
     if(!uri.startsWith("data:"))
-        ret.buf = cast(ubyte[]) std.file.read(build_path(dir, uri));
+        ret.buf = cast(ubyte[]) std.file.read(std.path.buildPath(dir, std.uri.decodeComponent(uri)));
     else
         ret.buf = parseDataUri(uri).payload;
 
@@ -1028,7 +1100,7 @@ private auto loadImageFromUri(string dir, string uri, out VkFormat format)
     import std.algorithm.searching: startsWith;
 
     if(!uri.startsWith("data:"))
-        return loadImageFromFile(build_path(dir, uri), format);
+        return loadImageFromFile(std.path.buildPath(dir, std.uri.decodeComponent(uri)), format);
 
     const data = parseDataUri(uri);
     enforceImageMime(data.mimeType);

@@ -1,16 +1,24 @@
 module pukan;
 
 public import pukan.background;
+public import pukan.camera;
+public import pukan.camera_controls;
+public import pukan.compressed_texture;
+public import pukan.fly_camera;
 public import pukan.gltf;
+public import pukan.godot_scene;
 public import pukan.material;
 public import pukan.mesh;
 public import pukan.misc;
+public import pukan.pbr;
 public import pukan.primitives_tree;
 public import pukan.primitives_tree.mesh;
 public import pukan.primitives_tree.tree;
 public import pukan.scene;
+public import pukan.screenshot;
 public import pukan.stereo;
 public import pukan.vulkan;
+public import pukan.webp;
 
 import pukan.vulkan.bindings;
 

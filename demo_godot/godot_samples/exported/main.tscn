@@ -1,0 +1,20 @@
+[gd_scene format=4]
+
+[ext_resource type="ArrayMesh" path="res://procedural_mesh.tres" id="1_mesh"]
+[ext_resource type="PackedScene" path="res://nested.tscn" id="2_scene"]
+[ext_resource type="Material" path="res://panel_material.tres" id="3_mat"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_1"]
+
+[node name="Root" type="Node3D"]
+
+[node name="Procedural" type="MeshInstance3D" parent="."]
+mesh = ExtResource("1_mesh")
+
+[node name="Panel" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0)
+mesh = SubResource("BoxMesh_1")
+material_override = ExtResource("3_mat")
+
+[node name="Nested" parent="." instance=ExtResource("2_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 0)

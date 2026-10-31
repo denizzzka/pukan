@@ -1,0 +1,86 @@
+[gd_scene format=4]
+
+[ext_resource type="PackedScene" path="res://town/model/town_model.scn" id="1_model"]
+[ext_resource type="Material" path="res://town/sky_day.tres" id="2_sky"]
+[ext_resource type="PackedScene" path="res://town/tree/scene.scn" id="3_tree"]
+[ext_resource type="PackedScene" path="res://town/lamp/lamp_scene.tscn" id="4_lamp"]
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = ExtResource("2_sky")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_sky_contribution = 0.5
+tonemap_mode = 4
+glow_intensity = 0.5
+fog_enabled = true
+fog_light_color = Color(0.7254902, 0.91764706, 1, 1)
+fog_density = 0.0015
+fog_sky_affect = 0.0
+
+[node name="TownView" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="TownModel" parent="." instance=ExtResource("1_model")]
+
+[node name="Trees" type="Node3D" parent="."]
+
+[node name="Tree" parent="Trees" instance=ExtResource("3_tree")]
+transform = Transform3D(0.375, 0, 0, 0, 0.375, 0, 0, 0, 0.375, 5.548664, 9.214607, 21.853706)
+
+[node name="Tree2" parent="Trees" instance=ExtResource("3_tree")]
+transform = Transform3D(-0.1781004, 0, 0.27185518, 0, 0.325, 0, -0.27185518, 0, -0.1781004, 22.705954, 8.334187, -12.540859)
+
+[node name="Tree3" parent="Trees" instance=ExtResource("3_tree")]
+transform = Transform3D(0.10563323, 0, 0.42713186, 0, 0.44, 0, -0.42713186, 0, 0.10563323, 50.709362, 10.075925, -6.032544)
+
+[node name="Tree4" parent="Trees" instance=ExtResource("3_tree")]
+transform = Transform3D(0.41906354, 0, 0.13411105, 0, 0.44, 0, -0.13411105, 0, 0.41906354, -12.516531, 12.71288, -15.442337)
+
+[node name="Tree5" parent="Trees" instance=ExtResource("3_tree")]
+transform = Transform3D(0.23812625, 0, -0.17412893, 0, 0.295, 0, 0.17412893, 0, 0.23812625, -20.612381, 3.7711592, 1.7494526)
+
+[node name="Lamps" type="Node3D" parent="."]
+
+[node name="Lamp" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.826617, 10.281145, 21.406624)
+
+[node name="Lamp2" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.36482, 8.762463, 17.41033)
+
+[node name="Lamp3" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.877937, 11.294644, -5.150609)
+
+[node name="Lamp4" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.558727, 9.149303, -7.0745764)
+
+[node name="Lamp5" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.047234, 5.208529, 4.7793546)
+
+[node name="Lamp6" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.494762, 5.208529, 4.762315)
+
+[node name="Lamp7" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.80326, 5.208529, 22.523823)
+
+[node name="Lamp8" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.958977, 8.124198, -17.695438)
+
+[node name="Lamp9" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.080837, 8.124197, 0.42528152)
+
+[node name="Lamp10" parent="Lamps" instance=ExtResource("4_lamp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46.96642, 11.294643, -7.1991215)
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.793955, 0.350561, -0.496732, -0.295414, 0.491651, 0.819152, 0.531381, 0.797111, -0.286788, 11.0084, 12.3453, -31.3148)
+light_energy = 1.45
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.8321, 0.5547, 0, -0.5547, 0.8321, 0, 60, 90)
+fov = 75.0
+near = 0.05
+far = 1000.0

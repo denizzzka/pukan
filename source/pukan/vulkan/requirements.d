@@ -34,6 +34,7 @@ private alias featureStructs = AliasSeq!(
     VkPhysicalDeviceVulkan12Features,
     VkPhysicalDeviceVulkan13Features,
     VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT,
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT,
 );
 
 /// Storage for every known feature structure
@@ -45,6 +46,8 @@ private template featureStructVersion(T)
     static if(is(T == VkPhysicalDeviceVulkan11Features) || is(T == VkPhysicalDeviceVulkan12Features))
         enum featureStructVersion = VulkanVersion(1, 2);
     else static if(is(T == VkPhysicalDeviceVulkan13Features))
+        enum featureStructVersion = VulkanVersion(1, 3);
+    else static if(is(T == VkPhysicalDeviceExtendedDynamicStateFeaturesEXT))
         enum featureStructVersion = VulkanVersion(1, 3);
     else
         enum featureStructVersion = VulkanVersion(1, 0);
@@ -69,6 +72,8 @@ private template featureStructSType(T)
         enum featureStructSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     else static if(is(T == VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT))
         enum featureStructSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
+    else static if(is(T == VkPhysicalDeviceExtendedDynamicStateFeaturesEXT))
+        enum featureStructSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
     else
         static assert(false, "unknown feature structure: " ~ T.stringof);
 }
@@ -546,11 +551,11 @@ void fillFeatureChain(Reqs...)(ref FeatureChain chain)
 {
     static foreach(R; Reqs)
         static if(R.isChainFeature)
-        {
+        {{
             auto ref slot = chain[chainIndex!(R.owner)];
             slot.sType = featureStructSType!(R.owner);
             __traits(getMember, slot, R.requirementName) = VK_TRUE;
-        }
+        }}
 }
 
 /// Links the requested chain features into head

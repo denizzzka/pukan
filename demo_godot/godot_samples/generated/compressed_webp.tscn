@@ -1,0 +1,14 @@
+[gd_scene format=4]
+
+[ext_resource type="Texture2D" path="res://particle.webp.ctex" id="1_tex"]
+
+[sub_resource type="StandardMaterial3D" id="mat"]
+albedo_texture = ExtResource("1_tex")
+
+[sub_resource type="BoxMesh" id="box"]
+
+[node name="Root" type="Node3D"]
+
+[node name="Box" type="MeshInstance3D" parent="."]
+mesh = SubResource("box")
+material_override = SubResource("mat")

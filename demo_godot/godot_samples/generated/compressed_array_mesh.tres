@@ -1,0 +1,41 @@
+[gd_resource type="ArrayMesh" format=4]
+
+[ext_resource type="Texture2D" path="res://checker.png" id="1_luubp"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ltdy5"]
+resource_name = "AnimatedCube"
+albedo_texture = ExtResource("1_luubp")
+roughness = 0.079
+metadata/_gltf_primary_texture_coord = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_ccg1b"]
+_surfaces = [{
+"aabb": AABB(-1, -1, -1, 2, 2, 2.000001),
+"format": 34896613377,
+"index_count": 36,
+"index_data": PackedByteArray("AAABAAIAAwABAAAAAQAEAAIAAQADAAQAAAACAAUABQACAAQAAwAAAAYABgAAAAUABAADAAYABgAFAAcABQAEAAcABAAGAAcA"),
+"name": "AnimatedCube",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("//8AAP7/AAD//wAAAAAAAAAAAAAAAAAA/////wAAAAAAAP//AAAAAAAAAAD+/wAA/v//////AAAAAP///v8AAA==")
+}]
+blend_shape_mode = 0
+
+[resource]
+resource_name = "AnimatedCube_AnimatedCube"
+_surfaces = [{
+"aabb": AABB(-1, -1, -1, 2, 2, 2.000001),
+"attribute_data": PackedByteArray("/3//f/9///8AAP///3//f////3///wAA////f///AAD/fwAA////f///AAD/fwAA/3//f////3///////3//f/9///8AAP///3//fwAA//8AAP9//3//f///AAD/fwAA////f/9/AAD/f/9/////f/9/AAD/f/9//3//f///////f////3//fwAA//8AAP9/"),
+"format": 34896613399,
+"index_count": 36,
+"index_data": PackedByteArray("AAABAAIAAwAEAAUABgAHAAgACQAKAAsADAANAA4ADwAQABEAEgATABQAFQAWABcAGAAZABoAGwAcAB0AHgAfACAAIQAiACMA"),
+"material": SubResource("StandardMaterial3D_ltdy5"),
+"name": "AnimatedCube",
+"primitive": 3,
+"uv_scale": Vector4(2, 2, 0, 0),
+"vertex_count": 36,
+"vertex_data": PackedByteArray("//8AAP7//z///wAAAAD/PwAAAAAAAP8/AAD//wAA/7//////AAD/v/7///////+//////wAA/7///wAAAAD/v///AAD+//+//v//////AID//wAA/v8AgAAAAAD+/wCAAAAAAP7/AAAAAAAAAAAAAAAA//8AAAAA//8AAAAAAAD/////AAAAAAAA//8AAAAA//8AAP7//z8AAAAAAAD/PwAAAAD+//8/AAD//wAA/7/+////////vwAA///+//+//////wAA/7///wAA/v//v/7///////+//v//////AIAAAAAA/v8AgAAA///+/wCAAAAAAP7/AAAAAP//AAAAAAAA///+/wAA//8AAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD/fwAA/38AAP9/////f////3////9//38AAP9/AAD/fwAA/3////9/////f////z//f/8//3//P/9/////f////3////9/AAD/fwAA/38AAP9/////f////3////9//38AAP9/AAD/fwAA/3////9/////f////z//f/8//3//P/9/////f////3////9/")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_ccg1b")

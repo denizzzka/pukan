@@ -1,5 +1,8 @@
 module pukan.shadow;
 
+import dlib.math: Matrix4x4f, Vector3f, Vector4f;
+import pukan.camera: cameraView, vulkanPerspectiveMatrix;
+import pukan.misc: Boxf, vulkanOrthographicMatrix;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.renderpass: RenderPass;
@@ -229,5 +232,185 @@ final class ShadowMap
             imageView: view,
             sampler: sampler,
         );
+    }
+}
+
+/// The sun's shadow map: one depth image per frame in flight
+final class SunShadow
+{
+    private LogicalDevice device;
+    ShadowPass pass;
+    private ShadowMap[] maps;
+    private bool[] valid;
+    private VkSampler sampler;
+
+    /// Renders the map again only after `invalidate`
+    bool cache;
+    bool enabled = true;
+    /// Side of the square map
+    uint mapSize = 1024;
+    /// Light view-projection the pass and the PBR shaders share
+    Matrix4x4f viewProj = Matrix4x4f.identity;
+    /// NDC depth bias that keeps the world-space offset constant
+    float depthBias = 0.0015f;
+
+    private Boxf bounds;
+    private bool hasBounds;
+    private enum fallbackFov = 24.0f;
+    private enum fallbackDistance = 10.0f;
+
+    this(LogicalDevice device, uint mapSize = 1024)
+    in(mapSize > 0)
+    {
+        this.device = device;
+        this.mapSize = mapSize;
+        pass = new ShadowPass(device, DefaultRenderPass.depthFormat);
+
+        VkSamplerCreateInfo info = {
+            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            magFilter: VK_FILTER_LINEAR,
+            minFilter: VK_FILTER_LINEAR,
+            mipmapMode: VK_SAMPLER_MIPMAP_MODE_NEAREST,
+            addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            compareEnable: VK_TRUE,
+            compareOp: VK_COMPARE_OP_LESS_OR_EQUAL,
+            borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+            unnormalizedCoordinates: VK_FALSE,
+        };
+        vkCall(device.device, &info, device.alloc, &sampler);
+    }
+
+    ~this()
+    {
+        foreach(ref map; maps)
+            if(map)
+                destroy(map);
+
+        if(sampler)
+            vkDestroySampler(device.device, sampler, device.alloc);
+
+        if(pass)
+            destroy(pass);
+    }
+
+    /// Fits the map around `bounds`; a box without bounds restores the fallback
+    void fit(in Boxf bounds)
+    {
+        import std.math: isNaN;
+
+        this.bounds = bounds;
+        hasBounds = !bounds.min.x.isNaN;
+        invalidate();
+    }
+
+    void invalidate()
+    {
+        valid[] = false;
+    }
+
+    void recreate(size_t frameCount)
+    {
+        if(maps.length == frameCount)
+            return;
+
+        foreach(ref map; maps)
+            if(map)
+                destroy(map);
+
+        maps.length = frameCount;
+        valid.length = frameCount;
+        valid[] = false;
+
+        foreach(i; 0 .. frameCount)
+            maps[i] = new ShadowMap(device, pass, mapSize);
+    }
+
+    /// Rebuilds the light matrix; `sunDirection` points toward the sun
+    void update(Vector3f sunDirection)
+    {
+        const sun = sunDirection.normalized;
+
+        if(!hasBounds)
+        {
+            const eye = sun * fallbackDistance;
+            const view = cameraView(eye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
+            const proj = vulkanPerspectiveMatrix(fallbackFov, 1.0f, 1.0f, fallbackDistance * 2.0f);
+            viewProj = proj * view;
+            depthBias = 0.0015f;
+            return;
+        }
+
+        const center = (bounds.min + bounds.max) * 0.5f;
+        const extent = (bounds.max - bounds.min) * 0.5f;
+        const radius = extent.length;
+        const eye = center + sun * (radius * 2.0f + 1.0f);
+        const view = cameraView(eye, center, Vector3f(0, 1, 0));
+
+        float xMin = float.max;
+        float xMax = -float.max;
+        float yMin = float.max;
+        float yMax = -float.max;
+        float zMin = float.max;
+        float zMax = -float.max;
+
+        foreach(i; 0 .. 8)
+        {
+            const corner = Vector3f(
+                (i & 1) ? bounds.max.x : bounds.min.x,
+                (i & 2) ? bounds.max.y : bounds.min.y,
+                (i & 4) ? bounds.max.z : bounds.min.z,
+            );
+            const p = Vector4f(corner.x, corner.y, corner.z, 1) * view;
+
+            if(p.x < xMin) xMin = p.x;
+            if(p.x > xMax) xMax = p.x;
+            if(p.y < yMin) yMin = p.y;
+            if(p.y > yMax) yMax = p.y;
+            if(p.z < zMin) zMin = p.z;
+            if(p.z > zMax) zMax = p.z;
+        }
+
+        auto padding = radius * 0.02f;
+        if(padding < 0.5f)
+            padding = 0.5f;
+
+        auto nearPlane = -zMax - padding;
+        if(nearPlane < 0.01f)
+            nearPlane = 0.01f;
+        const farPlane = -zMin + padding;
+
+        viewProj = vulkanOrthographicMatrix(
+            xMin - padding, xMax + padding,
+            yMin - padding, yMax + padding,
+            nearPlane, farPlane,
+        ) * view;
+
+        // A fixed depth offset in world units: the orthographic range is large
+        depthBias = 0.03f / (farPlane - nearPlane);
+    }
+
+    VkDescriptorImageInfo imageInfo(size_t frameIndex)
+    {
+        assert(frameIndex < maps.length);
+        return maps[frameIndex].imageInfo(sampler);
+    }
+
+    /// Returns false when the cached map is reused
+    bool record(size_t frameIndex, VkCommandBuffer buf, void delegate(ref VkCommandBuffer) draw)
+    {
+        assert(frameIndex < maps.length);
+
+        if(!enabled || draw is null)
+            return false;
+
+        if(cache && valid[frameIndex])
+            return false;
+
+        pass.record(buf, maps[frameIndex].renderedFrameBuffer, maps[frameIndex].renderExtent, draw);
+        valid[frameIndex] = true;
+
+        return true;
     }
 }

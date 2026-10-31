@@ -1,0 +1,41 @@
+[gd_scene format=4]
+
+[ext_resource type="Texture2D" path="res://checker.png" id="1_sqfhb"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qvt43"]
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_sqfhb")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p4au8"]
+albedo_color = Color(0.8, 0.8, 0.8, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_d1dis"]
+_surfaces = [{
+"aabb": AABB(-1, 0, -1, 2, 1e-05, 2),
+"attribute_data": PackedByteArray("/wAA/wAAAAAAAAAAAP8A/wAAgD8AAAAAAAD//wAAAAAAAIA//////wAAgD8AAIA/"),
+"format": 34359742495,
+"index_count": 6,
+"index_data": PackedByteArray("AAABAAIAAQADAAIA"),
+"material": SubResource("StandardMaterial3D_qvt43"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("AACAvwAAAAAAAIC/AACAPwAAAAAAAIC/AACAvwAAAAAAAIA/AACAPwAAAAAAAIA//3///////7//f///////v/9///////+//3///////78=")
+}, {
+"aabb": AABB(0, 0, 0, 1, 1, 1e-05),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/"),
+"format": 34359742487,
+"index_count": 3,
+"index_data": PackedByteArray("AAACAAEA"),
+"material": SubResource("StandardMaterial3D_p4au8"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 3,
+"vertex_data": PackedByteArray("AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA/3//f/9/AID/f/9//38AgP9//3//fwCA")
+}]
+
+[node name="Root" type="Node3D" unique_id=876187188]
+
+[node name="Procedural" type="MeshInstance3D" parent="." unique_id=881356839]
+transform = Transform3D(0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, 0.8660254, 0, 1, 0)
+mesh = SubResource("ArrayMesh_d1dis")

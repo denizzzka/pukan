@@ -16,6 +16,8 @@ struct Material
     vec4 transmission; // x = factor
     vec4 volume; // x = thickness, y = attenuation distance
     vec4 attenuationColor;
+    vec4 uvTransform; // xy = scale, zw = offset
+    ivec4 textureChannels; // metallic, roughness, occlusion
 };
 
 const uint MATERIAL_MODE_UNLIT = 0u;
@@ -43,6 +45,9 @@ const uint MATERIAL_FLAG_IRIDESCENCE_TEXTURE = 1u << 16;
 const uint MATERIAL_FLAG_IRIDESCENCE_THICKNESS_TEXTURE = 1u << 17;
 const uint MATERIAL_FLAG_TRANSMISSION_TEXTURE = 1u << 18;
 const uint MATERIAL_FLAG_VOLUME_THICKNESS_TEXTURE = 1u << 19;
+const uint MATERIAL_FLAG_GODOT_METALLIC_TEXTURE = 1u << 20;
+const uint MATERIAL_FLAG_GODOT_ROUGHNESS_TEXTURE = 1u << 21;
+const uint MATERIAL_FLAG_GODOT_NORMAL_TWO_CHANNEL = 1u << 22;
 
 const uint MATERIAL_ALPHA_OPAQUE = 0u;
 const uint MATERIAL_ALPHA_MASK = 1u;
@@ -121,7 +126,7 @@ vec3 environmentRadiance(vec3 direction, float roughness)
 }
 
 /// Narkowicz 2015 ACES fit
-vec3 toneMap(vec3 color)
+vec3 toneMapAces(vec3 color)
 {
     const float a = 2.51;
     const float b = 0.03;
@@ -130,6 +135,44 @@ vec3 toneMap(vec3 color)
     const float e = 0.14;
 
     return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
+}
+
+vec3 toneMapReinhard(vec3 color, float white)
+{
+    const float whiteSquared = white * white;
+    const vec3 whiteSquaredColor = whiteSquared * color;
+
+    return (whiteSquaredColor + color * color) / (whiteSquaredColor + whiteSquared);
+}
+
+vec3 toneMapFilmic(vec3 color, float white)
+{
+    const float exposureBias = 2.0;
+    const float A = 0.22 * exposureBias * exposureBias;
+    const float B = 0.30 * exposureBias;
+    const float C = 0.10;
+    const float D = 0.20;
+    const float E = 0.01;
+    const float F = 0.30;
+
+    const vec3 tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
+    const float whiteTonemapped = ((white * (A * white + C * B) + D * E) / (white * (A * white + B) + D * F)) - E / F;
+
+    return tonemapped / whiteTonemapped;
+}
+
+vec3 toneMap(vec3 color, uint mode, float white)
+{
+    color = max(color, vec3(0.0));
+
+    switch(mode)
+    {
+        case 0u: return clamp(color, 0.0, 1.0);
+        case 1u: return clamp(toneMapReinhard(color, white), 0.0, 1.0);
+        case 2u: return clamp(toneMapFilmic(color, white), 0.0, 1.0);
+        // ACES also stands in for AgX until it is calibrated
+        default: return toneMapAces(color);
+    }
 }
 
 struct Surface
@@ -362,7 +405,7 @@ float shadowFactor(vec3 position, vec3 normal)
         return 1.0;
 
     // The sampler filters linearly, so one tap averages a 2x2 comparison
-    return texture(shadowMap, vec3(uv, ndc.z - 0.0015));
+    return texture(shadowMap, vec3(uv, ndc.z - frameUbo.frame.shadowParams.y));
 }
 
 vec3 shadePbr(Surface s)
@@ -536,14 +579,16 @@ vec3 shadePbr(Surface s)
     const vec3 reflection = mix(environment(R), vec3(0.1), roughness);
     const vec3 Fenv = fresnelSchlickRoughness(NdotV, F0, roughness);
     const vec3 kDEnv = (1.0 - Fenv) * (1.0 - metallic);
-    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao * iblIntensity;
+    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao * iblIntensity
+        * frameUbo.frame.ambientParams.rgb * frameUbo.frame.ambientParams.a;
 #else
     const vec3 irradiance = texture(irradianceMap, equirectUv(N)).rgb;
     const vec3 reflection = textureLod(prefilteredMap, equirectUv(R), roughness * PREFILTERED_MAX_LOD).rgb;
     const vec2 environmentBrdf = texture(brdfLut, vec2(NdotV, roughness)).rg;
     const vec3 Fenv = F0 * environmentBrdf.x + environmentBrdf.y;
     const vec3 kDEnv = (1.0 - Fenv) * (1.0 - metallic);
-    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao * iblIntensity;
+    const vec3 ambient = (kDEnv * s.albedo * irradiance + reflection * Fenv) * s.ao * iblIntensity
+        * frameUbo.frame.ambientParams.rgb * frameUbo.frame.ambientParams.a;
 #endif
 
     const float coating = 1.0 - clearcoat * coatFresnel;

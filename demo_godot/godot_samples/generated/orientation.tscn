@@ -1,0 +1,82 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://orientation_front.ctex" id="1_byj1w"]
+[ext_resource type="Texture2D" path="res://orientation_back.ctex" id="2_duh0f"]
+[ext_resource type="Texture2D" path="res://orientation_right.ctex" id="3_os4tr"]
+[ext_resource type="Texture2D" path="res://orientation_left.ctex" id="4_2ymnv"]
+[ext_resource type="Texture2D" path="res://orientation_top.ctex" id="5_41axe"]
+[ext_resource type="Texture2D" path="res://orientation_bottom.ctex" id="6_0jeq5"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ppgw7"]
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("1_byj1w")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_guhdd"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ity0x"]
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("2_duh0f")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_dtm5b"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_y8i4e"]
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("3_os4tr")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_5g61b"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7wk7c"]
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("4_2ymnv")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_wncvj"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s07tc"]
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("5_41axe")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_kwbv7"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vdh0n"]
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("6_0jeq5")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_m4von"]
+
+[node name="Orientation" type="Node3D" unique_id=1539473440]
+
+[node name="Front" type="MeshInstance3D" parent="." unique_id=612119852]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 1)
+material_override = SubResource("StandardMaterial3D_ppgw7")
+mesh = SubResource("PlaneMesh_guhdd")
+
+[node name="Back" type="MeshInstance3D" parent="." unique_id=1426282115]
+transform = Transform3D(-1, 0, 0, 0, 0, -1, 0, -1, 0, 0, 0, -1)
+material_override = SubResource("StandardMaterial3D_ity0x")
+mesh = SubResource("PlaneMesh_dtm5b")
+
+[node name="Right" type="MeshInstance3D" parent="." unique_id=1335078392]
+transform = Transform3D(0, 1, 0, 0, 0, -1, -1, 0, 0, 1, 0, 0)
+material_override = SubResource("StandardMaterial3D_y8i4e")
+mesh = SubResource("PlaneMesh_5g61b")
+
+[node name="Left" type="MeshInstance3D" parent="." unique_id=1634892709]
+transform = Transform3D(0, -1, 0, 0, 0, -1, 1, 0, 0, -1, 0, 0)
+material_override = SubResource("StandardMaterial3D_7wk7c")
+mesh = SubResource("PlaneMesh_wncvj")
+
+[node name="Top" type="MeshInstance3D" parent="." unique_id=1583339709]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1, 0)
+material_override = SubResource("StandardMaterial3D_s07tc")
+mesh = SubResource("PlaneMesh_kwbv7")
+
+[node name="Bottom" type="MeshInstance3D" parent="." unique_id=2009911908]
+transform = Transform3D(-1, 0, 0, 0, -1, 0, 0, 0, 1, 0, -1, 0)
+material_override = SubResource("StandardMaterial3D_vdh0n")
+mesh = SubResource("PlaneMesh_m4von")

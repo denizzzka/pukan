@@ -37,6 +37,9 @@ enum MaterialFlag: uint
     iridescenceThicknessTexture = 1u << 17,
     transmissionTexture = 1u << 18,
     volumeThicknessTexture = 1u << 19,
+    godotMetallicTexture = 1u << 20,
+    godotRoughnessTexture = 1u << 21,
+    godotNormalTwoChannel = 1u << 22,
 }
 
 alias MaterialFlags = BitFlags!MaterialFlag;
@@ -66,6 +69,8 @@ struct Material
     Vector4f transmission = Vector4f(0, 0, 0, 0);       // x = factor
     Vector4f volume = Vector4f(0, 0, 0, 0);             // x = thickness, y = attenuation distance, z = dispersion
     Vector4f attenuationColor = Vector4f(1, 1, 1, 1);
+    Vector4f uvTransform = Vector4f(1, 1, 0, 0);        // xy = UV scale, zw = UV offset
+    Vector4i textureChannels = Vector4i(0, 0, 0, 0);    // metallic, roughness, occlusion
 
     this(Vector3f color, MaterialMode mode = MaterialMode.lit, MaterialFlags flags = MaterialFlags.init)
     {
@@ -175,7 +180,7 @@ struct Material
     }
 }
 
-static assert(Material.sizeof == 224);
+static assert(Material.sizeof == 256);
 
 unittest
 {

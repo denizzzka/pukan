@@ -11,7 +11,7 @@ import std.meta: AliasSeq;
 /// jointMatrices[i] = skinRootInverse * transFromRoot[nodeIndices[i]] * inverseBindMatrices[i]
 class SkinMatrices : Compute
 {
-    package alias requirements = AliasSeq!(
+    public alias requirements = AliasSeq!(
         Requirement!(VkPhysicalDeviceVulkan13Features.maintenance4),
         Requirement!(VkPhysicalDeviceLimits.maxComputeWorkGroupInvocations, 64),
     );

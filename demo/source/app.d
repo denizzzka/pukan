@@ -3,7 +3,7 @@ import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
 import pukan.vulkan.renderpass: DrawPhase;
 import pukan.material: runtimeMaterialOverride;
-import pukan.gltf.pipelines: LightingMode, lightingMode;
+import pukan.pbr.pipelines: LightingMode, lightingMode;
 import pukan.scene_tree;
 import pukan.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.primitives_tree.mesh: LitVertex;
@@ -67,6 +67,8 @@ void main(string[] args) {
     bool noShadows;
     string materialMode = "authored";
     string[] sampleNames;
+    string screenshotPath;
+    uint screenshotFrame;
     auto getoptResult = getopt(
         args,
         "stereo", "render side-by-side stereo", &stereo,
@@ -77,6 +79,8 @@ void main(string[] args) {
         "no-shadows", "do not cast shadows", &noShadows,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
+        "screenshot", "save the captured frame to this PNG", &screenshotPath,
+        "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
     );
 
     if(getoptResult.helpWanted)
@@ -96,7 +100,6 @@ void main(string[] args) {
 
         sceneYaw = 0;
         scenePitch = 0;
-        cameraDistance = initialCameraDistance;
     }
 
     version(linux)
@@ -254,6 +257,16 @@ void main(string[] args) {
 
     shadowsOn = !noShadows;
 
+    camera = FlyCamera.lookingAt(
+        Vector3f(0, 0.2f, -initialCameraDistance),
+        Vector3f(0, 0, 0),
+    );
+    camera.fov = cameraFovY;
+    camera.speed = 1.0f;
+
+    if(!benchMode)
+        writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
+
     scene.addPointLight(Vector3f(0.9f, 0.35f, 1.1f), Vector3f(1.0f, 0.25f, 0.15f) * 6.0f, 4.0f);
     scene.addPointLight(Vector3f(-0.8f, 0.4f, 0.8f), Vector3f(0.15f, 0.45f, 1.0f) * 6.0f, 4.0f);
     scene.addPointLight(Vector3f(0.0f, 1.1f, 1.4f), Vector3f(0.3f, 0.9f, 0.35f) * 4.0f, 5.0f);
@@ -340,6 +353,8 @@ void main(string[] args) {
     ulong[] benchFrameNs;
     ulong[] benchUpdateNs;
 
+    const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
+
     // Main loop
     uint frameCount;
     while (!glfwWindowShouldClose(window) && (frames == 0 || frameCount < frames))
@@ -363,6 +378,62 @@ void main(string[] args) {
         if(!benchMode && !sceneDragging && interactionTimer.idleFor(frameTime, autoResumeDelay))
             sceneYaw += autoRotationSpeed * dt;
 
+        if(!benchMode)
+        {
+            bool pressed(int key) nothrow @nogc
+            {
+                return glfwGetKey(window, key) == GLFW_PRESS;
+            }
+
+            // A held look or pan button owns the cursor, so neither stops at a border
+            const captured =
+                glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS
+                || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+
+            if(captured != cursorCaptured)
+            {
+                cursorCaptured = captured;
+                controls.forgetCursor();
+
+                if(captured)
+                {
+                    glfwGetCursorPos(window, &savedCursorX, &savedCursorY);
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                }
+                else
+                {
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    glfwSetCursorPos(window, savedCursorX, savedCursorY);
+                }
+            }
+
+            CameraControlState controlState;
+            controlState.forward = pressed(GLFW_KEY_W);
+            controlState.back = pressed(GLFW_KEY_S);
+            controlState.left = pressed(GLFW_KEY_A);
+            controlState.right = pressed(GLFW_KEY_D);
+            controlState.rollLeft = pressed(GLFW_KEY_Q);
+            controlState.rollRight = pressed(GLFW_KEY_E);
+            controlState.fast = pressed(GLFW_KEY_LEFT_SHIFT) || pressed(GLFW_KEY_RIGHT_SHIFT);
+            controlState.slow = pressed(GLFW_KEY_LEFT_ALT) || pressed(GLFW_KEY_RIGHT_ALT);
+            controlState.resetRoll = pressed(GLFW_KEY_R);
+            controlState.toggleLookAxis = pressed(GLFW_KEY_H);
+
+            int viewportWidth;
+            int viewportHeight;
+            glfwGetWindowSize(window, &viewportWidth, &viewportHeight);
+            controlState.viewportWidth = cast(float) viewportWidth;
+            controlState.viewportHeight = cast(float) viewportHeight;
+
+            const lookAxis = camera.lookAxis;
+            controls.update(camera, controlState, dt);
+
+            if(camera.lookAxis != lookAxis)
+                writefln("look axis: %s", camera.lookAxis == LookAxis.horizontal
+                    ? "horizontal (world up)"
+                    : "screen (camera up)");
+        }
+
         ulong entityUpdateNs;
 
         WorldTransformation wtb;
@@ -376,8 +447,6 @@ void main(string[] args) {
             litCubeRotator,
         );
         entityUpdateNs += cast(ulong) (sw.peek - updateStart).total!"nsecs";
-        updateCursorRay(wtb, scene.swapChain.imageExtent);
-
 
         const transl = wtb.proj * wtb.view * wtb.model;
 
@@ -386,7 +455,7 @@ void main(string[] args) {
 
         scene.sphereRenderer.setCamera(
             sphereViewModel,
-            cameraFovY,
+            camera.fov,
             aspect,
             scene.swapChain.imageExtent.height,
             cameraNear,
@@ -396,7 +465,7 @@ void main(string[] args) {
 
         scene.cylinderRenderer.setCamera(
             cylinderViewModel,
-            cameraFovY,
+            camera.fov,
             aspect,
             scene.swapChain.imageExtent.height,
             cameraNear,
@@ -415,7 +484,7 @@ void main(string[] args) {
             writefln("lighting: %s", lightingMode);
         }
 
-        scene.shadowsEnabled = shadowsOn;
+        scene.sunShadow.enabled = shadowsOn;
 
         if(shadowsChanged)
         {
@@ -440,6 +509,9 @@ void main(string[] args) {
                 writefln("material override: %s", materialOverridden);
             }
         }
+
+        if(screenshotPath.length && frameCount == captureFrame)
+            scene.captureFrame(screenshotPath);
 
         scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
 
@@ -469,7 +541,7 @@ void main(string[] args) {
                         // Both phases of an eye share the view and the uniform
                         if(phase == DrawPhase.surface)
                         {
-                            auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
+                            auto stereoWtb = calculateStereoWTB(eyeExtent);
                             tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
                             scene.updateFrameUniforms(frame, view, stereoWtb[view]);
                         }
@@ -478,13 +550,13 @@ void main(string[] args) {
                     },
                     (buf, eye, eyeExtent, phase) {
                         const view = crossEyed ? 1 - eye : eye;
-                        auto stereoWtb = calculateStereoWTB(eyeExtent, curr);
+                        auto stereoWtb = calculateStereoWTB(eyeExtent);
                         tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
                         scene.updateFrameUniforms(frame, view, stereoWtb[view]);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
                     },
                     (buf) {
-                        tree.root.payload = Bone(scene.shadowViewProj * wtb.model);
+                        tree.root.payload = Bone(scene.sunShadow.viewProj * wtb.model);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );
@@ -504,12 +576,15 @@ void main(string[] args) {
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
                     (buf) {
-                        tree.root.payload = Bone(scene.shadowViewProj * wtb.model);
+                        tree.root.payload = Bone(scene.sunShadow.viewProj * wtb.model);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );
             }
         });
+
+        if(screenshotPath.length && frameCount == captureFrame)
+            writeln("screenshot saved to ", screenshotPath);
 
         const frameEnd = sw.peek;
 
@@ -661,9 +736,6 @@ enum cameraNear = 0.01f;
 enum cameraFar = 10.0f;
 enum stereoEyeSeparation = 0.06f;
 enum initialCameraDistance = 2.2f;
-enum cameraPanLimit = 3.0f;
-enum cameraPanSensitivity = 0.002f;
-enum cameraWheelPanStep = 0.15f;
 enum sceneDepth = 1.0f;
 
 bool benchMode;
@@ -683,10 +755,11 @@ private string[] benchSampleNames = [
     "SimpleTexture",
 ];
 
-float cameraDistance = initialCameraDistance;
-Vector3f cameraPan = Vector3f(0, 0, 0);
-/// World direction from the camera through the cursor, refreshed every frame
-Vector3f cursorRay = Vector3f(0, 0, 1);
+FlyCamera camera;
+CameraControls controls;
+bool cursorCaptured;
+double savedCursorX;
+double savedCursorY;
 
 bool skyChanged;
 bool shadowsOn = true;
@@ -706,7 +779,7 @@ extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
 
     interactionTimer.touch(frameTime);
 
-    if(key == GLFW_KEY_S)
+    if(key == GLFW_KEY_L)
     {
         lightingMode = lightingMode == LightingMode.ibl ? LightingMode.analytic
             : lightingMode == LightingMode.analytic ? LightingMode.none
@@ -737,12 +810,7 @@ extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
     if(benchMode)
         return;
 
-    const step = cast(float) yoffset * cameraWheelPanStep;
-
-    cameraPan.x = clampPan(cameraPan.x + cursorRay.x * step);
-    cameraPan.y = clampPan(cameraPan.y + cursorRay.y * step);
-    cameraPan.z = clampPan(cameraPan.z + cursorRay.z * step);
-
+    controls.scroll(cast(float) yoffset);
     interactionTimer.touch(frameTime);
 }
 
@@ -773,7 +841,6 @@ double frameTime;
 double cursorX;
 double cursorY;
 bool sceneDragging;
-bool cameraDragging;
 float sceneYaw = 0.0f;
 float scenePitch = 0.0f;
 
@@ -791,29 +858,30 @@ extern(C) void onMouseButton(GLFWwindow*, int button, int action, int) nothrow @
         else if(action == GLFW_RELEASE)
             sceneDragging = false;
     }
-    else if(button == GLFW_MOUSE_BUTTON_RIGHT)
-        cameraDragging = action == GLFW_PRESS;
 }
 
-extern(C) void onCursorPos(GLFWwindow*, double xpos, double ypos) nothrow @nogc
+extern(C) void onCursorPos(GLFWwindow* window, double xpos, double ypos) nothrow @nogc
 {
     if(benchMode)
         return;
+
+    const look = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+    const pan = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+
+    controls.cursorMoved(xpos, ypos, look, pan);
 
     const dx = xpos - cursorX;
     const dy = ypos - cursorY;
     cursorX = xpos;
     cursorY = ypos;
 
-    if(cameraDragging)
-    {
-        cameraPan.x = clampPan(cameraPan.x + cast(float) dx * cameraPanSensitivity);
-        cameraPan.y = clampPan(cameraPan.y - cast(float) dy * cameraPanSensitivity);
-        return;
-    }
+    if(look || pan)
+        interactionTimer.touch(frameTime);
 
     if(!sceneDragging)
         return;
+
+    interactionTimer.touch(frameTime);
 
     sceneYaw -= cast(float) dx * manualRotationSensitivity;
     scenePitch -= cast(float) dy * manualRotationSensitivity;
@@ -824,59 +892,14 @@ extern(C) void onCursorPos(GLFWwindow*, double xpos, double ypos) nothrow @nogc
         scenePitch = -maxScenePitch;
 }
 
-private void updateCursorRay(in WorldTransformation wtb, VkExtent2D extent) nothrow @nogc
-{
-    const viewProj = wtb.proj * wtb.view;
-    const invViewProj = viewProj.inverse;
-
-    const ndcX = cast(float) (2.0 * cursorX / extent.width - 1.0);
-    const ndcY = cast(float) (2.0 * cursorY / extent.height - 1.0);
-
-    const nearPoint = Vector4f(ndcX, ndcY, 0, 1) * invViewProj;
-    const farPoint = Vector4f(ndcX, ndcY, 1, 1) * invViewProj;
-
-    const direction = Vector3f(
-        farPoint.x / farPoint.w - nearPoint.x / nearPoint.w,
-        farPoint.y / farPoint.w - nearPoint.y / nearPoint.w,
-        farPoint.z / farPoint.w - nearPoint.z / nearPoint.w,
-    );
-
-    cursorRay = direction.normalized;
-}
-
-private float clampPan(float value) nothrow @nogc
-{
-    if(value < -cameraPanLimit)
-        return -cameraPanLimit;
-    if(value > cameraPanLimit)
-        return cameraPanLimit;
-
-    return value;
-}
-
-private Vector3f cameraEye() nothrow @nogc
-{
-    return Vector3f(0, -0.2f, -cameraDistance) + cameraPan;
-}
-
-private Vector3f cameraTarget() nothrow @nogc
-{
-    return cameraPan;
-}
-
-WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
+WorldTransformation calculateWTB(in VkExtent2D imageExtent)
 {
     WorldTransformation wtb;
 
     wtb.model = rotationMatrix!float(Axis.y, sceneYaw) * rotationMatrix!float(Axis.x, scenePitch);
-    // View is turned inside out, so we don't need to correct winding order of the glTF mesh vertices
-    wtb.view = lookAtMatrix(
-        cameraEye(),
-        cameraTarget(),
-        Vector3f(0, 1, 0), // downward direction (upward if OpenGL) in World coordinates.
-    );
-    wtb.proj = perspectiveMatrix(
-        cameraFovY,
+    wtb.view = camera.view;
+    wtb.proj = vulkanPerspectiveMatrix(
+        camera.fov,
         cast(float) imageExtent.width / imageExtent.height,
         cameraNear, cameraFar,
     );
@@ -884,14 +907,14 @@ WorldTransformation calculateWTB(in VkExtent2D imageExtent, float currDeltaTime)
     return wtb;
 }
 
-WorldTransformation[2] calculateStereoWTB(in VkExtent2D eyeExtent, float currDeltaTime)
+WorldTransformation[2] calculateStereoWTB(in VkExtent2D eyeExtent)
 {
-    auto base = calculateWTB(eyeExtent, currDeltaTime);
+    auto base = calculateWTB(eyeExtent);
     const views = makeStereoViews(
-        cameraEye(),
-        cameraTarget(),
-        Vector3f(0, 1, 0),
-        cameraFovY,
+        camera.position,
+        camera.position + camera.forward * initialCameraDistance,
+        camera.up,
+        camera.fov,
         eyeExtent,
         cameraNear,
         cameraFar,
@@ -919,7 +942,7 @@ void updateWorldTransformations(
     Bone* litCubeRotator,
 )
 {
-    wtb = calculateWTB(imageExtent, curr);
+    wtb = calculateWTB(imageExtent);
 
     auto cubeRotation = rotationQuaternion(Vector3f(0, 1, 0), 90f.degtorad * curr * 0.5);
     *cubeRotator = Bone(cubeRotation.toMatrix4x4);

@@ -1,8 +1,8 @@
-module pukan.gltf.pipelines;
+module pukan.pbr.pipelines;
 
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
 
-struct GltfPipelineVariants
+struct PbrPipelineVariants
 {
     GraphicsPipelineCfg opaque;
     GraphicsPipelineCfg doubleSided;
@@ -32,26 +32,29 @@ bool transmissionPass = true;
 /// for the resolve pass instead of blending in place
 bool oitPass = true;
 
-struct GltfSkyPipelines
+/// Draw-time switch: every surface uses the plain lit pipeline as opaque
+bool plainShading;
+
+struct PbrSkyPipelines
 {
-    GltfPipelineVariants ibl;
-    GltfPipelineVariants analytic;
-    GltfPipelineVariants none;
+    PbrPipelineVariants ibl;
+    PbrPipelineVariants analytic;
+    PbrPipelineVariants none;
 }
 
 /// One shader per material mode; the mode is fixed when the file is loaded
-struct GltfModePipelines
+struct PbrModePipelines
 {
-    GltfSkyPipelines pbr;
-    GltfSkyPipelines pbrCore;
-    GltfPipelineVariants lit;
-    GltfPipelineVariants unlit;
+    PbrSkyPipelines pbr;
+    PbrSkyPipelines pbrCore;
+    PbrPipelineVariants lit;
+    PbrPipelineVariants unlit;
 }
 
-struct GltfPipelines
+struct PbrPipelines
 {
-    GltfModePipelines skinned;
-    GltfModePipelines unskinned;
+    PbrModePipelines skinned;
+    PbrModePipelines unskinned;
     GraphicsPipelineCfg skinnedShadow;
     GraphicsPipelineCfg unskinnedShadow;
 }

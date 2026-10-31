@@ -1,0 +1,10 @@
+config_version=5
+
+[application]
+
+config/name="pukan exported fixture"
+run/main_scene="res://main.tscn"
+
+[rendering]
+
+textures/lossless_compression/force_png=true

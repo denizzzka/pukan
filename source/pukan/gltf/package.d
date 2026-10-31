@@ -1,15 +1,17 @@
 module pukan.gltf;
 
 import dlib.math;
-public import pukan.gltf.loader: LoadStats, loadGlTF2;
+public import pukan.gltf.loader: GltfAsset, LoadStats, createGltfInstance, loadGltfAsset;
 public import pukan.gltf.factory: GltfFactory;
-import pukan.gltf.accessor;
+import pukan.pbr.accessor;
 import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader;
-import pukan.gltf.pipelines: GltfPipelineVariants, GltfPipelines, LightingMode, lightingMode, oitPass, transmissionPass;
-import pukan.gltf.mesh: GltfMesh, MeshClass = GltfMesh, IndicesDescr, UploadedVertices;
+import pukan.pbr.pipelines: PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
+import pukan.gltf.material: applyGltfMaterial;
+import pukan.mesh: mirrors;
+import pukan.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
 import pukan.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
-import pukan.misc: Boxf;
+import pukan.misc: Boxf, isVisible, mergeAabb, transformAabb;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -148,7 +150,7 @@ class Node : BaseNode
     }
 }
 
-class GlTF : DrawableByVulkan
+class GlTF : DrawableByVulkan, Blended
 {
     LoadStats loadStats;
 
@@ -161,12 +163,12 @@ class GlTF : DrawableByVulkan
     package GltfContent content;
     alias this = content;
 
-    private BufferPieceOnGPU[] gpuBuffs;
+    package GltfAsset asset;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private VkDescriptorImageInfo fakeTextureInfo;
     private VkBuffer vertexFallback;
     private GltfLoadOptions loadOptions;
-    private GltfPipelines pipelines;
+    private PbrPipelines pipelines;
 
     private MeshClass[] meshes;
 
@@ -191,13 +193,11 @@ class GlTF : DrawableByVulkan
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
     package this(
-        ref GltfPipelines pipelines,
+        ref PbrPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
-        GltfContent cont,
-        LoaderNode[] nodes,
-        LoaderNode rootSceneNode,
+        GltfAsset asset,
         Texture fakeTexture,
         VkBuffer vertexFallback,
         GltfLoadOptions loadOptions,
@@ -208,7 +208,8 @@ class GlTF : DrawableByVulkan
         this.allocator = allocator;
         this.materialBuffer = materialBuffer;
         this.vertexFallback = vertexFallback;
-        content = cont;
+        this.asset = asset;
+        content = asset.content;
 
         fakeTextureInfo = VkDescriptorImageInfo(
             imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -218,14 +219,13 @@ class GlTF : DrawableByVulkan
 
         assert(content.meshes.length > 0);
 
-        animation = AnimationSupport(&content, nodes.length);
-        gpuBuffs.length = content.bufferViews.length;
-        skinsBaked = content.skins.length > 0 && !isSkinAnimated(content, nodes);
+        animation = AnimationSupport(&content, asset.nodes.length);
+        skinsBaked = content.skins.length > 0 && !isSkinAnimated(content, asset.nodes);
 
         {
-            baseNodeTranslations.length = nodes.length;
+            baseNodeTranslations.length = asset.nodes.length;
 
-            foreach(i, ref node; nodes)
+            foreach(i, ref node; asset.nodes)
                 baseNodeTranslations[i] = node.trans;
 
             // Vaules if object is not animated:
@@ -233,7 +233,7 @@ class GlTF : DrawableByVulkan
         }
 
         {
-            initJointMatricesBuffer(device, nodes);
+            initJointMatricesBuffer(device, asset.nodes);
 
             Node createNodeHier(ref LoaderNode ln)
             {
@@ -241,7 +241,7 @@ class GlTF : DrawableByVulkan
 
                 foreach(idx; ln.childrenNodeIndices)
                 {
-                    auto c = createNodeHier(nodes[idx]);
+                    auto c = createNodeHier(asset.nodes[idx]);
                     c.trans = &animation.perNodeTranslations[idx];
 
                     setupNodeTransFromRoot(c, idx);
@@ -252,8 +252,8 @@ class GlTF : DrawableByVulkan
                 return nn;
             }
 
-            this.rootSceneNode = createNodeHier(rootSceneNode);
-            this.rootSceneNodeTrans = rootSceneNode.trans;
+            this.rootSceneNode = createNodeHier(asset.rootSceneNode);
+            this.rootSceneNodeTrans = asset.rootSceneNode.trans;
             this.rootSceneNode.trans = &rootSceneNodeTrans;
         }
 
@@ -288,6 +288,14 @@ class GlTF : DrawableByVulkan
         this.rootSceneNode.traversal((node){
             setUpEachNode(node, device);
         });
+
+        // Raw glTF indices keep the counter-clockwise winding of the file
+        applyWinding!(Node, BaseNode)(
+            cast(Node) rootSceneNode,
+            Matrix4x4f.identity,
+            true,
+            node => node.trans.calcMatrix,
+        );
     }
 
     protected void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -328,17 +336,9 @@ class GlTF : DrawableByVulkan
 
     ~this()
     {
-        foreach(ref piece; gpuBuffs)
-            if(piece && piece.buffer)
-                destroy(piece.buffer);
-
         foreach(ref buffer; jointMatricesBufs)
             if(buffer)
                 destroy(buffer);
-
-        foreach(ref texture; content.textures)
-            if(texture)
-                destroy(texture);
     }
 
     string possibleName() const
@@ -383,16 +383,26 @@ class GlTF : DrawableByVulkan
         }
     }
 
-    auto calcAABB() const
+    auto calcAABB()
     {
-        import pukan.misc: Boxf;
+        Boxf result;
 
-        Boxf r;
+        void collect(Node node, Matrix4x4f trans)
+        {
+            assert(node.trans !is null);
 
-        foreach(m; meshes)
-            m.calcAABB(gpuBuffs, r);
+            trans *= node.trans.calcMatrix;
 
-        return r;
+            foreach(mesh; node.meshes)
+                mergeAabb(result, transformAabb(mesh.localAABB, trans));
+
+            foreach(child; node.children)
+                collect(cast(Node) child, trans);
+        }
+
+        collect(rootSceneNode, Matrix4x4f.identity);
+
+        return result;
     }
 
     //TODO: private
@@ -406,9 +416,11 @@ class GlTF : DrawableByVulkan
         auto start = MonoTime.currTime;
 
         commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
-            foreach(ref piece; gpuBuffs)
+            foreach(ref piece; asset.gpuBuffs[asset.uploadedBuffers .. $])
                 if(piece)
                     piece.recordUpload(buf);
+
+            asset.uploadedBuffers = asset.gpuBuffs.length;
 
             materialBuffer.recordUpload(buf);
 
@@ -445,7 +457,7 @@ class GlTF : DrawableByVulkan
         int skinIdx,
     )
     {
-        UploadedVertices uplVert;
+        MeshStreams uplVert;
 
         {
             const vertIdx = primitive.attributes["POSITION"].get!ushort;
@@ -467,9 +479,29 @@ class GlTF : DrawableByVulkan
 
         if(hasSkin)
         {
-            uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(
-                primitive.attributes["JOINTS_0"].get!uint
-            );
+            const jointAccessor = accessors[primitive.attributes["JOINTS_0"].get!uint];
+
+            if(jointAccessor.componentType == ComponentType.UNSIGNED_BYTE)
+            {
+                alias Vector4ub = Vector!(ubyte, 4);
+
+                const access = content.getAccess!(Type.VEC4, Vector4ub)(jointAccessor);
+                auto range = content.rangify!Vector4ub(access);
+
+                Vector4us[] joints;
+                joints.length = jointAccessor.count;
+
+                foreach(i; 0 .. jointAccessor.count)
+                {
+                    const joint = range[i];
+                    joints[i] = Vector4us(joint.x, joint.y, joint.z, joint.w);
+                }
+
+                uplVert.joints = createVertexBuffer(device, joints, asset.gpuBuffs);
+            }
+            else
+                uplVert.joints = content.getAccess!(Type.VEC4, Vector4us)(jointAccessor);
+
             uplVert.weights = content.getAccess!(Type.VEC4, Vector4f)(
                 primitive.attributes["WEIGHTS_0"].get!uint
             );
@@ -503,15 +535,15 @@ class GlTF : DrawableByVulkan
                 foreach(value; range)
                     widened ~= value;
 
-                const widenedAccess = createVertexBuffer(device, widened, gpuBuffs, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-                uplVert.indices = IndicesDescr(device, widenedAccess, ComponentType.UNSIGNED_SHORT);
+                const widenedAccess = createVertexBuffer(device, widened, asset.gpuBuffs, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                uplVert.indices = IndicesDescr(widenedAccess, VK_INDEX_TYPE_UINT16);
             }
             else
             {
                 const indicesAccessor = content.getAccess(indices);
                 createGpuBufIfNeed(device, indicesAccessor, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-                uplVert.indices = IndicesDescr(device, indicesAccessor, indices.componentType);
+                uplVert.indices = IndicesDescr(indicesAccessor, indices.componentType == ComponentType.UNSIGNED_INT ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16);
             }
         }
 
@@ -529,6 +561,47 @@ class GlTF : DrawableByVulkan
 
             uplVert.texCoords = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        }
+
+        const hasVertexColors = ("COLOR_0" in primitive.attributes) !is null;
+        if(hasVertexColors)
+        {
+            const colorIdx = primitive.attributes["COLOR_0"].get!ushort;
+            auto colors = &accessors[colorIdx];
+            enforce(colors.count == vertexCount);
+            debug assert(colors.type == Type.VEC3 || colors.type == Type.VEC4);
+
+            const view = content.bufferViews[colors.viewIdx];
+            const stride = view.stride ? view.stride : colors.typeSizeOf;
+            const ubyte* data = view.buf.ptr + colors.offset;
+
+            uint[] packed;
+            packed.length = colors.count;
+
+            float component(const ubyte* p, size_t index) const
+            {
+                with(ComponentType)
+                switch(colors.componentType)
+                {
+                    case FLOAT:          return (cast(const float*) p)[index];
+                    case UNSIGNED_BYTE:  return p[index] / 255.0f;
+                    case UNSIGNED_SHORT: return (cast(const ushort*) p)[index] / 65535.0f;
+                    default: assert(0);
+                }
+            }
+
+            foreach(i; 0 .. colors.count)
+            {
+                const p = data + i * stride;
+                const a = colors.type == Type.VEC4 ? component(p, 3) : 1.0f;
+                packed[i] =
+                    packColorComponent(component(p, 0)) |
+                    (packColorComponent(component(p, 1)) << 8) |
+                    (packColorComponent(component(p, 2)) << 16) |
+                    (packColorComponent(a) << 24);
+            }
+
+            uplVert.colors = createVertexBuffer(device, packed, asset.gpuBuffs);
         }
 
         // Tangent data is only needed when a normal map samples it
@@ -615,7 +688,7 @@ class GlTF : DrawableByVulkan
                     bakedNormals[i] = Vector3f(baked.x, baked.y, baked.z).normalized;
                 }
 
-                uplVert.normals = createVertexBuffer(device, bakedNormals, gpuBuffs);
+                uplVert.normals = createVertexBuffer(device, bakedNormals, asset.gpuBuffs);
             }
 
             if(hasTangents)
@@ -650,10 +723,10 @@ class GlTF : DrawableByVulkan
                     bakedTangents[i] = Vector4f(n.x, n.y, n.z, t.w);
                 }
 
-                uplVert.tangents = createVertexBuffer(device, bakedTangents, gpuBuffs);
+                uplVert.tangents = createVertexBuffer(device, bakedTangents, asset.gpuBuffs);
             }
 
-            uplVert.vertices = createVertexBuffer(device, bakedPositions, gpuBuffs);
+            uplVert.vertices = createVertexBuffer(device, bakedPositions, asset.gpuBuffs);
 
             uplVert.aabb = Boxf.init;
             hasSkin = false;
@@ -678,7 +751,7 @@ class GlTF : DrawableByVulkan
         // Every mesh binds MATERIAL_JOINTS; without a skin the shader ignores it
         VkDescriptorBufferInfo jointsUboInfo = jointsUboInfos[skinIdx >= 0 ? skinIdx : 0];
 
-        auto m = new GltfMesh(
+        auto m = new PbrMesh(
             mesh.name,
             uplVert,
             allocator,
@@ -689,14 +762,20 @@ class GlTF : DrawableByVulkan
             jointsUboInfo,
         );
 
-        m.applyMaterial(primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents, loadOptions);
-        m.buildGeometry(gpuBuffs);
+        applyGltfMaterial(m, primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents, hasVertexColors, loadOptions);
+        m.buildGeometry(asset.gpuBuffs);
         return m;
     }
 
     private static bool hasNormalTexture(in Json json)
     {
         return json.type == Json.Type.object && ("normalTexture" in json) !is null;
+    }
+
+    private static ubyte packColorComponent(float value)
+    {
+        import std.algorithm: max, min;
+        return cast(ubyte) (min(max(value, 0.0f), 1.0f) * 255.0f + 0.5f);
     }
 
     private static Matrix4x4f skinMatrix(
@@ -730,10 +809,10 @@ class GlTF : DrawableByVulkan
 
     private auto createGpuBufIfNeed(LogicalDevice device, in BufAccess ac, VkBufferUsageFlags flags)
     {
-        if(gpuBuffs[ac.viewIdx] is null)
-            gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
+        if(asset.gpuBuffs[ac.viewIdx] is null)
+            asset.gpuBuffs[ac.viewIdx] = content.bufferViews[ac.viewIdx].createGPUBuffer(device, flags);
 
-        return &gpuBuffs[ac.viewIdx];
+        return &asset.gpuBuffs[ac.viewIdx];
     }
 
     void refreshBuffers(VkCommandBuffer buf)
@@ -758,6 +837,9 @@ class GlTF : DrawableByVulkan
 
     bool isBlended() const
     {
+        if(plainShading)
+            return false;
+
         foreach(mesh; meshes)
             if(mesh.alphaMode == AlphaMode.blend)
                 return true;
@@ -780,41 +862,81 @@ class GlTF : DrawableByVulkan
         }
 
         //TODO: not need to call this recursive - just call it in row and use fromSkinRootNodeTranslations to get coords
-        void collectDraws(Matrix4x4f trans, Node node, ref MeshDraw[] draws)
+        void collectDraws(Matrix4x4f trans, Node node, ref MeshDraw[] draws, bool mirrored)
         {
             assert(node.trans !is null);
 
-            trans *= node.trans.calcMatrix;
+            const local = node.trans.calcMatrix;
+            trans *= local;
+
+            debug
+            {
+                mirrored = mirrored != local.mirrors;
+
+                foreach(mesh; node.meshes)
+                    assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
+            }
 
             foreach(mesh; node.meshes)
             {
+                //TODO: cull skinned meshes by their posed bounds
+                if(!mesh.hasSkin && !isVisible(mesh.localAABB, trans))
+                    continue;
+
                 const clip = Vector4f(0, 0, 0, 1) * trans;
                 draws ~= MeshDraw(mesh, trans, clip.w);
             }
 
             foreach(c; node.children)
-                collectDraws(trans, cast(Node) c, draws);
+                collectDraws(trans, cast(Node) c, draws, mirrored);
         }
 
-        // To avoid mirroring if loaded OpenGL mesh into Vulkan
-        trans *= Vector3f(-1, -1, -1).scaleMatrix;
-
         MeshDraw[] draws;
-        collectDraws(trans, rootSceneNode, draws);
+        collectDraws(trans, rootSceneNode, draws, false);
 
         // Back to front only matters for the in-place blend path
         if(phase == DrawPhase.blended)
             draws.sort!((a, b) => a.depth > b.depth);
 
-        foreach(draw; draws)
-            if(matchesPhase(draw.mesh, phase))
-                draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+        if(phase == DrawPhase.surface || phase == DrawPhase.shadow)
+        {
+            MeshClass[] order;
+            Matrix4x4f[][MeshClass] groups;
+
+            foreach(draw; draws)
+            {
+                if(!matchesPhase(draw.mesh, phase))
+                    continue;
+
+                //TODO: batch skinned meshes that share a pose
+                if(draw.mesh.hasSkin)
+                {
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+                    continue;
+                }
+
+                if(auto group = draw.mesh in groups)
+                    *group ~= draw.trans;
+                else
+                {
+                    order ~= draw.mesh;
+                    groups[draw.mesh] = [draw.trans];
+                }
+            }
+
+            foreach(mesh; order)
+                mesh.drawBatch(buf, selectPipeline(mesh, phase), groups[mesh], frameSet);
+        }
+        else
+            foreach(draw; draws)
+                if(matchesPhase(draw.mesh, phase))
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
     }
 
     private static bool matchesPhase(const MeshClass mesh, DrawPhase phase)
     {
-        const blended = mesh.alphaMode == AlphaMode.blend;
-        const transmissive = mesh.material.transmission.x > 0.0f;
+        const blended = !plainShading && mesh.alphaMode == AlphaMode.blend;
+        const transmissive = !plainShading && mesh.material.transmission.x > 0.0f;
         // Without its own pass, a transmissive mesh draws where the opaque ones do
         const ownPass = transmissive && transmissionPass;
 
@@ -838,6 +960,9 @@ class GlTF : DrawableByVulkan
 
         auto modes = mesh.hasSkin ? pipelines.skinned : pipelines.unskinned;
 
+        if(plainShading)
+            return mesh.doubleSided ? modes.lit.doubleSided : modes.lit.opaque;
+
         if(mesh.material.mode == MaterialMode.unlit || lightingMode == LightingMode.unlit)
             return selectVariant(modes.unlit, mesh);
 
@@ -853,7 +978,7 @@ class GlTF : DrawableByVulkan
         return selectVariant(variants, mesh);
     }
 
-    private static GraphicsPipelineCfg selectVariant(GltfPipelineVariants variants, const MeshClass mesh)
+    private static GraphicsPipelineCfg selectVariant(PbrPipelineVariants variants, const MeshClass mesh)
     {
         if(mesh.alphaMode == AlphaMode.blend)
         {
@@ -880,19 +1005,17 @@ class GlTF : DrawableByVulkan
 class SkinnedGlTF : GlTF
 {
     package this(
-        ref GltfPipelines pipelines,
+        ref PbrPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
-        GltfContent cont,
-        LoaderNode[] nodes,
-        LoaderNode rootSceneNode,
+        GltfAsset asset,
         Texture fakeTexture,
         VkBuffer vertexFallback,
         GltfLoadOptions loadOptions,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback, loadOptions);
+        super(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, loadOptions);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -953,19 +1076,17 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
     package SkinMatrices[] skinMatrices;
 
     package this(
-        ref GltfPipelines pipelines,
+        ref PbrPipelines pipelines,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         LogicalDevice device,
-        GltfContent cont,
-        LoaderNode[] nodes,
-        LoaderNode rootSceneNode,
+        GltfAsset asset,
         Texture fakeTexture,
         VkBuffer vertexFallback,
         GltfLoadOptions loadOptions,
     )
     {
-        super(pipelines, allocator, materialBuffer, device, cont, nodes, rootSceneNode, fakeTexture, vertexFallback, loadOptions);
+        super(pipelines, allocator, materialBuffer, device, asset, fakeTexture, vertexFallback, loadOptions);
     }
 
     protected override void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)

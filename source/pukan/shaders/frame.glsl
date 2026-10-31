@@ -18,7 +18,9 @@ struct FrameData
     mat4 shadowViewProj;
     vec4 cameraPosition;
     vec4 exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
-    vec4 shadowParams;   // x = 1 while the sun's shadow map is used
+    vec4 shadowParams;   // x = 1 while the sun's shadow map is used, y = depth bias
+    vec4 ambientParams;  // rgb = ambient tint, a = ambient energy
+    vec4 tonemapParams;  // x = mode, y = white
 };
 
 #include "frame_bindings.h"

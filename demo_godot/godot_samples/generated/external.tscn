@@ -1,0 +1,22 @@
+[gd_scene format=4]
+
+[ext_resource type="ArrayMesh" path="res://procedural_mesh.tres" id="1_mesh"]
+[ext_resource type="Material" path="res://procedural_material.tres" id="2_mat"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_1"]
+
+[node name="Root" type="Node3D"]
+
+[node name="ExternalMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 0)
+mesh = ExtResource("1_mesh")
+
+[node name="OverriddenBox" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0)
+mesh = SubResource("BoxMesh_1")
+material_override = ExtResource("2_mat")
+
+[node name="SurfaceOverride" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+mesh = SubResource("BoxMesh_1")
+surface_material_override/0 = ExtResource("2_mat")

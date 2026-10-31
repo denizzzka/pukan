@@ -67,6 +67,14 @@ final class MeshResources
     }
 }
 
+/// True when the transform has a negative determinant, that is, it mirrors
+bool mirrors(Matrix4x4f m)
+{
+    return m.a11 * (m.a22 * m.a33 - m.a23 * m.a32)
+        - m.a12 * (m.a21 * m.a33 - m.a23 * m.a31)
+        + m.a13 * (m.a21 * m.a32 - m.a22 * m.a31) < 0;
+}
+
 /// Geometry and descriptor set shared by static and skinned meshes
 class Mesh
 {
@@ -79,6 +87,22 @@ class Mesh
     VkDeviceSize indexOffset;
     VkIndexType indexType;
     uint indexCount;
+
+    /// Native winding of this mesh; set per draw with dynamic state
+    VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    /// Whether the transform chain that places this mesh mirrors
+    bool mirrored;
+
+    /// Godot keeps clockwise triangles and glTF counter-clockwise ones, and
+    /// Vulkan's Y-down clip space adds one flip that both then need
+    void applyFrontFace(bool mirrored, bool counterClockwiseTriangles)
+    {
+        this.mirrored = mirrored;
+        frontFace = mirrored != counterClockwiseTriangles
+            ? VK_FRONT_FACE_COUNTER_CLOCKWISE
+            : VK_FRONT_FACE_CLOCKWISE;
+    }
 
     protected MaterialBuffer materialBuffer;
     protected size_t materialSlot;
@@ -184,6 +208,8 @@ class Mesh
                 0,
                 null,
             );
+
+        vkCmdSetFrontFace(buf, frontFace);
 
         if(indexCount)
             vkCmdDrawIndexed(buf, indexCount, 1, 0, 0, 0);

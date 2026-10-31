@@ -1,0 +1,27 @@
+[gd_scene format=4]
+
+[sub_resource type="BoxMesh" id="box"]
+
+[sub_resource type="PlaneMesh" id="plane"]
+
+[node name="Root" type="Node3D"]
+
+[node name="BoxA" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, 0)
+mesh = SubResource("box")
+
+[node name="BoxB" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("box")
+
+[node name="BoxC" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, 0)
+mesh = SubResource("box")
+
+[node name="PlaneA" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.2, 0)
+mesh = SubResource("plane")
+
+[node name="PlaneB" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.2, 0)
+mesh = SubResource("plane")

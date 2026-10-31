@@ -1,0 +1,7 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[ext_resource type="Texture2D" path="res://checker.png" id="1_6m2yl"]
+
+[resource]
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_6m2yl")

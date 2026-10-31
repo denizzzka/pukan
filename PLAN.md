@@ -25,9 +25,290 @@ only a suggested grouping.
 
 ## Content formats
 
-- [ ] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
-      an integer grid with a mesh library per cell; decide whether to import that
-      data as is or to grow the same cell-and-library model on top of #16.
+### Godot 4 scenes
+
+Goal: load Godot 4 3D scenes from source projects and from packed production
+builds, a `.pck` or an exported directory. Godot 3 is out of scope. Code lives
+in `source/pukan/godot_scene/`; shared PBR pieces move to
+`source/pukan/pbr/`.
+
+Formats in scope: `.tscn`, `.tres`, `.escn` (text), `.scn`, `.res` (binary
+RSRC 5/6), `.ctex` (CompressedTexture2D), imported `.glb`/`.gltf`/`.obj`
+references, and `.pck` archives. `res://` resolves inside the project directory
+or the pack.
+
+#### Shared PBR groundwork
+
+- [x] Extract `PbrPipelines`, `PbrMesh`/`MeshGeometry` and the shared
+      `PbrFactory`; glTF and Godot both use them.
+- [x] Add vertex colors to the PBR path: a color vertex stream with a white
+      fallback, `fragColor` in `mesh_pbr*.vert`, `COLOR_0` in glTF and `COLOR`
+      in Godot surfaces. glTF allows `COLOR_0`; the loader never implemented
+      it. This is a gap in pukan, not a format requirement.
+- [x] Add a static `GODOT_MATERIAL` shader variant for Godot's separate
+      metallic and roughness maps, channel selectors and UV1 transform. Sample
+      the maps directly; do not repack textures on the CPU.
+- [x] Extend `Material` with the fields the Godot variant needs and keep the
+      glTF layout working.
+
+#### Phase 1: text scenes, static geometry and materials
+
+- [x] Text parser for `gd_scene`/`gd_resource`: tags, ext/sub resources, nodes,
+      properties, typed arrays, dictionaries, `SubResource`/`ExtResource`,
+      base64 `PackedByteArray` (format 4).
+- [x] `res://` resolution from `project.godot` and external text resources and
+      textures.
+- [x] External `.glb`/`.gltf` `PackedScene` references through the glTF loader.
+- [ ] External `.obj` references.
+- [x] `ArrayMesh` decoder for uncompressed version 2 surfaces: separate
+      position, normal and tangent regions in `vertex_data`, interleaved
+      `attribute_data` and `skin_data`, octahedral normals and tangents, RGBA8
+      colors, float32 UVs and 16/32-bit indices.
+- [x] Attribute-compressed surface decoding: quantized positions, 16-bit UVs
+      and a TBN axis-angle pair, which gives both the normal and the tangent.
+- [x] Surface format version 1 conversion for files saved by Godot 4.0 and 4.1.
+- [x] Primitive meshes: `BoxMesh`, `SphereMesh`, `CylinderMesh`,
+      `CapsuleMesh`, `TorusMesh`, `PlaneMesh`, `QuadMesh` and `PrismMesh`.
+- [x] Primitive subdivisions, and the exact `CapsuleMesh` and `PrismMesh`
+      shapes.
+- [x] `MeshInstance3D`: node tree, `transform`, `visible`, mesh and
+      per-surface materials.
+- [x] `MeshInstance3D`: `cast_shadow` modes and load-time `material_override`
+      and `surface_material_override/N`.
+- [x] `MeshInstance3D`: shared mesh geometry within a scene.
+- [ ] `MeshInstance3D`: material instances.
+- [x] `StandardMaterial3D` and `ORMMaterial3D`: albedo, metallic, roughness,
+      emission, normal, AO, transparency, alpha scissor, cull mode, unshaded
+      and vertex colors.
+- [x] Separate metallic and roughness maps, channel selectors and UV1
+      scale/offset in the Godot shader variant.
+- [x] Textures from `.png`, `.jpg`, `.webp`, `.tga` and `.hdr` through the
+      existing image loader; `.ctex` belongs to phase 3.
+- [x] Per-material sampler state: read `texture_filter` and `texture_repeat`
+      from `BaseMaterial3D` and bind a matching `VkSampler`. One linear repeat
+      sampler used to bleed green texels into the platformer cube seams, where
+      the material asks for nearest and clamp.
+- [x] `GodotScene : DrawableByVulkan`: draw phases, blend sorting, shadow
+      phase, AABB and name.
+- [x] `GodotScene`: runtime material override.
+- [x] First vertical slice: `ArrayMesh`, `StandardMaterial3D`, a PNG texture
+      and vertex colors render through `GodotFactory` in `demo_godot`.
+- [x] Fixtures and the `demo_godot` app, see below.
+
+#### Demo
+
+- [x] New `demo_godot` subpackage: a minimal window, camera and scene loader,
+      separate from the glTF arena in `demo`.
+- [x] A `--scene` path option that loads one fixture at startup.
+- [x] `--pack` to load a `res://` scene from a PCK; without `--scene` it uses
+      `application/run/main_scene` from `project.binary`.
+- [x] `--screenshot path` and `--screenshot-frame N` in both demos; the engine
+      saves the next rendered frame through `Scene.captureFrame`.
+- [x] A light render switch for `demo_godot`: draw every surface in the plain
+      lit mode, without transmission, transparency or the authored material
+      variants. Shadows keep their own switch.
+
+#### Phase 2: lights, cameras and environment
+
+- [x] `DirectionalLight3D`, `OmniLight3D` and `SpotLight3D` to the `Scene`
+      light list; add a `Scene.setSun` path for the directional one.
+- [x] `Camera3D` exposed on the loaded scene; the demo decides whether to use
+      it.
+- [x] `WorldEnvironment`, `Environment` and `Sky`: background colour, sky
+      gradient, ambient tint, exposure and tonemap modes. Parsed in
+      `godot_scene/environment.d`; AgX currently falls back to ACES. IBL
+      regenerated from the sky, fog, SDFGI and volumetrics stay unsupported.
+- [ ] Layers, visibility ranges and `cast_shadow` modes.
+- [x] Size the sun's shadow map to the loaded scene: `demo_godot` fits an
+      orthographic frustum to the scene AABB. `SunShadow` owns the pass, the
+      per-frame maps, the sampler and the cache. Cascades stay a separate item
+      in `## Lighting`.
+
+#### Phase 3: binary resources and packed production projects
+
+The end goal is a game exported by Godot, not only a source project.
+
+- [x] RSRC 5/6 reader: string table, external and internal resource tables, the
+      variant encoding and resource properties.
+- [x] `PackedScene._bundled` decoder for binary `.scn`.
+- [ ] `PackedScene` base scenes and child index ordering.
+- [x] `.import` remap, exported `.remap` chains and `project.binary`.
+- [ ] Read the glTF import settings next to a source asset: at least
+      `nodes/apply_root_scale` and `nodes/root_scale`, which is what makes the
+      town tree stand at the right size, plus `nodes/use_name_suffixes` and
+      `materials/extract` when a project relies on them.
+- [x] `.pck` v2-v4 reader, unencrypted, with a `GodotSource` abstraction shared
+      by directory and pack sources.
+- [ ] Stream or memory-map pack files instead of loading the whole archive.
+- [x] `.ctex` textures: embedded PNG and raw `DATA_FORMAT_IMAGE` for RGBA8,
+      RGB8, RG8, R8, LA8 and L8, with mip chains uploaded directly.
+- [x] `.ctex` WebP and VRAM-compressed formats (BC, ETC2, ASTC) through
+      `pukan.compressed_texture`, with device feature checks and sRGB or linear
+      sampling per material slot. Basis Universal stays unsupported.
+- [x] Binary `.res` materials and meshes.
+- [x] Compressed `RSCC` resources with Zstandard blocks, `StringName`
+      variants and `PackedScene` parent-path flags.
+- [x] Text scenes and binary resources both store `Basis` rows; the loader
+      used to read text rows as columns and so produced the transpose rotation.
+- [x] Godot content renders upright: both apps project through
+      `vulkanPerspectiveMatrix` and the front face comes from the source winding
+      and the mirrored flag of the transform chain.
+- [x] Shared parsed glTF content and GPU buffers across instances of one file;
+      node trees, animation state and joint buffers stay per instance.
+- [ ] Resource deduplication across a scene.
+- [x] Packed project fixture exported with Godot 4.7 and checked in.
+
+#### Phase 4: instances, skinned meshes and animation
+
+- [x] Nested text and binary `PackedScene` instances, including packs.
+- [ ] Instance property overrides and editable children.
+  - [x] Properties on the instanced root, which is how the platformer stage
+        replaces the `data` of its `GridMap`.
+  - [ ] Children addressed by `parent_id_path` and `index`.
+- [ ] `MultiMeshInstance3D` and `MultiMesh`.
+- [ ] Native Godot skinning, broken down:
+  - [x] Fixture reconnaissance: export `platformer/` as a PCK and confirm the
+        importer output (`Skeleton3D`, `Skin`, `ArrayMesh` skin data).
+  - [x] Read `Skin`: `bind_count`, `bind/{i}/bone`, `bind/{i}/name`,
+        `bind/{i}/pose`; fall back to name lookup for named skins.
+  - [x] Read `Skeleton3D`: `bones/{i}/name`, `parent`, `rest`, `enabled`,
+        `position`, `rotation`, `scale` and `bone_meta`; ignore metadata.
+  - [x] Resolve `MeshInstance3D.skin` and `MeshInstance3D.skeleton` NodePaths and
+        default an empty `skeleton` to the parent `Skeleton3D`.
+  - [x] Compute rest and pose bone transforms through the bone hierarchy,
+        honoring `enabled`; derive joint matrices from the skin's `pose` and
+        `bone`.
+  - [ ] CPU skinning fallback for devices without the GPU path.
+  - [x] GPU path: one joint matrix buffer per skin, bound through
+        `MATERIAL_JOINTS`; the imported enemy renders in its bind pose, upright
+        and oriented like Godot's own render.
+  - [ ] `BoneAttachment3D`: resolve `bone_name`/`bone_idx` and apply the bone's
+        global pose to the node and its children.
+  - [ ] `AnimationPlayer` and `Animation`: decode `AnimationLibrary`,
+        `AnimationPlayer` and `Animation`; sample transform tracks, `autoplay`
+        and looping, and drive skeleton poses per frame.
+  - [ ] Verify the walk animation against the glTF path.
+  - Note: `enemy.tscn` overrides `bones/N/...` on an instanced child, so native
+    skinning needs instance property overrides to reach feature parity.
+- [ ] Animation of material and node properties.
+
+#### Coordinate system
+
+Both apps project through `vulkanPerspectiveMatrix`, which flips the Y row that
+dlib's OpenGL projection leaves alone, so the image is upright and models keep
+their authored orientation. The glTF path no longer mirrors models, and
+`flipWinding`/`setFlipWinding` are gone, so a nested instance needs no special
+case.
+
+Winding follows the data instead of a flag. Godot's glTF importer stores
+clockwise triangles while a raw glTF file keeps counter-clockwise ones, and
+Vulkan's Y-down clip space adds one more flip, so `Mesh.applyFrontFace` takes
+both the source winding and whether the transform chain mirrors. The draw paths
+assert that a mesh is never shared between two different handedness values.
+
+- [x] One projection helper for `demo`, `demo_godot` and the shadow pass.
+- [x] Drop the glTF model mirror together with `flipWinding`, and derive the
+      front face from the transform chain.
+- [x] Put both camera defaults in the same Y-up world; window size and far plane
+      still differ.
+- [x] Verify `demo`, `orientation.tscn`, `lights_and_shadows`, `enemy_twins` and
+      the exported enemy, from both camera sides.
+- [x] Replace `lookAtMatrix` with a camera transform whose inverse is the view
+      matrix, the way Dagon uses `invAbsoluteTransformation`:
+      https://github.com/gecko0307/dlib/pull/192#issuecomment-2835001161
+      `demo`, `demo_godot`, the stereo pair and the shadow light all build a
+      view from eye, target and up and assert when that view is parallel to the
+      up vector. A `Camera3D` node and a directional light already carry a
+      transform to invert, so the eye and target pair only has to exist for the
+      command line.
+
+#### GridMap
+
+- [x] Spike: evaluate Godot GridMap support. It stores a 3D tile map as cells on
+      an integer grid with a mesh library per cell; the packed cells and the
+      `MeshLibrary` are read as they are.
+- [x] Add `platformer/stage/stage.tscn` as the GridMap landscape fixture: the
+      ready-made stage of the same demo project, with its `grid_map.scn`, the
+      `MeshLibrary` and the tile meshes. Only the floor renders so far, and the
+      report names `GridMap` and `MeshLibrary`.
+- [x] Render the landscape from cells: decode the packed cell triples, the
+      `cell_size` and centre flags, the 24 orthogonal rotations and the
+      `MeshLibrary` items, and draw one node per occupied cell with the item
+      mesh shared. The stage renders 2921 cells; collision shapes and navigation
+      data stay out.
+- [ ] The stage's sky, reflection probes and script stay unsupported and
+      counted.
+
+#### Compatibility policy
+
+- [ ] Unknown nodes and resources: count and report them for now, never crash.
+      Before production support is called done, enumerate every type used by
+      the supported projects and either implement it or record why it is
+      dropped. Remove the silent skip at that point.
+- [ ] `ShaderMaterial`, CSG, particles, decals, GI probes, fog volumes,
+      SkeletonIK and custom scripts stay out until a project needs them.
+- [ ] Encrypted `.pck` archives stay out.
+
+#### Fixtures
+
+Fixtures live in `demo_godot/godot_samples/`.
+
+- [x] `lights_and_shadows/test.tscn` from the Godot demo projects: text scene,
+      primitives, `StandardMaterial3D`, textures and lights.
+- [x] `platformer/enemy/enemy.tscn` plus `enemy.glb`: external `PackedScene`,
+      skeleton and animation.
+- [x] `platformer/enemy/enemy_twins.tscn`: two instances of `enemy.tscn` with
+      one shared glTF asset and independent node and joint state.
+- [x] `platformer/platformer.pck`: a Godot 4.7 export with the RSCC imported
+      `enemy.glb`, `Skeleton3D` and `Skin`.
+- [x] `platformer/stage/stage.tscn`: the ready-made GridMap landscape with its
+      `grid_map.scn`, 20 tile meshes and textures; counted until cells render.
+- [x] Generated `procedural.tscn`, `.scn` and `.res` with two uncompressed
+      `ArrayMesh` surfaces, built by Godot 4.7 headless.
+- [x] Generated `binary.tscn` referencing the binary `.res` mesh, and a binary
+      `.scn` scene loaded through `demo_godot`.
+- [x] Generated `fixtures.pck` with a text scene and texture, loaded through
+      `GodotSource` and `--pack`.
+- [x] Generated `ctex.tscn` and `raw.tscn` covering embedded PNG and raw RGBA8
+      `.ctex` textures.
+- [x] Generated `compressed_*.tscn` from the lights-demo checker and the
+      platformer particle: BC1, BC7, ETC2, ASTC, BC5 normals and lossless WebP.
+      ETC2 and ASTC need device support.
+- [x] Generated `nested.tscn` and `nested_binary.tscn` instancing text and
+      binary PackedScenes, checked through a PCK as well.
+- [x] Generated `primitives.tscn` with subdivided box and plane, a capsule and
+      a prism.
+- [x] Generated `shared_mesh.tscn`, where five nodes share two geometries.
+- [x] Generated `orientation.tscn`, a labelled cube whose faces name their own
+      axis and carry an up arrow, for checking the coordinate system.
+- [x] `exported/exported.pck`, a Godot 4.7 `--export-pack` build with `.remap`
+      chains, an imported `.ctex`, binary resources and `project.binary`.
+- [x] Generated `external.tscn` with an external `.tres` mesh, an external
+      material and both override forms.
+- [x] `compressed_array_mesh.tres` and `compressed_mesh.tscn`, produced by the
+      glTF importer from the AnimatedCube sample with mesh compression enabled.
+- [x] `truck_town/town_view.tscn`, a 2048 unit landscape with terrain, roads,
+      houses, trees, street lamps and a sky. It ships the `.scn` that Godot 4.7
+      imports from the upstream `.gltf`, because a game runs the imported
+      scene; only the textures stay as source files.
+- [ ] Interior fixture: a room assembled from CC0 Kenney furniture with omni
+      lights and a camera, to test many small glTF instances and indoor light
+      falloff.
+- [ ] `combined.tscn` instancing `lights_and_shadows/test.tscn`,
+      `platformer/enemy/enemy.tscn` and `generated/procedural.tscn` in one
+      scene, for composition checks. Godot cannot reference resources across
+      projects, and each fixture is its own project today, so this needs:
+  - [ ] one Godot project for the combined scene: either promote
+        `godot_samples/` to a single project and prefix every fixture `res://`
+        path, or add a `combined/` project that owns rewritten copies;
+  - [ ] rewrite the fixture-internal `res://` references and re-check their
+        `.import` and `.pck` fixtures;
+  - [ ] one camera and a far plane that covers the placed instances, and a
+        decision about the lights demo's 20 lights against `maxLights = 16`;
+  - [ ] verify that each part renders, that shared geometry and glTF assets are
+        counted once, and that the skipped counters aggregate;
+  - [ ] README and fixture list.
+- [x] README with source URLs, commit, licenses and the regeneration script.
 
 ## Geometric algebra: PGA and CGA
 
@@ -144,14 +425,24 @@ screen.
 
 The frame carries a light list in a storage buffer: the sun, then point and spot
 lights, sixteen entries in total. The sun casts a single 1024x1024 shadow map
-with a normal offset and one filtered comparison; only opaque glTF meshes cast,
-there are no cascades and no local-light shadows. Missing:
+with a normal offset and one filtered comparison; it is fitted to the loaded
+scene when the app supplies its bounds. Only the sun casts; there are no
+cascades and no local-light shadows. Missing:
 
-- [ ] Cascaded directional maps and an atlas for the local lights; the current
-      map is one perspective map around the scene centre and only the sun uses it.
+- [ ] Cascaded directional maps; the sun keeps one fitted orthographic map until
+      then.
+- [ ] Local-light shadows on top of `SunShadow`: an atlas of spot tiles first,
+      then point lights as a cubemap or six tiles, with per-light matrices,
+      tile metadata in the frame data and per-tile cache validity.
+- [x] Cache the sun's shadow map while the casters and the sun stay put, so a
+      static level does not redraw an unchanged map every frame.
 - [ ] Caster coverage: masked cutouts and the non-glTF primitives do not cast yet.
 - [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
 - [ ] Light culling by distance and screen size.
+- [ ] Calibrate AgX against Godot; `Environment.tonemap_mode = 4` falls back to
+      ACES today, and the background bypasses exposure and tonemap entirely.
+- [ ] Shadowmasking: baked directional occlusion that dynamic lights sample, so
+      a lit surface can stay in a baked shadow.
 
 ## Deferred shading
 
@@ -208,21 +499,34 @@ the near-term ones; the first touches the vertex layout that the mesh merge now
 owns, the second the draw path. The rest are long-term spikes, each judged
 against the plain version it replaces.
 
+- **Mixed winding in one batch**
+  - [x] Enable `VK_DYNAMIC_STATE_FRONT_FACE` on the PBR and primitive
+        pipelines; `Mesh` carries a `VkFrontFace` per draw and sets it before
+        drawing. glTF and Godot keep their native index order, and a batch
+        switches state instead of re-encoding indices. Requires the Vulkan 1.3
+        `extendedDynamicState` feature.
+
+- **Frustum culling**
+  - [x] Conservative local-AABB test against the draw matrix in the Godot and
+        glTF paths, in the colour and shadow passes, so an off-screen mesh
+        costs no draw.
+  - [ ] Skinned meshes: derive the bounds from the posed skeleton instead of
+        skipping them.
+  - [ ] Cull whole instances and subtrees before walking their children.
+
 - **Instanced static primitives**
-  - [ ] Batch any mesh that shares vertex and index buffers, pipeline variant
-        and texture set into one instanced draw, not glTF primitives only: the
-        loader is the first producer, not the boundary. The transform moves from
-        the push constant into an instance buffer, and the material becomes a
-        palette the fragment shader indexes by the instance instead of a
-        descriptor set per mesh. One batch carries one texture set, so materials
-        with different textures split it. The sphere and cylinder renderers
-        already issue instanced draws from compute-built commands and stay as
-        they are.
+  - [x] Batch static meshes that share vertex and index buffers, pipeline
+        variant and descriptor set into one instanced draw, not glTF primitives
+        only: the loader is the first producer, not the boundary. The transform
+        moves from the push constant into a per-frame instance buffer read as
+        vertex attributes. One batch carries one descriptor set, so meshes with
+        different materials split it. The sphere and cylinder renderers already
+        issue instanced draws from compute-built commands and stay as they are.
   - [ ] Skinned meshes join the same batch while they share a pose, which is one
         joint matrix buffer: the shader applies the instance transform after
         skinning, so a crowd in lockstep costs one draw. Different poses split
         into batches, each still instanced.
-  - [ ] Drop the texture set from the batch key: index textures from the
+  - [ ] Drop the descriptor set from the batch key: index textures from the
         material through one descriptor array sampled with
         `descriptorIndexing`, and store image and sampler indices in the
         material. Bounded by the after-bind descriptor limits and by the
@@ -233,6 +537,17 @@ against the plain version it replaces.
         costs about 0.11 ms whatever the triangle count, so the grid spends
         29 ms of its 32 ms there; with one draw the target is the shader and
         setup that remain, about 14 ms.
+
+- **Vertex color attribute**
+  - [ ] Measure the always-bound color stream: 4 bytes per vertex for colored
+        meshes, a stride-0 fallback for the rest, and one attribute fetch in
+        every PBR and shadow pipeline. Run the fixed scene with the same
+        geometry, once with colors and once without.
+  - [ ] Choose from the numbers between the single path and a static
+        `VERTEX_COLOR` shader and pipeline variant for colored materials. The
+        variant removes the fetch and the fallback but multiplies every
+        existing PBR pipeline; the shadow vertex input can drop color on its own
+        without that multiplication.
 
 - **Quantized static geometry**
   - [ ] Optional extreme quantization for static batches: store positions and
@@ -410,6 +725,29 @@ and no first draw stalls on a compile.
       fence instead of compiling inside the frame.
 - [ ] Keep the on-demand path as a fallback for materials that appear after the
       query.
+
+## Build-time feature selection
+
+The README asks for builds assembled from the features a project uses.
+
+- [ ] Compile a second lit fragment pair without `shadowFactor`, selected at
+      draw time from `Scene.shadowsEnabled`. Only lit doubles: 4 more SPVs and
+      24 pipelines. Duplicating the whole `mesh_pbr` family would add hundreds
+      of pipelines for a runtime toggle that already skips the fetch, so it
+      waits for the general variant selection.
+- [ ] Clarify the shader configuration space. List the axes that now multiply
+      `mesh_pbr` (lighting mode, shadows, OIT, transmission, Godot vs glTF,
+      core vs extended PBR) and choose for each a separate SPV, a
+      specialization constant, or a runtime branch. Explore splitting the
+      shader into feature blocks and composing only the needed ones at load
+      when a pipeline is created, for better performance: measure whether the
+      driver prunes dead branches from specialization constants, and whether
+      composing and compiling at load is affordable next to shipping SPVs.
+      This is the same shape as Godot's per-variant shader compilation.
+- [ ] Make the environment optional in `material.glsl`: compile out `toneMap`
+      and the ambient tint when the scene has no environment, and turn the
+      tonemap mode into a variant or a specialization constant instead of a
+      runtime branch. A build without environments should carry neither.
 
 ## OpenXR
 

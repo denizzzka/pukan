@@ -430,3 +430,44 @@ auto createFakeImage1x1(LogicalDevice device, CommandPool commandPool, VkCommand
     FakeImg extFormatImg;
     return loadImageToMemory(device, commandPool, commandBuf, extFormatImg, VK_FORMAT_R8G8B8A8_SRGB);
 }
+
+/// Identity component mapping for a sampled image view
+enum identityComponentMapping = VkComponentMapping(
+    r: VK_COMPONENT_SWIZZLE_IDENTITY,
+    g: VK_COMPONENT_SWIZZLE_IDENTITY,
+    b: VK_COMPONENT_SWIZZLE_IDENTITY,
+    a: VK_COMPONENT_SWIZZLE_IDENTITY,
+);
+
+/// Transitions one image subresource between layouts
+void transitionImageLayout(
+    VkCommandBuffer buf,
+    VkImage image,
+    VkImageLayout oldLayout,
+    VkImageLayout newLayout,
+    VkPipelineStageFlags srcStage,
+    VkAccessFlags srcAccess,
+    VkPipelineStageFlags dstStage,
+    VkAccessFlags dstAccess,
+    uint baseMip = 0,
+    uint mipCount = 1,
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+)
+{
+    VkImageMemoryBarrier barrier;
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.srcAccessMask = srcAccess;
+    barrier.dstAccessMask = dstAccess;
+    barrier.subresourceRange.aspectMask = aspect;
+    barrier.subresourceRange.baseMipLevel = baseMip;
+    barrier.subresourceRange.levelCount = mipCount;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    vkCmdPipelineBarrier(buf, srcStage, dstStage, 0, 0, null, 0, null, 1, &barrier);
+}
