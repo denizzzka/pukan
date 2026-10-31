@@ -841,8 +841,6 @@ Open questions:
 
 The compile-time policy is `off | scene | all | required`, default `scene`.
 
-- [ ] `required`: warm only the variants in the required set and throw for a
-      variant outside it, with technique and target in the message.
 - [ ] `Variants!(Modules...)`: the requirements-like union of `alias
       pipelineVariants` that defines the `required` set. Until it lands,
       `required` uses the scene query as its set.

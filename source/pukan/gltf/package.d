@@ -1001,7 +1001,7 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
 
     private GraphicsPipelineCfg selectPipeline(const MeshClass mesh, DrawPhase phase)
     {
-        return selectPipelineSlot(mesh, phase).get();
+        return selectPipelineSlot(mesh, phase).get(mesh.name);
     }
 
     void warmPipelines(bool shadows)

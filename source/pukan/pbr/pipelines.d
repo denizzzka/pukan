@@ -45,7 +45,7 @@ struct LazyPipeline
         this.subpass = subpass;
     }
 
-    GraphicsPipelineCfg get()
+    GraphicsPipelineCfg get(string context = null)
     {
         if(cfg.graphicsPipeline is null)
         {
@@ -58,11 +58,17 @@ struct LazyPipeline
                 if(factory.tryAcquire(technique, pass, subpass, ready))
                     cfg = ready;
                 else
-                    throw new PukanException(
-                        "pipeline variant was not preloaded: " ~
+                {
+                    string message = "pipeline variant was not preloaded: " ~
                         factory.techniqueName(technique) ~
                         " for " ~ pass.imageFormat.to!string ~
-                        ", subpass " ~ subpass.to!string);
+                        ", subpass " ~ subpass.to!string;
+
+                    if(context.length)
+                        message ~= ", " ~ context;
+
+                    throw new PukanException(message);
+                }
             }
         }
 
