@@ -839,15 +839,16 @@ Open questions:
 
 Pipelines are declared by what renders with them, not by a loader factory.
 `PbrFactory` keeps resources, materials and the descriptor allocator; the PBR
-declarations (`PbrPipelines`, shader stages, shadows and variants) move out of
-it. Background, OIT and primitives already declare their own.
+pipelines are declared in `pukan.pbr.pipeline_set`, which fills `PbrPipelines`.
+Background, OIT and primitives declare their own.
 
-A `PipelineKey` is the compile-time recipe: shader set, fixed state, bindings,
-vertex input and push constants. It is derived from the content, not from the
-technique name or profile, so identical declarations share one key. A
-`PipelineInstance` is a key plus a render target: one `VkPipeline` and one
-cache record. The generic `Pipelines` module interns keys, creates instances
-and caches them; it owns no PBR types and no warm list.
+A `PipelineKey` is the compile-time content and state identity of a pipeline:
+shader set, fixed state, bindings, vertex input and push constants. It is
+derived from the content, not from the technique name or profile, so identical
+declarations share one key. `PipelineFactory.declare` interns the key and
+returns it. A `PipelineInstance` is a key plus a render target: one
+`VkPipeline` and one cache record. The registry owns no PBR types and no warm
+list.
 
 The shader part of the key comes from `compile_shaders.sh`, which writes a
 16-byte MurmurHash3 x64_128 sum in little endian next to every `.spv`. The
@@ -857,14 +858,8 @@ its header, so a changed shader makes the record stale and the next save
 replaces it. Compute kernels hash their SPIR-V the same way. The cache size is
 explicit and defaults to 100 MB.
 
-- [ ] Add `PipelineKey` interning to the generic registry. `PipelineFactory`
-      keeps the Vulkan mechanics; `declare` returns the interned key.
-- [ ] Rename the existing `PipelineKey` (technique + target) to
-      `PipelineInstance`, since that is the recipe plus target.
-- [ ] Move the PBR declarations out of `PbrFactory`: shader stage helpers,
-      shadows and variants. `PbrFactory` stops creating pipelines.
-- [ ] Keep `PbrPipelines` as the PBR set of keys indexed by material state;
-      `LazyPipeline` resolves one on a target. It is not the registry.
+- [ ] Move the registry out of `pukan.vulkan.pipelines` into a generic
+      `pukan.pipelines` module.
 - [ ] Collect the `required` union from the keys each renderer declares, not
       from a factory-owned table.
 
