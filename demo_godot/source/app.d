@@ -697,7 +697,7 @@ void main(string[] args)
             flatForward.y = 0;
 
             if(flatForward.length > 1e-4f)
-                characterYaw = atan2(flatForward.x, flatForward.z);
+                characterYaw = -atan2(flatForward.x, flatForward.z);
 
             if(thirdPerson)
             {
@@ -734,10 +734,10 @@ void main(string[] args)
         Matrix4x4f characterTransform = Matrix4x4f.identity();
 
         if(characterMode && characterModel)
-            characterTransform = scaleMatrix(Vector3f(characterModelScaleX,
-                characterModelScaleY, characterModelScaleZ))
+            characterTransform = translationMatrix(characterRenderPosition + characterModelOffset)
                 * rotationMatrix!float(Axis.y, characterYaw)
-                * translationMatrix(characterRenderPosition + characterModelOffset);
+                * scaleMatrix(Vector3f(characterModelScaleX,
+                    characterModelScaleY, characterModelScaleZ));
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
