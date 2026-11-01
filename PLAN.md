@@ -211,8 +211,8 @@ sweeps, layer filtering and a fixed-step `Simulation`; `godot_scene` decodes
 `GridMap` item shapes; `pukan.mover.quake` has `pmMove`, friction,
 acceleration, air acceleration, clip velocity and step-slide; `demo_godot
 --character` walks a capsule on the platformer stage and on the `character/`
-movement gym in first or third person. Missing: water, noclip, crouch, moving
-platforms, mesh fallback, overlap queries, render interpolation and debug draw.
+movement gym, up its stairs and ramp, in first or third person. Missing: water, noclip, crouch, moving
+platforms, mesh fallback, overlap queries and debug draw.
 
 Decided for the slice:
 

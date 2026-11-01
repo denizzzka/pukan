@@ -266,6 +266,33 @@ final class GodotScene : DrawableByVulkan, Blended, PipelineWarmup
         return result;
     }
 
+    /// First Marker3D or CharacterBody3D origin, used as a character spawn
+    bool spawnPosition(out Vector3f position)
+    {
+        return findSpawn(root, Matrix4x4f.identity, position);
+    }
+
+    private static bool findSpawn(GodotNode node, Matrix4x4f trans, out Vector3f position)
+    {
+        trans *= node.local;
+
+        if(node.type == "Marker3D" || node.type == "CharacterBody3D")
+        {
+            position = Vector3f(trans.a14, trans.a24, trans.a34);
+            return true;
+        }
+
+        if(auto scene = cast(GodotScene) node.instance)
+            if(scene.findSpawn(scene.root, trans, position))
+                return true;
+
+        foreach(child; node.children)
+            if(findSpawn(child, trans, position))
+                return true;
+
+        return false;
+    }
+
     /// Adds every collision shape in the tree to `world` and builds it
     void buildCollisionWorld(CollisionWorld world)
     {

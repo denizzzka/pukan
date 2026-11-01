@@ -78,7 +78,7 @@ mesh = SubResource("FloorMesh")
 material_override = SubResource("FloorMaterial")
 
 [node name="Ramp" type="StaticBody3D" parent="."]
-transform = Transform3D(0.984808, 0.173648, 0, -0.173648, 0.984808, 0, 0, 0, 1, 0, 0.0, -6)
+transform = Transform3D(0.984808, -0.173648, 0, 0.173648, 0.984808, 0, 0, 0, 1, 0, 0.448, -6)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ramp"]
 shape = SubResource("RampShape")

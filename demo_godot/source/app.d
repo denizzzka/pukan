@@ -527,6 +527,13 @@ void main(string[] args)
 
         if(spawnOption.length)
             spawn = parseVector(spawnOption);
+        else
+        {
+            Vector3f marker;
+
+            if(godotScene.spawnPosition(marker))
+                spawn = marker;
+        }
 
         mover = new MoverComponent(collisionWorld, characterBody, characterConfig);
         mover.teleport(spawn);
@@ -646,7 +653,8 @@ void main(string[] args)
                     : mover.state.position.y;
             });
 
-            const eyePosition = mover.eyePosition();
+            const alpha = simulation.interpolationAlpha();
+            const eyePosition = mover.eyePosition(alpha);
 
             if(thirdPerson)
             {
@@ -670,7 +678,8 @@ void main(string[] args)
 
         if(characterMode && characterModel)
             characterTransform = scaleMatrix(Vector3f(characterModelScale, characterModelScale,
-                characterModelScale)) * translationMatrix(mover.state.position + characterModelOffset);
+                characterModelScale)) * translationMatrix(
+                    mover.renderPosition(simulation.interpolationAlpha()) + characterModelOffset);
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();

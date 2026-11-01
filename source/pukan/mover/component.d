@@ -17,6 +17,7 @@ final class MoverComponent
     QuakeBody body;
     QuakeMovementConfig config;
     QuakeMoveState state;
+    Vector3f previousPosition;
 
     this(
         CollisionWorld world,
@@ -36,11 +37,14 @@ final class MoverComponent
         state.velocity = Vector3f(0, 0, 0);
         state.onGround = false;
         state.groundNormal = body.up;
+        previousPosition = position;
     }
 
     /// One fixed motor tick; updates `state` and returns what moved
     QuakeMoveResult step(in QuakeCommand command, float dt)
     {
+        previousPosition = state.position;
+
         const result = pmMove(world, state, command, dt, body, config);
 
         state.position = result.position;
@@ -51,9 +55,15 @@ final class MoverComponent
         return result;
     }
 
-    Vector3f eyePosition() const
+    /// Position between the last and current tick, for rendering
+    Vector3f renderPosition(float alpha) const
     {
-        return state.position + body.up * body.eyeHeight;
+        return previousPosition + (state.position - previousPosition) * alpha;
+    }
+
+    Vector3f eyePosition(float alpha = 1.0f) const
+    {
+        return renderPosition(alpha) + body.up * body.eyeHeight;
     }
 }
 
@@ -68,4 +78,9 @@ unittest
 
     assert(mover.state.position == Vector3f(1, 2, 3));
     assert(mover.eyePosition() == Vector3f(1, 3.6f, 3));
+
+    mover.previousPosition = Vector3f(1, 2, 3);
+    mover.state.position = Vector3f(2, 2, 3);
+
+    assert(mover.renderPosition(0.5f) == Vector3f(1.5f, 2, 3));
 }
