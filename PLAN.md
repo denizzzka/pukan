@@ -652,13 +652,15 @@ per node, so a file may use several. Still missing:
 
 ### Transparency
 
-Opaque, mask (through alpha-to-coverage) and blend are covered. Blended draws
-store their fragments in per-pixel lists and a resolve pass sorts them by depth
-before compositing, so overlapping and self-intersecting transparent meshes no
-longer depend on a per-draw order. The resolve runs once before the colour copy
-and again after the transmission pass, filtered by the resolved scene depth, so
-glass shows blended objects behind it and blended fragments in front of glass
-stay in front. Long term:
+Opaque, mask (through alpha-to-coverage) and blend are covered. Godot's alpha
+depth prepass mode decodes as mask: it is an alpha-tested cutout, and blending
+a dense crown instead exhausts the fragment pool of the blended resolve.
+Blended draws store their fragments in per-pixel lists and a resolve pass sorts
+them by depth before compositing, so overlapping and self-intersecting
+transparent meshes no longer depend on a per-draw order. The resolve runs once
+before the colour copy and again after the transmission pass, filtered by the
+resolved scene depth, so glass shows blended objects behind it and blended
+fragments in front of glass stay in front. Long term:
 
 - [ ] A second bounce for stacked glass. The colour is copied once, so a pane
       behind another samples the background without the first pane. A second
