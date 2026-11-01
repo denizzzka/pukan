@@ -262,11 +262,9 @@ private QuakeMoveResult pmStepSlideMove(
     const flatDistance = horizontalLength(flat.position - position, body.up);
     const forwardDistance = horizontalLength(forward.position - position, body.up);
 
-    if(forwardDistance <= flatDistance)
+    // A tiny gain means the raised capsule still hits the obstacle
+    if(forwardDistance - flatDistance < config.safeMargin * 5.0f)
         return flat;
-
-    forward.onGround = false;
-    forward.hitWall = false;
 
     const downHit = world.sweepCapsule(
         capsuleBottom(forward.position, body),
@@ -277,18 +275,19 @@ private QuakeMoveResult pmStepSlideMove(
         config.safeMargin,
     );
 
-    if(downHit.hit && dot(downHit.normal, body.up) > cos(config.floorMaxAngle))
-    {
-        auto stepped = forward;
-        stepped.position = forward.position - body.up * (config.maxStepHeight * downHit.fraction);
-        stepped.onGround = true;
-        stepped.groundNormal = downHit.normal;
+    if(!downHit.hit || dot(downHit.normal, body.up) <= cos(config.floorMaxAngle))
+        return forward;
 
-        if(dot(stepped.position - position, body.up) > config.maxStepHeight * 0.5f)
-            return stepped;
-    }
+    auto stepped = forward;
+    stepped.position = forward.position - body.up * (config.maxStepHeight * downHit.fraction);
+    stepped.onGround = true;
+    stepped.groundNormal = downHit.normal;
 
-    return forward;
+    // Landing lower than the start is not a step
+    if(dot(stepped.position - position, body.up) <= 1e-3f)
+        return forward;
+
+    return stepped;
 }
 
 /// One Quake `pmove` tick

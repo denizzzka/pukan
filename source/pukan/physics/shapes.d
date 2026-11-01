@@ -16,7 +16,8 @@ enum ShapeKind
     plane,
 }
 
-/// Axis-aligned bounds with min/max corners
+/// Min/max bounds. dlib's AABB keeps center and half-size and has no union or
+/// sweep, so the BVH keeps the min/max form it needs.
 struct Aabb
 {
     Vector3f min;

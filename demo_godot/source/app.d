@@ -180,6 +180,7 @@ void main(string[] args)
     bool walkForward;
     bool fixedStep;
     bool noclip;
+    string modelOption;
     float physicsHz = 60.0f;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
@@ -204,6 +205,7 @@ void main(string[] args)
         "walk", "hold forward, for headless movement tests", &walkForward,
         "fixed-step", "advance one physics tick per frame", &fixedStep,
         "noclip", "ignore collision in character mode", &noclip,
+        "model", "character model path; defaults to CesiumMan", &modelOption,
         "third-person", "draw the character from behind", &thirdPerson,
         "physics-hz", "fixed character tick rate", &physicsHz,
         "fov", "vertical field of view in degrees", &fovOption,
@@ -369,7 +371,9 @@ void main(string[] args)
     {
         import std.file: exists;
 
-        const modelPath = "demo_godot/godot_samples/platformer/enemy/enemy.glb";
+        const modelPath = modelOption.length
+            ? modelOption
+            : "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb";
 
         if(exists(modelPath))
             characterModel = scene.gltfFactory.create(modelPath);
@@ -434,7 +438,7 @@ void main(string[] args)
 
         if(bounds.min.y == bounds.min.y && bounds.max.y > bounds.min.y)
         {
-            characterModelScale = 1.4f / (bounds.max.y - bounds.min.y);
+            characterModelScale = 1.8f / (bounds.max.y - bounds.min.y);
             characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScale, 0);
         }
     }

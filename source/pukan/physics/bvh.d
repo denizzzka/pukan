@@ -1,3 +1,7 @@
+/**
+ * Static bounding volume hierarchy over primitive bounds: nested boxes let a
+ * ray or a swept capsule skip most primitives. Built once after the level loads.
+ */
 module pukan.physics.bvh;
 
 import dlib.math: Vector3f;
