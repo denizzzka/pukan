@@ -3,7 +3,8 @@ module pukan.scene;
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired, Variants;
-import pukan.pbr.factory: PbrProfile, pbrGltfActive, pbrGodotActive;
+import pukan.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActive;
+import pukan.pbr.pipeline_set: createPbrPipelineSet;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
@@ -269,7 +270,8 @@ class SceneWith(Modules...)
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
-        pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, sunShadow.pass);
+        auto pbrPipelineSet = createPbrPipelineSet(pipelineFactory, renderPass, sunShadow.pass);
+        pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, pbrPipelineSet);
         static if(pipelineWarmupRequired)
         {
             static if(Modules.length == 0)

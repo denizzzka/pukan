@@ -2,8 +2,8 @@ module pukan.gltf.factory;
 
 import pukan.gltf;
 import pukan.gltf.loader: GltfAsset, GltfLoadOptions, createGltfInstance, loadGltfAsset;
-import pukan.pbr.factory: PbrFactory, PbrProfile;
-import pukan.pbr.pipelines: PbrPipelines, pipelineWarmupPerScene;
+import pukan.pbr.factory: PbrFactory;
+import pukan.pbr.pipelines: PbrPipelines, PbrProfile, pipelineWarmupPerScene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.conv: to;

@@ -1,11 +1,36 @@
 module pukan.pbr.pipelines;
 
 import pukan.exceptions: PukanException;
-import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, TechniqueId;
+import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, PipelineKey;
 import pukan.vulkan.renderpass: RenderPass;
 import std.conv: to;
 import std.meta: AliasSeq, NoDuplicates, staticMap;
 import std.traits: FieldNameTuple;
+
+/// Shader/profile set a pipeline belongs to
+enum PbrProfile
+{
+    /// glTF PBR materials
+    gltf,
+    /// Godot StandardMaterial3D materials
+    godot,
+}
+
+version(PbrGltfOnly)
+{
+    enum bool pbrGltfActive = true;
+    enum bool pbrGodotActive = false;
+}
+else version(PbrGodotOnly)
+{
+    enum bool pbrGltfActive = false;
+    enum bool pbrGodotActive = true;
+}
+else
+{
+    enum bool pbrGltfActive = true;
+    enum bool pbrGodotActive = true;
+}
 
 /// When pipeline variants are built
 enum PipelineWarmupPolicy
@@ -68,11 +93,11 @@ struct LazyPipeline
 {
     private GraphicsPipelineCfg cfg;
     private PipelineFactory factory;
-    private TechniqueId technique;
+    private PipelineKey technique;
     private RenderPass pass;
     private uint subpass;
 
-    this(PipelineFactory factory, TechniqueId technique, RenderPass pass, uint subpass)
+    this(PipelineFactory factory, PipelineKey technique, RenderPass pass, uint subpass)
     {
         this.factory = factory;
         this.technique = technique;

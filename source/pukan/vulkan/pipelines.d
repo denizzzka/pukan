@@ -155,20 +155,50 @@ struct RenderTargetId
     uint value;
 }
 
+/// Content and state identity of a pipeline, independent of the render target
 struct PipelineKey
 {
-    TechniqueId technique;
-    RenderTargetId target;
+    /// Content without the shader sums, for the cache file name
+    ubyte[32] slot;
+    /// Content with the shader sums
+    ubyte[32] digest;
 
     size_t toHash() const nothrow @safe
     {
-        return hashOf(technique.value, hashOf(target.value));
+        return hashOf(slot) ^ hashOf(digest);
     }
 
     bool opEquals(ref const PipelineKey rhs) const nothrow @safe
     {
-        return technique.value == rhs.technique.value &&
-            target.value == rhs.target.value;
+        return slot[] == rhs.slot[] && digest[] == rhs.digest[];
+    }
+
+    int opCmp(ref const PipelineKey rhs) const nothrow @safe
+    {
+        if(slot[] != rhs.slot[])
+            return slot[] < rhs.slot[] ? -1 : 1;
+
+        if(digest[] != rhs.digest[])
+            return digest[] < rhs.digest[] ? -1 : 1;
+
+        return 0;
+    }
+}
+
+/// One pipeline on one render target
+struct PipelineInstance
+{
+    PipelineKey key;
+    RenderTargetId target;
+
+    size_t toHash() const nothrow @safe
+    {
+        return hashOf(key.toHash(), hashOf(target.value));
+    }
+
+    bool opEquals(ref const PipelineInstance rhs) const nothrow @safe
+    {
+        return key == rhs.key && target.value == rhs.target.value;
     }
 }
 
@@ -452,6 +482,7 @@ final class PipelineFactory
 {
     private struct Technique
     {
+        PipelineKey key;
         RenderTechnique description;
         VkPipelineLayout pipelineLayout;
         VkDescriptorSetLayout setLayout;
@@ -475,8 +506,9 @@ final class PipelineFactory
 
     private LogicalDevice device;
     private Technique[] techniques;
+    private TechniqueId[PipelineKey] techniqueByKey;
     private RenderTarget[] targets;
-    private GraphicsPipelineCfg[PipelineKey] cache;
+    private GraphicsPipelineCfg[PipelineInstance] cache;
     private PipelineCacheManager cacheManager;
 
     /// Guards the variant cache, the target list and the preload queue
@@ -487,14 +519,14 @@ final class PipelineFactory
 
     private struct Pending
     {
+        PipelineInstance instance;
         PipelineKey key;
-        TechniqueId technique;
         RenderPass pass;
         uint subpass;
     }
 
     private Pending[] pending;
-    private bool[PipelineKey] requested;
+    private bool[PipelineInstance] requested;
     private size_t building;
 
     debug
@@ -637,13 +669,43 @@ final class PipelineFactory
         return new DescriptorAllocator(device, frameSetLayout, frameBindings, 16);
     }
 
-    TechniqueId declare(RenderTechnique technique, uint setsPerPool = 16)
+    private static PipelineKey techniqueKey(RenderTechnique technique)
     {
-        TechniqueId result;
+        PipelineVariantKeyBuilder builder;
+        builder.add(technique.state);
+        builder.addArray(technique.dynamicStates);
+
+        foreach(ref stage; technique.stages)
+        {
+            builder.addSlotString(stage.file);
+            builder.add(stage.stage);
+            builder.add(stage.pushConstantRange);
+            builder.addArray(stage.layoutBindings);
+            builder.addShader(stage.checksum);
+            builder.addArray(stage.vertexInput.bindings);
+            builder.addArray(stage.vertexInput.attributes);
+        }
+
+        const identity = builder.finish();
+
+        PipelineKey key;
+        key.slot[] = identity.slot.digest[];
+        key.digest[] = identity.digest[];
+
+        return key;
+    }
+
+    PipelineKey declare(RenderTechnique technique, uint setsPerPool = 16)
+    {
+        auto key = techniqueKey(technique);
 
         synchronized(mutex)
         {
+            if((key in techniqueByKey) !is null)
+                return key;
+
             Technique entry;
+            entry.key = key;
             entry.description = technique;
 
             auto bindings = createLayoutBinding(technique.stages);
@@ -657,42 +719,41 @@ final class PipelineFactory
             entry.allocator = new DescriptorAllocator(device, setLayout, bindings, setsPerPool);
 
             techniques ~= entry;
-
-            result = TechniqueId(cast(uint)(techniques.length - 1));
+            techniqueByKey[key] = TechniqueId(cast(uint)(techniques.length - 1));
         }
 
-        return result;
+        return key;
     }
 
-    GraphicsPipelineCfg acquire(TechniqueId id, RenderPass renderPass, uint subpass = 0)
+    GraphicsPipelineCfg acquire(PipelineKey key, RenderPass renderPass, uint subpass = 0)
     {
         synchronized(mutex)
         {
-            const key = PipelineKey(id, targetId(renderPass, subpass));
+            const instance = PipelineInstance(key, targetId(renderPass, subpass));
 
-            if(auto found = key in cache)
+            if(auto found = instance in cache)
                 return *found;
 
             try
-                cache[key] = createPipeline(id, renderPass, subpass);
+                cache[instance] = createPipeline(key, renderPass, subpass);
             catch(PukanException e)
             {
-                e.msg = "technique " ~ techniqueName(id) ~ ": " ~ e.msg;
+                e.msg = "technique " ~ techniqueName(key) ~ ": " ~ e.msg;
                 throw e;
             }
 
-            return cache[key];
+            return cache[instance];
         }
     }
 
     /// Returns a ready variant without creating one
-    bool tryAcquire(TechniqueId id, RenderPass renderPass, uint subpass, out GraphicsPipelineCfg cfg)
+    bool tryAcquire(PipelineKey key, RenderPass renderPass, uint subpass, out GraphicsPipelineCfg cfg)
     {
         synchronized(mutex)
         {
-            const key = PipelineKey(id, targetId(renderPass, subpass));
+            const instance = PipelineInstance(key, targetId(renderPass, subpass));
 
-            if(auto found = key in cache)
+            if(auto found = instance in cache)
             {
                 cfg = *found;
                 return true;
@@ -703,20 +764,20 @@ final class PipelineFactory
     }
 
     /// Queues a variant for the preload thread; a ready or queued variant is ignored
-    void request(TechniqueId id, RenderPass renderPass, uint subpass = 0)
+    void request(PipelineKey key, RenderPass renderPass, uint subpass = 0)
     {
         if(preloadThread is null)
             return;
 
         synchronized(mutex)
         {
-            const key = PipelineKey(id, targetId(renderPass, subpass));
+            const instance = PipelineInstance(key, targetId(renderPass, subpass));
 
-            if((key in cache) || (key in requested))
+            if((instance in cache) || (instance in requested))
                 return;
 
-            requested[key] = true;
-            pending ~= Pending(key, id, renderPass, subpass);
+            requested[instance] = true;
+            pending ~= Pending(instance, key, renderPass, subpass);
             condition.notify();
         }
     }
@@ -755,41 +816,48 @@ final class PipelineFactory
             mutex.unlock();
 
             try
-                acquire(job.technique, job.pass, job.subpass);
+                acquire(job.key, job.pass, job.subpass);
             catch(Exception e)
                 Instance.log_info("pipeline preload failed: " ~ e.msg);
 
             mutex.lock();
             --building;
-            requested.remove(job.key);
+            requested.remove(job.instance);
             if(pending.length == 0 && building == 0)
                 condition.notifyAll();
             mutex.unlock();
         }
     }
 
-    DescriptorAllocator descriptorAllocator(TechniqueId id)
+    DescriptorAllocator descriptorAllocator(PipelineKey key)
     {
-        assert(id.value < techniques.length);
+        const id = techniqueId(key);
 
         return techniques[id.value].allocator;
     }
 
     /// A private allocator for the same technique, for one loading thread.
-    DescriptorAllocator createDescriptorAllocator(TechniqueId id)
+    DescriptorAllocator createDescriptorAllocator(PipelineKey key)
     {
-        assert(id.value < techniques.length);
+        const id = techniqueId(key);
 
         ref technique = techniques[id.value];
 
         return new DescriptorAllocator(device, technique.setLayout, technique.bindings, technique.setsPerPool);
     }
 
-    string techniqueName(TechniqueId id) const
+    string techniqueName(PipelineKey key) const
     {
-        assert(id.value < techniques.length);
+        return techniques[techniqueId(key).value].description.name;
+    }
 
-        return techniques[id.value].description.name;
+    private TechniqueId techniqueId(PipelineKey key) const
+    {
+        auto found = key in techniqueByKey;
+
+        assert(found !is null, "pipeline key was not declared");
+
+        return *found;
     }
 
     private VkDescriptorSetLayout internSetLayout(VkDescriptorSetLayoutBinding[] bindings)
@@ -834,7 +902,7 @@ final class PipelineFactory
         return RenderTargetId(cast(uint)(targets.length - 1));
     }
 
-    private GraphicsPipelineCfg createPipeline(TechniqueId id, RenderPass renderPass, uint subpass)
+    private GraphicsPipelineCfg createPipeline(PipelineKey key, RenderPass renderPass, uint subpass)
     {
         import pukan.vulkan.defaults: multisampling;
 
@@ -842,7 +910,7 @@ final class PipelineFactory
 
         debug const start = MonoTime.currTime;
 
-        ref technique = techniques[id.value];
+        ref technique = techniques[techniqueId(key).value];
         const state = technique.description.state;
 
         VkPipelineShaderStageCreateInfo[] stages;
@@ -949,7 +1017,7 @@ final class PipelineFactory
             basePipelineIndex: -1,
         };
 
-        const identity = variantIdentity(id, renderPass, subpass);
+        const identity = variantIdentity(key, renderPass, subpass);
 
         bool needsRecompilation;
         auto pipelineCache = acquirePipelineCache(identity, needsRecompilation);
@@ -1010,24 +1078,10 @@ final class PipelineFactory
         What a variant is for the store, not how its creation info is
         assembled. The shader sums change the digest but not the slot.
     */
-    private PipelineVariantKey variantIdentity(TechniqueId id, RenderPass renderPass, uint subpass) const
+    private PipelineVariantKey variantIdentity(PipelineKey key, RenderPass renderPass, uint subpass) const
     {
-        ref const technique = techniques[id.value];
-
         PipelineVariantKeyBuilder builder;
-        builder.addString(technique.description.name);
-        builder.add(technique.description.state);
-        builder.addArray(technique.description.dynamicStates);
-
-        foreach(ref stage; technique.description.stages)
-        {
-            builder.add(stage.stage);
-            builder.add(stage.pushConstantRange);
-            builder.addShader(stage.checksum);
-            builder.addArray(stage.vertexInput.bindings);
-            builder.addArray(stage.vertexInput.attributes);
-        }
-
+        builder.addKey(key.slot, key.digest);
         builder.add(renderPass.imageFormat);
         builder.add(renderPass.depthFormat);
         builder.add(renderPass.samples);
@@ -1075,4 +1129,35 @@ final class PipelineFactory
 
         return ranges;
     }
+}
+
+unittest
+{
+    ShaderDecl stage;
+    stage.file = "test.spv";
+    stage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stage.checksum[0] = 1;
+
+    const first = PipelineFactory.techniqueKey(RenderTechnique(
+        name: "first",
+        stages: [stage],
+    ));
+    const renamed = PipelineFactory.techniqueKey(RenderTechnique(
+        name: "second",
+        stages: [stage],
+    ));
+
+    assert(first == renamed);
+
+    auto changedShader = stage;
+    changedShader.checksum[0] = 2;
+
+    const changed = PipelineFactory.techniqueKey(RenderTechnique(
+        name: "first",
+        stages: [changedShader],
+    ));
+
+    assert(first != changed);
+    assert(first.slot[] == changed.slot[]);
+    assert(first.digest[] != changed.digest[]);
 }

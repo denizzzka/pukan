@@ -76,6 +76,19 @@ struct PipelineVariantKeyBuilder
             add(value);
     }
 
+    /// Adds content that changes the slot but not the digest
+    void addSlot(T)(in T value)
+    {
+        slotHash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
+    }
+
+    /// Adds a string that changes the slot but not the digest
+    void addSlotString(string value)
+    {
+        addSlot(value.length);
+        slotHash.put(cast(const ubyte[]) value);
+    }
+
     /// Adds content that changes the digest but not the slot
     void addShader(T)(in T value)
     {
@@ -87,6 +100,13 @@ struct PipelineVariantKeyBuilder
     {
         addShader(bytes.length);
         hash.put(bytes);
+    }
+
+    /// Seeds both hashes with a key that already separates them
+    void addKey(const(ubyte)[32] slot, const(ubyte)[32] digest)
+    {
+        slotHash.put(slot);
+        hash.put(digest);
     }
 
     PipelineVariantKey finish()
