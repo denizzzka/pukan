@@ -4,7 +4,7 @@ import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired, Variants;
 import pukan.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActive;
-import pukan.pbr.pipeline_set: createPbrPipelineSet;
+import pukan.pbr.pipeline_set: PbrPipelineSet, createPbrPipelineSet;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
@@ -52,6 +52,7 @@ class SceneWith(Modules...)
     GltfFactory gltfFactory;
     GodotFactory godotFactory;
     PbrFactory pbrFactory;
+    PbrPipelineSet pbrPipelineSet;
     SphereRenderer sphereRenderer;
     CylinderRenderer cylinderRenderer;
     IblTextures ibl;
@@ -270,35 +271,35 @@ class SceneWith(Modules...)
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
-        auto pbrPipelineSet = createPbrPipelineSet(pipelineFactory, renderPass, sunShadow.pass);
-        pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, pbrPipelineSet);
+        pbrPipelineSet = createPbrPipelineSet(pipelineFactory, renderPass, sunShadow.pass);
+        pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, pbrPipelineSet.materialLayout);
         static if(pipelineWarmupRequired)
         {
             static if(Modules.length == 0)
             {
-                pbrFactory.warmAll();
+                pbrPipelineSet.warmAll();
                 pipelineFactory.waitForRequests();
-                pbrFactory.validateAll();
+                pbrPipelineSet.validateAll();
             }
             else
             {
-                pbrFactory.warmVariants!PipelineVariants();
+                pbrPipelineSet.warmVariants!PipelineVariants();
                 pipelineFactory.waitForRequests();
             }
         }
         else static if(pipelineWarmupEverything)
         {
-            pbrFactory.warmAll();
+            pbrPipelineSet.warmAll();
             pipelineFactory.waitForRequests();
-            pbrFactory.validateAll();
+            pbrPipelineSet.validateAll();
         }
         static if(pbrGltfActive)
-            gltfFactory = new GltfFactory(pbrFactory, pbrFactory.pipelinesFor(GltfFactory.pbrProfile));
+            gltfFactory = new GltfFactory(pbrFactory, pbrPipelineSet.pipelinesFor(GltfFactory.pbrProfile));
         static if(pbrGodotActive)
             godotFactory = new GodotFactory(
                 pbrFactory,
                 gltfFactory,
-                pbrFactory.pipelinesFor(GodotFactory.pbrProfile),
+                pbrPipelineSet.pipelinesFor(GodotFactory.pbrProfile),
             );
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);

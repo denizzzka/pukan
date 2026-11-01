@@ -7,6 +7,7 @@ import pukan.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, Pbr
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: FixedState, PipelineFactory, PipelineKey, RenderTechnique;
+import std.algorithm: canFind;
 
 private ShaderVertexInput vertexInput()
 {
@@ -489,6 +490,55 @@ struct PbrPipelineSet
     PbrPipelines[PbrProfile] sets;
     /// Set layout the material descriptors are allocated from
     PipelineKey materialLayout;
+
+    /// Queues every pipeline of the active profiles
+    void warmAll()
+    {
+        warmKeys(keys());
+    }
+
+    /// Queues the given keys on every active profile
+    void warmKeys(PipelineKey[] keys)
+    {
+        foreach(ref set; sets)
+            set.warmKeys(keys);
+    }
+
+    /// Queues the selected variants of every active profile
+    void warmVariants(Variants...)()
+    {
+        foreach(ref set; sets)
+            static foreach(variant; Variants)
+                set.warmVariant(variant);
+    }
+
+    /// Throws when any pipeline of the active profiles is missing
+    void validateAll()
+    {
+        foreach(ref set; sets)
+            set.validateAll();
+    }
+
+    /// Keys the active profiles declare, without duplicates
+    PipelineKey[] keys()
+    {
+        PipelineKey[] result;
+
+        foreach(ref set; sets)
+            foreach(key; set.keys())
+                if(!result.canFind(key))
+                    result ~= key;
+
+        return result;
+    }
+
+    /// Active pipeline set of a profile
+    PbrPipelines pipelinesFor(PbrProfile profile)
+    {
+        auto found = profile in sets;
+        assert(found !is null, "pipeline profile is not active");
+        return *found;
+    }
 }
 
 /// Declares the PBR pipelines of the active profiles

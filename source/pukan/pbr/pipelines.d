@@ -3,6 +3,7 @@ module pukan.pbr.pipelines;
 import pukan.exceptions: PukanException;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, PipelineKey;
 import pukan.vulkan.renderpass: RenderPass;
+import std.algorithm: canFind;
 import std.conv: to;
 import std.meta: AliasSeq, NoDuplicates, staticMap;
 import std.traits: FieldNameTuple;
@@ -137,6 +138,9 @@ struct LazyPipeline
 
     bool ready() const => cfg.graphicsPipeline !is null;
 
+    /// Recipe this slot resolves on its target
+    PipelineKey key() const => technique;
+
     void request()
     {
         factory.request(technique, pass, subpass);
@@ -208,8 +212,25 @@ final class PbrPipelines
     /// Queues every variant of this profile for the preload thread
     void warmAll()
     {
+        warmKeys(keys());
+    }
+
+    /// Queues every pipeline whose key is in the set
+    void warmKeys(PipelineKey[] keys)
+    {
         static foreach(member; FieldNameTuple!PbrPipelines)
-            warmField(__traits(getMember, this, member));
+            warmKeyField(__traits(getMember, this, member), keys);
+    }
+
+    /// Keys of every pipeline this set declares, without duplicates
+    PipelineKey[] keys() const
+    {
+        PipelineKey[] result;
+
+        static foreach(member; FieldNameTuple!PbrPipelines)
+            collectKeys(__traits(getMember, this, member), result);
+
+        return result;
     }
 
     /// Queues one concrete variant of this profile
@@ -290,13 +311,30 @@ final class PbrPipelines
             validateField(__traits(getMember, this, member));
     }
 
-    private static void warmField(T)(ref T value)
+    private static void warmKeyField(T)(ref T value, PipelineKey[] keys)
     {
         static if(is(T == LazyPipeline))
-            value.request();
+        {
+            if(keys.canFind(value.key))
+                value.request();
+        }
         else
             static foreach(member; FieldNameTuple!T)
-                warmField(__traits(getMember, value, member));
+                warmKeyField(__traits(getMember, value, member), keys);
+    }
+
+    private static void collectKeys(T)(ref const T value, ref PipelineKey[] result)
+    {
+        static if(is(T == LazyPipeline))
+        {
+            const key = value.key;
+
+            if(!result.canFind(key))
+                result ~= key;
+        }
+        else
+            static foreach(member; FieldNameTuple!T)
+                collectKeys(__traits(getMember, value, member), result);
     }
 
     private static void validateField(T)(ref T value)
