@@ -711,8 +711,9 @@ requirements, with the monolithic path as the fallback.
       variants, cold and with the pipeline cache warm. Linking is cheaper than
       compiling, but it is not free, and the count only matters while startup
       still stalls.
-- [ ] Split `PipelineKey` along the same four stages and cache the libraries in
-      the same store, so the combinatorial explosion shrinks in the cache too.
+- [ ] Split `PipelineInstance` along the same four stages and cache the libraries
+      in the same store, so the combinatorial explosion shrinks in the cache
+      too.
 - [ ] Evaluate `VK_EXT_shader_object` as the other way to the same end, with no
       link at all: bind the shaders and keep the state dynamic.
 
@@ -834,40 +835,38 @@ Open questions:
 - Keep the disk cache record when a pipeline is evicted, so the rebuild is
   cheap; dropping it would trade memory for compile time.
 
-### Pipeline creation
+### Pipeline creation and identity
 
-Pipeline creation is not PBR-specific. Move it into a generic `Pipelines`
-module (`pukan.pipelines` or `pukan.pipeline_set`): it owns `PipelineId`,
-`LazyPipeline` slots, creation, interning, warming and caching. `PbrFactory`
-keeps the PBR semantic table that maps material state to `PipelineId`s, and
-background, OIT and primitives use the same `Pipelines`. `PbrPipelines` is not
-the creation layer; it is the PBR table.
+Pipelines are declared by what renders with them, not by a loader factory.
+`PbrFactory` keeps resources, materials and the descriptor allocator; the PBR
+declarations (`PbrPipelines`, shader stages, shadows and variants) move out of
+it. Background, OIT and primitives already declare their own.
 
-- [ ] Move `createGltfPipelines`, `createGodotPipelines`, `createShadows`,
-      `createVariants` and the shader stage helpers into the generic
-      `Pipelines` module.
-- [ ] Make `PbrPipelines` the PBR semantic table; the generic container is
-      `Pipelines`.
-- [ ] Deduplicate identical pipelines by `PipelineId` in the generic layer.
-      Currently `declare` creates a new technique for every call, so the same
-      shader set from different profiles produces separate `VkPipeline`s.
+A `PipelineKey` is the compile-time recipe: shader set, fixed state, bindings,
+vertex input and push constants. It is derived from the content, not from the
+technique name or profile, so identical declarations share one key. A
+`PipelineInstance` is a key plus a render target: one `VkPipeline` and one
+cache record. The generic `Pipelines` module interns keys, creates instances
+and caches them; it owns no PBR types and no warm list.
 
-### Compile-time PipelineId
+The shader part of the key comes from `compile_shaders.sh`, which writes a
+16-byte MurmurHash3 x64_128 sum in little endian next to every `.spv`. The
+cache record is keyed by the instance: the file is named by the instance slot,
+the same identity without the shader content, and stores the shader digest in
+its header, so a changed shader makes the record stale and the next save
+replaces it. Compute kernels hash their SPIR-V the same way. The cache size is
+explicit and defaults to 100 MB.
 
-The id is derived from the shader set, not from the technique name or profile.
-`compile_shaders.sh` writes a 16-byte MurmurHash3 x64_128 sum in little endian
-next to every `.spv`; `PipelineVariantKey` folds those sums into its digest and
-keeps beside it the variant slot, the same identity without the shader content.
-A cache file is named by the slot and stores the digest in its header, so a
-changed shader makes the record stale and the next save replaces it. Compute
-kernels hash their SPIR-V the same way. The cache size is explicit and defaults
-to 100 MB.
-
-- [ ] Move the sums into an explicit `PipelineId` and intern pipelines by it,
-      so identical shader sets return the same `VkPipeline`.
-- [ ] Keep the shader `PipelineId` target-independent; `PipelineKey` combines
-      it with the render target, so the same shaders on another target still
-      need their own `VkPipeline`.
+- [ ] Add `PipelineKey` interning to the generic registry. `PipelineFactory`
+      keeps the Vulkan mechanics; `declare` returns the interned key.
+- [ ] Rename the existing `PipelineKey` (technique + target) to
+      `PipelineInstance`, since that is the recipe plus target.
+- [ ] Move the PBR declarations out of `PbrFactory`: shader stage helpers,
+      shadows and variants. `PbrFactory` stops creating pipelines.
+- [ ] Keep `PbrPipelines` as the PBR set of keys indexed by material state;
+      `LazyPipeline` resolves one on a target. It is not the registry.
+- [ ] Collect the `required` union from the keys each renderer declares, not
+      from a factory-owned table.
 
 ### Pipeline warmup policy
 
@@ -879,8 +878,8 @@ module's `alias pipelineVariants`; duplicate descriptors collapse, like
 when it draws, including scenes loaded later.
 
 `PbrProfile { gltf, godot }` lives in `pukan.pbr.factory` and names the
-shader set. `PbrFactory` creates one `PbrPipelines` per active profile; a build
-with `-version=PbrGltfOnly` or `-version=PbrGodotOnly` does not create the
+shader set. The PBR declarations build one `PbrPipelines` per active profile; a
+build with `-version=PbrGltfOnly` or `-version=PbrGodotOnly` does not build the
 other profile. `GltfFactory` and `GodotFactory` receive their set at
 construction and declare their profile statically, so the loader never looks it
 up by name. `pukan.pbr.pipelines` stays format-agnostic. The same variant list
