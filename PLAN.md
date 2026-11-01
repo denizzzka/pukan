@@ -451,8 +451,11 @@ animation delta replaces the usual input and physics velocity for that step.
       scene transform is a feet position and camera offsets match Godot. The shape center
       is offset by the radius plus half the cylinder.
 - [x] The character is a separate drawable (a glTF model or a debug capsule) drawn with
-      the interpolated body transform, not a node of the loaded scene. Node transform
-      writeback is only needed for moving platforms.
+      the simulated body transform, not a node of the loaded scene. The third-person
+      mesh and camera use the current position, so they match the capsule; first-person
+      interpolates. Node transform writeback is only needed for moving platforms.
+- [x] Model matrices use `trsMatrix`: the MVP path is column-vector, so the order is
+      `translation * rotation * scale`, not `scale * rotation * translation`.
 - [ ] `demo_godot` builds the collision world from the loaded scene, spawns the preset at
       `--spawn` or at the first `CharacterBody3D`/`Marker3D`, and steps the simulation
       before `drawNextFrame`. `--movement quake` is the default.

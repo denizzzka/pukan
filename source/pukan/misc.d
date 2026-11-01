@@ -114,7 +114,7 @@ VkFormat linearFormat(VkFormat format) @safe nothrow pure
     }
 }
 
-import dlib.math: Matrix4x4f, Vector3f, Vector4f, translationMatrix;
+import dlib.math: Matrix4x4f, Quaternionf, Vector3f, Vector4f, scaleMatrix, translationMatrix;
 
 //TODO: try dlib.geometry.aabb.AABB instead: it provides intersectsAABB and
 // closestPoint, but has no comparison for two boxes
@@ -183,6 +183,39 @@ unittest
 
     Boxf unknown;
     assert(isVisible(unknown, Matrix4x4f.identity));
+}
+
+/// Model matrix in the render convention: translate * rotate * scale.
+/// The MVP path is column-vector; never write scale * rotate * translate here.
+Matrix4x4f trsMatrix(in Vector3f translation, in Matrix4x4f rotation, in Vector3f scale)
+{
+    return translationMatrix(translation) * rotation * scaleMatrix(scale);
+}
+
+/// Model matrix from a quaternion rotation
+Matrix4x4f trsMatrix(in Vector3f translation, in Quaternionf rotation, in Vector3f scale)
+{
+    return trsMatrix(translation, rotation.toMatrix4x4, scale);
+}
+
+unittest
+{
+    const plain = trsMatrix(Vector3f(1, 2, 3), Matrix4x4f.identity, Vector3f(2, 3, 4));
+
+    assert(plain.a14 == 1 && plain.a24 == 2 && plain.a34 == 3);
+    assert(plain.a11 == 2 && plain.a22 == 3 && plain.a33 == 4);
+
+    Matrix4x4f rotation = Matrix4x4f.identity;
+    rotation.a11 = 0;
+    rotation.a13 = -1;
+    rotation.a31 = 1;
+    rotation.a33 = 0;
+
+    const turned = trsMatrix(Vector3f(1, 2, 3), rotation, Vector3f(1, 1, 1));
+
+    assert(turned.a11 == 0 && turned.a13 == -1);
+    assert(turned.a31 == 1 && turned.a33 == 0);
+    assert(turned.a14 == 1 && turned.a24 == 2 && turned.a34 == 3);
 }
 
 /// Orthographic projection for Vulkan: Y points down and depth spans [0, 1]
