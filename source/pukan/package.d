@@ -10,6 +10,7 @@ public import pukan.godot_scene;
 public import pukan.material;
 public import pukan.mesh;
 public import pukan.misc;
+public import pukan.mover;
 public import pukan.pbr;
 public import pukan.primitives_tree;
 public import pukan.primitives_tree.mesh;
