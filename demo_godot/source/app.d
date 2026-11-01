@@ -1,5 +1,6 @@
-import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix, scaleMatrix, translationMatrix;
+import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix;
 import pukan;
+import pukan.misc: trsMatrix;
 import pukan.mover.component: MoverComponent;
 import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
 import pukan.pbr.pipelines: plainShading;
@@ -810,10 +811,11 @@ void main(string[] args)
         Matrix4x4f characterTransform = Matrix4x4f.identity();
 
         if(characterMode && characterModel)
-            characterTransform = translationMatrix(characterRenderPosition + characterModelOffset)
-                * rotationMatrix!float(Axis.y, characterYaw)
-                * scaleMatrix(Vector3f(characterModelScaleX,
-                    characterModelScaleY, characterModelScaleZ));
+            characterTransform = trsMatrix(
+                characterRenderPosition + characterModelOffset,
+                rotationMatrix!float(Axis.y, characterYaw),
+                Vector3f(characterModelScaleX, characterModelScaleY, characterModelScaleZ),
+            );
 
         if(debugCapsuleLines && characterMode)
         {
