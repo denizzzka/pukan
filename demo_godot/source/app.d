@@ -1,9 +1,17 @@
-import dlib.math: Matrix4x4f, Vector3f, Vector4f;
+import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix;
 import pukan;
+import pukan.misc: trsMatrix;
+import pukan.mover.component: MoverComponent;
+import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
 import pukan.pbr.pipelines: plainShading;
+import pukan.physics.simulation: Simulation;
+import pukan.physics.world: CollisionWorld;
+import pukan.primitives_tree.lines: LineInstance, LineRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
+import std.algorithm: min;
+import std.math: PI, atan2, cos, sin;
 import std.exception: enforce;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
@@ -157,6 +165,70 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
             : "look axis: screen (camera up)");
 }
 
+LineInstance[] capsuleLines(
+    Vector3f feet,
+    QuakeBody body,
+    Vector4f color,
+    float width,
+)
+{
+    LineInstance[] lines;
+    const radius = body.radius;
+    const height = body.height;
+    const up = body.up;
+    const xAxis = Vector3f(1, 0, 0);
+    const zAxis = Vector3f(0, 0, 1);
+    const bottom = feet + up * radius;
+    const top = feet + up * (height - radius);
+
+    void add(Vector3f a, Vector3f b)
+    {
+        lines ~= LineInstance(
+            Vector4f(a.x, a.y, a.z, width),
+            Vector4f(b.x, b.y, b.z, 0),
+            color,
+        );
+    }
+
+    foreach(i; 0 .. 16)
+    {
+        const angle = 2.0f * PI * i / 16.0f;
+        const radial = xAxis * cos(angle) + zAxis * sin(angle);
+        add(bottom + radial * radius, top + radial * radius);
+    }
+
+    foreach(i; 0 .. 32)
+    {
+        const a0 = 2.0f * PI * i / 32.0f;
+        const a1 = 2.0f * PI * (i + 1) / 32.0f;
+        const r0 = xAxis * cos(a0) + zAxis * sin(a0);
+        const r1 = xAxis * cos(a1) + zAxis * sin(a1);
+        add(bottom + r0 * radius, bottom + r1 * radius);
+        add(top + r0 * radius, top + r1 * radius);
+    }
+
+    foreach(i; 0 .. 8)
+    {
+        const angle = PI * i / 8.0f;
+        const radial = xAxis * cos(angle) + zAxis * sin(angle);
+        Vector3f previousBottom = bottom + radial * radius;
+        Vector3f previousTop = top + radial * radius;
+
+        foreach(j; 1 .. 12)
+        {
+            const t = PI * j / 12.0f;
+            const bottomPoint = bottom + radial * (cos(t) * radius) - up * (sin(t) * radius);
+            const topPoint = top + radial * (cos(t) * radius) + up * (sin(t) * radius);
+            add(previousBottom, bottomPoint);
+            add(previousTop, topPoint);
+            previousBottom = bottomPoint;
+            previousTop = topPoint;
+        }
+    }
+
+    return lines;
+}
+
 void main(string[] args)
 {
     string scenePath;
@@ -170,6 +242,16 @@ void main(string[] args)
     bool noShadows;
     bool plainMode;
     bool offscreen;
+    bool characterMode;
+    bool thirdPerson;
+    string spawnOption;
+    bool walkForward;
+    bool fixedStep;
+    bool noclip;
+    bool noSpringArm;
+    bool debugCapsule;
+    string modelOption;
+    float physicsHz = 60.0f;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
     float farOption = cameraFar;
@@ -188,6 +270,16 @@ void main(string[] args)
         "no-shadows", "do not cast shadows", &noShadows,
         "plain", "draw every surface in the plain lit mode", &plainMode,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
+        "character", "walk a Quake-style capsule through the level", &characterMode,
+        "spawn", "character spawn position, x,y,z", &spawnOption,
+        "walk", "hold forward, for headless movement tests", &walkForward,
+        "fixed-step", "advance one physics tick per frame", &fixedStep,
+        "noclip", "ignore collision in character mode", &noclip,
+        "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
+        "debug-capsule", "draw the character collision capsule", &debugCapsule,
+        "model", "character model path; defaults to CesiumMan", &modelOption,
+        "third-person", "draw the character from behind", &thirdPerson,
+        "physics-hz", "fixed character tick rate", &physicsHz,
         "fov", "vertical field of view in degrees", &fovOption,
         "near", "near clipping distance", &nearOption,
         "far", "far clipping distance", &farOption,
@@ -334,12 +426,33 @@ void main(string[] args)
     scene.godotFactory.preloadShadows = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
-        scenePath = "demo_godot/godot_samples/generated/procedural.tscn";
+        scenePath = characterMode
+            ? "demo_godot/godot_samples/character/level.tscn"
+            : "demo_godot/godot_samples/generated/procedural.tscn";
 
     auto godotScene = packPath.length
         ? scene.godotFactory.createPacked(packPath, scenePath)
         : scene.godotFactory.create(scenePath);
     scope(exit) destroy(godotScene);
+
+    GlTF characterModel;
+    Vector3f characterModelOffset;
+    float characterModelScaleX = 1.0f;
+    float characterModelScaleY = 1.0f;
+    float characterModelScaleZ = 1.0f;
+
+    if(characterMode)
+    {
+        import std.file: exists;
+
+        const modelPath = modelOption.length
+            ? modelOption
+            : "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb";
+
+        if(exists(modelPath))
+            characterModel = scene.gltfFactory.create(modelPath);
+    }
+    scope(exit) if(characterModel) destroy(characterModel);
     writeln("loaded ", packPath.length ? packPath : scenePath, ": meshes ", godotScene.meshCount,
         ", geometries ", godotScene.geometryCount,
         ", nodes skipped ", godotScene.skippedNodes,
@@ -350,6 +463,10 @@ void main(string[] args)
 
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
     printSkippedTypes("resources not rendered", godotScene.skippedResourceTypes);
+
+    auto collisionWorld = new CollisionWorld;
+    godotScene.buildCollisionWorld(collisionWorld);
+    writeln("colliders ", collisionWorld.colliderCount());
 
     foreach(bounds; godotScene.instanceBounds)
         writeln("instance aabb ", bounds.min.x, " ", bounds.min.y, " ", bounds.min.z,
@@ -386,6 +503,32 @@ void main(string[] args)
 
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
+
+    if(characterModel)
+    {
+        characterModel.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
+
+        const bounds = characterModel.calcAABB();
+
+        if(bounds.min.y == bounds.min.y && bounds.max.y > bounds.min.y)
+        {
+            characterModelScaleY = 1.8f / (bounds.max.y - bounds.min.y);
+
+            const width = bounds.max.x - bounds.min.x;
+            const depth = bounds.max.z - bounds.min.z;
+            const capsuleDiameter = 0.8f;
+
+            characterModelScaleX = width > 0.0f
+                ? min(characterModelScaleY, capsuleDiameter / width)
+                : characterModelScaleY;
+            characterModelScaleZ = depth > 0.0f
+                ? min(characterModelScaleY, capsuleDiameter / depth)
+                : characterModelScaleY;
+
+            characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScaleY, 0);
+        }
+    }
+
     scene.sunShadow.fit(godotScene.calcAABB());
 
     if(godotScene.environment.present)
@@ -460,14 +603,66 @@ void main(string[] args)
 
     camera.speed = speedOption;
 
+    QuakeBody characterBody;
+    QuakeMovementConfig characterConfig;
+    MoverComponent mover;
+    QuakeCommand characterCommand;
+    characterCommand.wishDir = Vector3f(0, 0, 0);
+    characterCommand.wishSpeed = 0.0f;
+    characterCommand.jump = false;
+
+    Simulation simulation;
+
+    if(characterMode)
+    {
+        Vector3f spawn = Vector3f(0, 2, 0);
+
+        if(spawnOption.length)
+            spawn = parseVector(spawnOption);
+        else
+        {
+            Vector3f marker;
+
+            if(godotScene.spawnPosition(marker))
+                spawn = marker;
+        }
+
+        mover = new MoverComponent(collisionWorld, characterBody, characterConfig);
+        mover.setNoclip(noclip);
+        mover.teleport(spawn);
+
+        simulation = new Simulation(collisionWorld);
+        simulation.setTickRate(physicsHz);
+    }
+    scope(exit) if(simulation) destroy(simulation);
+
+    LineRenderer debugCapsuleLines;
+
+    if(debugCapsule)
+        debugCapsuleLines = new LineRenderer(
+            device, scene.pipelineFactory, scene.renderPass,
+            scene.swapChain.imageExtent, false, 4096, true);
+
+    scope(exit) if(debugCapsuleLines) destroy(debugCapsuleLines);
+
     if(!offscreen)
-        writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
+        writeln(characterMode
+            ? "character: WASD move, right mouse look, Space jump"
+            : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
     import core.time: MonoTime;
     const start = MonoTime.currTime;
     double lastTime = offscreen ? 0.0 : glfwGetTime();
+    double characterCursorX = 0.0;
+    double characterCursorY = 0.0;
+    bool characterCursorKnown;
+    float characterMaxHeight = -float.infinity;
+    float characterYaw = 0.0f;
+    float thirdPersonDistance = 6.0f;
+    bool characterVisible = true;
+    Vector3f characterRenderPosition;
 
     while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
@@ -476,11 +671,158 @@ void main(string[] args)
             glfwPollEvents();
 
         const now = offscreen ? (MonoTime.currTime - start).total!"msecs" * 0.001 : glfwGetTime();
-        const dt = cast(float) (now - lastTime < 0.1 ? now - lastTime : 0.1);
+        const measuredDt = cast(float) (now - lastTime < 0.1 ? now - lastTime : 0.1);
+        const dt = fixedStep || offscreen
+            ? cast(float) (1.0 / physicsHz)
+            : measuredDt;
         lastTime = now;
 
-        if(!offscreen)
+        if(characterMode)
+        {
+            if(!offscreen)
+            {
+                bool pressed(int key) nothrow @nogc
+                {
+                    return glfwGetKey(window, key) == GLFW_PRESS;
+                }
+
+                double cursorX;
+                double cursorY;
+                glfwGetCursorPos(window, &cursorX, &cursorY);
+
+                if(characterCursorKnown)
+                {
+                    const dx = cast(float) (cursorX - characterCursorX);
+                    const dy = cast(float) (cursorY - characterCursorY);
+
+                    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+                        camera.look(dx, dy);
+                }
+
+                characterCursorX = cursorX;
+                characterCursorY = cursorY;
+                characterCursorKnown = true;
+
+                Vector3f forward = camera.forward;
+                forward.y = 0;
+
+                if(forward.length > 1e-6f)
+                    forward = forward.normalized;
+                else
+                    forward = Vector3f(0, 0, 0);
+
+                Vector3f right = camera.right;
+                right.y = 0;
+
+                if(right.length > 1e-6f)
+                    right = right.normalized;
+                else
+                    right = Vector3f(0, 0, 0);
+
+                const forwardInput = (pressed(GLFW_KEY_W) ? 1.0f : 0.0f)
+                    - (pressed(GLFW_KEY_S) ? 1.0f : 0.0f);
+                const rightInput = (pressed(GLFW_KEY_D) ? 1.0f : 0.0f)
+                    - (pressed(GLFW_KEY_A) ? 1.0f : 0.0f);
+                const wish = forward * forwardInput + right * rightInput;
+
+                characterCommand.wishDir = wish;
+                characterCommand.wishSpeed = wish.length > 1e-6f
+                    ? characterConfig.maxSpeed
+                    : 0.0f;
+                characterCommand.jump = pressed(GLFW_KEY_SPACE);
+            }
+            else
+            {
+                characterCommand.wishDir = Vector3f(0, 0, 0);
+                characterCommand.wishSpeed = 0.0f;
+                characterCommand.jump = false;
+            }
+
+            if(walkForward)
+            {
+                Vector3f forward = camera.forward;
+                forward.y = 0;
+
+                if(forward.length > 1e-6f)
+                    forward = forward.normalized;
+                else
+                    forward = Vector3f(0, 0, 0);
+
+                characterCommand.wishDir = forward;
+                characterCommand.wishSpeed = characterConfig.maxSpeed;
+            }
+
+            simulation.step(dt, (tickDt) {
+                mover.step(characterCommand, tickDt);
+                characterMaxHeight = characterMaxHeight > mover.state.position.y
+                    ? characterMaxHeight
+                    : mover.state.position.y;
+            });
+
+            const alpha = simulation.interpolationAlpha();
+
+            // Third person draws the simulated position, so mesh and capsule agree
+            characterRenderPosition = thirdPerson
+                ? mover.state.position
+                : mover.renderPosition(alpha);
+
+            const eyePosition = thirdPerson
+                ? mover.state.position + characterBody.up * characterBody.eyeHeight
+                : mover.eyePosition(alpha);
+
+            Vector3f flatForward = camera.forward;
+            flatForward.y = 0;
+
+            if(flatForward.length > 1e-4f)
+                characterYaw = -atan2(flatForward.x, flatForward.z);
+
+            if(thirdPerson)
+            {
+                const back = -camera.forward;
+                const desired = 6.0f;
+                float targetDistance = desired;
+
+                if(!noSpringArm)
+                {
+                    const hit = collisionWorld.raycast(eyePosition, back, desired,
+                        characterBody.mask);
+
+                    if(hit.hit)
+                        targetDistance = hit.t > 0.1f ? hit.t - 0.1f : 0.1f;
+                }
+
+                if(targetDistance < thirdPersonDistance)
+                    thirdPersonDistance = targetDistance;
+                else
+                {
+                    const blend = dt * 6.0f < 1.0f ? dt * 6.0f : 1.0f;
+                    thirdPersonDistance += (targetDistance - thirdPersonDistance) * blend;
+                }
+
+                characterVisible = thirdPersonDistance > 0.75f;
+                camera.position = eyePosition + back * thirdPersonDistance;
+            }
+            else
+                camera.position = eyePosition;
+        }
+        else if(!offscreen)
             updateCamera(camera, window, dt);
+
+        Matrix4x4f characterTransform = Matrix4x4f.identity();
+
+        if(characterMode && characterModel)
+            characterTransform = trsMatrix(
+                characterRenderPosition + characterModelOffset,
+                rotationMatrix!float(Axis.y, characterYaw),
+                Vector3f(characterModelScaleX, characterModelScaleY, characterModelScaleZ),
+            );
+
+        if(debugCapsuleLines && characterMode)
+        {
+            debugCapsuleLines.setViewport(scene.swapChain.imageExtent);
+            debugCapsuleLines.setLines(capsuleLines(characterRenderPosition, characterBody,
+                Vector4f(0.2f, 0.85f, 1.0f, 0.45f), 1.5f));
+        }
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
@@ -503,6 +845,9 @@ void main(string[] args)
             scene.updateFrameUniforms(frame, 0, wtb);
             godotScene.refreshBuffers(frame.commandBuffer);
 
+            if(characterModel)
+                characterModel.refreshBuffers(frame.commandBuffer);
+
             const modelViewProj = wtb.proj * wtb.view * wtb.model;
 
 
@@ -513,6 +858,15 @@ void main(string[] args)
                 frame,
                 (buf, phase) {
                     godotScene.drawingBufferFilling(buf, modelViewProj, frame.frameSets[0].descriptorSet, phase);
+
+                    if(characterModel && thirdPerson && characterVisible)
+                        characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
+                            frame.frameSets[0].descriptorSet, phase);
+
+                    if(debugCapsuleLines && phase == DrawPhase.surface)
+                        debugCapsuleLines.drawingBufferFilling(buf,
+                            debugCapsuleLines.pipelineCfg, modelViewProj,
+                            frame.frameSets[0].descriptorSet);
                 },
                 null,
                 (buf) {
@@ -524,6 +878,11 @@ void main(string[] args)
         if(screenshotPath.length && frameIndex == captureFrame)
             writeln("screenshot saved to ", screenshotPath);
     }
+
+    if(characterMode)
+        writeln("character position ", mover.state.position,
+            " max height ", characterMaxHeight,
+            " onGround ", mover.state.onGround);
 
     vkDeviceWaitIdle(device.device);
 }

@@ -398,3 +398,15 @@ unittest
     camera.zoom(-1000);
     assert(camera.fov == maxFov);
 }
+
+unittest
+{
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, 0, -1));
+
+    assert(camera.forward.z < -0.9f);
+
+    camera.look(10, 0);
+
+    // Moving the cursor right must turn the view right
+    assert(camera.forward.x > 0.0f);
+}

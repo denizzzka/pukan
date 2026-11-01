@@ -1,0 +1,5 @@
+config_version=5
+
+[application]
+config/name="Character"
+run/main_scene="res://level.tscn"

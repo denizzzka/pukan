@@ -37,6 +37,10 @@ RSRC 5/6), `.ctex` (CompressedTexture2D), imported `.glb`/`.gltf`/`.obj`
 references, and `.pck` archives. `res://` resolves inside the project directory
 or the pack.
 
+Collision bodies and shape resources are decoded for the Mover, see
+`#### Colliders from Godot` under `## Mover`. They are not visual content and
+stay out of the draw tree.
+
 #### Phase 1: text scenes, static geometry and materials
 
 - [ ] External `.obj` references.
@@ -119,6 +123,10 @@ Fixtures live in `demo_godot/godot_samples/`.
 - [ ] Interior fixture: a room assembled from CC0 Kenney furniture with omni
       lights and a camera, to test many small glTF instances and indoor light
       falloff.
+- [ ] `character/`: a movement gym with a `StaticBody3D` floor, ramp, stairs, a
+      0.45 m step, a 45-degree slope, a narrow ledge, a wall, crates and a water
+      volume, plus a `CharacterBody3D` spawn marker and a `Camera3D`. The
+      platformer stage stays the `GridMap` case.
 - [ ] `combined.tscn` instancing `lights_and_shadows/test.tscn`,
       `platformer/enemy/enemy.tscn` and `generated/procedural.tscn` in one
       scene, for composition checks. Godot cannot reference resources across
@@ -136,23 +144,35 @@ Fixtures live in `demo_godot/godot_samples/`.
 
 ## Mover
 
-Goal: a modular movement system built on Unreal Engine Mover, with the feature
-completeness of CMC's default character set and the API clarity of Godot's
-`CharacterBody3D`. The core is actor-type and shape agnostic: any root scene component,
-any up axis, a capsule, box, sphere, cylinder or no collision at all. A capsule belongs
-only to the optional default character set, which is the first target. Mover replaces the
-CMC monolith with composable modes, transitions and modifiers; CMC only supplies the
-features to match. Networking is a separate, later backend, see `## Networking`.
+Goal: a modular movement system whose first motor is Quake-style, with the API
+clarity of Godot's `CharacterBody3D` and the modularity of Unreal Mover. The core
+is actor-type and shape agnostic: any root scene component, any up axis, a
+capsule, box, sphere, cylinder or no collision at all. The first preset is a
+humanoid capsule on Godot levels. CMC-style acceleration and Godot-style
+`moveAndSlide` parity are later movement models, not the first target. Networking
+is a separate, later backend, see `## Networking`.
+
+From Quake:
+
+- a fixed `pmove` tick and `usercmd` input: wish direction, wish speed, jump, crouch and
+  attack;
+- ground friction, acceleration, air acceleration, stop speed, gravity and max velocity;
+- `PM_ClipVelocity` with overbounce and `PM_StepSlideMove` with an up-forward-down pass;
+- water move, noclip and spectator, and no coyote time or jump buffer by default;
+- client prediction and server reconciliation over the same move, see `## Networking`.
 
 From Godot:
 
-- a kinematic body and a `moveAndSlide()` collision utility that resolves the slide; the
-  active mode chooses when to call it and with which shape and velocity;
+- a kinematic body and `moveAndSlide()` behavior that resolves the slide; the active mode
+  chooses when to call it and with which shape and velocity;
 - explicit `isOnFloor`/`isOnWall`/`isOnCeiling`, floor normal and angle, `upDirection`,
   `floorSnapLength`, `floorMaxAngle`, `maxSlides`, `safeMargin`, `motionMode`;
 - moving platform velocity, floor locking and last-collision results.
 
-From Unreal CMC (feature reference):
+Behavior parity with Godot, not numeric parity: the same visible outcomes, our own
+deterministic math and step-up.
+
+From Unreal CMC (later movement model):
 
 - movement modes: walking, falling, flying, swimming, custom;
 - acceleration, braking, ground friction, air control and gravity scale;
@@ -174,8 +194,48 @@ From Unreal Mover (architecture):
 - actor-type and shape agnostic: any root scene component, optional collision and any up
   axis.
 
-Expect more project-side code than CMC: the engine supplies the simulation and the
-command contract, not a binding system.
+Expect more project-side code than CMC or Quake: the engine supplies the simulation
+and the command contract, not a binding system.
+
+### First playable slice
+
+The slice is a kinematic capsule on a loaded Godot level with a Quake-style
+motor: ground friction and acceleration, air acceleration, step-slide, instant
+jump, water and noclip. Only static and kinematic colliders react. Rigid-body
+dynamics, joints, ragdolls and vehicles stay out until the capsule is solid.
+
+Current state: the physics core, the Godot collision decode and the Quake
+ground/air motor are in. `pukan.physics` has shapes, a BVH, ray and capsule
+sweeps, layer filtering and a fixed-step `Simulation`; `godot_scene` decodes
+`StaticBody3D`, `AnimatableBody3D`, `RigidBody3D`, the shape resources and
+`GridMap` item shapes; `pukan.mover.quake` has `pmMove`, friction,
+acceleration, air acceleration, clip velocity and step-slide; `demo_godot
+--character` walks a capsule on the platformer stage and on the `character/`
+movement gym, up its stairs and ramp, in first or third person. Missing: water,
+crouch, moving platforms, mesh fallback and debug draw.
+
+Decided for the slice:
+
+- own narrowphase and BVH, with no physics engine dependency; `dlib.geometry`
+  supplies support functions but has no sweep;
+- static and kinematic colliders only, no rigid-body island solver;
+- Y up and a capsule preset, while the core stays shape and actor agnostic;
+- level collision comes from Godot body nodes and `GridMap` items, mesh
+  fallback is opt-in;
+- the character is a separate drawable driven by the body transform, not a
+  mutable node of the loaded scene;
+- the first motor is Quake-style; CMC and Godot `moveAndSlide` models come later;
+- behavior parity with Godot's collision semantics, not numeric parity;
+- the player body is a capsule; `BoxShape3D` stays a level collider, and a box
+  body is a later preset that only needs a unit test now;
+- no second preset in the slice; a box-body test proves the core is shape
+  agnostic;
+- moving platforms follow jump and slide in Phase 2, root motion stays later.
+
+Done when `demo_godot --character` spawns on the platformer stage and on the
+`character/` fixture, walks up and down the ramp, jumps onto a crate, slides
+along walls, steps onto a 0.45 m ledge, gains speed with a strafe jump, and
+keeps a stable fixed tick while the frame rate changes.
 
 ### Shape and the default character set
 
@@ -187,30 +247,108 @@ Mover core.
       one, and with no collision at all.
 - [ ] `BodyShape` covers capsule, box, sphere and cylinder, plus `none`. Modes declare
       which shapes they support, so a car or a projectile uses the same core.
-- [ ] The up axis is configurable per body; the default character set assumes Z up and a
-      vertical capsule, like CMC.
-- [ ] The default character set is an optional preset: capsule plus walking, falling,
-      flying and swimming, matching CMC behavior for humanoids.
+- [x] The up axis is configurable per body; the default character set uses Y up, like
+      Godot, and a vertical capsule.
+- [x] Godot shape semantics: the capsule stores a radius and a total height including
+      both hemispheres, the box stores full extents, matching `CapsuleShape3D` and
+      `BoxShape3D`.
+- [x] The default character preset is a 0.4 m radius, 1.8 m capsule with a 1.6 m eye
+      height and collision layer 1, matching the scale of the Godot fixtures.
+- [x] The Quake motor uses the capsule in the first slice; an AABB body is a later
+      Quake preset for exact `mins`/`maxs` feel.
+- [x] Box is a level collider (`GridMap`, crates, walls) and a later body shape; the
+      first slice does not need a box body.
+- [ ] The default character set is an optional preset: capsule plus ground, air, water
+      and noclip modes.
 - [ ] Other presets (vehicle, projectile, quadruped, flying pawn) assemble modes without
       the character set and without a capsule.
+
+### Collision world
+
+`pukan.physics` owns shapes, the broadphase and the queries. It knows nothing
+about Godot, rendering or the motor. `godot_scene` decodes collision nodes and
+shape resources and adds them with world transforms. `mover` consumes queries
+only and never walks the scene tree.
+
+- [x] `CollisionShape` covers sphere, capsule, box, cylinder, convex point set,
+      triangle mesh, world boundary plane and none.
+- [x] `Collider` stores the world transform, the shape, the collision layer and mask,
+      the owning node and whether it is static or kinematic.
+- [x] `CollisionWorld` keeps one static BVH over primitive AABBs and mesh triangles,
+      built after the level loads.
+- [ ] A moved kinematic collider refits its leaf or rebuilds the tree.
+- [ ] `RayHit` and `ShapeCastHit` share time of impact, point, normal, penetration depth,
+      collider and node.
+- [x] Broadphase: median split on the longest axis, leaf size 4, triangles flattened
+      into the same tree with their collider id.
+- [ ] Narrowphase: analytic plane and sphere, segment-triangle distance for a capsule
+      against a mesh, GJK distance for separated convex pairs plus conservative
+      advancement; `intrMPR` from `dlib.geometry` supplies the penetration normal when
+      they overlap. No SAT fallback until a test demands it.
+- [ ] Shape casts for sphere, capsule, box and cylinder; a capsule is a segment plus a
+      radius. Each cast advances at most 16 steps and starts from the swept AABB.
+- [ ] Triangle meshes weld shared vertices and filter internal edges, so a cast does not
+      catch on the seam between coplanar triangles.
+- [ ] `PlaneCollider` and convex brush colliders are optional for Quake-style maps; the
+      first slice uses Godot triangles and primitives.
+- [x] Box colliders are required for `GridMap`, crates and walls; a box body is not.
+- [x] Overlap query for triggers, spawn checks and crouch clearance.
+- [x] Collision layers are the 32-bit Godot bitmasks; a query takes a mask and matches
+      when `layer & mask` is non-zero.
+- [x] Contact normals point out of the collider toward the body, like Godot's
+      `KinematicCollision3D`.
+- [ ] Numeric defaults follow Godot: safe margin 0.001 m, floor max angle 45 degrees,
+      floor snap 0.1 m, wall minimum slide angle 15 degrees, at most 4 slides.
+- [x] Quake's overbounce, step-slide and air acceleration belong to the motor, not the
+      collision world.
+- [x] Reuse `dlib.math` types and `dlib.geometry` support functions; dlib's MPR only
+      detects overlap and has no sweep, so the swept narrowphase is ours.
+
+#### Colliders from Godot
+
+- [x] `StaticBody3D`, `AnimatableBody3D` and `RigidBody3D` (as a static snapshot) decode
+      `collision_layer`, `collision_mask` and their `CollisionShape3D` children.
+- [x] Shapes: `BoxShape3D` full extents, `SphereShape3D` radius, `CapsuleShape3D` radius
+      and total height, `CylinderShape3D`, `ConvexPolygonShape3D` points,
+      `ConcavePolygonShape3D` triangles and `WorldBoundaryShape3D` plane.
+- [x] Shape resources resolve from sub-resources and external `.tres`/`.res`, text and
+      binary, the same way meshes and materials do.
+- [x] `CollisionShape3D` applies its local transform and honors `disabled`.
+- [x] `GridMap` adds the `MeshLibrary` `item/N/shapes` pairs at each occupied cell,
+      reusing the cell transform and 24-way orientation the visual cells already
+      compute.
+- [x] Nested `GodotScene` instances are traversed once, with the same instance transform
+      the draw path uses, so collision does not depend on how the scene nests.
+- [ ] Collision data lives on `GodotNode` and needs no device, so a headless server can
+      load a level and build the same world without Vulkan.
+- [ ] `GodotLoadOptions.collisionFromMeshes` turns a `MeshInstance3D` without a body into
+      a concave collider; off by default because the town would pay for every tree.
+- [ ] glTF instances can contribute concave colliders behind their own option, off by
+      default for the same reason.
+- [ ] `RayCast3D` becomes a ray query for the camera spring arm and debug, not a
+      collider.
+- [ ] `Area3D` volumes are query-only; they never block the body.
+- [x] Rigid bodies stay static snapshots in the slice; moving them, joints and
+      body-to-body contacts are a later backend.
 
 ### Movement modes as modules
 
 - [ ] `MovementMode` is an interface with hooks such as `onGenerateMove` and
-      `onSimulationTick`, not a switch inside one update function. Walking, falling,
-      flying, swimming and custom are separate modules.
-- [ ] Modes declare the shared settings they need (walkable slope, gravity, speeds);
-      `MoverComponent` deduplicates them, so walking and falling read one instance.
-- [ ] `walking`: ground friction and gravity maintain floor contact; vertical velocity
-      is clamped while grounded, so the body cannot launch itself from a slope. Step-up,
-      floor snap and walkable floor angle apply. Leaving the floor switches to `falling`.
-- [ ] `falling`: gravity plus air control; horizontal input is scaled by `airControl`.
-      Landing switches back to `walking`, and a jump leaves the ground without an
-      intermediate falling frame.
-- [ ] `flying`: no gravity by default, free 3D acceleration and braking, optional
-      vertical input and no floor state. Useful for noclip, spectating and jetpacks.
-- [ ] `swimming`: reduced gravity, fluid friction and buoyancy, with an optional surface
-      transition; floor snap and step-up are disabled.
+      `onSimulationTick`, not a switch inside one update function. Ground, air, water,
+      noclip and custom are separate modules.
+- [ ] Modes declare the shared settings they need (gravity, speeds, friction, step
+      height); `MoverComponent` deduplicates them, so ground and air read one instance.
+- [x] `moveAndSlide` is Quake's `PM_ClipVelocity` plus `PM_StepSlideMove`: up to four
+      planes, overbounce 1.001, and a step pass that keeps the farther result.
+- [x] `ground`: Quake friction and acceleration, step-slide, floor classification and
+      jump. Leaving the floor switches to `air`; water switches to `water`.
+- [x] `air`: gravity and air acceleration, no friction; landing switches to `ground`.
+      The air acceleration is what makes strafe jumping and bunny hopping work, with no
+      special-case code.
+- [ ] `water`: reduced gravity, water friction and buoyancy, swim up and down, no
+      step-up or floor snap; leaving the volume switches back to `air` or `ground`.
+- [x] `noclip`: no collision, free 3D movement and no floor state, for spectating and
+      debug.
 - [ ] `custom`: bypasses the built-in motor entirely: no gravity, friction, floor checks
       or automatic collision response. A `CustomMovement` hook receives the body, input
       and `dt` and drives the motion, and may call `moveAndSlide` explicitly, for
@@ -221,20 +359,21 @@ Mover core.
       a custom mode can return control to a built-in one.
 - [ ] Layered moves and `MovementModifier`s apply on top of a mode, so a platform,
       impulse or stance changes motion without editing the mode.
+- [x] The Quake preset has no coyote time, jump buffer, jump hold or multiple jumps.
+      Those belong to the later CMC model.
 - [ ] Per-mode unit tests and a test that cycles through every mode and back.
 
 ### Input
 
-Mover does not own device input. It consumes a command struct that the project fills
-from keyboard, mouse, gamepad, touch, AI or a replay. The default CMC character setup
-reads devices for you, which is convenient but rigid; here the mapping stays with the
-game.
+Mover does not own device input. It consumes a `usercmd`-style command struct that the
+project fills from keyboard, mouse, gamepad, touch, AI or a replay. The engine supplies
+the contract, not the binding.
 
-- [ ] `MoveInput` is whatever command struct the project chooses; the core only requires
-      a minimal contract (move axis, look delta, jump, crouch, sprint and action
-      triggers). The default character preset ships `CharacterInput` as an example;
-      games add their own fields.
-- [ ] `pukan.mover` never reads GLFW or gamepads. `demo_godot` provides a
+- [ ] `CharacterInput` carries the Quake `usercmd` fields: wish direction, wish speed,
+      jump, crouch, attack, use, view angles and tick. The default character preset
+      ships it as an example; games add their own fields.
+- [x] The Quake preset reads wish direction and wish speed and has no jump hold.
+- [x] `pukan.mover` never reads GLFW or gamepads. `demo_godot` provides a
       `CharacterControls` mapper from GLFW keys and mouse to `CharacterInput`.
 - [ ] Optional reference mapper with rebindable actions, dead zones and sensitivity,
       shipped as a demo utility, not baked into the controller.
@@ -245,6 +384,9 @@ game.
       requirements.
 
 ### Root motion
+
+Not part of the Quake motor. It stays a later layer for animation-driven actions,
+after the first slice is solid.
 
 Unreal lets an animation own movement for the duration of an action: a dash, a
 knockback hit or a scripted move. The movement step still resolves collision, but the
@@ -270,12 +412,22 @@ animation delta replaces the usual input and physics velocity for that step.
 
 ### Design
 
-- [ ] `pukan.mover`: `MoverComponent` owns a `BodyShape` and a `MoveState`; `MoveInput` is
-      the project-filled command contract; `MoverComponent` runs one fixed-step update and
-      hands each move to a `MoverBackend`.
+- [x] `pukan.physics.shapes`: `CollisionShape`, `ShapeKind`, `Collider`, shape
+      construction and bounds.
+- [x] `pukan.physics.bvh`: static BVH with median split and primitive or triangle leaves.
+- [ ] `pukan.physics.narrowphase`: segment-triangle distance, GJK distance, conservative
+      advancement and the plane and sphere fast paths.
+- [x] `pukan.physics.world`: `CollisionWorld`, `RayHit`, `ShapeCastHit`, `Contact`, layer
+      filtering and queries.
+- [x] `pukan.mover`: `MoverComponent` owns a `BodyShape` and a `MoveState`; `MoveInput`
+      is the project-filled `usercmd`; one fixed `pmove` runs the selected mode and
+      modifiers, then hands the move to a `MoverBackend`.
+- [ ] `pukan.mover.quake`: `QuakeMovementConfig`, `pmFriction`, `pmAccelerate`,
+      `pmAirAccelerate`, `pmClipVelocity`, `pmStepSlide` and the ground, air, water and
+      noclip modes.
 - [ ] `pukan.character`: optional default preset. It configures `MoverComponent` with a
-      capsule and supplies `CharacterInput`, `CharacterMovementConfig` and the walking,
-      falling, flying and swimming modes for CMC parity.
+      capsule and supplies `CharacterInput`, `QuakeMovementConfig` and the first movement
+      modes.
 - [ ] `MoverComponent` selects the mode, runs transitions and modifiers, and delegates the
       step to them, with no per-mode branching.
 - [ ] `MoveState` splits sync state (position, velocity, orientation, floor/wall/ceiling
@@ -285,13 +437,28 @@ animation delta replaces the usual input and physics velocity for that step.
 - [ ] `MoverBackend` interface: a local backend runs a move immediately, and a replay
       backend can rerun recorded moves. The core never talks to sockets; the network
       implementation belongs to `## Networking`.
-- [ ] The default character preset places the capsule origin at the feet, so scene
-      transforms and camera offsets match Godot.
-- [ ] `CollisionWorld`: BVH over mesh triangles and primitive colliders (box, sphere,
-      capsule, cylinder, plane), with collision layers and masks.
-- [ ] Queries: ray, sphere and shape sweeps for capsule, box, sphere and cylinder; a
-      swept shape returns time of impact, point, normal, penetration depth, shape and
-      node. Reuse `dlib.geometry` where it fits; add the missing narrowphase.
+- [x] `pukan.physics.simulation`: `Simulation` owns the collision world and the fixed
+      tick: a 60 Hz accumulator clamped to 8 steps per frame, the body list and the
+      interpolation alpha. `Scene` stays a renderer and does not tick.
+- [ ] `pmove` is deterministic and versioned; behavior parity with Godot's
+      `moveAndSlide`, not numeric parity.
+- [x] Quake defaults live in `QuakeMovementConfig` and stay tunable: max speed 320 ups
+      (8.1 m/s), jump 270 ups (6.9 m/s), gravity 800 ups squared (20.3 m/s squared),
+      friction 6, stop speed 100 ups (2.5 m/s), acceleration 10, air acceleration 1,
+      step 18 units (0.46 m). Quake 3 is the baseline; a QuakeWorld config can change
+      air acceleration and friction later.
+- [x] The default character preset places the capsule bottom at the body origin, so a
+      scene transform is a feet position and camera offsets match Godot. The shape center
+      is offset by the radius plus half the cylinder.
+- [x] The character is a separate drawable (a glTF model or a debug capsule) drawn with
+      the simulated body transform, not a node of the loaded scene. The third-person
+      mesh and camera use the current position, so they match the capsule; first-person
+      interpolates. Node transform writeback is only needed for moving platforms.
+- [x] Model matrices use `trsMatrix`: the MVP path is column-vector, so the order is
+      `translation * rotation * scale`, not `scale * rotation * translation`.
+- [ ] `demo_godot` builds the collision world from the loaded scene, spawns the preset at
+      `--spawn` or at the first `CharacterBody3D`/`Marker3D`, and steps the simulation
+      before `drawNextFrame`. `--movement quake` is the default.
 - [ ] `CharacterControls` is a demo-side mapper from GLFW keys and mouse to the default
       preset's `CharacterInput`; the motor consumes the command and never opens a device.
       The camera rigs read the same command.
@@ -300,66 +467,72 @@ animation delta replaces the usual input and physics velocity for that step.
 
 ### Phases
 
+#### Phase 0: fixed tick and world state
+
+- [x] `Simulation` with the fixed 60 Hz accumulator, a clamp of 8 steps per frame and a
+      render interpolation alpha.
+- [x] `MoverComponent` runs a fixed `pmove` and stores the previous and current
+      position; first-person rendering interpolates it.
+- [x] `demo_godot` gets `--physics-hz` and `--fixed-step` and steps
+      the simulation before recording the frame.
+- [ ] An empty capsule with no collision follows the tick and interpolates in the demo.
+
 #### Phase 1: collision world
 
-- [ ] Build `CollisionWorld` from `GodotScene` mesh triangles and from decoded collision
-      shapes.
-- [ ] Decode `StaticBody3D`, `AnimatableBody3D`, `RigidBody3D` and `Area3D`, their
-      `CollisionShape3D` children, and `BoxShape3D`, `SphereShape3D`, `CapsuleShape3D`,
-      `CylinderShape3D`, `ConvexPolygonShape3D`, `ConcavePolygonShape3D` and
-      `WorldBoundaryShape3D`.
-- [ ] `GridMap` cell collision and `collision_layer`/`collision_mask` filtering.
-- [ ] Fall back to mesh triangles for `MeshInstance3D` without collision shapes, behind
-      a switch for fixtures that have none.
+- [x] Decode the Godot body nodes and shape resources from `#### Colliders from Godot`.
+- [ ] `CollisionWorld` BVH, ray query, shape cast and overlap query.
+- [x] Build the world from `GodotScene`, including `GridMap` cells.
+- [ ] Weld triangle vertices and filter internal edges.
+- [ ] Unit tests for every shape pair, ray hit and cast time of impact; a triangle mesh
+      floor, a box wall, a ramp, a capsule body and a box body.
+- [ ] Measure the BVH build time on the platformer stage and the town, and the cast cost.
+- [ ] `demo_godot --debug-collision` draws every collider and the result of a camera ray.
 
-#### Phase 2: kinematic motor
+#### Phase 2: Quake motor
 
-- [ ] Movement mode modules and `MovementTransition`s with per-mode gravity, friction,
-      acceleration and floor rules.
-- [ ] Acceleration, braking, ground friction and air control; sprint and walk speeds.
-- [ ] `moveAndSlide`: iterative collide-and-slide with contact planes, `safeMargin`,
-      `maxSlides`, floor/wall/ceiling classification and blocking-hit results.
-- [ ] Step-up over `maxStepHeight`, floor snap after leaving the ground, walkable floor
-      angle and slope sliding.
-- [ ] Jump with velocity, hold time, multiple jumps, jump buffer and coyote time.
-- [ ] Crouch changes the body shape height (the capsule in the default character set)
-      and checks the ceiling before standing up.
-- [ ] Moving platform velocity, floor locking and platform rotation.
+- [ ] `pmove` with ground, air, water and noclip modes and `MovementTransition`s.
+- [x] Ground friction, acceleration, stop speed, gravity and max velocity.
+- [x] Air acceleration, no friction, and the strafe jump and bunny hop it produces.
+- [x] `PM_ClipVelocity` with overbounce 1.001 and `PM_StepSlideMove`: slide, then
+      up-forward-down over `maxStepHeight` (0.46 m), keeping the farther result.
+- [x] Instant jump, no coyote time, no jump buffer, no hold and no multiple jumps.
+- [ ] Crouch changes the capsule height and checks the ceiling before standing up.
+- [ ] Water move with reduced gravity, water friction and swim up and down.
+- [ ] Moving platform velocity, floor locking and platform rotation with
+      `AnimatableBody3D` writeback.
+- [ ] Unit tests: walk up a ramp, step onto a 0.45 m ledge, jump and land, slide along a
+      wall, strafe jump speed gain, bunny hop, water, noclip, and no tunneling.
 
 #### Phase 3: input, camera and demo
 
-- [ ] First-person camera with eye height and third-person camera with a spring arm.
-- [ ] `demo_godot`: `--character` and `--third-person`, spawn the default character
-      preset on the platformer stage, show its shape and contacts in a debug mode.
-- [ ] The same `CharacterInput` drives the default character preset and both camera
-      rigs; the demo mapper switches control between them without built-in input maps. A
-      mode switch returns control to the free camera without losing the character state.
+- [ ] `CharacterInput` from GLFW: WASD, mouse look, Space, Ctrl and attack.
+- [x] First-person camera at eye height and third-person camera with a collision-aware
+      spring arm.
+- [x] `demo_godot --character` and `--third-person` spawn the preset on the platformer
+      stage and on the movement gym; a mode switch returns to the fly camera without
+      losing the body state.
+- [ ] Debug draw of the capsule, contacts, normals, velocity, floor state, movement mode
+      and active action; OSD counters once the 2D overlay exists.
 
-#### Phase 4: animation, root motion, replay and verification
+#### Phase 4: animation, root motion and replay
 
-- [ ] Root-motion extraction and the layered actions from `### Root motion`; blend
-      trees receive speed and floor state; attach the skeleton to the body root.
-- [ ] Unit tests for every shape pair, sweep, slide, step-up and snap; also test
-      root-motion modes and action cancellation. Golden traces from a fixed input
-      sequence.
-- [ ] Fixed timestep with render interpolation. Record input, body state, active action
-      and camera in the PNG metadata planned for the demo, so a run can be replayed
-      exactly.
-- [ ] Debug draw: body shape, contacts, normals, velocity, floor state, movement mode,
-      active action and root-motion delta; OSD counters once the 2D overlay exists.
+- [ ] Animated walk, idle, jump and fall for the demo character.
+- [ ] Root-motion extraction and the layered actions from `### Root motion`; blend trees
+      receive speed and floor state; attach the skeleton to the body root. This is not
+      part of the Quake motor and can land after it.
+- [ ] Golden traces from a fixed input sequence, plus tests for root-motion modes and
+      action cancellation.
+- [ ] Record input, body state, active action and camera in the PNG metadata planned for
+      the demo, so a run can be replayed exactly.
 
-Questions:
+### Later movement models
 
-- Own narrowphase and solver, or a physics library? Start with shape-specific sweeps and
-  a small kinematic solver; the body needs queries, not a rigid-body island solver.
-- Which shapes must the first version support: is a capsule enough for the default
-  character set, or should box and cylinder land with it?
-- Are moving platforms in the first version, and does root motion land before or after
-  them?
-- Should collision come only from `GodotScene`, or also from glTF instances in the
-  same `CollisionWorld`?
-- Which non-character preset proves the core is shape-agnostic: a vehicle, a projectile
-  or a flying pawn?
+- [ ] CMC model: acceleration and braking, air control, jump hold, multiple jumps,
+      coyote time, crouch and root motion.
+- [ ] Godot model: `moveAndSlide` behavior parity, floor snap and `motionMode`.
+- [ ] AABB body for exact Quake `mins`/`maxs` feel.
+- [ ] Second preset, starting with a projectile: no input, no camera, gravity, sweep and
+      bounce.
 
 ## Geometric algebra: PGA and CGA
 
@@ -922,6 +1095,9 @@ snapshots or rollback buffers.
 This is an optional network backend for the Mover core in `## Mover`, not a second
 movement system. `MoverComponent` produces moves from input and state; this layer
 buffers, sends, applies and replays them.
+
+The Quake motor is the reference implementation: `usercmd`, fixed `pmove`, snapshots and
+prediction. CMC and Godot models must stay deterministic if they are networked later.
 
 - [ ] One shared tick timeline. The server advances authoritative ticks; the client runs
       the same fixed-step simulation slightly ahead of the server in prediction mode.

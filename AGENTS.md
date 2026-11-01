@@ -21,6 +21,12 @@
 - Do not leave partially translated or mixed-language comments behind.
 - If the comment becomes unnecessary after refactoring, delete it instead of rewriting.
 
+## Render transforms
+
+- The MVP path is column-vector: `proj * view * model`, and shaders use `mvp * vec4`.
+- Build model matrices with `trsMatrix`, which composes `T * R * S`. Never write
+  `S * R * T` for the render path.
+
 ## D language-specific code features
 - Use whenever possible: templates, ranges, compile-time evaluation, conditional compilation.
 - The colon in imports should be placed on the left side: "import std.algorithm: min, max, sort, map;".

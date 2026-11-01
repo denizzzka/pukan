@@ -8,6 +8,8 @@ import pukan.mesh: mirrors;
 import pukan.misc: Boxf, isVisible, mergeAabb, transformAabb;
 import pukan.pbr.accessor: BufferPieceOnGPU;
 import pukan.pbr.mesh: PbrMesh;
+import pukan.physics.shapes: Collider, CollisionShape;
+import pukan.physics.world: CollisionWorld;
 import pukan.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
@@ -67,6 +69,15 @@ struct GodotCamera
     float farPlane = 1000.0f;
 }
 
+/// One collision shape attached to a body node
+struct GodotCollider
+{
+    CollisionShape shape;
+    Matrix4x4f local = Matrix4x4f.identity;
+    uint layer = 1;
+    uint mask = 1;
+}
+
 class GodotNode
 {
     string name;
@@ -75,6 +86,10 @@ class GodotNode
     bool visible = true;
     PbrMesh[] meshes;
     GodotNode[] children;
+    GodotCollider[] colliders;
+    uint collisionLayer = 1;
+    uint collisionMask = 1;
+    bool collisionBody;
 
     GodotLight light;
     bool hasLight;
@@ -249,6 +264,54 @@ final class GodotScene : DrawableByVulkan, Blended, PipelineWarmup
         collect(Matrix4x4f.identity, root);
 
         return result;
+    }
+
+    /// First Marker3D or CharacterBody3D origin, used as a character spawn
+    bool spawnPosition(out Vector3f position)
+    {
+        return findSpawn(root, Matrix4x4f.identity, position);
+    }
+
+    private static bool findSpawn(GodotNode node, Matrix4x4f trans, out Vector3f position)
+    {
+        trans *= node.local;
+
+        if(node.type == "Marker3D" || node.type == "CharacterBody3D")
+        {
+            position = Vector3f(trans.a14, trans.a24, trans.a34);
+            return true;
+        }
+
+        if(auto scene = cast(GodotScene) node.instance)
+            if(scene.findSpawn(scene.root, trans, position))
+                return true;
+
+        foreach(child; node.children)
+            if(findSpawn(child, trans, position))
+                return true;
+
+        return false;
+    }
+
+    /// Adds every collision shape in the tree to `world` and builds it
+    void buildCollisionWorld(CollisionWorld world)
+    {
+        collectColliders(root, Matrix4x4f.identity, world);
+        world.build();
+    }
+
+    private void collectColliders(GodotNode node, Matrix4x4f trans, CollisionWorld world)
+    {
+        trans *= node.local;
+
+        foreach(collider; node.colliders)
+            world.add(Collider(collider.shape, trans * collider.local, collider.layer, collider.mask));
+
+        if(auto scene = cast(GodotScene) node.instance)
+            scene.collectColliders(scene.root, trans, world);
+
+        foreach(child; node.children)
+            collectColliders(child, trans, world);
     }
 
     void uploadToGPUImmediate(

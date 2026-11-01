@@ -13,7 +13,7 @@ import pukan.godot_scene.remap: resolveGodotPath;
 import pukan.godot_scene.source: DirectorySource, GodotSource;
 import pukan.godot_scene.mesh: GodotArraySurface, GodotPrimitive, decodeArrayMesh;
 import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
-import pukan.godot_scene.scene: GodotBone, GodotCamera, GodotLight, GodotLightKind, GodotNode, GodotScene, GodotSkin, GodotSkeleton;
+import pukan.godot_scene.scene: GodotBone, GodotCamera, GodotCollider, GodotLight, GodotLightKind, GodotNode, GodotScene, GodotSkin, GodotSkeleton;
 import pukan.godot_scene.text: GodotTextDocument, GodotTextExternal, GodotTextNode, GodotTextResource, parseGodotTextFile;
 import pukan.godot_scene.value;
 import pukan.gltf: GlTF;
@@ -24,6 +24,7 @@ import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.pbr.pipelines: PbrPipelines;
 import pukan.pbr.factory: PbrFactory;
 import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
+import pukan.physics.shapes: CollisionShape;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.image: identityComponentMapping, loadImageToMemory, loadImageWithMips;
@@ -708,6 +709,13 @@ private final class GodotLoader
         if(auto value = "visible" in properties)
             node.visible = asBool(*value, "visible");
 
+        if(isCollisionBody(section.type))
+        {
+            node.collisionBody = true;
+            node.collisionLayer = cast(uint) propertyLong(properties, "collision_layer", 1);
+            node.collisionMask = cast(uint) propertyLong(properties, "collision_mask", 1);
+        }
+
         switch(section.type)
         {
             case "DirectionalLight3D":
@@ -812,6 +820,9 @@ private final class GodotLoader
             ++skippedNodeTypes["GridMap"];
         }
 
+        if(section.type == "CollisionShape3D" && parent !is null && parent.collisionBody)
+            addCollisionShape(document, properties, parent);
+
         if(isUnsupportedVisualNode(section.type))
         {
             ++skippedNodes;
@@ -823,6 +834,180 @@ private final class GodotLoader
         }
 
         return node;
+    }
+
+    private static bool isCollisionBody(string type)
+    {
+        switch(type)
+        {
+            case "StaticBody3D":
+            case "AnimatableBody3D":
+            case "RigidBody3D":
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool createCollisionShape(
+        string type,
+        in GodotVariant[string] properties,
+        out CollisionShape shape,
+    )
+    {
+        switch(type)
+        {
+            case "BoxShape3D":
+            {
+                Vector3f size = Vector3f(1, 1, 1);
+
+                if(auto value = "size" in properties)
+                    size = as!(Vector3f)(*value, "size");
+
+                if(size.x <= 0.0f || size.y <= 0.0f || size.z <= 0.0f)
+                    return false;
+
+                shape = CollisionShape.box(size);
+                return true;
+            }
+
+            case "SphereShape3D":
+            {
+                const radius = cast(float) propertyDouble(properties, "radius", 0.5);
+
+                if(radius <= 0.0f)
+                    return false;
+
+                shape = CollisionShape.sphere(radius);
+                return true;
+            }
+
+            case "CapsuleShape3D":
+            {
+                const radius = cast(float) propertyDouble(properties, "radius", 0.5);
+                const height = cast(float) propertyDouble(properties, "height", 2.0);
+
+                if(radius <= 0.0f || height < radius * 2.0f)
+                    return false;
+
+                shape = CollisionShape.capsule(radius, height);
+                return true;
+            }
+
+            case "CylinderShape3D":
+            {
+                const radius = cast(float) propertyDouble(properties, "radius", 0.5);
+                const height = cast(float) propertyDouble(properties, "height", 2.0);
+
+                if(radius <= 0.0f || height <= 0.0f)
+                    return false;
+
+                shape = CollisionShape.cylinder(radius, height);
+                return true;
+            }
+
+            case "ConvexPolygonShape3D":
+            {
+                auto value = "points" in properties;
+
+                if(value is null)
+                    return false;
+
+                auto points = vector3Array(*value, "points");
+
+                if(points.length < 4)
+                    return false;
+
+                shape = CollisionShape.convex(points);
+                return true;
+            }
+
+            case "ConcavePolygonShape3D":
+            {
+                auto value = "data" in properties;
+
+                if(value is null)
+                    return false;
+
+                auto data = vector3Array(*value, "data");
+
+                if(data.length < 3)
+                    return false;
+
+                shape = CollisionShape.triangleMesh(data, null);
+                return true;
+            }
+
+            case "WorldBoundaryShape3D":
+            {
+                auto value = "plane" in properties;
+
+                if(value is null)
+                    return false;
+
+                const plane = as!(GodotPlane)(*value, "plane");
+                shape = CollisionShape.plane(plane.normal, plane.d);
+                return true;
+            }
+
+            default:
+                return false;
+        }
+    }
+
+    private static Vector3f[] vector3Array(in GodotVariant value, string what)
+    {
+        if(value.type !is typeid(Vector3f[]))
+            throw new PukanException(what ~ ": expected PackedVector3Array, got " ~ variantTypeName(value));
+
+        return value.get!(Vector3f[]).dup;
+    }
+
+    private bool readCollisionShape(
+        ref GodotTextDocument document,
+        in GodotVariant value,
+        out CollisionShape shape,
+    )
+    {
+        if(value.type !is typeid(GodotObjectRef))
+            return false;
+
+        string type;
+        GodotVariant[string] properties;
+        string documentPath;
+
+        if(!resolveResource(document, asObjectRef(value, "shape"), type, properties, documentPath))
+            return false;
+
+        return createCollisionShape(type, properties, shape);
+    }
+
+    private void addCollisionShape(
+        ref GodotTextDocument document,
+        in GodotVariant[string] properties,
+        GodotNode body,
+    )
+    {
+        if(propertyBool(properties, "disabled", false))
+            return;
+
+        auto value = "shape" in properties;
+
+        if(value is null)
+            return;
+
+        CollisionShape shape;
+
+        if(!readCollisionShape(document, *value, shape))
+            return;
+
+        Matrix4x4f local = Matrix4x4f.identity();
+
+        if(auto transform = "transform" in properties)
+            local = as!(GodotTransform3D)(*transform, "transform").toMatrix;
+
+        body.colliders ~= GodotCollider(shape, local, body.collisionLayer, body.collisionMask);
     }
 
     /// A nested scene keeps its own loader, so bring its report up to the parent
@@ -968,6 +1153,7 @@ private final class GodotLoader
 
         GodotVariant[long] itemMeshes;
         Matrix4x4f[long] itemTransforms;
+        GodotCollider[][long] itemShapes;
 
         foreach(key, ref value; libraryProperties)
         {
@@ -989,6 +1175,29 @@ private final class GodotLoader
 
                 case "mesh_transform":
                     itemTransforms[id] = as!(GodotTransform3D)(value, key).toMatrix;
+                    break;
+
+                case "shapes":
+                    if(value.type is typeid(GodotArray))
+                    {
+                        auto array = asArray(value, key);
+                        auto shapeDocument = libraryInScene ? document : libraryDocument;
+
+                        for(size_t i = 0; i + 1 < array.items.length; i += 2)
+                        {
+                            if(array.items[i].type !is typeid(GodotObjectRef)
+                                || array.items[i + 1].type !is typeid(GodotTransform3D))
+                                continue;
+
+                            CollisionShape shape;
+
+                            if(!readCollisionShape(shapeDocument, array.items[i], shape))
+                                continue;
+
+                            const transform = as!(GodotTransform3D)(array.items[i + 1], key).toMatrix;
+                            itemShapes[id] ~= GodotCollider(shape, transform);
+                        }
+                    }
                     break;
 
                 default:
@@ -1021,6 +1230,9 @@ private final class GodotLoader
             propertyBool(properties, "cell_center_z", true) ? cellSize.z * 0.5f : 0.0f,
         );
 
+        const gridLayer = cast(uint) propertyLong(properties, "collision_layer", 1);
+        const gridMask = cast(uint) propertyLong(properties, "collision_mask", 1);
+
         GodotNode[long] templates;
 
         bool added;
@@ -1048,7 +1260,9 @@ private final class GodotLoader
                 templateNode = cell.item in templates;
             }
 
-            if((*templateNode).meshes.length == 0)
+            auto shapes = cell.item in itemShapes;
+
+            if((*templateNode).meshes.length == 0 && shapes is null)
                 continue;
 
             auto cellNode = new GodotNode;
@@ -1059,10 +1273,25 @@ private final class GodotLoader
                 cell.z * cellSize.z,
             ) + halfCell) * gridMapRotation(cell.rotation);
 
+            Matrix4x4f itemInverse = Matrix4x4f.identity;
+
             if(auto itemTransform = cell.item in itemTransforms)
+            {
                 cellNode.local *= *itemTransform;
+                itemInverse = (*itemTransform).inverse;
+            }
 
             cellNode.meshes = (*templateNode).meshes;
+
+            if(shapes !is null)
+                foreach(shape; *shapes)
+                    cellNode.colliders ~= GodotCollider(
+                        shape.shape,
+                        itemInverse * shape.local,
+                        gridLayer,
+                        gridMask,
+                    );
+
             node.addChild(cellNode);
             added = true;
         }
