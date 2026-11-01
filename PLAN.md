@@ -837,6 +837,41 @@ Open questions:
 - Keep the disk cache record when a pipeline is evicted, so the rebuild is
   cheap; dropping it would trade memory for compile time.
 
+### Pipeline creation
+
+`PbrFactory` currently builds both profiles' `PbrPipelines` itself. Move the
+construction into a separate module; `PbrFactory` keeps resources, materials
+and the descriptor allocator. `GltfFactory` and `GodotFactory` still receive the
+resulting set, but do not own the builder.
+
+- [ ] Move `createGltfPipelines`, `createGodotPipelines`, `createShadows`,
+      `createVariants` and the shader stage helpers into a new module.
+- [ ] Deduplicate identical pipelines by `PipelineId` after the move. Currently
+      `declare` creates a new technique for every call, so the same shader set
+      from different profiles produces separate `VkPipeline`s.
+
+### Compile-time PipelineId
+
+The id is derived from the shader set, not from the technique name or profile.
+`compile_shaders.sh` writes a `.sum` next to every `.spv`: MurmurHash3 of the
+SPIR-V bytes in little endian. A pipeline hash combines the sums of its stages
+with the fixed state and bindings.
+
+- [ ] Add MurmurHash3 to `compile_shaders.sh`. No `mmh3` or `murmurhash`
+      utility is installed here; use a small Python implementation or add
+      `mmh3` as a build dependency.
+- [ ] Write `<name>.spv.sum` in little endian next to every compiled shader.
+- [ ] Combine the raw shader sums into the pipeline hash and store it in the
+      `PipelineCacheStore` record.
+- [ ] On load compare the stored hash with the sums of the current shaders; a
+      mismatch invalidates the record and forces recompilation.
+- [ ] Intern `PipelineFactory` techniques by `PipelineId`, so identical shader
+      sets return the same `TechniqueId` and `VkPipeline`.
+- [ ] Keep the shader `PipelineId` target-independent; `PipelineKey` combines
+      it with the render target, so the same shaders on another target still
+      need their own `VkPipeline`.
+- [ ] Make the cache size explicit and default to 100 MB.
+
 ### Pipeline warmup policy
 
 The compile-time policy is `off | scene | all | required`, default `scene`.
@@ -886,7 +921,7 @@ format spreads:
 - [ ] Store driver blobs only, or store the variant state and rebuild the
       create info from it. The second allows validation and migration, the
       first is smaller.
-- [ ] Bound by bytes, record count, age or scene. The current caps are 64 MB
+- [ ] Bound by bytes, record count, age or scene. The current caps are 100 MB
       and 4096 records; measure hit rate against each.
 - [ ] Decide whether an evicted pipeline also drops its cache record, or keeps
       it for a cheap rebuild.
