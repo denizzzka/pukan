@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 TGT="--target-env=vulkan1.3"
 INCLUDES="-I source/pukan/shaders"
@@ -70,3 +71,31 @@ glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/checkerboard.vert -o com
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/checkerboard.frag -o compiled_shaders/checkerboard_frag.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/gemm.comp -o compiled_shaders/gemm.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/skin_matrices.comp -o compiled_shaders/skin_matrices.spv
+
+# MurmurHash3 x64_128 of every SPIR-V module, little endian, next to the module.
+# The pipeline identity uses these sums instead of the full SPIR-V bytes.
+python="${SHADER_HASH_PYTHON:-python3}"
+if ! "$python" -c 'import mmh3' >/dev/null 2>&1; then
+    for candidate in "$HOME"/.local/pipx/venvs/*/bin/python; do
+        [ -x "$candidate" ] || continue
+        if "$candidate" -c 'import mmh3' >/dev/null 2>&1; then
+            python="$candidate"
+            break
+        fi
+    done
+fi
+if ! "$python" -c 'import mmh3' >/dev/null 2>&1; then
+    echo "mmh3 is required for $python; install it or set SHADER_HASH_PYTHON" >&2
+    exit 1
+fi
+
+"$python" - <<'PY'
+import pathlib
+import struct
+import mmh3
+
+for spv in sorted(pathlib.Path("compiled_shaders").glob("*.spv")):
+    value = mmh3.hash128(spv.read_bytes(), signed=False)
+    digest = struct.pack("<QQ", value & 0xFFFFFFFFFFFFFFFF, value >> 64)
+    spv.with_suffix(".spv.sum").write_bytes(digest)
+PY
