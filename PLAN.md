@@ -577,6 +577,27 @@ animation delta replaces the usual input and physics velocity for that step.
 - [ ] Second preset, starting with a projectile: no input, no camera, gravity, sweep and
       bounce.
 
+## Motion Matching
+
+The target is the pose search system Unreal ships as the `PoseSearch` plugin: animation
+segments are sampled into a database of feature vectors, and every search compares a query
+built from the current pose, velocity and predicted trajectory against them. It replaces
+hand-authored locomotion state machines and blend trees, so it comes after the Mover and
+root motion are solid.
+
+### Skeleton
+
+Features are extracted per bone and the trajectory is expressed in the root's space, so the
+rig has to be predictable. glTF 2.0 carries whatever hierarchy the exporter produced.
+
+- [ ] Root bone at ground level (or at the pelvis) and animated. When the glTF root is a
+      static `Armature` or scene root, the animation holds no displacement and the database
+      gets no usable trajectory or speed.
+- [ ] Check the rig in debug builds, the way `debugVerifySkinJoints` checks the GPU skinning:
+      report a root joint without a translation channel and a bind pose that is neither at
+      ground level nor at the pelvis, so a bad export fails at load instead of yielding a
+      database that matches nothing.
+
 ## Geometric algebra: PGA and CGA
 
 - [ ] Spike: evaluate adding PGA (Projective Geometric Algebra) and CGA
@@ -660,8 +681,24 @@ them by depth before compositing, so overlapping and self-intersecting
 transparent meshes no longer depend on a per-draw order. The resolve runs once
 before the colour copy and again after the transmission pass, filtered by the
 resolved scene depth, so glass shows blended objects behind it and blended
-fragments in front of glass stay in front. Long term:
+fragments in front of glass stay in front. The fragment pool is fixed: 512K
+fragments, 8 MB, shared by the whole frame. When it runs out the writer drops
+the rest of the fragments without a trace, so a dense surface loses whole
+blocks of itself, cut along a straight line where the pool ended. A crown close
+to the camera alone asks for 1-4M fragments at 800x600, so the limit needs a
+different technique rather than a bigger constant. Long term:
 
+- [ ] Weighted blended OIT: two RGBA16F accumulations, constant memory per
+      pixel and no popping. Needs a pass of its own with two attachments, and
+      an accumulation cannot be filtered by depth, so the transmission resolve
+      needs another way to keep blended fragments in front of glass.
+- [ ] A per-pixel cap: bound the layers one pixel may take, so a single dense
+      surface cannot starve the rest of the screen, and blend what does not
+      fit directly. Order inside the overflow stays approximate.
+- [ ] A pool sized from the viewport. Simple, but this content needs 64 MB per
+      frame at 800x600, so it only moves the limit.
+- [ ] The depth prepass a mode 4 material asks for, so only the front layer
+      reaches the queue. Removes this overload at its source, not the limit.
 - [ ] A second bounce for stacked glass. The colour is copied once, so a pane
       behind another samples the background without the first pane. A second
       copy, layered panes with their own samples, or tracing the glass in the

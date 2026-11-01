@@ -159,8 +159,8 @@ GodotMaterialData readGodotMaterial(
 
     if(auto value = "transparency" in properties)
     {
-        // The depth prepass mode is an alpha-tested cutout, so it stays out of
-        // the blended queue, whose fragment pool a dense crown would exhaust
+        //TODO: honor the depth prepass a mode 4 material asks for; until then
+        // this cutout keeps a dense crown out of the OIT fragment pool
         with(AlphaMode)
         switch(asLong(*value, "transparency"))
         {
