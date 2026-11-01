@@ -190,7 +190,7 @@ abstract class PipelineCacheStore
 /// Writes cache files under the user's cache directory
 final class FilePipelineCacheStore: PipelineCacheStore
 {
-    enum defaultMaxBytes = 64 * 1024 * 1024;
+    enum defaultMaxBytes = 100 * 1024 * 1024;
     enum defaultMaxRecords = 4096;
 
     private string directory;
