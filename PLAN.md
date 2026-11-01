@@ -856,6 +856,11 @@ through `FieldNameTuple`, so the full warm list is generated, not handwritten.
 `required` warms the declared union. Both wait before `Scene` returns; `scene`
 warms each loaded object and the first frame waits.
 
+`SceneWith!(Modules...)` takes the union through its template argument.
+`Scene` is `SceneWith!()`, so the default build warms the full built-in set for
+`required`; an application with a smaller list instantiates `SceneWith` with its
+own modules.
+
 - [ ] Include third-party technique variants in `Variants!`. For now only the
       built-in `PbrVariant` descriptors are listed.
 - [ ] Add glTF variants to a Godot-only build only when that build actually
