@@ -1142,6 +1142,7 @@ class SkinnedGlTF_skinJointsGPU : SkinnedGlTF
 
             skinMatrices[i] = new SkinMatrices(
                 device,
+                pipelines.factory,
                 cast(uint) nodes.length,
                 skin.nodesIndices,
                 invBindArr,

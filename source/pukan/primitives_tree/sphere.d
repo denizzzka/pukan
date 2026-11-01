@@ -89,14 +89,9 @@ private struct ClassifyPush
 
 private final class SphereKernel : Compute
 {
-    this(
-        LogicalDevice device,
-        VkDescriptorSetLayoutBinding[] bindings,
-        ubyte[] spv,
-        VkPushConstantRange range,
-    )
+    this(LogicalDevice device, PipelineFactory pipelines, ShaderDecl shader)
     {
-        super(device, bindings, spv, range);
+        super(device, pipelines, shader);
     }
 
     void bind(uint binding, VkDescriptorType type, ref VkDescriptorBufferInfo info)
@@ -131,7 +126,7 @@ private final class IcosphereGenerator : Compute
     private MemoryBuffer indexBuffer;
     private bool generated;
 
-    this(LogicalDevice device, uint maxLevel)
+    this(LogicalDevice device, PipelineFactory pipelines, uint maxLevel)
     {
         VkDescriptorSetLayoutBinding[] layoutBindings = [
             VkDescriptorSetLayoutBinding(
@@ -150,12 +145,15 @@ private final class IcosphereGenerator : Compute
 
         super(
             device,
-            layoutBindings,
-            cast(ubyte[]) import("icosphere.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: Params.sizeof,
+            pipelines,
+            shaderStage!"icosphere.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                layoutBindings,
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: Params.sizeof,
+                ),
             ),
         );
 
@@ -279,6 +277,7 @@ class SphereRenderer : DrawablePrimitive
     );
 
     private LogicalDevice device;
+    private PipelineFactory pipelines;
     private SphereLod lod;
     private uint instanceCount;
     private uint groupCount;
@@ -319,6 +318,7 @@ class SphereRenderer : DrawablePrimitive
     )
     {
         this.device = device;
+        this.pipelines = pipelines;
         this.lod = lod;
         this.levelCount = lod.maxLevel + 1;
 
@@ -343,7 +343,7 @@ class SphereRenderer : DrawablePrimitive
 
         pipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
-        generator = new IcosphereGenerator(device, lod.maxLevel);
+        generator = new IcosphereGenerator(device, pipelines, lod.maxLevel);
     }
 
     private static ShaderDecl[] shaderStages()
@@ -531,18 +531,21 @@ class SphereRenderer : DrawablePrimitive
 
         classify = new SphereKernel(
             device,
-            [
-                VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-            ],
-            cast(ubyte[]) import("sphere_classify.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: ClassifyPush.sizeof,
+            pipelines,
+            shaderStage!"sphere_classify.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: ClassifyPush.sizeof,
+                ),
             ),
         );
         classify.bind(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, centersInfo);
@@ -554,17 +557,20 @@ class SphereRenderer : DrawablePrimitive
 
         scan = new SphereKernel(
             device,
-            [
-                VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-            ],
-            cast(ubyte[]) import("sphere_scan.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: uint.sizeof,
+            pipelines,
+            shaderStage!"sphere_scan.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: uint.sizeof,
+                ),
             ),
         );
         scan.bind(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, countsInfo);
@@ -575,20 +581,23 @@ class SphereRenderer : DrawablePrimitive
 
         scatter = new SphereKernel(
             device,
-            [
-                VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-            ],
-            cast(ubyte[]) import("sphere_scatter.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: uint.sizeof,
+            pipelines,
+            shaderStage!"sphere_scatter.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: uint.sizeof,
+                ),
             ),
         );
         scatter.bind(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, centersInfo);

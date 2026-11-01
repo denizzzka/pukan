@@ -231,6 +231,7 @@ private struct PbrPipelineBuilder
     private PbrPipelines createGltfPipelines(RenderPass renderPass, RenderPass shadowPass)
     {
         auto result = new PbrPipelines;
+        result.factory = pipelines;
 
         auto skinnedPbr = shaderStages!"mesh_pbr_frag.spv"();
         auto staticPbr = staticShaderStages!"mesh_pbr_frag.spv"();
@@ -260,6 +261,7 @@ private struct PbrPipelineBuilder
     private PbrPipelines createGodotPipelines(RenderPass renderPass, RenderPass shadowPass)
     {
         auto result = new PbrPipelines;
+        result.factory = pipelines;
 
         auto skinnedPbr = shaderStages!"mesh_pbr_frag_godot.spv"();
         auto staticPbr = staticShaderStages!"mesh_pbr_frag_godot.spv"();

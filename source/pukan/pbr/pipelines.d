@@ -201,6 +201,9 @@ struct PbrModePipelines
 /// Pipeline variants of one shader profile, shared by every instance
 final class PbrPipelines
 {
+    /// Registry the set was declared through
+    PipelineFactory factory;
+
     PbrModePipelines skinned;
     PbrModePipelines unskinned;
     LazyPipeline skinnedShadow;
@@ -219,7 +222,10 @@ final class PbrPipelines
     void warmKeys(PipelineKey[] keys)
     {
         static foreach(member; FieldNameTuple!PbrPipelines)
-            warmKeyField(__traits(getMember, this, member), keys);
+        {
+            static if(member != "factory")
+                warmKeyField(__traits(getMember, this, member), keys);
+        }
     }
 
     /// Keys of every pipeline this set declares, without duplicates
@@ -228,7 +234,10 @@ final class PbrPipelines
         PipelineKey[] result;
 
         static foreach(member; FieldNameTuple!PbrPipelines)
-            collectKeys(__traits(getMember, this, member), result);
+        {
+            static if(member != "factory")
+                collectKeys(__traits(getMember, this, member), result);
+        }
 
         return result;
     }
@@ -308,7 +317,10 @@ final class PbrPipelines
     void validateAll()
     {
         static foreach(member; FieldNameTuple!PbrPipelines)
-            validateField(__traits(getMember, this, member));
+        {
+            static if(member != "factory")
+                validateField(__traits(getMember, this, member));
+        }
     }
 
     private static void warmKeyField(T)(ref T value, PipelineKey[] keys)

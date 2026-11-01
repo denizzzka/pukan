@@ -3,7 +3,6 @@ module pukan.vulkan.computation;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirement;
-import pukan.vulkan.shaders: ShaderInfo;
 import std.meta: AliasSeq;
 
 /// Base class for GPU compute kernels
@@ -23,99 +22,22 @@ abstract class Compute
 
     this(
         LogicalDevice dev,
-        VkDescriptorSetLayoutBinding[] layoutBindings,
-        ubyte[] spvBinary,
-        VkPushConstantRange pushConstant,
+        PipelineFactory pipelines,
+        ShaderDecl shader,
         VkSpecializationInfo* specialization = null,
     )
     {
         device = dev;
 
-        poolAndLayout = device.createDescriptorPool(layoutBindings, 1);
+        auto cfg = pipelines.acquireCompute(shader, specialization);
+
+        pipeline = cfg.pipeline;
+        pipelineLayout = cfg.pipelineLayout;
+        pushConstantSize = shader.pushConstantRange.size;
+        needsRecompilation = cfg.needsRecompilation;
+
+        poolAndLayout = device.createDescriptorPool(cfg.setLayout, shader.layoutBindings, 1);
         descriptorSet = device.allocateDescriptorSet(poolAndLayout);
-
-        pushConstantSize = pushConstant.size;
-
-        auto shader = device.uploadShaderToGPU(
-            spvBinary,
-            VK_SHADER_STAGE_COMPUTE_BIT,
-            layoutBindings,
-            pushConstant,
-        );
-
-        pipelineLayout = createPipelineLayout(device, [poolAndLayout.descriptorSetLayout], [pushConstant]);
-        device.registerPipelineLayout(pipelineLayout);
-
-        auto stage = shader.createShaderStageInfo;
-        stage.pSpecializationInfo = specialization;
-
-        auto pipelineCreateInfo = VkComputePipelineCreateInfo(
-            sType: VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            stage: stage,
-            layout: pipelineLayout,
-            basePipelineHandle: null,
-            basePipelineIndex: -1,
-        );
-
-        VkPipelineCache pipelineCache;
-        PipelineVariantKey identity;
-        const name = typeid(this).name;
-
-        if(auto manager = device.pipelineCacheManager)
-        {
-            identity = computeIdentity(name, layoutBindings, pushConstant, specialization, spvBinary);
-            pipelineCache = manager.acquire(identity, needsRecompilation);
-        }
-        else
-            needsRecompilation = true;
-
-        scope(exit)
-            if(pipelineCache)
-                device.destroyPipelineCache(pipelineCache);
-
-        pipeline = device.createComputePipelines([pipelineCreateInfo], pipelineCache)[0];
-
-        if(auto manager = device.pipelineCacheManager)
-        {
-            manager.storeResult(identity, pipelineCache);
-
-            debug
-                Instance.log_info(
-                    "pipeline cache: " ~ name ~ "-" ~ identity.toString() ~
-                    (needsRecompilation ? " compiled" : " cached"));
-        }
-    }
-
-    /**
-        What a kernel is for the store: its class, bindings, push constant,
-        specialization data and SPIR-V. The shader bytes change the digest but
-        not the slot.
-    */
-    private static PipelineVariantKey computeIdentity(
-        string name,
-        VkDescriptorSetLayoutBinding[] layoutBindings,
-        VkPushConstantRange pushConstant,
-        VkSpecializationInfo* specialization,
-        const(ubyte)[] spvBinary,
-    )
-    {
-        PipelineVariantKeyBuilder builder;
-        builder.addString(name);
-        builder.addArray(layoutBindings);
-        builder.add(pushConstant);
-        builder.addShaderBytes(spvBinary);
-
-        if(specialization !is null)
-        {
-            builder.add(specialization.dataSize);
-
-            if(specialization.dataSize)
-                builder.addArray((cast(const ubyte*) specialization.pData)[0 .. specialization.dataSize]);
-
-            builder.addArray(specialization.pMapEntries[0 .. specialization.mapEntryCount]);
-        }
-
-        return builder.finish;
     }
 
     protected void bindBuffer(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorBufferInfo bufferInfo)
@@ -196,14 +118,14 @@ class Gemm : Compute
     enum workgroupSizeY = 16;
 
     /// Verifies the requirements, then creates the kernel
-    static Gemm create(LogicalDevice dev, uint M, uint N, uint K)
+    static Gemm create(LogicalDevice dev, PipelineFactory pipelines, uint M, uint N, uint K)
     {
         dev.ensureEnabled!requirements("Gemm");
 
-        return new Gemm(dev, M, N, K);
+        return new Gemm(dev, pipelines, M, N, K);
     }
 
-    private this(LogicalDevice dev, uint M, uint N, uint K)
+    private this(LogicalDevice dev, PipelineFactory pipelines, uint M, uint N, uint K)
     {
         VkDescriptorSetLayoutBinding[] layoutBindings = [
             VkDescriptorSetLayoutBinding(
@@ -246,9 +168,12 @@ class Gemm : Compute
 
         super(
             dev,
-            layoutBindings,
-            cast(ubyte[]) import("gemm.spv"),
-            pushConstant,
+            pipelines,
+            shaderStage!"gemm.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                layoutBindings,
+                pushConstant,
+            ),
             &specialization,
         );
 

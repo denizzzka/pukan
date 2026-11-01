@@ -127,14 +127,9 @@ private struct ClassifyPush
 
 private final class CylinderKernel : Compute
 {
-    this(
-        LogicalDevice device,
-        VkDescriptorSetLayoutBinding[] bindings,
-        ubyte[] spv,
-        VkPushConstantRange range,
-    )
+    this(LogicalDevice device, PipelineFactory pipelines, ShaderDecl shader)
     {
-        super(device, bindings, spv, range);
+        super(device, pipelines, shader);
     }
 
     void bind(uint binding, VkDescriptorType type, ref VkDescriptorBufferInfo info)
@@ -169,7 +164,7 @@ private final class CylinderMeshGenerator : Compute
     private MemoryBuffer indexBuffer;
     private bool generated;
 
-    this(LogicalDevice device, uint maxLevel)
+    this(LogicalDevice device, PipelineFactory pipelines, uint maxLevel)
     {
         VkDescriptorSetLayoutBinding[] layoutBindings = [
             VkDescriptorSetLayoutBinding(
@@ -188,12 +183,15 @@ private final class CylinderMeshGenerator : Compute
 
         super(
             device,
-            layoutBindings,
-            cast(ubyte[]) import("cylinder_mesh.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: Params.sizeof,
+            pipelines,
+            shaderStage!"cylinder_mesh.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                layoutBindings,
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: Params.sizeof,
+                ),
             ),
         );
 
@@ -358,6 +356,7 @@ class CylinderRenderer : DrawablePrimitive
     );
 
     private LogicalDevice device;
+    private PipelineFactory pipelines;
     private CylinderLod lod;
     private uint instanceCount;
     private uint groupCount;
@@ -397,6 +396,7 @@ class CylinderRenderer : DrawablePrimitive
     )
     {
         this.device = device;
+        this.pipelines = pipelines;
         this.lod = lod;
         this.levelCount = lod.maxLevel + 1;
 
@@ -423,7 +423,7 @@ class CylinderRenderer : DrawablePrimitive
 
         pipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
-        generator = new CylinderMeshGenerator(device, lod.maxLevel);
+        generator = new CylinderMeshGenerator(device, pipelines, lod.maxLevel);
     }
 
     private static ShaderDecl[] shaderStages()
@@ -624,18 +624,21 @@ class CylinderRenderer : DrawablePrimitive
 
         classify = new CylinderKernel(
             device,
-            [
-                VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-            ],
-            cast(ubyte[]) import("cylinder_classify.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: ClassifyPush.sizeof,
+            pipelines,
+            shaderStage!"cylinder_classify.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: ClassifyPush.sizeof,
+                ),
             ),
         );
         classify.bind(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aInfo);
@@ -647,17 +650,20 @@ class CylinderRenderer : DrawablePrimitive
 
         scan = new CylinderKernel(
             device,
-            [
-                VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-            ],
-            cast(ubyte[]) import("cylinder_scan.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: uint.sizeof,
+            pipelines,
+            shaderStage!"cylinder_scan.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: uint.sizeof,
+                ),
             ),
         );
         scan.bind(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, countsInfo);
@@ -668,19 +674,22 @@ class CylinderRenderer : DrawablePrimitive
 
         scatter = new CylinderKernel(
             device,
-            [
-                VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-                VkDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
-            ],
-            cast(ubyte[]) import("cylinder_scatter.spv"),
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
-                offset: 0,
-                size: uint.sizeof,
+            pipelines,
+            shaderStage!"cylinder_scatter.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                [
+                    VkDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                    VkDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT),
+                ],
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+                    offset: 0,
+                    size: uint.sizeof,
+                ),
             ),
         );
         scatter.bind(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aInfo);

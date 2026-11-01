@@ -145,6 +145,16 @@ struct GraphicsPipelineCfg
     bool needsRecompilation;
 }
 
+/// One compute pipeline and the layouts it needs
+struct ComputePipelineCfg
+{
+    VkPipeline pipeline;
+    VkPipelineLayout pipelineLayout;
+    VkDescriptorSetLayout setLayout;
+    /// Set when this run compiled the kernel instead of taking a stored record
+    bool needsRecompilation;
+}
+
 struct TechniqueId
 {
     uint value;
@@ -491,7 +501,25 @@ final class PipelineFactory
         uint subpass;
     }
 
+    private struct ComputeTechnique
+    {
+        PipelineKey key;
+        /// Cache address of the kernel, without the shader content
+        ubyte[32] slot;
+        ShaderDecl shader;
+        VkDescriptorSetLayout setLayout;
+        VkPipelineLayout pipelineLayout;
+        ComputePipelineCfg cfg;
+    }
+
     private struct PipelineLayoutEntry
+    {
+        VkDescriptorSetLayout setLayout;
+        VkPushConstantRange[] pushConstants;
+        VkPipelineLayout layout;
+    }
+
+    private struct ComputeLayoutEntry
     {
         VkDescriptorSetLayout setLayout;
         VkPushConstantRange[] pushConstants;
@@ -501,6 +529,8 @@ final class PipelineFactory
     private LogicalDevice device;
     private Technique[] techniques;
     private TechniqueId[PipelineKey] techniqueByKey;
+    private ComputeTechnique[] computeTechniques;
+    private size_t[PipelineKey] computeByKey;
     private RenderTarget[] targets;
     private GraphicsPipelineCfg[PipelineInstance] cache;
     private PipelineCacheManager cacheManager;
@@ -536,6 +566,7 @@ final class PipelineFactory
     private VkDescriptorSetLayout[] setLayouts;
     private VkDescriptorSetLayoutBinding[][] setLayoutBindings;
     private PipelineLayoutEntry[] pipelineLayoutEntries;
+    private ComputeLayoutEntry[] computeLayoutEntries;
 
     private VkDescriptorSetLayout frameSetLayout;
     private VkDescriptorSetLayoutBinding[] frameBindings;
@@ -695,6 +726,43 @@ final class PipelineFactory
         return result;
     }
 
+    private struct ComputeIdentity
+    {
+        PipelineKey key;
+        ubyte[32] slot;
+    }
+
+    private static ComputeIdentity computeIdentity(
+        ShaderDecl shader,
+        VkSpecializationInfo* specialization,
+    )
+    {
+        PipelineVariantKeyBuilder builder;
+        builder.addSlotString(shader.file);
+        builder.add(shader.stage);
+        builder.add(shader.pushConstantRange);
+        builder.addArray(shader.layoutBindings);
+        builder.addShader(shader.checksum);
+
+        if(specialization !is null)
+        {
+            builder.add(specialization.dataSize);
+
+            if(specialization.dataSize)
+                builder.addArray((cast(const ubyte*) specialization.pData)[0 .. specialization.dataSize]);
+
+            builder.addArray(specialization.pMapEntries[0 .. specialization.mapEntryCount]);
+        }
+
+        const identity = builder.finish();
+
+        ComputeIdentity result;
+        result.key.digest[] = identity.digest[];
+        result.slot[] = identity.slot.digest[];
+
+        return result;
+    }
+
     PipelineKey declare(RenderTechnique technique, uint setsPerPool = 16)
     {
         const identity = techniqueIdentity(technique);
@@ -745,6 +813,37 @@ final class PipelineFactory
             }
 
             return cache[instance];
+        }
+    }
+
+    /// Returns the shared compute pipeline for a kernel declaration
+    ComputePipelineCfg acquireCompute(ShaderDecl shader, VkSpecializationInfo* specialization = null)
+    {
+        auto identity = computeIdentity(shader, specialization);
+        auto key = identity.key;
+
+        synchronized(mutex)
+        {
+            if(auto found = key in computeByKey)
+                return computeTechniques[*found].cfg;
+
+            ComputeTechnique entry;
+            entry.key = key;
+            entry.slot = identity.slot;
+            entry.shader = shader;
+
+            auto bindings = createLayoutBinding([shader]);
+            entry.setLayout = internSetLayout(bindings);
+            entry.pipelineLayout = internComputePipelineLayout(
+                entry.setLayout,
+                pushConstantRanges([shader]),
+            );
+            entry.cfg = createComputePipeline(entry, specialization);
+
+            computeTechniques ~= entry;
+            computeByKey[key] = computeTechniques.length - 1;
+
+            return entry.cfg;
         }
     }
 
@@ -889,6 +988,23 @@ final class PipelineFactory
         device.registerPipelineLayout(layout);
 
         pipelineLayoutEntries ~= PipelineLayoutEntry(setLayout, pushConstants.dup, layout);
+
+        return layout;
+    }
+
+    private VkPipelineLayout internComputePipelineLayout(
+        VkDescriptorSetLayout setLayout,
+        VkPushConstantRange[] pushConstants,
+    )
+    {
+        foreach(ref entry; computeLayoutEntries)
+            if(entry.setLayout == setLayout && entry.pushConstants == pushConstants)
+                return entry.layout;
+
+        auto layout = createPipelineLayout(device, [setLayout], pushConstants);
+        device.registerPipelineLayout(layout);
+
+        computeLayoutEntries ~= ComputeLayoutEntry(setLayout, pushConstants.dup, layout);
 
         return layout;
     }
@@ -1054,6 +1170,75 @@ final class PipelineFactory
             pipelineLayout: technique.pipelineLayout,
             needsRecompilation: needsRecompilation,
         );
+    }
+
+    private ComputePipelineCfg createComputePipeline(
+        ref ComputeTechnique technique,
+        VkSpecializationInfo* specialization,
+    )
+    {
+        debug import core.time: MonoTime;
+
+        debug const start = MonoTime.currTime;
+
+        auto shader = device.uploadShaderDecl(technique.shader);
+        auto stage = shader.createShaderStageInfo;
+        stage.pSpecializationInfo = specialization;
+
+        VkComputePipelineCreateInfo pipelineCreateInfo = {
+            sType: VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            stage: stage,
+            layout: technique.pipelineLayout,
+            basePipelineHandle: null,
+            basePipelineIndex: -1,
+        };
+
+        const identity = computeVariantIdentity(technique.key, technique.slot);
+
+        bool needsRecompilation;
+        auto pipelineCache = acquirePipelineCache(identity, needsRecompilation);
+        scope(exit) device.destroyPipelineCache(pipelineCache);
+
+        auto pipeline = device.createComputePipelines([pipelineCreateInfo], pipelineCache)[0];
+
+        storePipelineCache(identity, pipelineCache);
+
+        debug
+        {
+            const elapsed = MonoTime.currTime - start;
+
+            pipelineCreationTime += elapsed;
+
+            if(needsRecompilation)
+                ++compiledVariants;
+            else
+            {
+                ++cachedVariants;
+                assert(pipeline != VkPipeline.init, "a cached compute pipeline is not valid");
+            }
+
+            Instance.log_info(
+                "pipeline cache: " ~ technique.shader.file ~ "-" ~ identity.toString() ~
+                (needsRecompilation ? " compiled" : " cached") ~
+                " in " ~ elapsed.total!"usecs".to!string ~ " us");
+        }
+
+        return ComputePipelineCfg(
+            pipeline: pipeline,
+            pipelineLayout: technique.pipelineLayout,
+            setLayout: technique.setLayout,
+            needsRecompilation: needsRecompilation,
+        );
+    }
+
+    /// What a kernel is for the store: bindings, push constant, specialization
+    /// and shader sums, with no render target.
+    private static PipelineVariantKey computeVariantIdentity(PipelineKey key, const(ubyte)[32] slot)
+    {
+        PipelineVariantKeyBuilder builder;
+        builder.addKey(slot, key.digest);
+
+        return builder.finish;
     }
 
     /// Driver cache for one variant, seeded with its stored record

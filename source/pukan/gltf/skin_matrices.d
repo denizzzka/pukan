@@ -32,6 +32,7 @@ class SkinMatrices : Compute
 
     this(
         LogicalDevice dev,
+        PipelineFactory pipelines,
         uint nodesCount,
         const(uint)[] nodesIndices,
         const(Matrix4x4f)[] inverseBindMatrices,
@@ -97,9 +98,12 @@ class SkinMatrices : Compute
 
         super(
             dev,
-            layoutBindings,
-            cast(ubyte[]) import("skin_matrices.spv"),
-            pushConstant,
+            pipelines,
+            shaderStage!"skin_matrices.spv"(
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                layoutBindings,
+                pushConstant,
+            ),
             &specialization,
         );
 

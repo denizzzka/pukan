@@ -84,6 +84,8 @@ void main()
         if(cacheManager)
             destroy(cacheManager);
 
+    scope pipelines = new PipelineFactory(device, cacheManager, false);
+
     string formatReason;
     enforce(device.supportsImageFormat(sampled, formatReason),
         "sampled image format is not supported: " ~ formatReason);
@@ -92,7 +94,7 @@ void main()
     enforce(!device.supportsImageFormat(sampled, formatReason),
         "oversized image extent was accepted");
 
-    auto gemm = Gemm.create(device, M, N, K);
+    auto gemm = Gemm.create(device, pipelines, M, N, K);
     scope(exit) destroy(gemm);
 
     gemm.setA(A);
