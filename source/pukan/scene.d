@@ -268,7 +268,11 @@ class Scene
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
         pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, sunShadow.pass);
         static if(pipelineWarmupEverything)
+        {
             pbrFactory.warmAll();
+            pipelineFactory.waitForRequests();
+            pbrFactory.validateAll();
+        }
         gltfFactory = new GltfFactory(pbrFactory);
         godotFactory = new GodotFactory(pbrFactory, gltfFactory);
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
@@ -992,7 +996,10 @@ class Scene
     void warmVariants(Variants...)()
     {
         static if(pipelineWarmupRequired)
+        {
             pbrFactory.warmVariants!Variants();
+            pipelineFactory.waitForRequests();
+        }
     }
 
     private void recordPendingScreenshot(ref Frame frame)
@@ -1020,8 +1027,6 @@ class Scene
             if(!pipelinesReady)
             {
                 pipelineFactory.waitForRequests();
-                static if(pipelineWarmupEverything)
-                    pbrFactory.validateAll();
                 pipelinesReady = true;
             }
         }

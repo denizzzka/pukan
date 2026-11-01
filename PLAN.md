@@ -843,7 +843,10 @@ The compile-time policy is `off | scene | all | required`, default `scene`.
 
 `required` takes its set from `Variants!(Modules...)`, the union of each
 module's `alias pipelineVariants`. A drawable that needs a group outside the
-union throws when it draws, which also covers scenes loaded later.
+union throws when it draws, which also covers scenes loaded later. `all` warms
+and validates before `Scene` returns; `required` waits when the application
+installs the set; `scene` warms each loaded object and the first frame waits
+for the remainder.
 
 - [ ] Include third-party technique variants in `Variants!`. For now only the
       built-in `PbrVariant` groups are listed.
