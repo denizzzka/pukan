@@ -1,6 +1,9 @@
-import dlib.math: Matrix4x4f, Vector3f, Vector4f;
+import dlib.math: Matrix4x4f, Vector3f, Vector4f, scaleMatrix, translationMatrix;
 import pukan;
+import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig, QuakeMoveState, pmMove;
 import pukan.pbr.pipelines: plainShading;
+import pukan.physics.simulation: Simulation;
+import pukan.physics.world: CollisionWorld;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
@@ -170,6 +173,10 @@ void main(string[] args)
     bool noShadows;
     bool plainMode;
     bool offscreen;
+    bool characterMode;
+    bool thirdPerson;
+    string spawnOption;
+    float physicsHz = 60.0f;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
     float farOption = cameraFar;
@@ -188,6 +195,10 @@ void main(string[] args)
         "no-shadows", "do not cast shadows", &noShadows,
         "plain", "draw every surface in the plain lit mode", &plainMode,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
+        "character", "walk a Quake-style capsule through the level", &characterMode,
+        "spawn", "character spawn position, x,y,z", &spawnOption,
+        "third-person", "draw the character from behind", &thirdPerson,
+        "physics-hz", "fixed character tick rate", &physicsHz,
         "fov", "vertical field of view in degrees", &fovOption,
         "near", "near clipping distance", &nearOption,
         "far", "far clipping distance", &farOption,
@@ -340,6 +351,21 @@ void main(string[] args)
         ? scene.godotFactory.createPacked(packPath, scenePath)
         : scene.godotFactory.create(scenePath);
     scope(exit) destroy(godotScene);
+
+    GlTF characterModel;
+    Vector3f characterModelOffset;
+    float characterModelScale = 1.0f;
+
+    if(characterMode)
+    {
+        import std.file: exists;
+
+        const modelPath = "demo_godot/godot_samples/platformer/enemy/enemy.glb";
+
+        if(exists(modelPath))
+            characterModel = scene.gltfFactory.create(modelPath);
+    }
+    scope(exit) if(characterModel) destroy(characterModel);
     writeln("loaded ", packPath.length ? packPath : scenePath, ": meshes ", godotScene.meshCount,
         ", geometries ", godotScene.geometryCount,
         ", nodes skipped ", godotScene.skippedNodes,
@@ -350,6 +376,10 @@ void main(string[] args)
 
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
     printSkippedTypes("resources not rendered", godotScene.skippedResourceTypes);
+
+    auto collisionWorld = new CollisionWorld;
+    godotScene.buildCollisionWorld(collisionWorld);
+    writeln("colliders ", collisionWorld.colliderCount());
 
     foreach(bounds; godotScene.instanceBounds)
         writeln("instance aabb ", bounds.min.x, " ", bounds.min.y, " ", bounds.min.z,
@@ -386,6 +416,20 @@ void main(string[] args)
 
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
+
+    if(characterModel)
+    {
+        characterModel.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
+
+        const bounds = characterModel.calcAABB();
+
+        if(bounds.min.y == bounds.min.y && bounds.max.y > bounds.min.y)
+        {
+            characterModelScale = 1.8f / (bounds.max.y - bounds.min.y);
+            characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScale, 0);
+        }
+    }
+
     scene.sunShadow.fit(godotScene.calcAABB());
 
     if(godotScene.environment.present)
@@ -460,14 +504,45 @@ void main(string[] args)
 
     camera.speed = speedOption;
 
+    QuakeBody characterBody;
+    QuakeMovementConfig characterConfig;
+    QuakeMoveState characterState;
+    QuakeCommand characterCommand;
+    characterCommand.wishDir = Vector3f(0, 0, 0);
+    characterCommand.wishSpeed = 0.0f;
+    characterCommand.jump = false;
+
+    Simulation simulation;
+
+    if(characterMode)
+    {
+        Vector3f spawn = Vector3f(0, 2, 0);
+
+        if(spawnOption.length)
+            spawn = parseVector(spawnOption);
+
+        characterState.position = spawn;
+        characterState.velocity = Vector3f(0, 0, 0);
+        characterState.onGround = false;
+
+        simulation = new Simulation(collisionWorld);
+        simulation.setTickRate(physicsHz);
+    }
+    scope(exit) if(simulation) destroy(simulation);
+
     if(!offscreen)
-        writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
+        writeln(characterMode
+            ? "character: WASD move, right mouse look, Space jump"
+            : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     uint frameIndex;
     import core.time: MonoTime;
     const start = MonoTime.currTime;
     double lastTime = offscreen ? 0.0 : glfwGetTime();
+    double characterCursorX = 0.0;
+    double characterCursorY = 0.0;
+    bool characterCursorKnown;
 
     while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
@@ -479,8 +554,92 @@ void main(string[] args)
         const dt = cast(float) (now - lastTime < 0.1 ? now - lastTime : 0.1);
         lastTime = now;
 
-        if(!offscreen)
+        if(characterMode)
+        {
+            if(!offscreen)
+            {
+                bool pressed(int key) nothrow @nogc
+                {
+                    return glfwGetKey(window, key) == GLFW_PRESS;
+                }
+
+                double cursorX;
+                double cursorY;
+                glfwGetCursorPos(window, &cursorX, &cursorY);
+
+                if(characterCursorKnown)
+                {
+                    const dx = cast(float) (cursorX - characterCursorX);
+                    const dy = cast(float) (cursorY - characterCursorY);
+
+                    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+                        camera.look(dx, dy);
+                }
+
+                characterCursorX = cursorX;
+                characterCursorY = cursorY;
+                characterCursorKnown = true;
+
+                Vector3f forward = camera.forward;
+                forward.y = 0;
+
+                if(forward.length > 1e-6f)
+                    forward = forward.normalized;
+                else
+                    forward = Vector3f(0, 0, 0);
+
+                Vector3f right = camera.right;
+                right.y = 0;
+
+                if(right.length > 1e-6f)
+                    right = right.normalized;
+                else
+                    right = Vector3f(0, 0, 0);
+
+                const forwardInput = (pressed(GLFW_KEY_W) ? 1.0f : 0.0f)
+                    - (pressed(GLFW_KEY_S) ? 1.0f : 0.0f);
+                const rightInput = (pressed(GLFW_KEY_D) ? 1.0f : 0.0f)
+                    - (pressed(GLFW_KEY_A) ? 1.0f : 0.0f);
+                const wish = forward * forwardInput + right * rightInput;
+
+                characterCommand.wishDir = wish;
+                characterCommand.wishSpeed = wish.length > 1e-6f
+                    ? characterConfig.maxSpeed
+                    : 0.0f;
+                characterCommand.jump = pressed(GLFW_KEY_SPACE);
+            }
+            else
+            {
+                characterCommand.wishDir = Vector3f(0, 0, 0);
+                characterCommand.wishSpeed = 0.0f;
+                characterCommand.jump = false;
+            }
+
+            simulation.step(dt, (tickDt) {
+                const result = pmMove(collisionWorld, characterState, characterCommand,
+                    tickDt, characterBody, characterConfig);
+
+                characterState.position = result.position;
+                characterState.velocity = result.velocity;
+                characterState.onGround = result.onGround;
+                characterState.groundNormal = result.groundNormal;
+            });
+
+            const eyePosition = characterState.position
+                + Vector3f(0, characterBody.eyeHeight, 0);
+
+            camera.position = thirdPerson
+                ? eyePosition - camera.forward * 4.0f
+                : eyePosition;
+        }
+        else if(!offscreen)
             updateCamera(camera, window, dt);
+
+        Matrix4x4f characterTransform = Matrix4x4f.identity();
+
+        if(characterMode && characterModel)
+            characterTransform = scaleMatrix(Vector3f(characterModelScale, characterModelScale,
+                characterModelScale)) * translationMatrix(characterState.position + characterModelOffset);
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
@@ -503,6 +662,9 @@ void main(string[] args)
             scene.updateFrameUniforms(frame, 0, wtb);
             godotScene.refreshBuffers(frame.commandBuffer);
 
+            if(characterModel)
+                characterModel.refreshBuffers(frame.commandBuffer);
+
             const modelViewProj = wtb.proj * wtb.view * wtb.model;
 
 
@@ -513,6 +675,10 @@ void main(string[] args)
                 frame,
                 (buf, phase) {
                     godotScene.drawingBufferFilling(buf, modelViewProj, frame.frameSets[0].descriptorSet, phase);
+
+                    if(characterModel && thirdPerson)
+                        characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
+                            frame.frameSets[0].descriptorSet, phase);
                 },
                 null,
                 (buf) {
@@ -524,6 +690,10 @@ void main(string[] args)
         if(screenshotPath.length && frameIndex == captureFrame)
             writeln("screenshot saved to ", screenshotPath);
     }
+
+    if(characterMode)
+        writeln("character position ", characterState.position,
+            " onGround ", characterState.onGround);
 
     vkDeviceWaitIdle(device.device);
 }
