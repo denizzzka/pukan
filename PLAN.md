@@ -737,6 +737,97 @@ need later.
 - [ ] Judge it on the fixed scene against 4x MSAA without TAA: the aliasing it
       removes, the ghosting it adds, and its cost on llvmpipe.
 
+## Large worlds
+
+Everything the engine draws today comes from one loaded scene: the tree is
+walked in full, one 1024x1024 sun map is fitted to the whole world, collision is
+one static BVH, lights are a single 16-entry frame list, and positions are
+single precision. A world that cannot be loaded at once needs all of these to
+change together, so the slices below share the cell grid as their unit.
+
+Order: coordinates and the cell partition first, because everything else
+addresses cells; then loading and unloading under a per-frame budget; then the
+spatial index and GPU-driven draws; then LOD, occlusion, shadows and collision
+streaming on top. Every slice is measured at cell borders, where its cost shows
+up.
+
+- **Cells and coordinates**
+  - [ ] A cell grid owned by `Scene`: a fixed cell size, a level origin and the
+        world bounds of each cell. The glTF and Godot loaders assign nodes to
+        cells by their bounds, and a node that spans cells duplicates into each.
+  - [ ] The loaded set around the camera: a radius of resident cells plus a
+        prefetch ring ordered by distance, with one budget per frame for mesh
+        upload and pipeline warmup. A cell is released only when no recorded
+        frame still draws it.
+  - [ ] Floating origin: keep the camera at the origin and shift cell
+        transforms, so single-precision positions stay precise far from the
+        start.
+  - [ ] Decide whether `Matrix4x4f` becomes double precision or only the cell
+        offsets do, and measure the vertex cost of the second on the fixed
+        scene.
+
+- **Spatial index and GPU-driven draws**
+  - [ ] One index over the loaded cells: a BVH or octree per cell with a flat
+        top index over cell bounds, shared by frustum, shadow and picking
+        queries.
+  - [ ] GPU culling: keep the instance list in a storage buffer, cull in a
+        compute shader and draw with `vkCmdDrawIndexedIndirectCount`, so the CPU
+        uploads only the camera and the cell list.
+  - [ ] Keep the CPU path as the fallback and as the reference for the GPU
+        results; judge it on 10k, 100k and 1M instances.
+
+- **LOD and HLOD**
+  - [ ] Mesh LOD from authored levels first, then generated ones; pick the level
+        by screen-space error and keep skinned meshes posed at every level.
+  - [ ] HLOD: merge distant groups into one proxy per cell, with an impostor for
+        the far ring. Build the merged geometry once per cell, not per frame.
+  - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
+        software raster) as the long-term replacement, only after the merged
+        HLOD has numbers.
+
+- **Occlusion**
+  - [ ] Depth-pyramid (HiZ) occlusion from the previous frame, or a software
+        raster of the large occluders on the CPU, and skip hidden cells and
+        instances before the draw.
+  - [ ] Portals and PVS for closed interiors: a room graph with portal frustums,
+        so rooms behind walls never enter the list. Judge it against HiZ inside
+        the truck town interiors.
+
+- **Shadows and lights**
+  - [ ] Cascaded shadow maps around the camera, each cascade with its own culled
+        set instead of one map fitted to the world.
+  - [ ] Local-light shadows from the atlas plan under `## Lighting`, culled per
+        cell.
+  - [ ] Tiled or clustered light culling, so a cell carries its own light list
+        and the 16-entry frame limit stops bounding the world.
+
+- **Collision**
+  - [ ] One collision BVH per cell, built and released with the cell, and a top
+        index over cells for queries that cross their bounds.
+  - [ ] Stream colliders one cell ahead of the camera, so the player never
+        reaches a cell that has no collision yet.
+  - [ ] Keep queries in world space with the floating origin applied.
+
+- **Resources**
+  - [ ] Async texture and mesh loading with a per-frame byte budget, replacing
+        the immediate upload the loaders do today.
+  - [ ] Virtual texturing or mip streaming for textures that exceed memory, with
+        residency bounded by the same cell policy.
+  - [ ] Share one GPU resource between cells, so an asset placed in two cells
+        loads and uploads once.
+
+- **Debug and budgets**
+  - [ ] A streaming overlay: loaded and pending cells, bytes per cell, drawables
+        per cell, and the frame cost of the load and unload step.
+  - [ ] Mark every cell border crossing with the frame time around it, so a
+        hitch is attributed to the load rather than to the next draw.
+  - [ ] Acceptance is the absence of hitches at cell borders, not an average
+        frame rate: a steady 10 to 20 ms drop at a crossing means the budget is
+        exceeded or a synchronous step (a physics scene build, a pipeline
+        compile) landed on the main thread.
+  - [ ] Prefetch seconds before the border, spread actor and collider creation
+        over frames, and move mesh loading and physics builds to worker threads.
+
 ## Data layout and throughput
 
 Thesis: the remaining speed is in reducing the entropy of the data that moves
