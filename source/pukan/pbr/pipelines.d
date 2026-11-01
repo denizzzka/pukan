@@ -8,9 +8,13 @@ import std.conv: to;
 /// When pipeline variants are built
 enum PipelineWarmupPolicy
 {
+    /// Build each variant on its first draw; no worker or query
     off,
+    /// Queue the variants of each loaded object; late ones build on demand
     scene,
+    /// Queue every reachable variant for the target at scene setup
     all,
+    /// Queue only the required set; a variant outside it is an error
     required,
 }
 
