@@ -158,30 +158,22 @@ struct RenderTargetId
 /// Content and state identity of a pipeline, independent of the render target
 struct PipelineKey
 {
-    /// Content without the shader sums, for the cache file name
-    ubyte[32] slot;
     /// Content with the shader sums
     ubyte[32] digest;
 
     size_t toHash() const nothrow @safe
     {
-        return hashOf(slot) ^ hashOf(digest);
+        return hashOf(digest);
     }
 
     bool opEquals(ref const PipelineKey rhs) const nothrow @safe
     {
-        return slot[] == rhs.slot[] && digest[] == rhs.digest[];
+        return digest[] == rhs.digest[];
     }
 
     int opCmp(ref const PipelineKey rhs) const nothrow @safe
     {
-        if(slot[] != rhs.slot[])
-            return slot[] < rhs.slot[] ? -1 : 1;
-
-        if(digest[] != rhs.digest[])
-            return digest[] < rhs.digest[] ? -1 : 1;
-
-        return 0;
+        return digest[] < rhs.digest[] ? -1 : digest[] > rhs.digest[] ? 1 : 0;
     }
 }
 
@@ -483,6 +475,8 @@ final class PipelineFactory
     private struct Technique
     {
         PipelineKey key;
+        /// Cache address of the variant, without the shader content
+        ubyte[32] slot;
         RenderTechnique description;
         VkPipelineLayout pipelineLayout;
         VkDescriptorSetLayout setLayout;
@@ -669,7 +663,13 @@ final class PipelineFactory
         return new DescriptorAllocator(device, frameSetLayout, frameBindings, 16);
     }
 
-    private static PipelineKey techniqueKey(RenderTechnique technique)
+    private struct TechniqueIdentity
+    {
+        PipelineKey key;
+        ubyte[32] slot;
+    }
+
+    private static TechniqueIdentity techniqueIdentity(RenderTechnique technique)
     {
         PipelineVariantKeyBuilder builder;
         builder.add(technique.state);
@@ -688,16 +688,17 @@ final class PipelineFactory
 
         const identity = builder.finish();
 
-        PipelineKey key;
-        key.slot[] = identity.slot.digest[];
-        key.digest[] = identity.digest[];
+        TechniqueIdentity result;
+        result.key.digest[] = identity.digest[];
+        result.slot[] = identity.slot.digest[];
 
-        return key;
+        return result;
     }
 
     PipelineKey declare(RenderTechnique technique, uint setsPerPool = 16)
     {
-        auto key = techniqueKey(technique);
+        const identity = techniqueIdentity(technique);
+        const key = identity.key;
 
         synchronized(mutex)
         {
@@ -706,6 +707,7 @@ final class PipelineFactory
 
             Technique entry;
             entry.key = key;
+            entry.slot = identity.slot;
             entry.description = technique;
 
             auto bindings = createLayoutBinding(technique.stages);
@@ -1017,7 +1019,7 @@ final class PipelineFactory
             basePipelineIndex: -1,
         };
 
-        const identity = variantIdentity(key, renderPass, subpass);
+        const identity = variantIdentity(key, technique.slot, renderPass, subpass);
 
         bool needsRecompilation;
         auto pipelineCache = acquirePipelineCache(identity, needsRecompilation);
@@ -1078,10 +1080,15 @@ final class PipelineFactory
         What a variant is for the store, not how its creation info is
         assembled. The shader sums change the digest but not the slot.
     */
-    private PipelineVariantKey variantIdentity(PipelineKey key, RenderPass renderPass, uint subpass) const
+    private PipelineVariantKey variantIdentity(
+        PipelineKey key,
+        const(ubyte)[32] slot,
+        RenderPass renderPass,
+        uint subpass,
+    ) const
     {
         PipelineVariantKeyBuilder builder;
-        builder.addKey(key.slot, key.digest);
+        builder.addKey(slot, key.digest);
         builder.add(renderPass.imageFormat);
         builder.add(renderPass.depthFormat);
         builder.add(renderPass.samples);
@@ -1138,26 +1145,38 @@ unittest
     stage.stage = VK_SHADER_STAGE_VERTEX_BIT;
     stage.checksum[0] = 1;
 
-    const first = PipelineFactory.techniqueKey(RenderTechnique(
+    const first = PipelineFactory.techniqueIdentity(RenderTechnique(
         name: "first",
         stages: [stage],
     ));
-    const renamed = PipelineFactory.techniqueKey(RenderTechnique(
+    const renamed = PipelineFactory.techniqueIdentity(RenderTechnique(
         name: "second",
         stages: [stage],
     ));
 
-    assert(first == renamed);
+    assert(first.key == renamed.key);
+    assert(first.slot[] == renamed.slot[]);
 
     auto changedShader = stage;
     changedShader.checksum[0] = 2;
 
-    const changed = PipelineFactory.techniqueKey(RenderTechnique(
+    const changed = PipelineFactory.techniqueIdentity(RenderTechnique(
         name: "first",
         stages: [changedShader],
     ));
 
-    assert(first != changed);
+    assert(first.key != changed.key);
     assert(first.slot[] == changed.slot[]);
-    assert(first.digest[] != changed.digest[]);
+    assert(first.key.digest[] != changed.key.digest[]);
+
+    auto renamedFile = stage;
+    renamedFile.file = "other.spv";
+
+    const otherFile = PipelineFactory.techniqueIdentity(RenderTechnique(
+        name: "first",
+        stages: [renamedFile],
+    ));
+
+    assert(first.key == otherFile.key);
+    assert(first.slot[] != otherFile.slot[]);
 }
