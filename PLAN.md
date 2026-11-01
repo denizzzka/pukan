@@ -783,9 +783,6 @@ every blob in the binary is wrong when each is used once per process, and
 - [ ] A library user can load their own SPIR-V by path or from memory and
       declare a `RenderTechnique` with it. `uploadShaderToGPU` already takes
       bytes; add `uploadShader(path, ...)` and a `ShaderSource` for packs.
-- [ ] Include a digest of each stage's SPIR-V in `PipelineVariantKey`. User
-      techniques can share a name, state and bindings while using different
-      shaders, and the store must not let their records overwrite each other.
 - [ ] Keep `ShaderSource` alive for the lifetime of the device; it owns the
       search roots and any pack handles.
 - [ ] Use `VK_EXT_pipeline_creation_cache_control` with
@@ -858,24 +855,19 @@ the creation layer; it is the PBR table.
 ### Compile-time PipelineId
 
 The id is derived from the shader set, not from the technique name or profile.
-`compile_shaders.sh` writes a `.sum` next to every `.spv`: MurmurHash3 of the
-SPIR-V bytes in little endian. A pipeline hash combines the sums of its stages
-with the fixed state and bindings.
+`compile_shaders.sh` writes a 16-byte MurmurHash3 x64_128 sum in little endian
+next to every `.spv`; `PipelineVariantKey` folds those sums into its digest and
+keeps beside it the variant slot, the same identity without the shader content.
+A cache file is named by the slot and stores the digest in its header, so a
+changed shader makes the record stale and the next save replaces it. Compute
+kernels hash their SPIR-V the same way. The cache size is explicit and defaults
+to 100 MB.
 
-- [ ] Add MurmurHash3 to `compile_shaders.sh`. No `mmh3` or `murmurhash`
-      utility is installed here; use a small Python implementation or add
-      `mmh3` as a build dependency.
-- [ ] Write `<name>.spv.sum` in little endian next to every compiled shader.
-- [ ] Combine the raw shader sums into the pipeline hash and store it in the
-      `PipelineCacheStore` record.
-- [ ] On load compare the stored hash with the sums of the current shaders; a
-      mismatch invalidates the record and forces recompilation.
-- [ ] Intern pipelines in the generic `Pipelines` layer by `PipelineId`, so
-      identical shader sets return the same `VkPipeline`.
+- [ ] Move the sums into an explicit `PipelineId` and intern pipelines by it,
+      so identical shader sets return the same `VkPipeline`.
 - [ ] Keep the shader `PipelineId` target-independent; `PipelineKey` combines
       it with the render target, so the same shaders on another target still
       need their own `VkPipeline`.
-- [ ] Make the cache size explicit and default to 100 MB.
 
 ### Pipeline warmup policy
 
