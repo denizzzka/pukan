@@ -2,12 +2,13 @@ module pukan.pbr.factory;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import material_bindings;
-import pukan.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines;
+import pukan.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, PbrVariant;
 import pukan.pbr.mesh: staticInstanceBinding;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique, TechniqueId;
+import std.meta: AliasSeq;
 
 private ShaderVertexInput vertexInput()
 {
@@ -227,6 +228,15 @@ class PbrFactory
     MeshResources resources;
     PbrPipelines pipelineCfgs;
     PbrPipelines godotPipelines;
+
+    /// Variant groups this factory can provide
+    alias pipelineVariants = AliasSeq!(
+        PbrVariant.pbr,
+        PbrVariant.pbrCore,
+        PbrVariant.lit,
+        PbrVariant.unlit,
+        PbrVariant.shadow,
+    );
 
     this(
         LogicalDevice device,
@@ -510,6 +520,13 @@ class PbrFactory
     {
         pipelineCfgs.warmAll();
         godotPipelines.warmAll();
+    }
+
+    /// Queues the selected variant groups of both families
+    void warmVariants(Variants...)()
+    {
+        pipelineCfgs.warmVariants!Variants();
+        godotPipelines.warmVariants!Variants();
     }
 
     /// Throws when any variant of either family is missing

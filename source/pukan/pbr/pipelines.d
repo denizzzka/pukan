@@ -4,6 +4,7 @@ import pukan.exceptions: PukanException;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, TechniqueId;
 import pukan.vulkan.renderpass: RenderPass;
 import std.conv: to;
+import std.meta: AliasSeq, NoDuplicates, staticMap;
 
 /// When pipeline variants are built
 enum PipelineWarmupPolicy
@@ -31,6 +32,36 @@ enum bool pipelineWarmupEnabled = pipelineWarmupPolicy != PipelineWarmupPolicy.o
 enum bool pipelineWarmupPerScene = pipelineWarmupPolicy == PipelineWarmupPolicy.scene ||
     pipelineWarmupPolicy == PipelineWarmupPolicy.required;
 enum bool pipelineWarmupEverything = pipelineWarmupPolicy == PipelineWarmupPolicy.all;
+enum bool pipelineWarmupRequired = pipelineWarmupPolicy == PipelineWarmupPolicy.required;
+
+/// Coarse groups of pipeline variants a module can require
+enum PbrVariant
+{
+    /// Extended PBR across every sky and alpha state
+    pbr,
+    /// Core PBR across every sky and alpha state
+    pbrCore,
+    /// Lit material
+    lit,
+    /// Unlit material
+    unlit,
+    /// Shadow and mask-shadow techniques
+    shadow,
+}
+
+private template modulePipelineVariants(M)
+{
+    static if(__traits(hasMember, M, "pipelineVariants"))
+        alias modulePipelineVariants = __traits(getMember, M, "pipelineVariants");
+    else
+        alias modulePipelineVariants = AliasSeq!();
+}
+
+/// Union of the variant groups declared by the given modules
+template Variants(Modules...)
+{
+    alias Variants = NoDuplicates!(staticMap!(modulePipelineVariants, Modules));
+}
 
 /// A pipeline variant created on first use
 struct LazyPipeline
@@ -159,6 +190,43 @@ final class PbrPipelines
         unskinnedShadow.request();
         skinnedMaskShadow.request();
         unskinnedMaskShadow.request();
+    }
+
+    /// Queues the selected variant groups of this family
+    void warmVariants(Kinds...)()
+    {
+        static foreach(K; Kinds)
+        {
+            static if(K == PbrVariant.pbr)
+            {
+                warmAll(skinned.pbr);
+                warmAll(unskinned.pbr);
+            }
+            else static if(K == PbrVariant.pbrCore)
+            {
+                warmAll(skinned.pbrCore);
+                warmAll(unskinned.pbrCore);
+            }
+            else static if(K == PbrVariant.lit)
+            {
+                warmAll(skinned.lit);
+                warmAll(unskinned.lit);
+            }
+            else static if(K == PbrVariant.unlit)
+            {
+                warmAll(skinned.unlit);
+                warmAll(unskinned.unlit);
+            }
+            else static if(K == PbrVariant.shadow)
+            {
+                skinnedShadow.request();
+                unskinnedShadow.request();
+                skinnedMaskShadow.request();
+                unskinnedMaskShadow.request();
+            }
+            else
+                static assert(false, "unknown PbrVariant");
+        }
     }
 
     /// Throws when a variant is still missing after the preload queue drains
