@@ -1,0 +1,177 @@
+[gd_scene load_steps=20 format=3]
+
+[sub_resource type="BoxShape3D" id="FloorShape"]
+size = Vector3(40, 1, 40)
+
+[sub_resource type="BoxMesh" id="FloorMesh"]
+size = Vector3(40, 1, 40)
+
+[sub_resource type="StandardMaterial3D" id="FloorMaterial"]
+albedo_color = Color(0.32, 0.45, 0.32, 1)
+
+[sub_resource type="BoxShape3D" id="RampShape"]
+size = Vector3(8, 0.5, 6)
+
+[sub_resource type="BoxMesh" id="RampMesh"]
+size = Vector3(8, 0.5, 6)
+
+[sub_resource type="StandardMaterial3D" id="RampMaterial"]
+albedo_color = Color(0.45, 0.38, 0.3, 1)
+
+[sub_resource type="BoxShape3D" id="StepShape1"]
+size = Vector3(2, 0.45, 2)
+
+[sub_resource type="BoxMesh" id="StepMesh1"]
+size = Vector3(2, 0.45, 2)
+
+[sub_resource type="BoxShape3D" id="StepShape2"]
+size = Vector3(2, 0.9, 2)
+
+[sub_resource type="BoxMesh" id="StepMesh2"]
+size = Vector3(2, 0.9, 2)
+
+[sub_resource type="BoxShape3D" id="StepShape3"]
+size = Vector3(2, 1.35, 2)
+
+[sub_resource type="BoxMesh" id="StepMesh3"]
+size = Vector3(2, 1.35, 2)
+
+[sub_resource type="BoxShape3D" id="StepShape4"]
+size = Vector3(2, 1.8, 2)
+
+[sub_resource type="BoxMesh" id="StepMesh4"]
+size = Vector3(2, 1.8, 2)
+
+[sub_resource type="BoxShape3D" id="WallShape"]
+size = Vector3(0.5, 4, 20)
+
+[sub_resource type="BoxMesh" id="WallMesh"]
+size = Vector3(0.5, 4, 20)
+
+[sub_resource type="StandardMaterial3D" id="WallMaterial"]
+albedo_color = Color(0.5, 0.32, 0.32, 1)
+
+[sub_resource type="BoxShape3D" id="CrateShape"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="BoxMesh" id="CrateMesh"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="CrateMaterial"]
+albedo_color = Color(0.55, 0.45, 0.25, 1)
+
+[node name="Level" type="Node3D"]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.965926, -0.166366, 0.198267, 1.42109e-14, 0.766044, 0.642788, -0.258819, 0.620886, -0.739941, 0, 10, 0)
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("FloorShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("FloorMesh")
+material_override = SubResource("FloorMaterial")
+
+[node name="Ramp" type="StaticBody3D" parent="."]
+transform = Transform3D(0.984808, 0.173648, 0, -0.173648, 0.984808, 0, 0, 0, 1, 0, 0.0, -6)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ramp"]
+shape = SubResource("RampShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ramp"]
+mesh = SubResource("RampMesh")
+material_override = SubResource("RampMaterial")
+
+[node name="Step1" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.225, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Step1"]
+shape = SubResource("StepShape1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Step1"]
+mesh = SubResource("StepMesh1")
+material_override = SubResource("RampMaterial")
+
+[node name="Step2" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.45, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Step2"]
+shape = SubResource("StepShape2")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Step2"]
+mesh = SubResource("StepMesh2")
+material_override = SubResource("RampMaterial")
+
+[node name="Step3" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0.675, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Step3"]
+shape = SubResource("StepShape3")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Step3"]
+mesh = SubResource("StepMesh3")
+material_override = SubResource("RampMaterial")
+
+[node name="Step4" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0.9, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Step4"]
+shape = SubResource("StepShape4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Step4"]
+mesh = SubResource("StepMesh4")
+material_override = SubResource("RampMaterial")
+
+[node name="Wall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 2, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall"]
+shape = SubResource("WallShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Wall"]
+mesh = SubResource("WallMesh")
+material_override = SubResource("WallMaterial")
+
+[node name="Crate1" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.5, -3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Crate1"]
+shape = SubResource("CrateShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Crate1"]
+mesh = SubResource("CrateMesh")
+material_override = SubResource("CrateMaterial")
+
+[node name="Crate2" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 0.5, -3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Crate2"]
+shape = SubResource("CrateShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Crate2"]
+mesh = SubResource("CrateMesh")
+material_override = SubResource("CrateMaterial")
+
+[node name="Crate3" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.6, 1.5, -3)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Crate3"]
+shape = SubResource("CrateShape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Crate3"]
+mesh = SubResource("CrateMesh")
+material_override = SubResource("CrateMaterial")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -18)
+fov = 60.0
+near = 0.05
+far = 200.0
+
+[node name="Spawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -10)

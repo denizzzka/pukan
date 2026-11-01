@@ -1,6 +1,7 @@
 import dlib.math: Matrix4x4f, Vector3f, Vector4f, scaleMatrix, translationMatrix;
 import pukan;
-import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig, QuakeMoveState, pmMove;
+import pukan.mover.component: MoverComponent;
+import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
 import pukan.pbr.pipelines: plainShading;
 import pukan.physics.simulation: Simulation;
 import pukan.physics.world: CollisionWorld;
@@ -176,6 +177,8 @@ void main(string[] args)
     bool characterMode;
     bool thirdPerson;
     string spawnOption;
+    bool walkForward;
+    bool fixedStep;
     float physicsHz = 60.0f;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
@@ -197,6 +200,8 @@ void main(string[] args)
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
         "character", "walk a Quake-style capsule through the level", &characterMode,
         "spawn", "character spawn position, x,y,z", &spawnOption,
+        "walk", "hold forward, for headless movement tests", &walkForward,
+        "fixed-step", "advance one physics tick per frame", &fixedStep,
         "third-person", "draw the character from behind", &thirdPerson,
         "physics-hz", "fixed character tick rate", &physicsHz,
         "fov", "vertical field of view in degrees", &fovOption,
@@ -345,7 +350,9 @@ void main(string[] args)
     scene.godotFactory.preloadShadows = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
-        scenePath = "demo_godot/godot_samples/generated/procedural.tscn";
+        scenePath = characterMode
+            ? "demo_godot/godot_samples/character/level.tscn"
+            : "demo_godot/godot_samples/generated/procedural.tscn";
 
     auto godotScene = packPath.length
         ? scene.godotFactory.createPacked(packPath, scenePath)
@@ -425,7 +432,7 @@ void main(string[] args)
 
         if(bounds.min.y == bounds.min.y && bounds.max.y > bounds.min.y)
         {
-            characterModelScale = 1.8f / (bounds.max.y - bounds.min.y);
+            characterModelScale = 1.4f / (bounds.max.y - bounds.min.y);
             characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScale, 0);
         }
     }
@@ -506,7 +513,7 @@ void main(string[] args)
 
     QuakeBody characterBody;
     QuakeMovementConfig characterConfig;
-    QuakeMoveState characterState;
+    MoverComponent mover;
     QuakeCommand characterCommand;
     characterCommand.wishDir = Vector3f(0, 0, 0);
     characterCommand.wishSpeed = 0.0f;
@@ -521,9 +528,8 @@ void main(string[] args)
         if(spawnOption.length)
             spawn = parseVector(spawnOption);
 
-        characterState.position = spawn;
-        characterState.velocity = Vector3f(0, 0, 0);
-        characterState.onGround = false;
+        mover = new MoverComponent(collisionWorld, characterBody, characterConfig);
+        mover.teleport(spawn);
 
         simulation = new Simulation(collisionWorld);
         simulation.setTickRate(physicsHz);
@@ -543,6 +549,7 @@ void main(string[] args)
     double characterCursorX = 0.0;
     double characterCursorY = 0.0;
     bool characterCursorKnown;
+    float characterMaxHeight = -float.infinity;
 
     while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
@@ -551,7 +558,10 @@ void main(string[] args)
             glfwPollEvents();
 
         const now = offscreen ? (MonoTime.currTime - start).total!"msecs" * 0.001 : glfwGetTime();
-        const dt = cast(float) (now - lastTime < 0.1 ? now - lastTime : 0.1);
+        const measuredDt = cast(float) (now - lastTime < 0.1 ? now - lastTime : 0.1);
+        const dt = fixedStep || offscreen
+            ? cast(float) (1.0 / physicsHz)
+            : measuredDt;
         lastTime = now;
 
         if(characterMode)
@@ -615,22 +625,43 @@ void main(string[] args)
                 characterCommand.jump = false;
             }
 
-            simulation.step(dt, (tickDt) {
-                const result = pmMove(collisionWorld, characterState, characterCommand,
-                    tickDt, characterBody, characterConfig);
+            if(walkForward)
+            {
+                Vector3f forward = camera.forward;
+                forward.y = 0;
 
-                characterState.position = result.position;
-                characterState.velocity = result.velocity;
-                characterState.onGround = result.onGround;
-                characterState.groundNormal = result.groundNormal;
+                if(forward.length > 1e-6f)
+                    forward = forward.normalized;
+                else
+                    forward = Vector3f(0, 0, 0);
+
+                characterCommand.wishDir = forward;
+                characterCommand.wishSpeed = characterConfig.maxSpeed;
+            }
+
+            simulation.step(dt, (tickDt) {
+                mover.step(characterCommand, tickDt);
+                characterMaxHeight = characterMaxHeight > mover.state.position.y
+                    ? characterMaxHeight
+                    : mover.state.position.y;
             });
 
-            const eyePosition = characterState.position
-                + Vector3f(0, characterBody.eyeHeight, 0);
+            const eyePosition = mover.eyePosition();
 
-            camera.position = thirdPerson
-                ? eyePosition - camera.forward * 4.0f
-                : eyePosition;
+            if(thirdPerson)
+            {
+                const back = -camera.forward;
+                const desired = 6.0f;
+                const hit = collisionWorld.raycast(eyePosition, back, desired,
+                    characterBody.mask);
+                const distance = hit.hit
+                    ? (hit.t > 0.1f ? hit.t - 0.1f : 0.1f)
+                    : desired;
+
+                camera.position = eyePosition + back * distance;
+            }
+            else
+                camera.position = eyePosition;
         }
         else if(!offscreen)
             updateCamera(camera, window, dt);
@@ -639,7 +670,7 @@ void main(string[] args)
 
         if(characterMode && characterModel)
             characterTransform = scaleMatrix(Vector3f(characterModelScale, characterModelScale,
-                characterModelScale)) * translationMatrix(characterState.position + characterModelOffset);
+                characterModelScale)) * translationMatrix(mover.state.position + characterModelOffset);
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
@@ -692,8 +723,9 @@ void main(string[] args)
     }
 
     if(characterMode)
-        writeln("character position ", characterState.position,
-            " onGround ", characterState.onGround);
+        writeln("character position ", mover.state.position,
+            " max height ", characterMaxHeight,
+            " onGround ", mover.state.onGround);
 
     vkDeviceWaitIdle(device.device);
 }
