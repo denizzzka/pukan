@@ -5,6 +5,7 @@ import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, TechniqueId
 import pukan.vulkan.renderpass: RenderPass;
 import std.conv: to;
 import std.meta: AliasSeq, NoDuplicates, staticMap;
+import std.traits: FieldNameTuple;
 
 /// When pipeline variants are built
 enum PipelineWarmupPolicy
@@ -33,19 +34,44 @@ enum bool pipelineWarmupPerScene = pipelineWarmupPolicy == PipelineWarmupPolicy.
 enum bool pipelineWarmupEverything = pipelineWarmupPolicy == PipelineWarmupPolicy.all;
 enum bool pipelineWarmupRequired = pipelineWarmupPolicy == PipelineWarmupPolicy.required;
 
-/// Coarse groups of pipeline variants a module can require
-enum PbrVariant
+/// Shader/profile set a pipeline belongs to
+enum PbrProfile
 {
-    /// Extended PBR across every sky and alpha state
-    pbr,
-    /// Core PBR across every sky and alpha state
-    pbrCore,
-    /// Lit material
-    lit,
-    /// Unlit material
-    unlit,
-    /// Shadow and mask-shadow techniques
-    shadow,
+    /// glTF PBR materials
+    gltf,
+    /// Godot StandardMaterial3D materials
+    godot,
+}
+
+version(PbrGltfOnly)
+{
+    enum bool pbrGltfActive = true;
+    enum bool pbrGodotActive = false;
+}
+else version(PbrGodotOnly)
+{
+    enum bool pbrGltfActive = false;
+    enum bool pbrGodotActive = true;
+}
+else
+{
+    enum bool pbrGltfActive = true;
+    enum bool pbrGodotActive = true;
+}
+
+/// One concrete pipeline variant, independent of the profile that provides it
+struct PbrVariant
+{
+    enum Mode { pbr, pbrCore, lit, unlit }
+    enum Sky { ibl, analytic, none }
+    enum State { opaque, doubleSided, blend, doubleSidedBlend, oit, doubleSidedOit }
+    enum Shadow { none, normal, mask }
+
+    bool skinned;
+    Mode mode;
+    Sky sky;
+    State state;
+    Shadow shadow = Shadow.none;
 }
 
 private template modulePipelineVariants(M)
@@ -179,114 +205,120 @@ final class PbrPipelines
     LazyPipeline skinnedMaskShadow;
     LazyPipeline unskinnedMaskShadow;
 
-    /// Queues every variant of this family for the preload thread
+    /// Queues every variant of this profile for the preload thread
     void warmAll()
     {
-        warmAll(skinned);
-        warmAll(unskinned);
-
-        skinnedShadow.request();
-        unskinnedShadow.request();
-        skinnedMaskShadow.request();
-        unskinnedMaskShadow.request();
+        static foreach(member; FieldNameTuple!PbrPipelines)
+            warmField(__traits(getMember, this, member));
     }
 
-    /// Queues the selected variant groups of this family
-    void warmVariants(Kinds...)()
+    /// Queues one concrete variant of this profile
+    void warmVariant(in PbrVariant variant)
     {
-        static foreach(K; Kinds)
+        if(variant.shadow != PbrVariant.Shadow.none)
         {
-            static if(K == PbrVariant.pbr)
+            if(variant.shadow == PbrVariant.Shadow.normal)
             {
-                warmAll(skinned.pbr);
-                warmAll(unskinned.pbr);
-            }
-            else static if(K == PbrVariant.pbrCore)
-            {
-                warmAll(skinned.pbrCore);
-                warmAll(unskinned.pbrCore);
-            }
-            else static if(K == PbrVariant.lit)
-            {
-                warmAll(skinned.lit);
-                warmAll(unskinned.lit);
-            }
-            else static if(K == PbrVariant.unlit)
-            {
-                warmAll(skinned.unlit);
-                warmAll(unskinned.unlit);
-            }
-            else static if(K == PbrVariant.shadow)
-            {
-                skinnedShadow.request();
-                unskinnedShadow.request();
-                skinnedMaskShadow.request();
-                unskinnedMaskShadow.request();
+                if(variant.skinned)
+                    skinnedShadow.request();
+                else
+                    unskinnedShadow.request();
             }
             else
-                static assert(false, "unknown PbrVariant");
+            {
+                if(variant.skinned)
+                    skinnedMaskShadow.request();
+                else
+                    unskinnedMaskShadow.request();
+            }
+
+            return;
+        }
+
+        if(variant.skinned)
+            warmMaterial(skinned, variant);
+        else
+            warmMaterial(unskinned, variant);
+    }
+
+    private static void warmMaterial(ref PbrModePipelines modes, in PbrVariant variant)
+    {
+        final switch(variant.mode)
+        {
+            case PbrVariant.Mode.pbr:
+                final switch(variant.sky)
+                {
+                    case PbrVariant.Sky.ibl: requestState(modes.pbr.ibl, variant.state); break;
+                    case PbrVariant.Sky.analytic: requestState(modes.pbr.analytic, variant.state); break;
+                    case PbrVariant.Sky.none: requestState(modes.pbr.none, variant.state); break;
+                }
+                break;
+            case PbrVariant.Mode.pbrCore:
+                final switch(variant.sky)
+                {
+                    case PbrVariant.Sky.ibl: requestState(modes.pbrCore.ibl, variant.state); break;
+                    case PbrVariant.Sky.analytic: requestState(modes.pbrCore.analytic, variant.state); break;
+                    case PbrVariant.Sky.none: requestState(modes.pbrCore.none, variant.state); break;
+                }
+                break;
+            case PbrVariant.Mode.lit:
+                requestState(modes.lit, variant.state);
+                break;
+            case PbrVariant.Mode.unlit:
+                requestState(modes.unlit, variant.state);
+                break;
+        }
+    }
+
+    private static void requestState(ref PbrPipelineVariants variants, PbrVariant.State state)
+    {
+        final switch(state)
+        {
+            case PbrVariant.State.opaque: variants.opaque.request(); break;
+            case PbrVariant.State.doubleSided: variants.doubleSided.request(); break;
+            case PbrVariant.State.blend: variants.blend.request(); break;
+            case PbrVariant.State.doubleSidedBlend: variants.doubleSidedBlend.request(); break;
+            case PbrVariant.State.oit: variants.oit.request(); break;
+            case PbrVariant.State.doubleSidedOit: variants.doubleSidedOit.request(); break;
         }
     }
 
     /// Throws when a variant is still missing after the preload queue drains
     void validateAll()
     {
-        validateAll(skinned);
-        validateAll(unskinned);
-
-        skinnedShadow.get();
-        unskinnedShadow.get();
-        skinnedMaskShadow.get();
-        unskinnedMaskShadow.get();
+        static foreach(member; FieldNameTuple!PbrPipelines)
+            validateField(__traits(getMember, this, member));
     }
 
-    private static void warmAll(ref PbrModePipelines modes)
+    private static void warmField(T)(ref T value)
     {
-        warmAll(modes.pbr);
-        warmAll(modes.pbrCore);
-        warmAll(modes.lit);
-        warmAll(modes.unlit);
+        static if(is(T == LazyPipeline))
+            value.request();
+        else
+            static foreach(member; FieldNameTuple!T)
+                warmField(__traits(getMember, value, member));
     }
 
-    private static void warmAll(ref PbrSkyPipelines skies)
+    private static void validateField(T)(ref T value)
     {
-        warmAll(skies.ibl);
-        warmAll(skies.analytic);
-        warmAll(skies.none);
+        static if(is(T == LazyPipeline))
+            value.get();
+        else
+            static foreach(member; FieldNameTuple!T)
+                validateField(__traits(getMember, value, member));
+    }
+}
+
+unittest
+{
+    static struct Required
+    {
+        alias pipelineVariants = AliasSeq!(
+            PbrVariant(skinned: true, mode: PbrVariant.Mode.lit, state: PbrVariant.State.opaque),
+            PbrVariant(skinned: true, mode: PbrVariant.Mode.lit, state: PbrVariant.State.opaque),
+            PbrVariant(skinned: false, mode: PbrVariant.Mode.pbr, sky: PbrVariant.Sky.ibl, state: PbrVariant.State.opaque),
+        );
     }
 
-    private static void warmAll(ref PbrPipelineVariants variants)
-    {
-        variants.opaque.request();
-        variants.doubleSided.request();
-        variants.blend.request();
-        variants.doubleSidedBlend.request();
-        variants.oit.request();
-        variants.doubleSidedOit.request();
-    }
-
-    private static void validateAll(ref PbrModePipelines modes)
-    {
-        validateAll(modes.pbr);
-        validateAll(modes.pbrCore);
-        validateAll(modes.lit);
-        validateAll(modes.unlit);
-    }
-
-    private static void validateAll(ref PbrSkyPipelines skies)
-    {
-        validateAll(skies.ibl);
-        validateAll(skies.analytic);
-        validateAll(skies.none);
-    }
-
-    private static void validateAll(ref PbrPipelineVariants variants)
-    {
-        variants.opaque.get();
-        variants.doubleSided.get();
-        variants.blend.get();
-        variants.doubleSidedBlend.get();
-        variants.oit.get();
-        variants.doubleSidedOit.get();
-    }
+    static assert(Variants!Required.length == 2);
 }

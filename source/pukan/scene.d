@@ -2,7 +2,7 @@ module pukan.scene;
 
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
-import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired;
+import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired, Variants;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
@@ -16,8 +16,10 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.pipeline_cache: FilePipelineCacheStore, PipelineCacheStore;
 import std.uuid: UUID;
 
-class Scene
+class SceneWith(Modules...)
 {
+    alias PipelineVariants = Variants!Modules;
+
     LogicalDevice device;
     VkSurfaceKHR surface;
     VkSurfaceFormatKHR surfaceFormat;
@@ -267,7 +269,21 @@ class Scene
         texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
         litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
         pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, renderPass, sunShadow.pass);
-        static if(pipelineWarmupEverything)
+        static if(pipelineWarmupRequired)
+        {
+            static if(Modules.length == 0)
+            {
+                pbrFactory.warmAll();
+                pipelineFactory.waitForRequests();
+                pbrFactory.validateAll();
+            }
+            else
+            {
+                pbrFactory.warmVariants!PipelineVariants();
+                pipelineFactory.waitForRequests();
+            }
+        }
+        else static if(pipelineWarmupEverything)
         {
             pbrFactory.warmAll();
             pipelineFactory.waitForRequests();
@@ -992,16 +1008,6 @@ class Scene
         pendingScreenshotPath = path;
     }
 
-    /// Queues the compile-time variant set for the required policy
-    void warmVariants(Variants...)()
-    {
-        static if(pipelineWarmupRequired)
-        {
-            pbrFactory.warmVariants!Variants();
-            pipelineFactory.waitForRequests();
-        }
-    }
-
     private void recordPendingScreenshot(ref Frame frame)
     {
         if(pendingScreenshotPath.length == 0)
@@ -1089,6 +1095,9 @@ class Scene
         swapChain.toNextFrame();
     }
 }
+
+/// Scene with the built-in PBR variants, warmed automatically for required
+alias Scene = SceneWith!();
 
 import dlib.math;
 

@@ -3,7 +3,7 @@ module pukan.gltf.factory;
 import pukan.gltf;
 import pukan.gltf.loader: GltfAsset, GltfLoadOptions, createGltfInstance, loadGltfAsset;
 import pukan.pbr.factory: PbrFactory;
-import pukan.pbr.pipelines: pipelineWarmupPerScene;
+import pukan.pbr.pipelines: PbrProfile, pipelineWarmupPerScene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.conv: to;
@@ -74,7 +74,7 @@ class GltfFactory
             allocator,
             pbr.resources.materials,
             pbr.device,
-            pbr.pipelineCfgs,
+            pbr.pipelinesFor(PbrProfile.gltf),
             pbr.resources.fakeTexture,
             pbr.resources.fallbackVertex.buf,
             computeJointsOnGPU,

@@ -841,23 +841,25 @@ Open questions:
 
 The compile-time policy is `off | scene | all | required`, default `scene`.
 
-`required` takes its set from `Variants!(Modules...)`, the union of each
-module's `alias pipelineVariants`. A drawable that needs a group outside the
-union throws when it draws, which also covers scenes loaded later. `all` warms
-and validates before `Scene` returns; `required` waits when the application
-installs the set; `scene` warms each loaded object and the first frame waits
-for the remainder.
+`Variants!(Modules...)` unions concrete `PbrVariant` descriptors from each
+module's `alias pipelineVariants`; duplicate descriptors collapse, like
+`Requirements!`. A drawable that needs a descriptor outside the union throws
+when it draws, including scenes loaded later.
 
-`all` and `required` currently warm both the glTF and Godot families, because
-`PbrFactory` owns both sets. The family has to become part of the compile-time
-set before a glTF-only application can skip the Godot variants.
+`PbrProfile { gltf, godot }` names the shader set. `PbrFactory` creates one
+`PbrPipelines` per active profile and keeps them in a keyed set; a build with
+`-version=PbrGltfOnly` or `-version=PbrGodotOnly` does not create the other
+profile. The same variant list is applied to every active set.
 
-- [ ] Put the family in the variant set: `PbrFamily { gltf, godot }` and
-      `PbrVariantSpec { family, kind }`. `GltfFactory` declares glTF groups;
-      `GodotFactory` declares Godot groups plus glTF for imported instances.
-      Then `all` and `required` warm only the families in the set.
+`all` walks every `LazyPipeline` field of `PbrPipelines` at compile time
+through `FieldNameTuple`, so the full warm list is generated, not handwritten.
+`required` warms the declared union. Both wait before `Scene` returns; `scene`
+warms each loaded object and the first frame waits.
+
 - [ ] Include third-party technique variants in `Variants!`. For now only the
-      built-in `PbrVariant` groups are listed.
+      built-in `PbrVariant` descriptors are listed.
+- [ ] Add glTF variants to a Godot-only build only when that build actually
+      imports glTF; otherwise the first imported instance throws.
 
 ### Pipeline cache strategies
 
