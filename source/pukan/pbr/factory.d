@@ -2,12 +2,37 @@ module pukan.pbr.factory;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import material_bindings;
-import pukan.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, PbrProfile, pbrGltfActive, pbrGodotActive;
+import pukan.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines;
 import pukan.pbr.mesh: staticInstanceBinding;
 import pukan.mesh: MeshResources;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique, TechniqueId;
+
+/// Shader/profile set a pipeline belongs to
+enum PbrProfile
+{
+    /// glTF PBR materials
+    gltf,
+    /// Godot StandardMaterial3D materials
+    godot,
+}
+
+version(PbrGltfOnly)
+{
+    enum bool pbrGltfActive = true;
+    enum bool pbrGodotActive = false;
+}
+else version(PbrGodotOnly)
+{
+    enum bool pbrGltfActive = false;
+    enum bool pbrGodotActive = true;
+}
+else
+{
+    enum bool pbrGltfActive = true;
+    enum bool pbrGodotActive = true;
+}
 
 private ShaderVertexInput vertexInput()
 {

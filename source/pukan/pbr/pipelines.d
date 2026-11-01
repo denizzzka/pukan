@@ -34,31 +34,6 @@ enum bool pipelineWarmupPerScene = pipelineWarmupPolicy == PipelineWarmupPolicy.
 enum bool pipelineWarmupEverything = pipelineWarmupPolicy == PipelineWarmupPolicy.all;
 enum bool pipelineWarmupRequired = pipelineWarmupPolicy == PipelineWarmupPolicy.required;
 
-/// Shader/profile set a pipeline belongs to
-enum PbrProfile
-{
-    /// glTF PBR materials
-    gltf,
-    /// Godot StandardMaterial3D materials
-    godot,
-}
-
-version(PbrGltfOnly)
-{
-    enum bool pbrGltfActive = true;
-    enum bool pbrGodotActive = false;
-}
-else version(PbrGodotOnly)
-{
-    enum bool pbrGltfActive = false;
-    enum bool pbrGodotActive = true;
-}
-else
-{
-    enum bool pbrGltfActive = true;
-    enum bool pbrGodotActive = true;
-}
-
 /// One concrete pipeline variant, independent of the profile that provides it
 struct PbrVariant
 {
@@ -194,7 +169,7 @@ struct PbrModePipelines
     PbrPipelineVariants unlit;
 }
 
-/// Pipeline variants of the glTF and Godot families, shared by every instance
+/// Pipeline variants of one shader profile, shared by every instance
 final class PbrPipelines
 {
     PbrModePipelines skinned;

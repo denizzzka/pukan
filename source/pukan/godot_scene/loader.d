@@ -21,7 +21,7 @@ import pukan.gltf.factory: GltfFactory;
 import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
 import pukan.misc: linearFormat, loadImageFromMemory;
 import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
-import pukan.pbr.pipelines: PbrProfile;
+import pukan.pbr.pipelines: PbrPipelines;
 import pukan.pbr.factory: PbrFactory;
 import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
 import pukan.vulkan;
@@ -300,6 +300,7 @@ private final class GodotLoader
 {
     LogicalDevice device;
     PbrFactory pbr;
+    PbrPipelines pipelines;
     GltfFactory gltfFactory;
     GodotLoadOptions options;
     DescriptorAllocator allocator;
@@ -328,10 +329,11 @@ private final class GodotLoader
     size_t[string] skippedNodeTypes;
     size_t[string] skippedResourceTypes;
 
-    this(LogicalDevice device, PbrFactory pbr, GltfFactory gltfFactory, GodotLoadOptions options)
+    this(LogicalDevice device, PbrFactory pbr, PbrPipelines pipelines, GltfFactory gltfFactory, GodotLoadOptions options)
     {
         this.device = device;
         this.pbr = pbr;
+        this.pipelines = pipelines;
         this.gltfFactory = gltfFactory;
         this.options = options;
         this.allocator = pbr.createAllocator();
@@ -405,7 +407,7 @@ private final class GodotLoader
         applyWinding!(GodotNode, GodotNode)(root, Matrix4x4f.identity(), false, node => node.local);
 
         auto scene = new GodotScene(
-            pbr.pipelinesFor(PbrProfile.godot),
+            pipelines,
             device,
             pbr.resources.materials,
             root,
@@ -775,7 +777,7 @@ private final class GodotLoader
                             childOptions.loadStack = options.loadStack ~ scenePath;
                             childOptions.rootOverrides = section.properties;
                             childOptions.hasRootOverrides = true;
-                            node.instance = loadGodotScene(project.source, key, pbr, gltfFactory, childOptions);
+                            node.instance = loadGodotScene(project.source, key, pbr, pipelines, gltfFactory, childOptions);
                             instances ~= node.instance;
 
                             if(auto child = cast(GodotScene) node.instance)
@@ -1789,11 +1791,12 @@ private final class GodotLoader
 GodotScene loadGodotScene(
     string filename,
     PbrFactory pbr,
+    PbrPipelines pipelines,
     GltfFactory gltfFactory,
     GodotLoadOptions options = GodotLoadOptions.init,
 )
 {
-    auto loader = new GodotLoader(pbr.device, pbr, gltfFactory, options);
+    auto loader = new GodotLoader(pbr.device, pbr, pipelines, gltfFactory, options);
     return loader.run(filename);
 }
 
@@ -1801,10 +1804,11 @@ GodotScene loadGodotScene(
     GodotSource source,
     string scenePath,
     PbrFactory pbr,
+    PbrPipelines pipelines,
     GltfFactory gltfFactory,
     GodotLoadOptions options = GodotLoadOptions.init,
 )
 {
-    auto loader = new GodotLoader(pbr.device, pbr, gltfFactory, options);
+    auto loader = new GodotLoader(pbr.device, pbr, pipelines, gltfFactory, options);
     return loader.run(source, scenePath, null);
 }

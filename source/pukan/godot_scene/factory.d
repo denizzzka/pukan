@@ -7,8 +7,8 @@ import pukan.godot_scene.source: PckSource;
 import pukan.godot_scene.scene: GodotScene;
 import pukan.gltf.factory: GltfFactory;
 import pukan.gltf.skin_matrices: SkinMatrices;
-import pukan.pbr.factory: PbrFactory;
-import pukan.pbr.pipelines: pipelineWarmupPerScene;
+import pukan.pbr.factory: PbrFactory, PbrProfile;
+import pukan.pbr.pipelines: PbrPipelines, pipelineWarmupPerScene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.meta: AliasSeq;
@@ -34,21 +34,25 @@ class GodotFactory
 
     private PbrFactory pbr;
     private GltfFactory gltfFactory;
+    private PbrPipelines pipelines;
     GodotLoadOptions loadOptions;
     /// Whether loading also queues the shadow variants
     bool preloadShadows = true;
+    /// Profile this factory draws with
+    enum pbrProfile = PbrProfile.godot;
 
-    this(PbrFactory pbr, GltfFactory gltfFactory)
+    this(PbrFactory pbr, GltfFactory gltfFactory, PbrPipelines pipelines)
     {
         this.pbr = pbr;
         this.gltfFactory = gltfFactory;
+        this.pipelines = pipelines;
     }
 
     GodotScene create(string filename)
     {
         assert(pbr.device);
 
-        auto scene = loadGodotScene(filename, pbr, gltfFactory, loadOptions);
+        auto scene = loadGodotScene(filename, pbr, pipelines, gltfFactory, loadOptions);
         static if(pipelineWarmupPerScene)
             scene.warmPipelines(preloadShadows);
 
@@ -70,7 +74,7 @@ class GodotFactory
                 throw new PukanException(packPath ~ ": pack has no application/run/main_scene");
         }
 
-        auto scene = loadGodotScene(source, scenePath, pbr, gltfFactory, loadOptions);
+        auto scene = loadGodotScene(source, scenePath, pbr, pipelines, gltfFactory, loadOptions);
         static if(pipelineWarmupPerScene)
             scene.warmPipelines(preloadShadows);
 

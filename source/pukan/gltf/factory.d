@@ -2,8 +2,8 @@ module pukan.gltf.factory;
 
 import pukan.gltf;
 import pukan.gltf.loader: GltfAsset, GltfLoadOptions, createGltfInstance, loadGltfAsset;
-import pukan.pbr.factory: PbrFactory;
-import pukan.pbr.pipelines: PbrProfile, pipelineWarmupPerScene;
+import pukan.pbr.factory: PbrFactory, PbrProfile;
+import pukan.pbr.pipelines: PbrPipelines, pipelineWarmupPerScene;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import std.conv: to;
@@ -31,15 +31,19 @@ class GltfFactory
     );
 
     private PbrFactory pbr;
+    private PbrPipelines pipelines;
     private immutable bool computeJointsOnGPU;
     private GltfAsset[string] assetCache;
     GltfLoadOptions loadOptions;
     /// Whether loading also queues the shadow variants
     bool preloadShadows = true;
+    /// Profile this factory draws with
+    enum pbrProfile = PbrProfile.gltf;
 
-    this(PbrFactory pbr, bool computeJointsOnGPU = true)
+    this(PbrFactory pbr, PbrPipelines pipelines, bool computeJointsOnGPU = true)
     {
         this.pbr = pbr;
+        this.pipelines = pipelines;
         this.computeJointsOnGPU = computeJointsOnGPU;
     }
 
@@ -74,7 +78,7 @@ class GltfFactory
             allocator,
             pbr.resources.materials,
             pbr.device,
-            pbr.pipelinesFor(PbrProfile.gltf),
+            pipelines,
             pbr.resources.fakeTexture,
             pbr.resources.fallbackVertex.buf,
             computeJointsOnGPU,

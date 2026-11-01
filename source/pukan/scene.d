@@ -3,6 +3,7 @@ module pukan.scene;
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired, Variants;
+import pukan.pbr.factory: PbrProfile, pbrGltfActive, pbrGodotActive;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
@@ -289,8 +290,14 @@ class SceneWith(Modules...)
             pipelineFactory.waitForRequests();
             pbrFactory.validateAll();
         }
-        gltfFactory = new GltfFactory(pbrFactory);
-        godotFactory = new GodotFactory(pbrFactory, gltfFactory);
+        static if(pbrGltfActive)
+            gltfFactory = new GltfFactory(pbrFactory, pbrFactory.pipelinesFor(GltfFactory.pbrProfile));
+        static if(pbrGodotActive)
+            godotFactory = new GodotFactory(
+                pbrFactory,
+                gltfFactory,
+                pbrFactory.pipelinesFor(GodotFactory.pbrProfile),
+            );
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
     }
@@ -305,7 +312,8 @@ class SceneWith(Modules...)
         if(pendingScreenshot)
             destroy(pendingScreenshot);
 
-        gltfFactory.destroyAssets();
+        if(gltfFactory)
+            gltfFactory.destroyAssets();
 
         background.destroy;
 

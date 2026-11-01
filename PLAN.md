@@ -846,10 +846,13 @@ module's `alias pipelineVariants`; duplicate descriptors collapse, like
 `Requirements!`. A drawable that needs a descriptor outside the union throws
 when it draws, including scenes loaded later.
 
-`PbrProfile { gltf, godot }` names the shader set. `PbrFactory` creates one
-`PbrPipelines` per active profile and keeps them in a keyed set; a build with
-`-version=PbrGltfOnly` or `-version=PbrGodotOnly` does not create the other
-profile. The same variant list is applied to every active set.
+`PbrProfile { gltf, godot }` lives in `pukan.pbr.factory` and names the
+shader set. `PbrFactory` creates one `PbrPipelines` per active profile; a build
+with `-version=PbrGltfOnly` or `-version=PbrGodotOnly` does not create the
+other profile. `GltfFactory` and `GodotFactory` receive their set at
+construction and declare their profile statically, so the loader never looks it
+up by name. `pukan.pbr.pipelines` stays format-agnostic. The same variant list
+is applied to every active set.
 
 `all` walks every `LazyPipeline` field of `PbrPipelines` at compile time
 through `FieldNameTuple`, so the full warm list is generated, not handwritten.
