@@ -725,13 +725,6 @@ opposite. The scene should be able to name the shaders and pipeline variants it
 will use before the first frame, so a loader can warm them while the scene loads
 and no first draw stalls on a compile.
 
-Current state: the PBR declarations live in `PbrPipelineSet`, which builds a
-variant on first use or on a preload request; only the variants the loaded
-scene can select are built. `PipelineCacheStore` decides whether a variant is
-compiled or taken from a stored `VkPipelineCache` blob, but it cannot replace
-the SPIR-V: `vkCreateGraphicsPipelines` still needs the shader module and the
-full create info on a hit.
-
 ### Declaration site
 
 - [ ] Under `PukanEmbedShaders` the bytes stay in the binary; when file loading
@@ -835,72 +828,10 @@ Open questions:
 
 ### Pipeline creation and identity
 
-Pipelines are declared by what renders with them, not by a loader factory.
-`PbrFactory` keeps resources, materials and the descriptor allocator; the PBR
-pipelines are declared in `pukan.pbr.pipeline_set`, which fills `PbrPipelines`.
-Background, OIT and primitives declare their own.
-
-A `PipelineKey` is the compile-time content and state identity of a pipeline:
-shader set, fixed state, bindings, vertex input and push constants. It is
-derived from the content, not from the technique name or profile, so identical
-declarations share one key. `PipelineFactory.declare` interns the key and
-returns it. A `PipelineInstance` is a key plus a render target: one
-`VkPipeline` and one cache record. The registry owns no PBR types and no warm
-list.
-
-The shader part of the key comes from `compile_shaders.sh`, which writes a
-16-byte MurmurHash3 x64_128 sum in little endian next to every `.spv`. The
-cache record is keyed by the instance: the file is named by the instance slot,
-the same identity without the shader content, and stores the shader digest in
-its header, so a changed shader makes the record stale and the next save
-replaces it. Compute kernels hash their SPIR-V the same way. The cache size is
-explicit and defaults to 100 MB.
-
 - [ ] Move the registry out of `pukan.vulkan.pipelines` into a generic
       `pukan.pipelines` module.
 
-### Compute pipelines
-
-Compute kernels go through the same registry. `Compute` takes a `ShaderDecl`
-and the `PipelineFactory`, declares the kernel layouts, and compiles the
-pipeline on first dispatch. The factory interns the kernel by its content key
-and returns one `VkPipeline` per key. The key is the shader sum, bindings, push
-constants and specialization, with no class name and no render target.
-`shaderStage!"name"` supplies the `.sum`, so a changed compute shader
-invalidates its record like a graphics one. Every `SkinMatrices` with the same
-shader shares one pipeline.
-
-`PipelineFactory.eagerCompute` is set for the `all` and `required` policies, so
-their compute kernels compile at declaration; `off` and `scene` keep them lazy
-until the first dispatch.
-
 ### Pipeline warmup policy
-
-The compile-time policy is `off | scene | all | required`, default `scene`.
-
-`Variants!(Modules...)` unions concrete `PbrVariant` descriptors from each
-module's `alias pipelineVariants`; duplicate descriptors collapse, like
-`Requirements!`. A drawable that needs a descriptor outside the union throws
-when it draws, including scenes loaded later.
-
-`PbrProfile { gltf, godot }` lives in `pukan.pbr.pipelines` and names the
-shader set. The PBR declarations build one `PbrPipelines` per active profile; a
-build with `-version=PbrGltfOnly` or `-version=PbrGodotOnly` does not build the
-other profile. `GltfFactory` and `GodotFactory` receive their set at
-construction and declare their profile statically, so the loader never looks it
-up by name. `pukan.pbr.pipelines` stays format-agnostic. The same variant list
-is applied to every active set. `PbrPipelineSet` owns the warm and validate
-calls and exposes the keys it declares, so the factory holds no pipeline table.
-
-`all` walks every `LazyPipeline` field of `PbrPipelines` at compile time
-through `FieldNameTuple`, so the full warm list is generated, not handwritten.
-`required` warms the union of declared keys and variants. Both wait before
-`Scene` returns; `scene` warms each loaded object and the first frame waits.
-
-`SceneWith!(Modules...)` takes the union through its template argument.
-`Scene` is `SceneWith!()`, so the default build warms the full built-in set for
-`required`; an application with a smaller list instantiates `SceneWith` with its
-own modules.
 
 - [ ] Include third-party technique variants in `Variants!`. For now only the
       built-in `PbrVariant` descriptors are listed.
@@ -954,12 +885,9 @@ The README asks for builds assembled from the features a project uses.
 
 ## Offscreen output
 
-`demo` and `demo_godot` render through a `SwapChain` tied to a GLFW window, so
-a run needs a display and a visible window. Debugging wants the same frame
-written into images in memory instead.
-
-- [ ] Use it for benchmarks and CI: the fixed scene then measures GPU work
-      without present timing or vsync, and the run needs no display server.
+- [ ] Use the offscreen path for benchmarks and CI: the fixed scene then
+      measures GPU work without present timing or vsync, and the run needs no
+      display server.
 - [ ] Put the swapchain and the offscreen target behind one interface instead
       of the `SwapChain` mode flag.
 
