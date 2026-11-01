@@ -23,6 +23,46 @@ only a suggested grouping.
   - [ ] #15 Add USD/USDA/USDC support.
   - [ ] #16 Add terrain support.
 
+## Look at the dependencies first
+
+Before writing an algorithm, search for it by hand. The local Dub cache under
+`~/.dub/packages` already holds dlib, dagon, gamut and ae; the Dub registry and
+the maintained D repositories come next, then the demos and the code this
+project already carries. A second implementation is the fallback, and the item
+or the commit says what was searched and why nothing fit.
+
+What is there today:
+
+- `dlib.geometry`: `Frustum` with `intersectsAABB` and `intersectsSphere`,
+  `AABB`, `OBB`, `MPR`, `TriMesh`, ray and triangle intersection. Borrow the
+  tests and the formulas, not the types: dlib's `AABB` is a center and a
+  half-size with cached `pmin`/`pmax`, while `pukan.physics.shapes.Aabb` and
+  `pukan.misc.Boxf` keep min and max and need union, sweep and surface area.
+- `dlib.math`: matrix decomposition, dual quaternions, SSE helpers.
+- `dlib.concurrency`: thread pool, task queue, worker threads and an SPSC
+  queue, the pieces a streaming path needs for upload and build workers.
+- `dlib.container`, `dlib.core`: arrays, BST, dict, buffers, arenas and
+  ownership.
+- `dagon.collision.bvh`: a generic SAH BVH with box, sphere and ray traversal
+  queries.
+- `dagon.openworld`: `OpenWorldManager` and `WorldChunk`, a chunk grid with
+  activation, an update loop and a traveler wrap hook.
+- `dagon.graphics.lod`: `LODDrawable` with distance bands and fade.
+- `dagon.graphics.csm`, `psm`, `dpsm`, `shadowmap`: cascaded, perspective and
+  dual-paraboloid shadow map boilerplate.
+- `dagon.render.deferred`: a G-buffer renderer with geometry, light, shadow,
+  SSAO and volumetric passes. Its occlusion pass is SSAO, not occlusion
+  culling, so it is no answer to the hidden-geometry item.
+- `dagon.graphics.terrain`, `heightmap`, `billboard`: terrain and camera-facing
+  quads.
+- `ae.sys.paths`, `ae.sys.config`, `ae.sys.benchmark`: user directories,
+  configuration and timing.
+- `gamut`: image codecs and texture formats.
+
+None of it is dropped in whole: dagon targets OpenGL and owns its own scene
+graph, and dlib's containers predate ranges. The gain is the algorithm, its
+tests and the corner cases already paid for.
+
 ## Content formats
 
 ### Godot 4 scenes
@@ -281,6 +321,9 @@ only and never walks the scene tree.
       collider and node.
 - [x] Broadphase: median split on the longest axis, leaf size 4, triangles flattened
       into the same tree with their collider id.
+- [ ] Compare `pukan.physics.bvh` with `dagon.collision.bvh` (SAH, generic, with
+      box, sphere and ray traversal) before growing it further; keep ours only
+      where the Vulkan no-allocation and streaming rebuild demands differ.
 - [ ] Narrowphase: analytic plane and sphere, segment-triangle distance for a capsule
       against a mesh, GJK distance for separated convex pairs plus conservative
       advancement; `intrMPR` from `dlib.geometry` supplies the penetration normal when
@@ -749,7 +792,9 @@ Order: coordinates and the cell partition first, because everything else
 addresses cells; then loading and unloading under a per-frame budget; then the
 spatial index and GPU-driven draws; then LOD, occlusion, shadows and collision
 streaming on top. Every slice is measured at cell borders, where its cost shows
-up.
+up. Before each slice, read the matching reference named in
+`## Look at the dependencies first`: `dagon.openworld` for the cell grid,
+`dagon.collision.bvh` for the index and `dagon.graphics.lod` for LOD.
 
 - **Cells and coordinates**
   - [ ] A cell grid owned by `Scene`: a fixed cell size, a level origin and the
