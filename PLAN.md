@@ -37,6 +37,10 @@ RSRC 5/6), `.ctex` (CompressedTexture2D), imported `.glb`/`.gltf`/`.obj`
 references, and `.pck` archives. `res://` resolves inside the project directory
 or the pack.
 
+Collision bodies and shape resources are decoded for the Mover, see
+`#### Colliders from Godot` under `## Mover`. They are not visual content and
+stay out of the draw tree.
+
 #### Phase 1: text scenes, static geometry and materials
 
 - [ ] External `.obj` references.
@@ -119,6 +123,9 @@ Fixtures live in `demo_godot/godot_samples/`.
 - [ ] Interior fixture: a room assembled from CC0 Kenney furniture with omni
       lights and a camera, to test many small glTF instances and indoor light
       falloff.
+- [ ] `character/`: a small level with a `StaticBody3D` floor, ramp, stairs, a
+      wall and crates, plus a `CharacterBody3D` spawn marker and a `Camera3D`,
+      for the Mover slice. The platformer stage stays the `GridMap` case.
 - [ ] `combined.tscn` instancing `lights_and_shadows/test.tscn`,
       `platformer/enemy/enemy.tscn` and `generated/procedural.tscn` in one
       scene, for composition checks. Godot cannot reference resources across
@@ -177,6 +184,37 @@ From Unreal Mover (architecture):
 Expect more project-side code than CMC: the engine supplies the simulation and the
 command contract, not a binding system.
 
+### First playable slice
+
+The slice is a kinematic capsule that walks, jumps, falls and climbs steps on a
+loaded Godot level. Only static and kinematic colliders react. Rigid-body
+dynamics, joints, ragdolls, vehicles and networked movement stay out until the
+capsule is solid.
+
+Current state: `godot_scene` decodes no collision nodes or shape resources,
+`GodotScene` draws from immutable node transforms, and there is no collision
+world, motor, fixed tick or character input. The work therefore runs in this
+order: fixed tick and world state, collision data and queries, motor, input and
+camera, then animation.
+
+Decided for the slice:
+
+- own narrowphase and BVH, with no physics engine dependency; `dlib.geometry`
+  supplies support functions but has no sweep;
+- static and kinematic colliders only, no rigid-body island solver;
+- Y up and a capsule preset, while the core stays shape and actor agnostic;
+- level collision comes from Godot body nodes and `GridMap` items, mesh
+  fallback is opt-in;
+- the character is a separate drawable driven by the body transform, not a
+  mutable node of the loaded scene;
+- moving platforms follow jump and slide in Phase 2, root motion stays in
+  Phase 4.
+
+Done when `demo_godot --character` spawns on the platformer stage and on the
+`character/` fixture, walks up and down the ramp, jumps onto a crate, slides
+along walls without leaving the level, and keeps a stable fixed tick while the
+frame rate changes.
+
 ### Shape and the default character set
 
 Mover is actor-type and shape agnostic. CMC requires an `ACharacter` and a capsule; the
@@ -187,12 +225,78 @@ Mover core.
       one, and with no collision at all.
 - [ ] `BodyShape` covers capsule, box, sphere and cylinder, plus `none`. Modes declare
       which shapes they support, so a car or a projectile uses the same core.
-- [ ] The up axis is configurable per body; the default character set assumes Z up and a
-      vertical capsule, like CMC.
+- [ ] The up axis is configurable per body; the default character set uses Y up, like
+      Godot, and a vertical capsule.
+- [ ] Godot shape semantics: the capsule stores a radius and a total height including
+      both hemispheres, the box stores full extents, matching `CapsuleShape3D` and
+      `BoxShape3D`.
+- [ ] The default character preset is a 0.4 m radius, 1.8 m capsule with a 1.6 m eye
+      height and collision layer 1, matching the scale of the Godot fixtures.
 - [ ] The default character set is an optional preset: capsule plus walking, falling,
       flying and swimming, matching CMC behavior for humanoids.
 - [ ] Other presets (vehicle, projectile, quadruped, flying pawn) assemble modes without
       the character set and without a capsule.
+
+### Collision world
+
+`pukan.physics` owns shapes, the broadphase and the queries. It knows nothing
+about Godot, rendering or the motor. `godot_scene` decodes collision nodes and
+shape resources and adds them with world transforms. `mover` consumes queries
+only and never walks the scene tree.
+
+- [ ] `CollisionShape` covers sphere, capsule, box, cylinder, convex point set,
+      triangle mesh, world boundary plane and none.
+- [ ] `Collider` stores the world transform, the shape, the collision layer and mask,
+      the owning node and whether it is static or kinematic.
+- [ ] `CollisionWorld` keeps one static BVH over primitive AABBs and mesh triangles,
+      built after the level loads; a changed kinematic collider refits its leaf or
+      rebuilds the tree.
+- [ ] `RayHit` and `ShapeCastHit` share time of impact, point, normal, penetration depth,
+      collider and node.
+- [ ] Broadphase: median split on the longest axis, leaf size 4, triangles flattened
+      into the same tree with their collider id.
+- [ ] Narrowphase: analytic plane and sphere, segment-triangle distance for a capsule
+      against a mesh, GJK distance for separated convex pairs plus conservative
+      advancement; `intrMPR` from `dlib.geometry` supplies the penetration normal when
+      they overlap. No SAT fallback until a test demands it.
+- [ ] Shape casts for sphere, capsule, box and cylinder; a capsule is a segment plus a
+      radius. Each cast advances at most 16 steps and starts from the swept AABB.
+- [ ] Overlap query for triggers, spawn checks and crouch clearance.
+- [ ] Collision layers are the 32-bit Godot bitmasks; a query takes a mask and matches
+      when `layer & mask` is non-zero.
+- [ ] Contact normals point out of the collider toward the body, like Godot's
+      `KinematicCollision3D`.
+- [ ] Numeric defaults follow Godot: safe margin 0.001 m, floor max angle 45 degrees,
+      floor snap 0.1 m, wall minimum slide angle 15 degrees, at most 4 slides.
+- [ ] Reuse `dlib.math` types and `dlib.geometry` support functions; dlib's MPR only
+      detects overlap and has no sweep, so the swept narrowphase is ours.
+
+#### Colliders from Godot
+
+- [ ] `StaticBody3D`, `AnimatableBody3D` and `RigidBody3D` (as a static snapshot) decode
+      `collision_layer`, `collision_mask` and their `CollisionShape3D` children.
+- [ ] Shapes: `BoxShape3D` full extents, `SphereShape3D` radius, `CapsuleShape3D` radius
+      and total height, `CylinderShape3D`, `ConvexPolygonShape3D` points,
+      `ConcavePolygonShape3D` triangles and `WorldBoundaryShape3D` plane.
+- [ ] Shape resources resolve from sub-resources and external `.tres`/`.res`, text and
+      binary, the same way meshes and materials do.
+- [ ] `CollisionShape3D` applies its local transform and honors `disabled`.
+- [ ] `GridMap` adds the `MeshLibrary` `item/N/shapes` pairs at each occupied cell,
+      reusing the cell transform and 24-way orientation the visual cells already
+      compute.
+- [ ] Nested `GodotScene` instances are traversed once, with the same instance transform
+      the draw path uses, so collision does not depend on how the scene nests.
+- [ ] Collision data lives on `GodotNode` and needs no device, so a headless server can
+      load a level and build the same world without Vulkan.
+- [ ] `GodotLoadOptions.collisionFromMeshes` turns a `MeshInstance3D` without a body into
+      a concave collider; off by default because the town would pay for every tree.
+- [ ] glTF instances can contribute concave colliders behind their own option, off by
+      default for the same reason.
+- [ ] `RayCast3D` becomes a ray query for the camera spring arm and debug, not a
+      collider.
+- [ ] `Area3D` volumes are query-only; they never block the body.
+- [ ] Rigid bodies stay static snapshots in the slice; moving them, joints and
+      body-to-body contacts are a later backend.
 
 ### Movement modes as modules
 
@@ -270,9 +374,16 @@ animation delta replaces the usual input and physics velocity for that step.
 
 ### Design
 
+- [ ] `pukan.physics.shapes`: `CollisionShape`, `ShapeKind`, `Collider`, shape
+      construction and bounds.
+- [ ] `pukan.physics.bvh`: static BVH with median split and primitive or triangle leaves.
+- [ ] `pukan.physics.narrowphase`: segment-triangle distance, GJK distance, conservative
+      advancement and the plane and sphere fast paths.
+- [ ] `pukan.physics.world`: `CollisionWorld`, `RayHit`, `ShapeCastHit`, `Contact`, layer
+      filtering and queries.
 - [ ] `pukan.mover`: `MoverComponent` owns a `BodyShape` and a `MoveState`; `MoveInput` is
-      the project-filled command contract; `MoverComponent` runs one fixed-step update and
-      hands each move to a `MoverBackend`.
+      the project-filled command contract; one fixed step runs the selected mode and
+      modifiers, then hands the move to a `MoverBackend`.
 - [ ] `pukan.character`: optional default preset. It configures `MoverComponent` with a
       capsule and supplies `CharacterInput`, `CharacterMovementConfig` and the walking,
       falling, flying and swimming modes for CMC parity.
@@ -285,13 +396,18 @@ animation delta replaces the usual input and physics velocity for that step.
 - [ ] `MoverBackend` interface: a local backend runs a move immediately, and a replay
       backend can rerun recorded moves. The core never talks to sockets; the network
       implementation belongs to `## Networking`.
-- [ ] The default character preset places the capsule origin at the feet, so scene
-      transforms and camera offsets match Godot.
-- [ ] `CollisionWorld`: BVH over mesh triangles and primitive colliders (box, sphere,
-      capsule, cylinder, plane), with collision layers and masks.
-- [ ] Queries: ray, sphere and shape sweeps for capsule, box, sphere and cylinder; a
-      swept shape returns time of impact, point, normal, penetration depth, shape and
-      node. Reuse `dlib.geometry` where it fits; add the missing narrowphase.
+- [ ] `pukan.physics.simulation`: `Simulation` owns the collision world and the fixed
+      tick: a 60 Hz accumulator clamped to 8 steps per frame, the body list and the
+      interpolation alpha. `Scene` stays a renderer and does not tick.
+- [ ] The default character preset places the capsule bottom at the body origin, so a
+      scene transform is a feet position and camera offsets match Godot. The shape center
+      is offset by the radius plus half the cylinder.
+- [ ] The character is a separate drawable (a glTF model or a debug capsule) drawn with
+      the interpolated body transform, not a node of the loaded scene. Node transform
+      writeback is only needed for moving platforms.
+- [ ] `demo_godot` builds the collision world from the loaded scene, spawns the preset at
+      `--spawn` or at the first `CharacterBody3D`/`Marker3D`, and steps the simulation
+      before `drawNextFrame`.
 - [ ] `CharacterControls` is a demo-side mapper from GLFW keys and mouse to the default
       preset's `CharacterInput`; the motor consumes the command and never opens a device.
       The camera rigs read the same command.
@@ -300,66 +416,71 @@ animation delta replaces the usual input and physics velocity for that step.
 
 ### Phases
 
+#### Phase 0: fixed tick and world state
+
+- [ ] `Simulation` with the fixed 60 Hz accumulator, a clamp of 8 steps per frame and a
+      render interpolation alpha.
+- [ ] `MoverComponent` stores the previous and current transform; rendering interpolates
+      position and orientation.
+- [ ] `demo_godot` gets `--physics-hz` and `--fixed-step` and steps the simulation before
+      recording the frame.
+- [ ] An empty capsule with no collision follows the tick and interpolates in the demo.
+
 #### Phase 1: collision world
 
-- [ ] Build `CollisionWorld` from `GodotScene` mesh triangles and from decoded collision
-      shapes.
-- [ ] Decode `StaticBody3D`, `AnimatableBody3D`, `RigidBody3D` and `Area3D`, their
-      `CollisionShape3D` children, and `BoxShape3D`, `SphereShape3D`, `CapsuleShape3D`,
-      `CylinderShape3D`, `ConvexPolygonShape3D`, `ConcavePolygonShape3D` and
-      `WorldBoundaryShape3D`.
-- [ ] `GridMap` cell collision and `collision_layer`/`collision_mask` filtering.
-- [ ] Fall back to mesh triangles for `MeshInstance3D` without collision shapes, behind
-      a switch for fixtures that have none.
+- [ ] Decode the Godot body nodes and shape resources from `#### Colliders from Godot`.
+- [ ] `CollisionWorld` BVH, ray query, shape cast and overlap query.
+- [ ] Build the world from `GodotScene`, including `GridMap` cells.
+- [ ] Unit tests for every shape pair, ray hit and cast time of impact; a triangle mesh
+      floor, a box wall, a ramp and a capsule.
+- [ ] Measure the BVH build time on the platformer stage and the town, and the cast cost.
+- [ ] `demo_godot --debug-collision` draws every collider and the result of a camera ray.
 
 #### Phase 2: kinematic motor
 
 - [ ] Movement mode modules and `MovementTransition`s with per-mode gravity, friction,
       acceleration and floor rules.
+- [ ] `motionMode` grounded and floating: grounded uses floor state, snap and slope
+      rules; floating ignores them.
 - [ ] Acceleration, braking, ground friction and air control; sprint and walk speeds.
 - [ ] `moveAndSlide`: iterative collide-and-slide with contact planes, `safeMargin`,
-      `maxSlides`, floor/wall/ceiling classification and blocking-hit results.
+      `maxSlides`, floor/wall/ceiling classification, blocking hits and slide projection.
 - [ ] Step-up over `maxStepHeight`, floor snap after leaving the ground, walkable floor
-      angle and slope sliding.
-- [ ] Jump with velocity, hold time, multiple jumps, jump buffer and coyote time.
-- [ ] Crouch changes the body shape height (the capsule in the default character set)
-      and checks the ceiling before standing up.
-- [ ] Moving platform velocity, floor locking and platform rotation.
+      angle, slope sliding and `floorStopOnSlope`.
+- [ ] Jump with velocity, variable hold, multiple jumps, jump buffer and coyote time.
+- [ ] Crouch changes the capsule height and checks the ceiling before standing up.
+- [ ] Moving platform velocity, floor locking and platform rotation with
+      `AnimatableBody3D` writeback.
+- [ ] Unit tests: walk up a ramp, stop on a slope, step onto a crate, jump and land,
+      slide along a wall, crouch under a ledge, ride a platform.
 
 #### Phase 3: input, camera and demo
 
-- [ ] First-person camera with eye height and third-person camera with a spring arm.
-- [ ] `demo_godot`: `--character` and `--third-person`, spawn the default character
-      preset on the platformer stage, show its shape and contacts in a debug mode.
-- [ ] The same `CharacterInput` drives the default character preset and both camera
-      rigs; the demo mapper switches control between them without built-in input maps. A
-      mode switch returns control to the free camera without losing the character state.
+- [ ] `CharacterInput` from GLFW: WASD, mouse look, Space, Shift and Ctrl.
+- [ ] First-person camera at eye height and third-person camera with a collision-aware
+      spring arm.
+- [ ] `demo_godot --character` and `--third-person` spawn the preset on the platformer
+      stage; a mode switch returns to the fly camera without losing the body state.
+- [ ] Debug draw of the capsule, contacts, normals, velocity, floor state, movement mode
+      and active action; OSD counters once the 2D overlay exists.
 
-#### Phase 4: animation, root motion, replay and verification
+#### Phase 4: animation, root motion and replay
 
-- [ ] Root-motion extraction and the layered actions from `### Root motion`; blend
-      trees receive speed and floor state; attach the skeleton to the body root.
-- [ ] Unit tests for every shape pair, sweep, slide, step-up and snap; also test
-      root-motion modes and action cancellation. Golden traces from a fixed input
-      sequence.
-- [ ] Fixed timestep with render interpolation. Record input, body state, active action
-      and camera in the PNG metadata planned for the demo, so a run can be replayed
-      exactly.
-- [ ] Debug draw: body shape, contacts, normals, velocity, floor state, movement mode,
-      active action and root-motion delta; OSD counters once the 2D overlay exists.
+- [ ] Root-motion extraction and the layered actions from `### Root motion`; blend trees
+      receive speed and floor state; attach the skeleton to the body root.
+- [ ] Animated walk, idle, jump and fall for the demo character.
+- [ ] Golden traces from a fixed input sequence, plus tests for root-motion modes and
+      action cancellation.
+- [ ] Record input, body state, active action and camera in the PNG metadata planned for
+      the demo, so a run can be replayed exactly.
 
-Questions:
+Open questions:
 
-- Own narrowphase and solver, or a physics library? Start with shape-specific sweeps and
-  a small kinematic solver; the body needs queries, not a rigid-body island solver.
-- Which shapes must the first version support: is a capsule enough for the default
-  character set, or should box and cylinder land with it?
-- Are moving platforms in the first version, and does root motion land before or after
-  them?
-- Should collision come only from `GodotScene`, or also from glTF instances in the
-  same `CollisionWorld`?
-- Which non-character preset proves the core is shape-agnostic: a vehicle, a projectile
-  or a flying pawn?
+- Does exact numeric parity with Godot's `move_and_slide` matter, or is the same
+  behavior with our own step-up and slide enough?
+- Does the slice need a second preset (vehicle, projectile or flying pawn) to prove the
+  core is shape agnostic, or is that a follow-up?
+- Is a capsule enough for the first slice, or must a box body ship with it?
 
 ## Geometric algebra: PGA and CGA
 
