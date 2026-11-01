@@ -862,15 +862,17 @@ explicit and defaults to 100 MB.
 ### Compute pipelines
 
 Compute kernels go through the same registry. `Compute` takes a `ShaderDecl`
-and the `PipelineFactory`, then asks for a `ComputePipelineCfg`; the factory
-interns the kernel by its content key and returns one `VkPipeline` per key. The
-key is the shader sum, bindings, push constants and specialization, with no
-class name and no render target. `shaderStage!"name"` supplies the `.sum`, so a
-changed compute shader invalidates its record like a graphics one. Every
-`SkinMatrices` with the same shader shares one pipeline.
+and the `PipelineFactory`, declares the kernel layouts, and compiles the
+pipeline on first dispatch. The factory interns the kernel by its content key
+and returns one `VkPipeline` per key. The key is the shader sum, bindings, push
+constants and specialization, with no class name and no render target.
+`shaderStage!"name"` supplies the `.sum`, so a changed compute shader
+invalidates its record like a graphics one. Every `SkinMatrices` with the same
+shader shares one pipeline.
 
-- [ ] Add compute keys to the warmup and `required` sets, and make compute
-      kernels lazy if a scene wants to defer them.
+`PipelineFactory.eagerCompute` is set for the `all` and `required` policies, so
+their compute kernels compile at declaration; `off` and `scene` keep them lazy
+until the first dispatch.
 
 ### Pipeline warmup policy
 
