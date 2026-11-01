@@ -848,6 +848,14 @@ and validates before `Scene` returns; `required` waits when the application
 installs the set; `scene` warms each loaded object and the first frame waits
 for the remainder.
 
+`all` and `required` currently warm both the glTF and Godot families, because
+`PbrFactory` owns both sets. The family has to become part of the compile-time
+set before a glTF-only application can skip the Godot variants.
+
+- [ ] Put the family in the variant set: `PbrFamily { gltf, godot }` and
+      `PbrVariantSpec { family, kind }`. `GltfFactory` declares glTF groups;
+      `GodotFactory` declares Godot groups plus glTF for imported instances.
+      Then `all` and `required` warm only the families in the set.
 - [ ] Include third-party technique variants in `Variants!`. For now only the
       built-in `PbrVariant` groups are listed.
 
