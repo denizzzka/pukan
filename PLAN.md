@@ -991,21 +991,6 @@ against the plain version it replaces.
 Not parallelized: present, event polling, swapchain maintenance, pipeline and
 shader creation.
 
-## User directories
-
-`FilePipelineCacheStore.defaultDirectory` reads `XDG_CACHE_HOME` or `HOME` on
-POSIX and `LOCALAPPDATA` on Windows. Config, data, logs and screenshots need
-the same answer, and the right one differs per platform and packaging (Flatpak,
-Snap, macOS application containers), so it belongs in one place rather than in
-each caller.
-
-- [ ] Pick one library, or write the small wrapper, that resolves the cache,
-      config, data and log roots per platform; `xdgpaths` covers the XDG case.
-- [ ] Route the pipeline cache, config, data, logs and screenshots through it.
-- [ ] Keep the roots overridable from the environment and from a command-line
-      switch, so a portable build and tests do not share state with an
-      installed copy.
-
 ## Pipeline libraries
 
 Long term, optional: `VK_KHR_pipeline_library` together with
@@ -1191,6 +1176,25 @@ The README asks for builds assembled from the features a project uses.
       and the ambient tint when the scene has no environment, and turn the
       tonemap mode into a variant or a specialization constant instead of a
       runtime branch. A build without environments should carry neither.
+
+## Module selection
+
+`pukan/package.d` and `pukan/vulkan/package.d` re-export everything, and 38
+library files import the `pukan.vulkan` umbrella themselves, so any entry point
+reaches 93 of the 94 modules. Importing one module costs what importing the
+whole engine costs.
+
+- [ ] Replace the internal `import pukan.vulkan;` and `import pukan;` with
+      explicit imports. That alone drops the closure to 35 modules from
+      `pukan.scene`, 28 from `pukan.gltf` and 18 from `pukan.vulkan.core`,
+      with no public API change.
+- [ ] Then decide whether the two umbrellas stay as an opt-in import or go.
+      Deleting them breaks `import pukan;` and makes the module layout part of
+      the contract, so it comes after the internal cleanup.
+- `public import` and plain `import` compile the same; only deleting a line
+  helps. The library build compiles all sources either way, so the gain is on
+  the application side: 3.2 s against 0.4 s and 5 MB against 0.6 MB for a
+  trivial app.
 
 ## Offscreen output
 
