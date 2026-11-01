@@ -29,8 +29,7 @@ else
     enum pipelineWarmupPolicy = PipelineWarmupPolicy.scene;
 
 enum bool pipelineWarmupEnabled = pipelineWarmupPolicy != PipelineWarmupPolicy.off;
-enum bool pipelineWarmupPerScene = pipelineWarmupPolicy == PipelineWarmupPolicy.scene ||
-    pipelineWarmupPolicy == PipelineWarmupPolicy.required;
+enum bool pipelineWarmupPerScene = pipelineWarmupPolicy == PipelineWarmupPolicy.scene;
 enum bool pipelineWarmupEverything = pipelineWarmupPolicy == PipelineWarmupPolicy.all;
 enum bool pipelineWarmupRequired = pipelineWarmupPolicy == PipelineWarmupPolicy.required;
 

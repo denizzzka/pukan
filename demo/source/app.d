@@ -23,6 +23,7 @@ import std.stdio;
 import std.string: fromStringz, toStringz;
 
 alias appRequirements = Requirements!(SwapChain, GltfFactory, FrameBuilder, SphereRenderer, CylinderRenderer);
+alias appPipelineVariants = Variants!(PbrFactory);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
 else alias DebugEntities = AliasSeq!();
 
@@ -286,6 +287,8 @@ void main(string[] args) {
             benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
         );
     scope(exit) destroy(scene);
+
+    scene.warmVariants!appPipelineVariants();
 
     shadowsOn = !noShadows;
     scene.gltfFactory.preloadShadows = shadowsOn;

@@ -841,9 +841,12 @@ Open questions:
 
 The compile-time policy is `off | scene | all | required`, default `scene`.
 
-- [ ] `Variants!(Modules...)`: the requirements-like union of `alias
-      pipelineVariants` that defines the `required` set. Until it lands,
-      `required` uses the scene query as its set.
+`required` takes its set from `Variants!(Modules...)`, the union of each
+module's `alias pipelineVariants`. A drawable that needs a group outside the
+union throws when it draws, which also covers scenes loaded later.
+
+- [ ] Include third-party technique variants in `Variants!`. For now only the
+      built-in `PbrVariant` groups are listed.
 
 ### Pipeline cache strategies
 

@@ -2,7 +2,7 @@ module pukan.scene;
 
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
-import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene;
+import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired;
 import pukan.ibl: createIblTextures, IblTextures;
 import pukan.mesh: MeshResources;
 import pukan.oit: DepthResolve, OitFrame, OitResolve;
@@ -986,6 +986,13 @@ class Scene
     void captureFrame(string path)
     {
         pendingScreenshotPath = path;
+    }
+
+    /// Queues the compile-time variant set for the required policy
+    void warmVariants(Variants...)()
+    {
+        static if(pipelineWarmupRequired)
+            pbrFactory.warmVariants!Variants();
     }
 
     private void recordPendingScreenshot(ref Frame frame)

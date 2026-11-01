@@ -11,6 +11,7 @@ import std.stdio: writeln;
 import std.string: toStringz;
 
 alias appRequirements = Requirements!(SwapChain, GodotFactory, FrameBuilder);
+alias appPipelineVariants = Variants!(PbrFactory);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
 else alias DebugEntities = AliasSeq!();
 
@@ -328,6 +329,8 @@ void main(string[] args)
     else
         scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat);
     scope(exit) destroy(scene);
+
+    scene.warmVariants!appPipelineVariants();
 
     scene.sunShadow.enabled = !noShadows;
     scene.sunShadow.cache = true;
