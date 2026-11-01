@@ -839,16 +839,21 @@ Open questions:
 
 ### Pipeline creation
 
-`PbrFactory` currently builds both profiles' `PbrPipelines` itself. Move the
-construction into a separate module; `PbrFactory` keeps resources, materials
-and the descriptor allocator. `GltfFactory` and `GodotFactory` still receive the
-resulting set, but do not own the builder.
+Pipeline creation is not PBR-specific. Move it into a generic `Pipelines`
+module (`pukan.pipelines` or `pukan.pipeline_set`): it owns `PipelineId`,
+`LazyPipeline` slots, creation, interning, warming and caching. `PbrFactory`
+keeps the PBR semantic table that maps material state to `PipelineId`s, and
+background, OIT and primitives use the same `Pipelines`. `PbrPipelines` is not
+the creation layer; it is the PBR table.
 
 - [ ] Move `createGltfPipelines`, `createGodotPipelines`, `createShadows`,
-      `createVariants` and the shader stage helpers into a new module.
-- [ ] Deduplicate identical pipelines by `PipelineId` after the move. Currently
-      `declare` creates a new technique for every call, so the same shader set
-      from different profiles produces separate `VkPipeline`s.
+      `createVariants` and the shader stage helpers into the generic
+      `Pipelines` module.
+- [ ] Make `PbrPipelines` the PBR semantic table; the generic container is
+      `Pipelines`.
+- [ ] Deduplicate identical pipelines by `PipelineId` in the generic layer.
+      Currently `declare` creates a new technique for every call, so the same
+      shader set from different profiles produces separate `VkPipeline`s.
 
 ### Compile-time PipelineId
 
@@ -865,8 +870,8 @@ with the fixed state and bindings.
       `PipelineCacheStore` record.
 - [ ] On load compare the stored hash with the sums of the current shaders; a
       mismatch invalidates the record and forces recompilation.
-- [ ] Intern `PipelineFactory` techniques by `PipelineId`, so identical shader
-      sets return the same `TechniqueId` and `VkPipeline`.
+- [ ] Intern pipelines in the generic `Pipelines` layer by `PipelineId`, so
+      identical shader sets return the same `VkPipeline`.
 - [ ] Keep the shader `PipelineId` target-independent; `PipelineKey` combines
       it with the render target, so the same shaders on another target still
       need their own `VkPipeline`.
