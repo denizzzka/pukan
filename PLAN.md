@@ -859,6 +859,19 @@ explicit and defaults to 100 MB.
 - [ ] Move the registry out of `pukan.vulkan.pipelines` into a generic
       `pukan.pipelines` module.
 
+### Compute pipelines
+
+Compute kernels go through the same registry. `Compute` takes a `ShaderDecl`
+and the `PipelineFactory`, then asks for a `ComputePipelineCfg`; the factory
+interns the kernel by its content key and returns one `VkPipeline` per key. The
+key is the shader sum, bindings, push constants and specialization, with no
+class name and no render target. `shaderStage!"name"` supplies the `.sum`, so a
+changed compute shader invalidates its record like a graphics one. Every
+`SkinMatrices` with the same shader shares one pipeline.
+
+- [ ] Add compute keys to the warmup and `required` sets, and make compute
+      kernels lazy if a scene wants to defer them.
+
 ### Pipeline warmup policy
 
 The compile-time policy is `off | scene | all | required`, default `scene`.
