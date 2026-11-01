@@ -47,6 +47,7 @@ struct QuakeMoveState
     Vector3f position;
     Vector3f velocity;
     bool onGround;
+    bool noclip;
     Vector3f groundNormal = Vector3f(0, 1, 0);
 }
 
@@ -309,6 +310,19 @@ QuakeMoveResult pmMove(
         wishDir = Vector3f(0, 0, 0);
 
     const wishSpeed = min(command.wishSpeed, config.maxSpeed);
+
+    if(state.noclip)
+    {
+        const noclipVelocity = wishDir * wishSpeed;
+        QuakeMoveResult result;
+        result.position = state.position + noclipVelocity * dt;
+        result.velocity = noclipVelocity;
+        result.onGround = false;
+        result.groundNormal = body.up;
+
+        return result;
+    }
+
     bool onGround = state.onGround;
 
     if(onGround)
@@ -449,6 +463,19 @@ unittest
     }
 
     assert(state.position.x < 2.2f);
+
+    state.position = Vector3f(2.2f, 0, 0);
+    state.velocity = Vector3f(0, 0, 0);
+    state.onGround = false;
+    state.noclip = true;
+    walk.wishDir = Vector3f(1, 0, 0);
+    walk.wishSpeed = 4.0f;
+
+    const noclipMove = pmMove(wallWorld, state, walk, 0.5f, body, config);
+
+    assert(noclipMove.position.x > 3.6f);
+    assert(!noclipMove.onGround);
+    state.noclip = false;
 
     auto stepWorld = new CollisionWorld;
     stepWorld.add(Collider(

@@ -179,6 +179,7 @@ void main(string[] args)
     string spawnOption;
     bool walkForward;
     bool fixedStep;
+    bool noclip;
     float physicsHz = 60.0f;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
@@ -202,6 +203,7 @@ void main(string[] args)
         "spawn", "character spawn position, x,y,z", &spawnOption,
         "walk", "hold forward, for headless movement tests", &walkForward,
         "fixed-step", "advance one physics tick per frame", &fixedStep,
+        "noclip", "ignore collision in character mode", &noclip,
         "third-person", "draw the character from behind", &thirdPerson,
         "physics-hz", "fixed character tick rate", &physicsHz,
         "fov", "vertical field of view in degrees", &fovOption,
@@ -536,6 +538,7 @@ void main(string[] args)
         }
 
         mover = new MoverComponent(collisionWorld, characterBody, characterConfig);
+        mover.setNoclip(noclip);
         mover.teleport(spawn);
 
         simulation = new Simulation(collisionWorld);

@@ -31,6 +31,11 @@ final class MoverComponent
         state.groundNormal = body.up;
     }
 
+    void setNoclip(bool enabled)
+    {
+        state.noclip = enabled;
+    }
+
     void teleport(in Vector3f position)
     {
         state.position = position;

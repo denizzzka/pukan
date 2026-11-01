@@ -177,6 +177,21 @@ final class CollisionWorld
         return best;
     }
 
+    /// True when a capsule already overlaps any collider matching `mask`
+    bool overlapCapsule(
+        in Vector3f a,
+        in Vector3f b,
+        float radius,
+        uint mask = uint.max,
+        float margin = 0.001f,
+        out ShapeCastHit hit,
+    ) const
+    {
+        hit = sweepCapsule(a, b, radius, Vector3f(0, 0, 0), mask, margin);
+
+        return hit.hit;
+    }
+
     /// Earliest hit of a moving capsule segment
     ShapeCastHit sweepCapsule(
         in Vector3f a,
@@ -532,4 +547,10 @@ unittest
 
     assert(intoWall.hit);
     assert(intoWall.normal.x < -0.9f);
+
+    ShapeCastHit overlap;
+    assert(world.overlapCapsule(Vector3f(0, 0.4f, 0), Vector3f(0, 1.4f, 0), 0.4f,
+        uint.max, 0.001f, overlap));
+    assert(!world.overlapCapsule(Vector3f(0, 5, 0), Vector3f(0, 6, 0), 0.4f,
+        uint.max, 0.001f, overlap));
 }

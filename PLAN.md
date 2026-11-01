@@ -211,8 +211,8 @@ sweeps, layer filtering and a fixed-step `Simulation`; `godot_scene` decodes
 `GridMap` item shapes; `pukan.mover.quake` has `pmMove`, friction,
 acceleration, air acceleration, clip velocity and step-slide; `demo_godot
 --character` walks a capsule on the platformer stage and on the `character/`
-movement gym, up its stairs and ramp, in first or third person. Missing: water, noclip, crouch, moving
-platforms, mesh fallback, overlap queries and debug draw.
+movement gym, up its stairs and ramp, in first or third person. Missing: water,
+crouch, moving platforms, mesh fallback and debug draw.
 
 Decided for the slice:
 
@@ -292,7 +292,7 @@ only and never walks the scene tree.
 - [ ] `PlaneCollider` and convex brush colliders are optional for Quake-style maps; the
       first slice uses Godot triangles and primitives.
 - [x] Box colliders are required for `GridMap`, crates and walls; a box body is not.
-- [ ] Overlap query for triggers, spawn checks and crouch clearance.
+- [x] Overlap query for triggers, spawn checks and crouch clearance.
 - [x] Collision layers are the 32-bit Godot bitmasks; a query takes a mask and matches
       when `layer & mask` is non-zero.
 - [x] Contact normals point out of the collider toward the body, like Godot's
@@ -347,7 +347,7 @@ only and never walks the scene tree.
       special-case code.
 - [ ] `water`: reduced gravity, water friction and buoyancy, swim up and down, no
       step-up or floor snap; leaving the volume switches back to `air` or `ground`.
-- [ ] `noclip`: no collision, free 3D movement and no floor state, for spectating and
+- [x] `noclip`: no collision, free 3D movement and no floor state, for spectating and
       debug.
 - [ ] `custom`: bypasses the built-in motor entirely: no gravity, friction, floor checks
       or automatic collision response. A `CustomMovement` hook receives the body, input
