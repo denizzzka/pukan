@@ -1,4 +1,4 @@
-import dlib.math: Matrix4x4f, Vector3f, Vector4f, scaleMatrix, translationMatrix;
+import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix, scaleMatrix, translationMatrix;
 import pukan;
 import pukan.mover.component: MoverComponent;
 import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
@@ -8,6 +8,8 @@ import pukan.physics.world: CollisionWorld;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
+import std.algorithm: min;
+import std.math: atan2;
 import std.exception: enforce;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
@@ -180,6 +182,7 @@ void main(string[] args)
     bool walkForward;
     bool fixedStep;
     bool noclip;
+    bool noSpringArm;
     string modelOption;
     float physicsHz = 60.0f;
     float fovOption = cameraFov;
@@ -205,6 +208,7 @@ void main(string[] args)
         "walk", "hold forward, for headless movement tests", &walkForward,
         "fixed-step", "advance one physics tick per frame", &fixedStep,
         "noclip", "ignore collision in character mode", &noclip,
+        "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
         "model", "character model path; defaults to CesiumMan", &modelOption,
         "third-person", "draw the character from behind", &thirdPerson,
         "physics-hz", "fixed character tick rate", &physicsHz,
@@ -365,7 +369,9 @@ void main(string[] args)
 
     GlTF characterModel;
     Vector3f characterModelOffset;
-    float characterModelScale = 1.0f;
+    float characterModelScaleX = 1.0f;
+    float characterModelScaleY = 1.0f;
+    float characterModelScaleZ = 1.0f;
 
     if(characterMode)
     {
@@ -438,8 +444,20 @@ void main(string[] args)
 
         if(bounds.min.y == bounds.min.y && bounds.max.y > bounds.min.y)
         {
-            characterModelScale = 1.8f / (bounds.max.y - bounds.min.y);
-            characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScale, 0);
+            characterModelScaleY = 1.8f / (bounds.max.y - bounds.min.y);
+
+            const width = bounds.max.x - bounds.min.x;
+            const depth = bounds.max.z - bounds.min.z;
+            const capsuleDiameter = 0.8f;
+
+            characterModelScaleX = width > 0.0f
+                ? min(characterModelScaleY, capsuleDiameter / width)
+                : characterModelScaleY;
+            characterModelScaleZ = depth > 0.0f
+                ? min(characterModelScaleY, capsuleDiameter / depth)
+                : characterModelScaleY;
+
+            characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScaleY, 0);
         }
     }
 
@@ -564,6 +582,10 @@ void main(string[] args)
     double characterCursorY = 0.0;
     bool characterCursorKnown;
     float characterMaxHeight = -float.infinity;
+    float characterYaw = 0.0f;
+    float thirdPersonDistance = 6.0f;
+    bool characterVisible = true;
+    Vector3f characterRenderPosition;
 
     while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
@@ -661,19 +683,47 @@ void main(string[] args)
             });
 
             const alpha = simulation.interpolationAlpha();
-            const eyePosition = mover.eyePosition(alpha);
+
+            // Third person draws the simulated position, so mesh and capsule agree
+            characterRenderPosition = thirdPerson
+                ? mover.state.position
+                : mover.renderPosition(alpha);
+
+            const eyePosition = thirdPerson
+                ? mover.state.position + characterBody.up * characterBody.eyeHeight
+                : mover.eyePosition(alpha);
+
+            Vector3f flatForward = camera.forward;
+            flatForward.y = 0;
+
+            if(flatForward.length > 1e-4f)
+                characterYaw = atan2(flatForward.x, flatForward.z);
 
             if(thirdPerson)
             {
                 const back = -camera.forward;
                 const desired = 6.0f;
-                const hit = collisionWorld.raycast(eyePosition, back, desired,
-                    characterBody.mask);
-                const distance = hit.hit
-                    ? (hit.t > 0.1f ? hit.t - 0.1f : 0.1f)
-                    : desired;
+                float targetDistance = desired;
 
-                camera.position = eyePosition + back * distance;
+                if(!noSpringArm)
+                {
+                    const hit = collisionWorld.raycast(eyePosition, back, desired,
+                        characterBody.mask);
+
+                    if(hit.hit)
+                        targetDistance = hit.t > 0.1f ? hit.t - 0.1f : 0.1f;
+                }
+
+                if(targetDistance < thirdPersonDistance)
+                    thirdPersonDistance = targetDistance;
+                else
+                {
+                    const blend = dt * 6.0f < 1.0f ? dt * 6.0f : 1.0f;
+                    thirdPersonDistance += (targetDistance - thirdPersonDistance) * blend;
+                }
+
+                characterVisible = thirdPersonDistance > 0.75f;
+                camera.position = eyePosition + back * thirdPersonDistance;
             }
             else
                 camera.position = eyePosition;
@@ -684,9 +734,10 @@ void main(string[] args)
         Matrix4x4f characterTransform = Matrix4x4f.identity();
 
         if(characterMode && characterModel)
-            characterTransform = scaleMatrix(Vector3f(characterModelScale, characterModelScale,
-                characterModelScale)) * translationMatrix(
-                    mover.renderPosition(simulation.interpolationAlpha()) + characterModelOffset);
+            characterTransform = scaleMatrix(Vector3f(characterModelScaleX,
+                characterModelScaleY, characterModelScaleZ))
+                * rotationMatrix!float(Axis.y, characterYaw)
+                * translationMatrix(characterRenderPosition + characterModelOffset);
 
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
@@ -723,7 +774,7 @@ void main(string[] args)
                 (buf, phase) {
                     godotScene.drawingBufferFilling(buf, modelViewProj, frame.frameSets[0].descriptorSet, phase);
 
-                    if(characterModel && thirdPerson)
+                    if(characterModel && thirdPerson && characterVisible)
                         characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
                             frame.frameSets[0].descriptorSet, phase);
                 },

@@ -468,8 +468,8 @@ animation delta replaces the usual input and physics velocity for that step.
 
 - [x] `Simulation` with the fixed 60 Hz accumulator, a clamp of 8 steps per frame and a
       render interpolation alpha.
-- [ ] `MoverComponent` runs a fixed `pmove`, stores the previous and current transform,
-      and rendering interpolates position and orientation.
+- [x] `MoverComponent` runs a fixed `pmove` and stores the previous and current
+      position; first-person rendering interpolates it.
 - [x] `demo_godot` gets `--physics-hz` and `--fixed-step` and steps
       the simulation before recording the frame.
 - [ ] An empty capsule with no collision follows the tick and interpolates in the demo.
