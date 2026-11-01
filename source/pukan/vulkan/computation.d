@@ -18,6 +18,8 @@ abstract class Compute
     /// Set when this run compiled the kernel instead of taking a stored record
     bool needsRecompilation;
 
+    private PipelineFactory pipelines;
+    private PipelineKey computeKey;
     private VkWriteDescriptorSet[] pendingWrites;
 
     this(
@@ -28,16 +30,31 @@ abstract class Compute
     )
     {
         device = dev;
+        this.pipelines = pipelines;
 
-        auto cfg = pipelines.acquireCompute(shader, specialization);
+        auto layout = pipelines.declareCompute(shader, specialization);
+
+        computeKey = layout.key;
+        pipelineLayout = layout.pipelineLayout;
+        pushConstantSize = shader.pushConstantRange.size;
+
+        poolAndLayout = device.createDescriptorPool(layout.setLayout, shader.layoutBindings, 1);
+        descriptorSet = device.allocateDescriptorSet(poolAndLayout);
+
+        if(pipelines.eagerCompute)
+            ensurePipeline();
+    }
+
+    private void ensurePipeline()
+    {
+        if(pipeline !is null)
+            return;
+
+        auto cfg = pipelines.acquireCompute(computeKey);
 
         pipeline = cfg.pipeline;
         pipelineLayout = cfg.pipelineLayout;
-        pushConstantSize = shader.pushConstantRange.size;
         needsRecompilation = cfg.needsRecompilation;
-
-        poolAndLayout = device.createDescriptorPool(cfg.setLayout, shader.layoutBindings, 1);
-        descriptorSet = device.allocateDescriptorSet(poolAndLayout);
     }
 
     protected void bindBuffer(uint dstBinding, VkDescriptorType descriptorType, ref VkDescriptorBufferInfo bufferInfo)
@@ -58,6 +75,8 @@ abstract class Compute
 
     protected void dispatch(VkCommandBuffer cmdBuf, const(void)* pushConstants, uint groupsX, uint groupsY, uint groupsZ)
     {
+        ensurePipeline();
+
         vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
         vkCmdBindDescriptorSets(

@@ -236,6 +236,7 @@ class SceneWith(Modules...)
         }
 
         pipelineFactory = new PipelineFactory(device, pipelineCacheManager, pipelineWarmupEnabled);
+        pipelineFactory.eagerCompute = pipelineWarmupEverything || pipelineWarmupRequired;
         frameAllocator = pipelineFactory.createFrameAllocator();
         meshResources = new MeshResources(device);
         ibl = createIblTextures(device);

@@ -155,6 +155,14 @@ struct ComputePipelineCfg
     bool needsRecompilation;
 }
 
+/// Layouts of a declared compute kernel, before its pipeline is compiled
+struct ComputeLayoutCfg
+{
+    PipelineKey key;
+    VkPipelineLayout pipelineLayout;
+    VkDescriptorSetLayout setLayout;
+}
+
 struct TechniqueId
 {
     uint value;
@@ -509,6 +517,10 @@ final class PipelineFactory
         ShaderDecl shader;
         VkDescriptorSetLayout setLayout;
         VkPipelineLayout pipelineLayout;
+        VkSpecializationMapEntry[] specializationEntries;
+        ubyte[] specializationData;
+        VkSpecializationInfo specialization;
+        bool hasSpecialization;
         ComputePipelineCfg cfg;
     }
 
@@ -534,6 +546,9 @@ final class PipelineFactory
     private RenderTarget[] targets;
     private GraphicsPipelineCfg[PipelineInstance] cache;
     private PipelineCacheManager cacheManager;
+
+    /// Compiles a compute kernel when it is declared, before its first dispatch
+    bool eagerCompute;
 
     /// Guards the variant cache, the target list and the preload queue
     private Mutex mutex;
@@ -732,6 +747,32 @@ final class PipelineFactory
         ubyte[32] slot;
     }
 
+    private static VkSpecializationInfo copySpecialization(
+        ref ComputeTechnique technique,
+        VkSpecializationInfo* specialization,
+    )
+    {
+        if(specialization is null)
+            return VkSpecializationInfo.init;
+
+        technique.specializationEntries =
+            specialization.pMapEntries[0 .. specialization.mapEntryCount].dup;
+
+        if(specialization.dataSize)
+        {
+            technique.specializationData.length = specialization.dataSize;
+            technique.specializationData[] =
+                (cast(const ubyte*) specialization.pData)[0 .. specialization.dataSize];
+        }
+
+        return VkSpecializationInfo(
+            mapEntryCount: cast(uint) technique.specializationEntries.length,
+            pMapEntries: technique.specializationEntries.ptr,
+            dataSize: technique.specializationData.length,
+            pData: technique.specializationData.ptr,
+        );
+    }
+
     private static ComputeIdentity computeIdentity(
         ShaderDecl shader,
         VkSpecializationInfo* specialization,
@@ -816,8 +857,8 @@ final class PipelineFactory
         }
     }
 
-    /// Returns the shared compute pipeline for a kernel declaration
-    ComputePipelineCfg acquireCompute(ShaderDecl shader, VkSpecializationInfo* specialization = null)
+    /// Declares a compute kernel and returns its layouts, without compiling it
+    ComputeLayoutCfg declareCompute(ShaderDecl shader, VkSpecializationInfo* specialization = null)
     {
         auto identity = computeIdentity(shader, specialization);
         auto key = identity.key;
@@ -825,12 +866,18 @@ final class PipelineFactory
         synchronized(mutex)
         {
             if(auto found = key in computeByKey)
-                return computeTechniques[*found].cfg;
+            {
+                ref existing = computeTechniques[*found];
+
+                return ComputeLayoutCfg(existing.key, existing.pipelineLayout, existing.setLayout);
+            }
 
             ComputeTechnique entry;
             entry.key = key;
             entry.slot = identity.slot;
             entry.shader = shader;
+            entry.hasSpecialization = specialization !is null;
+            entry.specialization = copySpecialization(entry, specialization);
 
             auto bindings = createLayoutBinding([shader]);
             entry.setLayout = internSetLayout(bindings);
@@ -838,12 +885,30 @@ final class PipelineFactory
                 entry.setLayout,
                 pushConstantRanges([shader]),
             );
-            entry.cfg = createComputePipeline(entry, specialization);
 
             computeTechniques ~= entry;
             computeByKey[key] = computeTechniques.length - 1;
 
-            return entry.cfg;
+            return ComputeLayoutCfg(key, entry.pipelineLayout, entry.setLayout);
+        }
+    }
+
+    /// Returns the shared compute pipeline for a declared kernel
+    ComputePipelineCfg acquireCompute(PipelineKey key)
+    {
+        synchronized(mutex)
+        {
+            auto found = key in computeByKey;
+            assert(found !is null, "compute kernel was not declared");
+
+            ref technique = computeTechniques[*found];
+
+            if(technique.cfg.pipeline !is null)
+                return technique.cfg;
+
+            technique.cfg = createComputePipeline(technique);
+
+            return technique.cfg;
         }
     }
 
@@ -1172,10 +1237,7 @@ final class PipelineFactory
         );
     }
 
-    private ComputePipelineCfg createComputePipeline(
-        ref ComputeTechnique technique,
-        VkSpecializationInfo* specialization,
-    )
+    private ComputePipelineCfg createComputePipeline(ref ComputeTechnique technique)
     {
         debug import core.time: MonoTime;
 
@@ -1183,7 +1245,7 @@ final class PipelineFactory
 
         auto shader = device.uploadShaderDecl(technique.shader);
         auto stage = shader.createShaderStageInfo;
-        stage.pSpecializationInfo = specialization;
+        stage.pSpecializationInfo = technique.hasSpecialization ? &technique.specialization : null;
 
         VkComputePipelineCreateInfo pipelineCreateInfo = {
             sType: VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
