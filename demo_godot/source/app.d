@@ -5,11 +5,12 @@ import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
 import pukan.pbr.pipelines: plainShading;
 import pukan.physics.simulation: Simulation;
 import pukan.physics.world: CollisionWorld;
+import pukan.primitives_tree.lines: LineInstance, LineRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
 import std.algorithm: min;
-import std.math: atan2;
+import std.math: PI, atan2, cos, sin;
 import std.exception: enforce;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
@@ -163,6 +164,70 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
             : "look axis: screen (camera up)");
 }
 
+LineInstance[] capsuleLines(
+    Vector3f feet,
+    QuakeBody body,
+    Vector4f color,
+    float width,
+)
+{
+    LineInstance[] lines;
+    const radius = body.radius;
+    const height = body.height;
+    const up = body.up;
+    const xAxis = Vector3f(1, 0, 0);
+    const zAxis = Vector3f(0, 0, 1);
+    const bottom = feet + up * radius;
+    const top = feet + up * (height - radius);
+
+    void add(Vector3f a, Vector3f b)
+    {
+        lines ~= LineInstance(
+            Vector4f(a.x, a.y, a.z, width),
+            Vector4f(b.x, b.y, b.z, 0),
+            color,
+        );
+    }
+
+    foreach(i; 0 .. 16)
+    {
+        const angle = 2.0f * PI * i / 16.0f;
+        const radial = xAxis * cos(angle) + zAxis * sin(angle);
+        add(bottom + radial * radius, top + radial * radius);
+    }
+
+    foreach(i; 0 .. 32)
+    {
+        const a0 = 2.0f * PI * i / 32.0f;
+        const a1 = 2.0f * PI * (i + 1) / 32.0f;
+        const r0 = xAxis * cos(a0) + zAxis * sin(a0);
+        const r1 = xAxis * cos(a1) + zAxis * sin(a1);
+        add(bottom + r0 * radius, bottom + r1 * radius);
+        add(top + r0 * radius, top + r1 * radius);
+    }
+
+    foreach(i; 0 .. 8)
+    {
+        const angle = PI * i / 8.0f;
+        const radial = xAxis * cos(angle) + zAxis * sin(angle);
+        Vector3f previousBottom = bottom + radial * radius;
+        Vector3f previousTop = top + radial * radius;
+
+        foreach(j; 1 .. 12)
+        {
+            const t = PI * j / 12.0f;
+            const bottomPoint = bottom + radial * (cos(t) * radius) - up * (sin(t) * radius);
+            const topPoint = top + radial * (cos(t) * radius) + up * (sin(t) * radius);
+            add(previousBottom, bottomPoint);
+            add(previousTop, topPoint);
+            previousBottom = bottomPoint;
+            previousTop = topPoint;
+        }
+    }
+
+    return lines;
+}
+
 void main(string[] args)
 {
     string scenePath;
@@ -183,6 +248,7 @@ void main(string[] args)
     bool fixedStep;
     bool noclip;
     bool noSpringArm;
+    bool debugCapsule;
     string modelOption;
     float physicsHz = 60.0f;
     float fovOption = cameraFov;
@@ -209,6 +275,7 @@ void main(string[] args)
         "fixed-step", "advance one physics tick per frame", &fixedStep,
         "noclip", "ignore collision in character mode", &noclip,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
+        "debug-capsule", "draw the character collision capsule", &debugCapsule,
         "model", "character model path; defaults to CesiumMan", &modelOption,
         "third-person", "draw the character from behind", &thirdPerson,
         "physics-hz", "fixed character tick rate", &physicsHz,
@@ -568,6 +635,15 @@ void main(string[] args)
     }
     scope(exit) if(simulation) destroy(simulation);
 
+    LineRenderer debugCapsuleLines;
+
+    if(debugCapsule)
+        debugCapsuleLines = new LineRenderer(
+            device, scene.pipelineFactory, scene.renderPass,
+            scene.swapChain.imageExtent, false, 4096, true);
+
+    scope(exit) if(debugCapsuleLines) destroy(debugCapsuleLines);
+
     if(!offscreen)
         writeln(characterMode
             ? "character: WASD move, right mouse look, Space jump"
@@ -739,6 +815,13 @@ void main(string[] args)
                 * scaleMatrix(Vector3f(characterModelScaleX,
                     characterModelScaleY, characterModelScaleZ));
 
+        if(debugCapsuleLines && characterMode)
+        {
+            debugCapsuleLines.setViewport(scene.swapChain.imageExtent);
+            debugCapsuleLines.setLines(capsuleLines(characterRenderPosition, characterBody,
+                Vector4f(0.2f, 0.85f, 1.0f, 0.45f), 1.5f));
+        }
+
         WorldTransformation wtb;
         wtb.model = Matrix4x4f.identity();
         wtb.view = camera.view;
@@ -777,6 +860,11 @@ void main(string[] args)
                     if(characterModel && thirdPerson && characterVisible)
                         characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
                             frame.frameSets[0].descriptorSet, phase);
+
+                    if(debugCapsuleLines && phase == DrawPhase.surface)
+                        debugCapsuleLines.drawingBufferFilling(buf,
+                            debugCapsuleLines.pipelineCfg, modelViewProj,
+                            frame.frameSets[0].descriptorSet);
                 },
                 null,
                 (buf) {
