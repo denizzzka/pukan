@@ -397,14 +397,18 @@ final class PipelineCacheManager
     VkPipelineCache acquire(PipelineVariantKey identity, out bool needsRecompilation)
     {
         ubyte[] payload;
+        bool shaderChanged = false;
         needsRecompilation = false;
 
         if(store)
             while(true)
             {
+                bool changed;
+
                 try
                 {
-                    payload = store.load(identity);
+                    payload = store.load(identity, changed);
+                    shaderChanged = changed;
                     break;
                 }
                 catch(PipelineCacheLoadException e)
@@ -417,6 +421,11 @@ final class PipelineCacheManager
                     needsRecompilation = true;
                 }
             }
+
+        if(shaderChanged)
+            Instance.log_info(
+                "pipeline cache: " ~ identity.slot.toString() ~
+                " was built from older shaders, recompiling");
 
         if(payload is null)
             needsRecompilation = true;
@@ -999,7 +1008,7 @@ final class PipelineFactory
 
     /**
         What a variant is for the store, not how its creation info is
-        assembled. Shader bytes stay out, the driver keys those itself.
+        assembled. The shader sums change the digest but not the slot.
     */
     private PipelineVariantKey variantIdentity(TechniqueId id, RenderPass renderPass, uint subpass) const
     {
@@ -1014,6 +1023,7 @@ final class PipelineFactory
         {
             builder.add(stage.stage);
             builder.add(stage.pushConstantRange);
+            builder.addShader(stage.checksum);
             builder.addArray(stage.vertexInput.bindings);
             builder.addArray(stage.vertexInput.attributes);
         }

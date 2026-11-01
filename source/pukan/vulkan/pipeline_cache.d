@@ -4,15 +4,15 @@ import pukan.exceptions: PukanException;
 import std.conv: to;
 import std.digest.sha: SHA256, toHexString;
 import std.exception: enforce;
-import std.path: buildPath, baseName, extension, stripExtension;
+import std.path: buildPath, extension;
 import std.uuid: UUID;
 
 /// Layout of the container around a driver pipeline cache blob
 enum pipelineCacheFormatVersion = 1;
 
 
-/// Identifies a pipeline variant by a digest of the state that defines it
-struct PipelineVariantKey
+/// Identifies a pipeline variant regardless of the shader content behind it
+struct PipelineSlotKey
 {
     ubyte[32] digest;
 
@@ -20,15 +20,30 @@ struct PipelineVariantKey
     {
         return cast(string) toHexString(digest.dup);
     }
+}
+
+/// Identifies a pipeline variant by its slot and the shader content behind it
+struct PipelineVariantKey
+{
+    PipelineSlotKey slot;
+    ubyte[32] digest;
+
+    string toString() const
+    {
+        return slot.toString() ~ "-" ~ cast(string) toHexString(digest.dup);
+    }
 
     int opCmp(ref const PipelineVariantKey rhs) const nothrow @safe
     {
+        if(slot.digest[] != rhs.slot.digest[])
+            return slot.digest[] < rhs.slot.digest[] ? -1 : 1;
+
         return digest[] < rhs.digest[] ? -1 : digest[] > rhs.digest[] ? 1 : 0;
     }
 
     size_t toHash() const nothrow @safe
     {
-        return hashOf(digest);
+        return hashOf(digest) ^ hashOf(slot.digest);
     }
 }
 
@@ -36,16 +51,21 @@ struct PipelineVariantKey
 struct PipelineVariantKeyBuilder
 {
     private SHA256 hash;
+    private SHA256 slotHash;
 
     void add(T)(in T value)
     {
-        hash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
+        const bytes = (cast(const ubyte*) &value)[0 .. T.sizeof];
+        hash.put(bytes);
+        slotHash.put(bytes);
     }
 
     void addString(string value)
     {
         add(value.length);
-        hash.put(cast(const ubyte[]) value);
+        const bytes = cast(const ubyte[]) value;
+        hash.put(bytes);
+        slotHash.put(bytes);
     }
 
     void addArray(T)(const(T)[] values)
@@ -56,9 +76,23 @@ struct PipelineVariantKeyBuilder
             add(value);
     }
 
+    /// Adds content that changes the digest but not the slot
+    void addShader(T)(in T value)
+    {
+        hash.put((cast(const ubyte*) &value)[0 .. T.sizeof]);
+    }
+
+    /// Adds a shader blob that changes the digest but not the slot
+    void addShaderBytes(const(ubyte)[] bytes)
+    {
+        addShader(bytes.length);
+        hash.put(bytes);
+    }
+
     PipelineVariantKey finish()
     {
         PipelineVariantKey key;
+        key.slot.digest = slotHash.finish;
         key.digest = hash.finish;
 
         return key;
@@ -78,14 +112,21 @@ align(1) struct PipelineCacheHeader
     char[magicBytes.length] magic;
     uint formatVersion;
     ubyte[16] pipelineCacheUUID;
+    /// Digest of the shader content the record was built from
+    ubyte[32] shaderDigest;
     ulong payloadLength;
 
-    static PipelineCacheHeader create(UUID pipelineCacheUUID, ulong payloadLength)
+    static PipelineCacheHeader create(
+        UUID pipelineCacheUUID,
+        const(ubyte)[32] shaderDigest,
+        ulong payloadLength,
+    )
     {
         PipelineCacheHeader header;
         header.magic[] = magicBytes[];
         header.formatVersion = pipelineCacheFormatVersion;
         header.pipelineCacheUUID = pipelineCacheUUID.data;
+        header.shaderDigest[] = shaderDigest[];
         header.payloadLength = payloadLength;
 
         return header;
@@ -111,9 +152,11 @@ abstract class PipelineCacheStore
         this.pipelineCacheUUID = pipelineCacheUUID;
     }
 
-    /// Returns the blob of a variant, null when the store holds no record
-    ubyte[] load(PipelineVariantKey identity)
+    /// Returns the blob of a variant, null when the store holds no usable record
+    ubyte[] load(PipelineVariantKey identity, out bool shaderChanged)
     {
+        shaderChanged = false;
+
         const bytes = readRecord(identity);
 
         if(bytes is null)
@@ -142,13 +185,19 @@ abstract class PipelineCacheStore
             header.payloadLength == bytes.length - PipelineCacheHeader.sizeof,
             message(identity, "the payload length does not match the file size"));
 
+        if(header.shaderDigest[] != identity.digest[])
+        {
+            shaderChanged = true;
+            return null;
+        }
+
         return bytes[PipelineCacheHeader.sizeof .. $].dup;
     }
 
     /// Replaces the record of a variant with a driver blob
     void save(PipelineVariantKey identity, const(ubyte)[] payload)
     {
-        const header = PipelineCacheHeader.create(pipelineCacheUUID, payload.length);
+        const header = PipelineCacheHeader.create(pipelineCacheUUID, identity.digest, payload.length);
 
         ubyte[] record;
         record.length = PipelineCacheHeader.sizeof + payload.length;
@@ -163,9 +212,6 @@ abstract class PipelineCacheStore
     {
         removeRecord(identity);
     }
-
-    /// Variants the store holds, for progress reporting
-    abstract PipelineVariantKey[] manifest() const;
 
     /// Drops the least recently used records until the store fits its bounds
     void trim()
@@ -244,27 +290,6 @@ final class FilePipelineCacheStore: PipelineCacheStore
             return null;
 
         return buildPath(base, "pukan", "pipelines-v" ~ formatVersion.to!string);
-    }
-
-    override PipelineVariantKey[] manifest() const
-    {
-        import std.algorithm: filter, map, sort;
-        import std.array: array;
-        import std.file: SpanMode, dirEntries, exists, isFile;
-
-        if(!directory.exists)
-            return null;
-
-        auto keys = directory.dirEntries(SpanMode.shallow)
-            .filter!(entry => entry.isFile && entry.name.extension == ".pipelinecache")
-            .map!(entry => entry.name.baseName.stripExtension)
-            .filter!(name => isKeyName(name))
-            .map!(name => parseKey(name))
-            .array;
-
-        keys.sort;
-
-        return keys;
     }
 
     override void trim()
@@ -367,24 +392,54 @@ final class FilePipelineCacheStore: PipelineCacheStore
 
     private string filePath(PipelineVariantKey identity) const
     {
-        return buildPath(directory, identity.toString() ~ ".pipelinecache");
+        return buildPath(directory, identity.slot.toString() ~ ".pipelinecache");
     }
+}
 
-    private static bool isKeyName(string name)
-    {
-        import std.algorithm: all;
-        import std.ascii: isHexDigit;
+unittest
+{
+    import std.file: exists, rmdirRecurse, tempDir;
+    import std.path: buildPath;
+    import std.uuid: randomUUID;
 
-        return name.length == PipelineVariantKey.digest.length * 2 && name.all!isHexDigit;
-    }
+    ubyte[16] older;
+    older[0] = 1;
 
-    private static PipelineVariantKey parseKey(string name)
-    {
-        import std.digest: fromHexString;
+    ubyte[16] newer;
+    newer[0] = 2;
 
-        PipelineVariantKey key;
-        key.digest[] = fromHexString(name);
+    PipelineVariantKeyBuilder first;
+    first.addString("technique");
+    first.addShader(older);
+    const oldKey = first.finish();
 
-        return key;
-    }
+    PipelineVariantKeyBuilder second;
+    second.addString("technique");
+    second.addShader(newer);
+    const newKey = second.finish();
+
+    assert(oldKey.slot.digest[] == newKey.slot.digest[]);
+    assert(oldKey.digest[] != newKey.digest[]);
+
+    const uuid = randomUUID();
+    const directory = buildPath(tempDir, "pukan-pipeline-cache-" ~ uuid.toString);
+
+    scope(exit)
+        if(directory.exists)
+            rmdirRecurse(directory);
+
+    auto store = new FilePipelineCacheStore(directory, uuid);
+
+    bool shaderChanged;
+
+    store.save(oldKey, [1, 2, 3]);
+    assert(store.load(newKey, shaderChanged) is null);
+    assert(shaderChanged);
+
+    // The record of the same slot is replaced, not kept beside the new one
+    store.save(newKey, [4, 5, 6]);
+    assert(store.load(oldKey, shaderChanged) is null);
+    assert(shaderChanged);
+    assert(store.load(newKey, shaderChanged) !is null);
+    assert(!shaderChanged);
 }

@@ -63,7 +63,7 @@ abstract class Compute
 
         if(auto manager = device.pipelineCacheManager)
         {
-            identity = computeIdentity(name, layoutBindings, pushConstant, specialization);
+            identity = computeIdentity(name, layoutBindings, pushConstant, specialization, spvBinary);
             pipelineCache = manager.acquire(identity, needsRecompilation);
         }
         else
@@ -87,20 +87,23 @@ abstract class Compute
     }
 
     /**
-        What a kernel is for the store: its class, bindings, push constant and
-        specialization data. Shader bytes stay out, the driver keys those.
+        What a kernel is for the store: its class, bindings, push constant,
+        specialization data and SPIR-V. The shader bytes change the digest but
+        not the slot.
     */
     private static PipelineVariantKey computeIdentity(
         string name,
         VkDescriptorSetLayoutBinding[] layoutBindings,
         VkPushConstantRange pushConstant,
         VkSpecializationInfo* specialization,
+        const(ubyte)[] spvBinary,
     )
     {
         PipelineVariantKeyBuilder builder;
         builder.addString(name);
         builder.addArray(layoutBindings);
         builder.add(pushConstant);
+        builder.addShaderBytes(spvBinary);
 
         if(specialization !is null)
         {
