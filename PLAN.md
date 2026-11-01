@@ -725,14 +725,12 @@ opposite. The scene should be able to name the shaders and pipeline variants it
 will use before the first frame, so a loader can warm them while the scene loads
 and no first draw stalls on a compile.
 
-Current state: `PbrFactory` used to create 192 material pipelines and 6 shadow
-pipelines in its constructor, before a scene was loaded, and turn every embedded
-`.spv` into a `VkShaderModule` there too. It now declares the techniques and
-builds a variant on first use or on a preload request; only the variants the
-loaded scene can select are built. `PipelineCacheStore` decides whether a
-variant is compiled or taken from a stored `VkPipelineCache` blob, but it cannot
-replace the SPIR-V: `vkCreateGraphicsPipelines` still needs the shader module
-and the full create info on a hit.
+Current state: the PBR declarations live in `PbrPipelineSet`, which builds a
+variant on first use or on a preload request; only the variants the loaded
+scene can select are built. `PipelineCacheStore` decides whether a variant is
+compiled or taken from a stored `VkPipelineCache` blob, but it cannot replace
+the SPIR-V: `vkCreateGraphicsPipelines` still needs the shader module and the
+full create info on a hit.
 
 ### Declaration site
 
@@ -860,8 +858,6 @@ explicit and defaults to 100 MB.
 
 - [ ] Move the registry out of `pukan.vulkan.pipelines` into a generic
       `pukan.pipelines` module.
-- [ ] Collect the `required` union from the keys each renderer declares, not
-      from a factory-owned table.
 
 ### Pipeline warmup policy
 
@@ -872,18 +868,19 @@ module's `alias pipelineVariants`; duplicate descriptors collapse, like
 `Requirements!`. A drawable that needs a descriptor outside the union throws
 when it draws, including scenes loaded later.
 
-`PbrProfile { gltf, godot }` lives in `pukan.pbr.factory` and names the
+`PbrProfile { gltf, godot }` lives in `pukan.pbr.pipelines` and names the
 shader set. The PBR declarations build one `PbrPipelines` per active profile; a
 build with `-version=PbrGltfOnly` or `-version=PbrGodotOnly` does not build the
 other profile. `GltfFactory` and `GodotFactory` receive their set at
 construction and declare their profile statically, so the loader never looks it
 up by name. `pukan.pbr.pipelines` stays format-agnostic. The same variant list
-is applied to every active set.
+is applied to every active set. `PbrPipelineSet` owns the warm and validate
+calls and exposes the keys it declares, so the factory holds no pipeline table.
 
 `all` walks every `LazyPipeline` field of `PbrPipelines` at compile time
 through `FieldNameTuple`, so the full warm list is generated, not handwritten.
-`required` warms the declared union. Both wait before `Scene` returns; `scene`
-warms each loaded object and the first frame waits.
+`required` warms the union of declared keys and variants. Both wait before
+`Scene` returns; `scene` warms each loaded object and the first frame waits.
 
 `SceneWith!(Modules...)` takes the union through its template argument.
 `Scene` is `SceneWith!()`, so the default build warms the full built-in set for
@@ -897,27 +894,25 @@ own modules.
 
 ### Pipeline cache strategies
 
-The store is currently one file per variant, keyed by a digest of the variant
-state, seeded into a fresh `VkPipelineCache` for each creation, and bounded by
-an LRU sweep. Other strategies are possible and should be compared before the
-format spreads:
+The store is currently one file per instance slot, with the shader digest in
+the header, seeded into a fresh `VkPipelineCache` for each creation, and
+bounded by an LRU sweep. Other strategies are possible and should be compared
+before the format spreads:
 
-- [ ] One cache per variant (current) versus one shared cache for the device
+- [ ] One cache per instance (current) versus one shared cache for the device
       or scene. A shared cache can merge blobs and create in batches, but makes
       invalidation coarser and the file larger.
-- [ ] Per-variant files versus one archive with a manifest. The archive avoids
+- [ ] Per-instance files versus one archive with a manifest. The archive avoids
       thousands of small files but needs compaction.
 - [ ] Seed once per run, or merge stored blobs with `vkMergePipelineCaches`
       before creating. Merging costs CPU at startup but may raise hit rates.
-- [ ] Store driver blobs only, or store the variant state and rebuild the
+- [ ] Store driver blobs only, or store the instance state and rebuild the
       create info from it. The second allows validation and migration, the
       first is smaller.
 - [ ] Bound by bytes, record count, age or scene. The current caps are 100 MB
       and 4096 records; measure hit rate against each.
 - [ ] Decide whether an evicted pipeline also drops its cache record, or keeps
       it for a cheap rebuild.
-- [ ] Include the SPIR-V digest in the key before third-party shaders land, as
-      noted above.
 
 ## Build-time feature selection
 
