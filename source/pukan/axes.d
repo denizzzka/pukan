@@ -6,8 +6,9 @@ import std.math: abs, cos, sin;
 /// One of the coordinate axes, for a direction that is fixed for a whole scene.
 ///
 /// Which axis points up is a property of the game world, not of the code: a character only
-/// turns around that axis while it walks on the ground.
-enum Axis: ubyte
+/// turns around that axis while it walks on the ground. Deliberately has no base type, so
+/// that mixing an axis into arithmetic by accident does not compile.
+enum Axis
 {
     x,
     y,

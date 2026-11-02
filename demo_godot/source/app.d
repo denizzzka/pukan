@@ -1,11 +1,12 @@
 import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix;
 import pukan;
-import pukan.misc: trsMatrix;
+import pukan.axes: axisVector;
+import pukan.misc: Boxf, trsMatrix;
 import pukan.mover.component: MoverComponent;
 import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
 import pukan.pbr.pipelines: plainShading;
 import pukan.physics.simulation: Simulation;
-import pukan.physics.world: CollisionWorld;
+import pukan.physics.world: CollisionWorld, ShapeCastHit;
 import pukan.primitives_tree.lines: LineInstance, LineRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
@@ -64,6 +65,37 @@ Vector3f parseVector(string text)
     }
 
     return Vector3f(values[0], values[1], values[2]);
+}
+
+/// First surface below the top of the level, in the middle of the scene: what a level
+/// without a spawn marker offers
+Vector3f levelSpawn(CollisionWorld world, in Boxf bounds, in Vector3f up)
+{
+    const extent = (bounds.max - bounds.min).length;
+    const center = (bounds.min + bounds.max) * 0.5f;
+    const hit = world.raycast(center + up * (extent + 1), -up, 2 * extent + 2);
+
+    return hit.hit ? hit.point + up * 0.01f : center;
+}
+
+/// Lifts a spawn point that sits inside the geometry until the capsule no longer overlaps
+/// it: a marker under the terrain would otherwise trap the character for good
+Vector3f freeSpawn(CollisionWorld world, Vector3f feet, in Vector3f up, float radius, float height)
+{
+    ShapeCastHit overlap;
+
+    if(!world.overlapCapsule(feet + up * radius, feet + up * (height - radius), radius, uint.max, 0.001f, overlap))
+        return feet;
+
+    foreach(i; 0 .. 200)
+    {
+        feet += up * 0.25f;
+
+        if(!world.overlapCapsule(feet + up * radius, feet + up * (height - radius), radius, uint.max, 0.001f, overlap))
+            return feet;
+    }
+
+    return feet;
 }
 
 /// Names the content the loader saw but does not render
@@ -175,7 +207,7 @@ LineInstance[] capsuleLines(
     LineInstance[] lines;
     const radius = body.radius;
     const height = body.height;
-    const up = body.up;
+    const up = body.up.axisVector;
     const xAxis = Vector3f(1, 0, 0);
     const zAxis = Vector3f(0, 0, 1);
     const bottom = feet + up * radius;
@@ -242,8 +274,10 @@ void main(string[] args)
     bool noShadows;
     bool plainMode;
     bool offscreen;
-    bool characterMode;
-    bool thirdPerson;
+    bool characterMode = true;
+    bool thirdPerson = true;
+    bool noCharacter;
+    bool firstPerson;
     string spawnOption;
     bool walkForward;
     bool fixedStep;
@@ -270,7 +304,9 @@ void main(string[] args)
         "no-shadows", "do not cast shadows", &noShadows,
         "plain", "draw every surface in the plain lit mode", &plainMode,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
-        "character", "walk a Quake-style capsule through the level", &characterMode,
+        "character", "walk a Quake-style capsule through the level, the default", &characterMode,
+        "no-character", "fly the free camera instead of walking", &noCharacter,
+        "first-person", "start in the character's eyes instead of behind it", &firstPerson,
         "spawn", "character spawn position, x,y,z", &spawnOption,
         "walk", "hold forward, for headless movement tests", &walkForward,
         "fixed-step", "advance one physics tick per frame", &fixedStep,
@@ -291,6 +327,12 @@ void main(string[] args)
         defaultGetoptPrinter("pukan Godot scene demo", getoptResult.options);
         return;
     }
+
+    if(noCharacter)
+        characterMode = false;
+
+    if(firstPerson)
+        thirdPerson = false;
 
     plainShading = plainMode;
 
@@ -426,9 +468,7 @@ void main(string[] args)
     scene.godotFactory.preloadShadows = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
-        scenePath = characterMode
-            ? "demo_godot/godot_samples/character/level.tscn"
-            : "demo_godot/godot_samples/generated/procedural.tscn";
+        scenePath = "demo_godot/godot_samples/truck_town/town_view.tscn";
 
     auto godotScene = packPath.length
         ? scene.godotFactory.createPacked(packPath, scenePath)
@@ -616,17 +656,23 @@ void main(string[] args)
 
     if(characterMode)
     {
-        Vector3f spawn = Vector3f(0, 2, 0);
+        Vector3f spawn;
+        bool spawnKnown = false;
 
         if(spawnOption.length)
-            spawn = parseVector(spawnOption);
-        else
         {
-            Vector3f marker;
-
-            if(godotScene.spawnPosition(marker))
-                spawn = marker;
+            spawn = parseVector(spawnOption);
+            spawnKnown = true;
         }
+        else
+            spawnKnown = godotScene.spawnPosition(spawn);
+
+        if(!spawnKnown)
+            spawn = levelSpawn(collisionWorld, godotScene.calcAABB, scene.up.axisVector);
+
+        spawn = freeSpawn(collisionWorld, spawn, scene.up.axisVector, characterBody.radius, characterBody.height);
+
+        writeln("spawn ", spawn.x, ", ", spawn.y, ", ", spawn.z);
 
         mover = new MoverComponent(collisionWorld, characterBody, characterConfig);
         mover.setNoclip(noclip);
@@ -648,7 +694,7 @@ void main(string[] args)
 
     if(!offscreen)
         writeln(characterMode
-            ? "character: WASD move, right mouse look, Space jump"
+            ? "character: WASD move, right mouse look, Space jump, V third person"
             : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
@@ -662,6 +708,7 @@ void main(string[] args)
     float characterMaxHeight = -float.infinity;
     float characterYaw = 0.0f;
     float thirdPersonDistance = 6.0f;
+    bool thirdPersonKeyWasDown;
     bool characterVisible = true;
     Vector3f characterRenderPosition;
 
@@ -703,6 +750,16 @@ void main(string[] args)
                 characterCursorX = cursorX;
                 characterCursorY = cursorY;
                 characterCursorKnown = true;
+
+                const bool thirdPersonKey = pressed(GLFW_KEY_V);
+
+                if(thirdPersonKey && !thirdPersonKeyWasDown)
+                {
+                    thirdPerson = !thirdPerson;
+                    thirdPersonDistance = 6.0f;
+                }
+
+                thirdPersonKeyWasDown = thirdPersonKey;
 
                 Vector3f forward = camera.forward;
                 forward.y = 0;
@@ -768,7 +825,7 @@ void main(string[] args)
                 : mover.renderPosition(alpha);
 
             const eyePosition = thirdPerson
-                ? mover.state.position + characterBody.up * characterBody.eyeHeight
+                ? mover.state.position + characterBody.up.axisVector * characterBody.eyeHeight
                 : mover.eyePosition(alpha);
 
             Vector3f flatForward = camera.forward;

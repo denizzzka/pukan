@@ -5,19 +5,45 @@ Run from the repository root; a Vulkan driver and a D compiler are required.
 ## Truck town
 
 ```sh
-dub run --root=demo_godot -- --scene demo_godot/godot_samples/truck_town/town_view.tscn --scene-camera
+dub run :demo_godot
 ```
 
-`--scene-camera` starts from the `Camera3D` stored in the scene.
+No arguments loads the truck town, walks a capsule through it and follows it in third
+person. `V` switches between third and first person while it runs, `--first-person` starts
+in the character's eyes.
+
+`--no-character` gives the free camera instead, and `--scene-camera` starts it from the
+`Camera3D` stored in the scene:
+
+```sh
+dub run :demo_godot -- --no-character --scene-camera
+```
 
 ## Platformer
 
 ```sh
-dub run --root=demo_godot -- --scene demo_godot/godot_samples/platformer/stage/stage.tscn --eye 8,8,-12 --target 0,1,0
+dub run :demo_godot -- --no-character --scene demo_godot/godot_samples/platformer/stage/stage.tscn --eye 8,8,-12 --target 0,1,0
 ```
 
-The stage has no scene camera, and the default view starts inside a wall, so the
-eye and target place the free camera outside it.
+The stage has no scene camera, and the free camera would start inside a wall, so the eye
+and target place it outside.
+
+## Character
+
+Character mode and third person are the defaults: `--no-character` flies the free camera,
+`--first-person` starts in the eyes. `--scene` picks another level, and
+`--scene demo_godot/godot_samples/character/level.tscn` is the movement gym.
+
+The capsule starts at `--spawn x,y,z` when given, else at the first `Marker3D` or
+`CharacterBody3D` of the scene, else on the first surface under the middle of the level. A
+start point inside the geometry is lifted out along the up axis, so a marker under the
+terrain cannot trap it.
+
+In third person the camera pulls in when a wall is behind the character; `--no-spring-arm`
+keeps the distance fixed.
+
+`--debug-capsule` draws the collision capsule, `--walk` holds forward, `--noclip` ignores
+collisions, and `--physics-hz` sets the character tick rate.
 
 ## Controls
 

@@ -109,7 +109,7 @@ octahedral normals and a tangent angle instead of float attributes.
 `res://procedural_mesh.res` and `res://checker.png`. Load it with:
 
 ```sh
-./demo_godot/pukan_demo_godot --pack demo_godot/godot_samples/generated/fixtures.pck --scene res://procedural.tscn --frames 2
+./demo_godot/pukan_demo_godot --no-character --pack demo_godot/godot_samples/generated/fixtures.pck --scene res://procedural.tscn --frames 2
 ```
 
 ## Exported project
@@ -129,7 +129,7 @@ directories, so the loader has to follow the remaps instead of reading the
 source paths. Load it without `--scene`:
 
 ```sh
-./demo_godot/pukan_demo_godot --pack demo_godot/godot_samples/exported/exported.pck --frames 2
+./demo_godot/pukan_demo_godot --no-character --pack demo_godot/godot_samples/exported/exported.pck --frames 2
 ```
 
 To regenerate after changing the source project:
@@ -162,7 +162,7 @@ contains the compressed `enemy.glb` import with `Skeleton3D` and `Skin`, so it
 exercises native Godot skinning and the RSCC/Zstandard resource path:
 
 ```sh
-./demo_godot/pukan_demo_godot --pack demo_godot/godot_samples/platformer/platformer.pck --scene res://enemy/enemy.tscn --frames 2
+./demo_godot/pukan_demo_godot --no-character --pack demo_godot/godot_samples/platformer/platformer.pck --scene res://enemy/enemy.tscn --frames 2
 ```
 
 The enemy currently renders in its bind pose; animation tracks are not applied
@@ -190,7 +190,7 @@ textures and `stage/collision/*` are kept; collision shapes and navigation data
 are ignored for now.
 
 ```sh
-./demo_godot/pukan_demo_godot --scene demo_godot/godot_samples/platformer/stage/stage.tscn --frames 2
+./demo_godot/pukan_demo_godot --no-character --scene demo_godot/godot_samples/platformer/stage/stage.tscn --frames 2
 ```
 
 Start outside the level with
@@ -211,7 +211,7 @@ files, and that is what a game runs. The tree's `nodes/root_scale=0.01` from
 transforms. Only the textures stay as source `.webp`, `.jpeg` and `.png` files.
 
 ```sh
-./demo_godot/pukan_demo_godot --scene demo_godot/godot_samples/truck_town/town_view.tscn --scene-camera --frames 2
+./demo_godot/pukan_demo_godot --no-character --scene demo_godot/godot_samples/truck_town/town_view.tscn --scene-camera --frames 2
 ```
 
 To regenerate the three `.scn` files, copy `town/{model,tree,lamp}` together
