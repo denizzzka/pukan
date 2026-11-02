@@ -806,7 +806,7 @@ void main(string[] args)
 
     if(!offscreen)
         writeln(characterMode
-            ? "character: WASD move, right mouse look, Space jump, V third person"
+            ? "character: WASD move, right mouse look, middle mouse orbit, Space jump, V third person"
             : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
@@ -849,16 +849,41 @@ void main(string[] args)
                     return glfwGetKey(window, key) == GLFW_PRESS;
                 }
 
+                const bool looking =
+                    glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+                // The middle button walks the camera around the body, which is how it is
+                // inspected from every side
+                const bool orbiting = thirdPerson
+                    && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+
+                // A held button owns the cursor, so the look does not stop at a border
+                if((looking || orbiting) != cursorCaptured)
+                {
+                    cursorCaptured = looking || orbiting;
+                    characterCursorKnown = false;
+
+                    if(cursorCaptured)
+                    {
+                        glfwGetCursorPos(window, &savedCursorX, &savedCursorY);
+                        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    }
+                    else
+                    {
+                        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                        glfwSetCursorPos(window, savedCursorX, savedCursorY);
+                    }
+                }
+
                 double cursorX;
                 double cursorY;
                 glfwGetCursorPos(window, &cursorX, &cursorY);
 
                 if(characterCursorKnown)
                 {
-                    const dx = cast(float) (cursorX - characterCursorX);
-                    const dy = cast(float) (cursorY - characterCursorY);
+                    const float dx = cast(float) (cursorX - characterCursorX);
+                    const float dy = cast(float) (cursorY - characterCursorY);
 
-                    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+                    if(looking || orbiting)
                         camera.look(dx, dy);
                 }
 

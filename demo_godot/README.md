@@ -60,7 +60,8 @@ character turns towards where it moves and plays its forward clips, because the 
 no strafing or backwards motion.
 
 In third person the camera pulls in when a wall is behind the character; `--no-spring-arm`
-keeps the distance fixed.
+keeps the distance fixed. Dragging with the middle mouse button takes the camera around the
+body while the body keeps its facing, so it can be inspected from every side.
 
 `--debug-capsule` draws the collision capsule, `--walk` holds forward, `--move-speed` sets how
 fast the character runs (the Quake maximum by default), `--noclip` ignores collisions, and
