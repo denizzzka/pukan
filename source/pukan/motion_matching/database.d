@@ -196,6 +196,14 @@ struct Database
         return range.first + offset;
     }
 
+    /// The channel vector of one stored pose.
+    const(float)[] vectorOf(size_t sampleIdx) const
+    {
+        const dimensions = dimensionWeights.length;
+
+        return vectors[sampleIdx * dimensions .. (sampleIdx + 1) * dimensions];
+    }
+
     /// Weighted squared distance between a stored pose and a query vector.
     float distance(size_t sampleIdx, const(float)[] query) const
     {
