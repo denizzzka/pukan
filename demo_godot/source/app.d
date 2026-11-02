@@ -883,8 +883,8 @@ void main(string[] args)
 
                 if(motionReady)
                 {
-                    // The clip owns the motion: the capsule moves as fast as the pose plays,
-                    // so the feet cannot slide, and collisions stay with the Mover
+                    // The clip owns the motion, so the feet cannot slide; the input then reaches
+                    // the search only as the wanted velocity of the predicted trajectory
                     const float speed = motionSpeed * motionRate;
                     const float yaw = -characterYaw;
                     const Vector3f forward = Vector3f(sin(yaw), 0, cos(yaw));
