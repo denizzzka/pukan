@@ -103,7 +103,11 @@ struct Schema
 
     /// A first layout for locomotion: the feet and the hands carry the gait, the pelvis and
     /// the head the posture; the trajectory is the four points Unreal ships by default.
-    static Schema locomotion()
+    ///
+    /// `poseWeight` is the share of the cost the pose may take. Normalized dimensions put a
+    /// bone position and a speed on the same footing, and a bone moves over centimetres where
+    /// the trajectory moves over metres, so the pose stays a tie breaker unless it is raised.
+    static Schema locomotion(float poseWeight = 0.01f)
     {
         Schema result;
 
@@ -114,15 +118,13 @@ struct Schema
             TrajectoryChannel(0.7, true, true, true, 7),
         ];
 
-        // Normalized cost: a bone moves over centimetres, a trajectory point over metres, so
-        // the pose needs a much smaller weight to stay a tie breaker, not the main term
         result.bones = [
-            BoneChannel("foot_l", true, true, 0.01f),
-            BoneChannel("foot_r", true, true, 0.01f),
-            BoneChannel("hand_l", true, true, 0.01f),
-            BoneChannel("hand_r", true, true, 0.01f),
-            BoneChannel("pelvis", true, true, 0.01f),
-            BoneChannel("head", true, true, 0.01f),
+            BoneChannel("foot_l", true, true, poseWeight),
+            BoneChannel("foot_r", true, true, poseWeight),
+            BoneChannel("hand_l", true, true, poseWeight),
+            BoneChannel("hand_r", true, true, poseWeight),
+            BoneChannel("pelvis", true, true, poseWeight),
+            BoneChannel("head", true, true, poseWeight),
         ];
 
         return result;

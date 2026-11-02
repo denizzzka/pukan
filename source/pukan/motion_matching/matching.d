@@ -30,9 +30,10 @@ struct Matching
     float sinceSearch = 0;
     /// Seconds between searches while the current pose can continue.
     float searchInterval = 0.1f;
-    /// Slowest and fastest playback rate.
-    float minRate = 0.5f;
-    float maxRate = 1.5f;
+    /// Slowest and fastest playback rate; the range Unreal allows, wide enough to reach a
+    /// clip from the speed either side of it
+    float minRate = 0.2f;
+    float maxRate = 2.0f;
     /// How much better another pose has to be, as a fraction of the cost of the one playing,
     /// before the character interrupts it. Without it two clips of similar speed flip-flop.
     float switchMargin = 0.2f;

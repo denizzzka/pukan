@@ -211,6 +211,8 @@ struct Database
 
     /// Measures the spread of every dimension over the whole table; a dimension that never
     /// changes gets a zero multiplier, so it drops out of the cost.
+    // TODO: measure on a dedicated normalization set, so adding a clip does not move the
+    // weights of a database that was tuned before it
     private void measureSpread()
     {
         import std.math: sqrt;
