@@ -666,7 +666,8 @@ locomotion only.
 ### Later
 
 - [ ] KD-tree or VP-tree over the feature vectors, once a profile shows the scan matters.
-- [ ] Normalization over the database, so weights mean the same thing across databases.
+- [x] Normalization over the database, so weights mean the same thing across databases: each
+      dimension is measured in its own spread, and the pose weight drops to a tie breaker.
 - [ ] Notifies, events, mirrored clips, blend spaces and montages, interaction searches.
 
 ## Geometric algebra: PGA and CGA

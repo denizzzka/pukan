@@ -69,6 +69,14 @@ struct Database
     /// Added to the distance of the pose that is already playing: the bias for not
     /// interrupting it.
     float keepPlayingBias = 0;
+    /// Whether dimensions are compared in units of their own spread, so a weight means the
+    /// same thing for a bone position and for a speed
+    bool normalize = true;
+    /// Per-dimension mean of the raw vectors, empty when normalization is off
+    float[] means;
+    /// Per-dimension multiplier that turns a raw difference into a normalized one, zero for a
+    /// dimension that never changes
+    float[] inverseDeviations;
 
     /// Indexes `clips`. The sampler is asked for times outside a clip as well, to measure
     /// velocities and the trajectory points at the ends, so it must wrap or clamp them.
@@ -163,6 +171,9 @@ struct Database
                 }
             }
         }
+
+        if(normalize)
+            measureSpread();
     }
 
     /// Index of the sample nearest to `time` inside `clip`: a looping clip wraps the time,
@@ -198,6 +209,39 @@ struct Database
         return range.first + offset;
     }
 
+    /// Measures the spread of every dimension over the whole table; a dimension that never
+    /// changes gets a zero multiplier, so it drops out of the cost.
+    private void measureSpread()
+    {
+        import std.math: sqrt;
+
+        const dimensions = dimensionWeights.length;
+        const count = dimensions > 0 ? vectors.length / dimensions : 0;
+
+        means.length = dimensions;
+        inverseDeviations.length = dimensions;
+
+        foreach(d; 0 .. dimensions)
+        {
+            float sum = 0;
+            float sumSquares = 0;
+
+            foreach(sampleIdx; 0 .. count)
+            {
+                const value = vectors[sampleIdx * dimensions + d];
+                sum += value;
+                sumSquares += value * value;
+            }
+
+            const mean = count > 0 ? sum / count : 0;
+            const variance = count > 0 ? sumSquares / count - mean * mean : 0;
+            const deviation = variance > 0 ? sqrt(variance) : 0;
+
+            means[d] = mean;
+            inverseDeviations[d] = deviation > 1e-6f ? 1 / deviation : 0;
+        }
+    }
+
     /// The channel vector of one stored pose.
     const(float)[] vectorOf(size_t sampleIdx) const
     {
@@ -207,6 +251,9 @@ struct Database
     }
 
     /// Weighted squared distance between a stored pose and a query vector.
+    ///
+    /// With normalization on, each dimension is measured in its own spread, so the weight is
+    /// a share of the cost rather than a unit conversion.
     float distance(size_t sampleIdx, const(float)[] query) const
     {
         assert(query.length == dimensionWeights.length);
@@ -215,10 +262,24 @@ struct Database
 
         float result = 0;
 
-        foreach(i, weight; dimensionWeights)
+        if(inverseDeviations.length == 0)
         {
-            const difference = query[i] - vectors[start + i];
-            result += weight * difference * difference;
+            foreach(i, weight; dimensionWeights)
+            {
+                const difference = query[i] - vectors[start + i];
+                result += weight * difference * difference;
+            }
+        }
+        else
+        {
+            foreach(i, weight; dimensionWeights)
+            {
+                const scale = inverseDeviations[i];
+                const difference = (query[i] - means[i]) * scale
+                    - (vectors[start + i] - means[i]) * scale;
+
+                result += weight * difference * difference;
+            }
         }
 
         return result;
@@ -300,10 +361,54 @@ unittest
     // The same vector as a query is at zero distance
     assert(database.distance(second, vector) == 0);
 
-    // A query one metre aside is not
+    // A query one metre aside is not; a dimension that never changes carries no information
     float[] far = vector.dup;
-    far[0] = 1;
+    far[9] += 1;
     assert(database.distance(second, far) > 0);
+}
+
+unittest
+{
+    import pukan.motion_matching.schema: BoneChannel, TrajectoryChannel;
+    import std.math: abs, sin;
+
+    // Root slides along +Z at 2 m/s, a single bone bobs above it
+    static ClipPose sampleStraightLine(size_t clip, float time)
+    {
+        enum duration = 2;
+
+        time = time < 0 ? 0 : (time > duration ? duration : time);
+
+        ClipPose result;
+        result.root = Transform(Vector3f(0, 0, 2 * time), 0);
+        result.bones = [Vector3f(0, 0.1f + 0.05f * sin(time * 3.0f), 0)];
+        return result;
+    }
+
+    enum up = Axis.y;
+
+    Schema schema;
+    schema.bones = [BoneChannel("foot", true, true, 1)];
+    schema.trajectory = [TrajectoryChannel(0.35, true, true, true, 1)];
+
+    Database database;
+    database.build(schema, up, [Clip("run", 2)], &sampleStraightLine);
+
+    // Every dimension is measured in its own spread, except one that never changes
+    assert(database.means.length == 14);
+    assert(database.inverseDeviations.length == 14);
+    assert(abs(database.means[9] - 0.1f) < 0.05f);
+
+    // The heading sideways is always zero, so it drops out of the cost
+    assert(database.inverseDeviations[6] == 0);
+
+    // A pose still is at zero distance from itself
+    assert(database.distance(30, database.vectors[30 * 14 .. 31 * 14]) == 0);
+
+    // And one metre aside is still far
+    float[] far = database.vectors[30 * 14 .. 31 * 14].dup;
+    far[9] += 1;
+    assert(database.distance(30, far) > 0);
 }
 
 unittest

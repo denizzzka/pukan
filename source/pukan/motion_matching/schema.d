@@ -114,13 +114,15 @@ struct Schema
             TrajectoryChannel(0.7, true, true, true, 7),
         ];
 
+        // Normalized cost: a bone moves over centimetres, a trajectory point over metres, so
+        // the pose needs a much smaller weight to stay a tie breaker, not the main term
         result.bones = [
-            BoneChannel("foot_l"),
-            BoneChannel("foot_r"),
-            BoneChannel("hand_l"),
-            BoneChannel("hand_r"),
-            BoneChannel("pelvis"),
-            BoneChannel("head"),
+            BoneChannel("foot_l", true, true, 0.01f),
+            BoneChannel("foot_r", true, true, 0.01f),
+            BoneChannel("hand_l", true, true, 0.01f),
+            BoneChannel("hand_r", true, true, 0.01f),
+            BoneChannel("pelvis", true, true, 0.01f),
+            BoneChannel("head", true, true, 0.01f),
         ];
 
         return result;
