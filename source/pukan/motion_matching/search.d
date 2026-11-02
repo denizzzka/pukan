@@ -1,5 +1,6 @@
 module pukan.motion_matching.search;
 
+import dlib.math: Vector3f;
 import pukan.motion_matching.database: Database, invalidSample;
 import pukan.motion_matching.query: Query;
 import pukan.motion_matching.schema: Schema;
@@ -51,6 +52,39 @@ bool evaluateCurrent(const Database database, const Query query, size_t sample, 
 
     found = FoundPose(sample, score(database, sample, query) + database.keepPlayingBias);
     return true;
+}
+
+/// Velocity of the root that a pose vector describes right now, in the root's own space.
+/// Zero when the schema has no trajectory velocity at the present moment.
+Vector3f currentVelocity(const Schema schema, const(float)[] pose)
+{
+    size_t offset;
+
+    foreach(ref channel; schema.trajectory)
+    {
+        const bool present = channel.offset == 0;
+
+        if(channel.position)
+        {
+            if(present && channel.velocity)
+                return Vector3f(pose[offset], pose[offset + 1], pose[offset + 2]);
+
+            offset += 3;
+        }
+
+        if(channel.velocity)
+        {
+            if(present)
+                return Vector3f(pose[offset], pose[offset + 1], pose[offset + 2]);
+
+            offset += 3;
+        }
+
+        if(channel.heading)
+            offset += 2;
+    }
+
+    return Vector3f(0, 0, 0);
 }
 
 /// How fast the chosen pose has to play to cover the distance the query asks for: the ratio

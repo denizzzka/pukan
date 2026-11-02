@@ -654,6 +654,8 @@ locomotion only.
       the switch is mostly invisible.
 - [x] Then crossfade over a short window: sample the outgoing and the incoming pose, lerp the
       bone transforms on the CPU and reuse the existing skinning path.
+- [x] The chosen pose owns the motion: the capsule moves at the pose speed times its play rate,
+      so the animation and the displacement cannot disagree; the Mover still resolves collisions.
 
 ### Later
 

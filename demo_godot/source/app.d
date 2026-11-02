@@ -6,6 +6,7 @@ import pukan.gltf.motion_sampler: MotionSampler;
 import pukan.motion_matching.database: Clip, Database, invalidSample;
 import pukan.motion_matching.history: PoseHistory;
 import pukan.motion_matching.matching: Matching;
+import pukan.motion_matching.search: currentVelocity;
 import pukan.motion_matching.query: Query, buildQuery;
 import pukan.motion_matching.schema: Schema;
 import pukan.motion_matching.trajectory: Trajectory;
@@ -20,7 +21,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
 import std.algorithm: min;
-import std.math: PI, atan2, cos, sin;
+import std.math: PI, atan2, cos, sin, sqrt;
 import std.exception: enforce;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
@@ -498,6 +499,9 @@ void main(string[] args)
     size_t motionClip;
     float motionTime;
     bool motionReady;
+    /// Horizontal speed of the pose playing and how fast it plays: together they move the capsule
+    float motionSpeed = 0;
+    float motionRate = 1;
     float characterModelScaleX = 1.0f;
     float characterModelScaleY = 1.0f;
     float characterModelScaleZ = 1.0f;
@@ -876,6 +880,18 @@ void main(string[] args)
 
             simulation.step(dt, (tickDt) {
                 mover.step(characterCommand, tickDt);
+
+                if(motionReady)
+                {
+                    // The clip owns the motion: the capsule moves as fast as the pose plays,
+                    // so the feet cannot slide, and collisions stay with the Mover
+                    const float speed = motionSpeed * motionRate;
+                    const float yaw = -characterYaw;
+                    const Vector3f forward = Vector3f(sin(yaw), 0, cos(yaw));
+
+                    mover.state.velocity = Vector3f(forward.x * speed,
+                        mover.state.velocity.y, forward.z * speed);
+                }
                 characterMaxHeight = characterMaxHeight > mover.state.position.y
                     ? characterMaxHeight
                     : mover.state.position.y;
@@ -939,9 +955,18 @@ void main(string[] args)
                 if(clipLength > 0)
                     motionTime %= clipLength;
 
+                const Vector3f poseVelocity = currentVelocity(motionDatabase.schema,
+                    motionDatabase.vectorOf(matching.currentSample));
+
+                motionSpeed = sqrt(poseVelocity.x * poseVelocity.x + poseVelocity.z * poseVelocity.z);
+                motionRate = decision.playRate;
+
                 if(frameIndex % 60 == 0)
                     writeln("motion: ", motionDatabase.clips[motionClip].name,
-                        " t=", motionTime, " rate=", decision.playRate);
+                        " t=", motionTime, " rate=", decision.playRate,
+                        " pose speed=", motionSpeed, " capsule speed=",
+                        sqrt(mover.state.velocity.x * mover.state.velocity.x
+                            + mover.state.velocity.z * mover.state.velocity.z));
             }
 
             if(thirdPerson)
