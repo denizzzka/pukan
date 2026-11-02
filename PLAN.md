@@ -1300,6 +1300,16 @@ whole engine costs.
   the application side: 3.2 s against 0.4 s and 5 MB against 0.6 MB for a
   trivial app.
 
+## Swapchain creation
+
+`SwapChain` hardcodes `minImageCount: 3` and only checks that
+`cap.maxImageCount >= 3`, so a surface that requires more images fails
+validation and then `vkCreateSwapchainKHR`. Choose the count from the
+capabilities range, keeping three when the range allows it.
+
+- [ ] Choose `minImageCount` as `max(3, cap.minImageCount)`, capped by
+      `cap.maxImageCount` unless it is zero.
+
 ## Offscreen output
 
 - [ ] Use the offscreen path for benchmarks and CI: the fixed scene then
