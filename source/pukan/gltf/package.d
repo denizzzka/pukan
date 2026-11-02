@@ -190,6 +190,9 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
 
     private Trans[] baseNodeTranslations;
     private AnimationSupport animation;
+    /// Clip chosen with `playAnimation`, -1 while the model picks one itself
+    private int playingClip = -1;
+    private float playingTime;
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
@@ -357,6 +360,58 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
     }
 
     bool isAnimated() const => animation.animations.length > 0;
+
+    /// Number of clips the model carries.
+    size_t animationCount() const
+    {
+        return content.animations.length;
+    }
+
+    /// Plays `clip` from `time` seconds; from then on the model advances only when asked.
+    void playAnimation(size_t clip, float time)
+    {
+        enforce(clip < content.animations.length, "the model has no such clip");
+
+        playingClip = cast(int) clip;
+        playingTime = time;
+    }
+
+    /// Advances the clip being played by `dt` seconds; the time wraps over the clip.
+    void advanceAnimation(float dt)
+    {
+        if(playingClip < 0)
+            return;
+
+        playingTime += dt;
+
+        const float length = clipLength(playingClip);
+
+        if(length > 0)
+        {
+            playingTime %= length;
+
+            if(playingTime < 0)
+                playingTime += length;
+        }
+    }
+
+    /// Length of a clip, the latest key of any of its samplers.
+    float clipLength(size_t clip)
+    {
+        enforce(clip < content.animations.length, "the model has no such clip");
+
+        float result = 0;
+
+        foreach(ref sampler; content.animations[clip].samplers)
+        {
+            auto timeline = content.rangify!float(sampler.inputAcc);
+
+            if(timeline.length > 0 && timeline[$ - 1] > result)
+                result = timeline[$ - 1];
+        }
+
+        return result;
+    }
 
     static if(runtimeMaterialOverride)
     {
@@ -836,8 +891,18 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
     {
         if(isAnimated)
         {
-            animation.currTime += 0.005;
-            applyAnimation();
+            if(playingClip >= 0)
+            {
+                animation.currTime = playingTime;
+                animation.setPose(&animations[playingClip], baseNodeTranslations);
+            }
+            else
+            {
+                // No clip was chosen, so the model walks its last one on its own
+                animation.currTime += 0.005;
+                applyAnimation();
+            }
+
             rootSceneNode.refreshTransFromRootValues;
         }
 
