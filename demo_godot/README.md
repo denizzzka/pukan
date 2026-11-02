@@ -42,6 +42,11 @@ The capsule starts at `--spawn x,y,z` when given, else at the first `Marker3D` o
 start point inside the geometry is lifted out along the up axis, so a marker under the
 terrain cannot trap it.
 
+The capsule is measured from the body rather than the other way round: the height comes from
+the model, the radius from the idle pose where the arms hang down, and the root speed of a
+clip converts to world units with the model scale. `--model-scale` overrides the automatic
+fit to 1.8 units tall; assets authored in centimetres need it.
+
 The default model is `demo/assets/motion/UAL1_Standard_RM.glb`, and its `Idle_Loop`,
 `Walk_Loop`, `Jog_Fwd_Loop` and `Sprint_Loop` clips drive motion matching: the search picks
 the pose that fits the input and the current motion, and the capsule then moves at the speed

@@ -20,8 +20,8 @@ import pukan.primitives_tree.lines: LineInstance, LineRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
-import std.algorithm: min;
-import std.math: PI, atan2, cos, sin, sqrt;
+import std.algorithm: max, min;
+import std.math: PI, abs, atan2, cos, sin, sqrt;
 import std.exception: enforce;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
@@ -296,6 +296,7 @@ void main(string[] args)
     string modelOption;
     float physicsHz = 60.0f;
     float moveSpeedOption;
+    float modelScaleOption;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
     float farOption = cameraFar;
@@ -327,6 +328,7 @@ void main(string[] args)
         "third-person", "draw the character from behind", &thirdPerson,
         "physics-hz", "fixed character tick rate", &physicsHz,
         "move-speed", "character speed in units per second; defaults to the Quake maximum", &moveSpeedOption,
+        "model-scale", "scale the character model by this factor; 0 fits it to 1.8 units tall", &modelScaleOption,
         "fov", "vertical field of view in degrees", &fovOption,
         "near", "near clipping distance", &nearOption,
         "far", "far clipping distance", &farOption,
@@ -505,6 +507,9 @@ void main(string[] args)
     float motionSpeed = 0;
     float motionRate = 1;
     float characterModelScale = 1.0f;
+    /// Body measurements taken from the model, zero until they are known
+    float capsuleRadius = 0;
+    float capsuleHeight = 0;
 
     if(characterMode)
     {
@@ -622,8 +627,33 @@ void main(string[] args)
         {
             // Even scaling only: a bind pose with the arms out is wider than the capsule, and
             // squeezing the width to fit it flattens the whole body
-            characterModelScale = 1.8f / (bounds.max.y - bounds.min.y);
+            characterModelScale = modelScaleOption > 0
+                ? modelScaleOption
+                : 1.8f / (bounds.max.y - bounds.min.y);
+
             characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScale, 0);
+            capsuleHeight = (bounds.max.y - bounds.min.y) * characterModelScale;
+        }
+
+        if(motionReady)
+        {
+            // The capsule follows the body, not the other way round: the bind pose has the
+            // arms out, so the body is measured on the idle pose, where they hang down
+            size_t idleClip = motionModelClips[0];
+
+            foreach(i, ref clip; motionDatabase.clips)
+                if(clip.name == "Idle_Loop")
+                    idleClip = motionModelClips[i];
+
+            Vector3f lowest;
+            Vector3f highest;
+
+            motionSampler.boneBounds(idleClip, 0, lowest, highest);
+
+            const float width = highest.x - lowest.x;
+            const float depth = highest.z - lowest.z;
+
+            capsuleRadius = (max(width, depth) / 2 + 0.04f) * characterModelScale;
         }
     }
 
@@ -711,6 +741,16 @@ void main(string[] args)
     QuakeBody characterBody;
     characterBody.up = scene.up;
     QuakeMovementConfig characterConfig;
+
+    if(capsuleHeight > 0 && capsuleRadius > 0)
+    {
+        characterBody.height = capsuleHeight;
+        characterBody.radius = capsuleRadius;
+        characterBody.eyeHeight = capsuleHeight - 0.2f;
+
+        writeln("capsule radius ", characterBody.radius, " height ", characterBody.height,
+            " scale ", characterModelScale);
+    }
 
     if(moveSpeedOption > 0)
         characterConfig.maxSpeed = moveSpeedOption;
@@ -888,7 +928,7 @@ void main(string[] args)
                 {
                     // The clip owns the motion, so the feet cannot slide; the input then reaches
                     // the search only as the wanted velocity of the predicted trajectory
-                    const float speed = motionSpeed * motionRate;
+                    const float speed = motionSpeed * motionRate * characterModelScale;
                     const Vector3f forward = Vector3f(sin(characterFacing), 0,
                         cos(characterFacing));
 
@@ -947,9 +987,10 @@ void main(string[] args)
                     ? atan2(wish.x, wish.z)
                     : characterFacing;
 
+                // The database speaks model units, the body moves in world units
                 trajectory.push(dt, Transform(mover.state.position, characterFacing),
-                    mover.state.velocity,
-                    characterCommand.wishDir * characterCommand.wishSpeed,
+                    mover.state.velocity / characterModelScale,
+                    characterCommand.wishDir * characterCommand.wishSpeed / characterModelScale,
                     wantedYaw);
 
                 const playing = motionSampler.sample(motionModelClips[motionClip], motionTime);

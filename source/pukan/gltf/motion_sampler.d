@@ -54,6 +54,48 @@ final class MotionSampler
         cycleKnown.length = asset.content.animations.length;
     }
 
+    /// Bounds of the schema bones at a moment of a clip, in the model's own space.
+    void boneBounds(size_t clip, float time, out Vector3f min, out Vector3f max)
+    {
+        const float length = duration(clip);
+
+        float local = time;
+
+        if(length > 0)
+        {
+            local %= length;
+
+            if(local < 0)
+                local += length;
+        }
+
+        evaluate(clip, local);
+
+        foreach(i, node; boneNodes)
+        {
+            const position = translation(worldMatrices[node]);
+
+            if(i == 0)
+            {
+                min = position;
+                max = position;
+                continue;
+            }
+
+            min = Vector3f(
+                position.x < min.x ? position.x : min.x,
+                position.y < min.y ? position.y : min.y,
+                position.z < min.z ? position.z : min.z,
+            );
+
+            max = Vector3f(
+                position.x > max.x ? position.x : max.x,
+                position.y > max.y ? position.y : max.y,
+                position.z > max.z ? position.z : max.z,
+            );
+        }
+    }
+
     /// Node the sampler measures every pose from.
     int rootNodeIndex() const
     {

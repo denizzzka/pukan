@@ -292,6 +292,9 @@ Mover core.
 - [x] Godot shape semantics: the capsule stores a radius and a total height including
       both hemispheres, the box stores full extents, matching `CapsuleShape3D` and
       `BoxShape3D`.
+- [x] The capsule follows the body instead of the body fitting the capsule: the radius comes
+      from the idle pose where the arms hang down, the height from the model, and the root
+      speed of a clip converts to world units with the model scale.
 - [x] The default character preset is a 0.4 m radius, 1.8 m capsule with a 1.6 m eye
       height and collision layer 1, matching the scale of the Godot fixtures.
 - [x] The Quake motor uses the capsule in the first slice; an AABB body is a later
