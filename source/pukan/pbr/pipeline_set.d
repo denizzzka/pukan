@@ -46,6 +46,11 @@ private ShaderVertexInput vertexInput()
                 stride: 4,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
+            VkVertexInputBindingDescription(
+                binding: 7,
+                stride: Vector2f.sizeof,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
         ],
         [
             VkVertexInputAttributeDescription(
@@ -83,6 +88,11 @@ private ShaderVertexInput vertexInput()
                 location: 6,
                 format: VK_FORMAT_R8G8B8A8_UNORM,
             ),
+            VkVertexInputAttributeDescription(
+                binding: 7,
+                location: 7,
+                format: VK_FORMAT_R32G32_SFLOAT,
+            ),
         ],
     );
 }
@@ -114,6 +124,11 @@ private ShaderVertexInput staticVertexInput()
             VkVertexInputBindingDescription(
                 binding: 4,
                 stride: 4,
+                inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+            ),
+            VkVertexInputBindingDescription(
+                binding: 5,
+                stride: Vector2f.sizeof,
                 inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
             ),
             VkVertexInputBindingDescription(
@@ -150,24 +165,29 @@ private ShaderVertexInput staticVertexInput()
             ),
             VkVertexInputAttributeDescription(
                 binding: 5,
+                location: 5,
+                format: VK_FORMAT_R32G32_SFLOAT,
+            ),
+            VkVertexInputAttributeDescription(
+                binding: staticInstanceBinding,
                 location: 7,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: 0,
             ),
             VkVertexInputAttributeDescription(
-                binding: 5,
+                binding: staticInstanceBinding,
                 location: 8,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: 4 * float.sizeof,
             ),
             VkVertexInputAttributeDescription(
-                binding: 5,
+                binding: staticInstanceBinding,
                 location: 9,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: 8 * float.sizeof,
             ),
             VkVertexInputAttributeDescription(
-                binding: 5,
+                binding: staticInstanceBinding,
                 location: 10,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: 12 * float.sizeof,

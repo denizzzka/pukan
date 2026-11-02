@@ -14,6 +14,7 @@ package(pukan) void applyGltfMaterial(
     in Json json,
     VkDescriptorImageInfo[] images,
     bool hasTexCoords,
+    bool hasTexCoords1,
     bool hasNormals,
     bool hasTangents,
     bool hasVertexColors,
@@ -26,11 +27,20 @@ package(pukan) void applyGltfMaterial(
 
     void bindTexture(in Json texture, size_t binding, MaterialFlag flag)
     {
-        if(!hasTexCoords)
+        uint uvSet;
+        if(auto texCoord = "texCoord" in texture)
+            uvSet = (*texCoord).get!uint;
+
+        enforce(uvSet < 2, "only two UV sets are supported");
+
+        if(uvSet == 0 ? !hasTexCoords : !hasTexCoords1)
             return;
 
         const index = texture["index"].get!size_t;
         enforce(index < images.length, "glTF material references a missing texture");
+
+        if(uvSet == 1)
+            mesh.material.uv1Textures = mesh.material.uv1Textures | (1u << binding);
 
         mesh.bindTexture(binding, flag, images[index]);
     }

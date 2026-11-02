@@ -20,12 +20,14 @@ layout(location = 3) in vec4 weight;
 layout(location = 4) in vec3 vertNormal;
 layout(location = 5) in vec4 vertTangent;
 layout(location = 6) in vec4 vertColor;
+layout(location = 7) in vec2 vertTextureCoord1;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTextureCoord;
 layout(location = 2) out vec3 fragNormal;
 layout(location = 3) out vec3 fragPosition;
 layout(location = 4) out vec4 fragTangent;
+layout(location = 5) out vec2 fragTextureCoord1;
 
 void main()
 {
@@ -38,11 +40,13 @@ void main()
 
     gl_Position = trans * (shadowSkinMatrix * vec4(position, 1.0));
     fragTextureCoord = vertTextureCoord;
+    fragTextureCoord1 = vertTextureCoord1;
     return;
 #endif
 
     fragColor = vertColor.rgb;
     fragTextureCoord = vertTextureCoord;
+    fragTextureCoord1 = vertTextureCoord1;
 
     const mat4 skinMatrix =
         jointMatrices[jointIndices.x] * weight.x +

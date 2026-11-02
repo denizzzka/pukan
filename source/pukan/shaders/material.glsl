@@ -6,7 +6,7 @@ struct Material
     vec4 emissiveFactor;
     vec4 metallicRoughness;
     vec4 alphaParams;
-    ivec4 params; // x = mode, y = flags, z = alpha mode
+    ivec4 params; // x = mode, y = flags, z = alpha mode, w = uv1 textures
     vec4 specular; // rgb = F0 color, a = strength
     vec4 iorParams; // x = index of refraction
     vec4 clearcoat; // x = factor, y = roughness, z = normal scale
@@ -58,6 +58,12 @@ const float MATERIAL_PI = 3.14159265358979323846;
 uint materialFlags(Material material)
 {
     return uint(material.params.y);
+}
+
+/// Bit per texture binding picks the second UV set for that map
+vec2 materialUV(Material material, uint binding, vec2 uv, vec2 uv1)
+{
+    return (uint(material.params.w) & (1u << binding)) != 0u ? uv1 : uv;
 }
 
 vec4 materialBaseColor(Material material, vec3 tint, vec2 uv, sampler2D baseColorTexture)

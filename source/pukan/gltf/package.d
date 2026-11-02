@@ -548,8 +548,6 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
             }
         }
 
-        enforce(!("TEXCOORD_1" in primitive.attributes), "not supported");
-
         const hasTexCoords = ("TEXCOORD_0" in primitive.attributes) !is null;
         if(hasTexCoords)
         {
@@ -562,6 +560,24 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
 
             uplVert.texCoords = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
             createGpuBufIfNeed(device, uplVert.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        }
+
+        // The plain lit and unlit modes sample a single UV set
+        const secondUvSetWanted = loadOptions.modeOverride != cast(int) MaterialMode.lit
+            && loadOptions.modeOverride != cast(int) MaterialMode.unlit;
+
+        const hasTexCoords1 = secondUvSetWanted && ("TEXCOORD_1" in primitive.attributes) !is null;
+        if(hasTexCoords1)
+        {
+            const texCoordsIdx = primitive.attributes["TEXCOORD_1"].get!ushort;
+            auto texCoords = &accessors[texCoordsIdx];
+
+            enforce(texCoords.count > 0);
+            debug assert(texCoords.type == "VEC2");
+            debug assert(texCoords.componentType == ComponentType.FLOAT);
+
+            uplVert.texCoords1 = content.getAccess!(Type.VEC2, Vector2f)(*texCoords);
+            createGpuBufIfNeed(device, uplVert.texCoords1, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
 
         const hasVertexColors = ("COLOR_0" in primitive.attributes) !is null;
@@ -763,7 +779,7 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
             jointsUboInfo,
         );
 
-        applyGltfMaterial(m, primitive.material, texturesDescrInfos, hasTexCoords, hasNormals, hasTangents, hasVertexColors, loadOptions);
+        applyGltfMaterial(m, primitive.material, texturesDescrInfos, hasTexCoords, hasTexCoords1, hasNormals, hasTangents, hasVertexColors, loadOptions);
         m.buildGeometry(asset.gpuBuffs);
         return m;
     }

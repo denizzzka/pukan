@@ -59,7 +59,7 @@ struct Material
     Vector4f emissiveFactor = Vector4f(0, 0, 0, 0);
     Vector4f metallicRoughness = Vector4f(0, 1, 1, 1); // metallic, roughness, normal scale, occlusion strength
     Vector4f alphaParams = Vector4f(0.5f, 0, 0, 0);    // x = cutoff
-    Vector4i params = Vector4i(0, 0, 0, 0);            // x = mode, y = flags, z = AlphaMode
+    Vector4i params = Vector4i(0, 0, 0, 0);            // x = mode, y = flags, z = AlphaMode, w = uv1 textures
     Vector4f specular = Vector4f(1, 1, 1, 1);          // rgb = F0 color, a = strength
     Vector4f iorParams = Vector4f(1.5f, 0, 0, 0);      // x = index of refraction
     Vector4f clearcoat = Vector4f(0, 0, 1, 0);         // x = factor, y = roughness, z = normal scale
@@ -96,6 +96,17 @@ struct Material
     @property void flags(MaterialFlags value)
     {
         params.y = cast(int) cast(uint) value;
+    }
+
+    /// One bit per texture binding that samples TEXCOORD_1
+    @property uint uv1Textures() const
+    {
+        return cast(uint) params.w;
+    }
+
+    @property void uv1Textures(uint value)
+    {
+        params.w = cast(int) value;
     }
 
     @property AlphaMode alphaMode() const

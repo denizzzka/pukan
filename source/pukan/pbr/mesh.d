@@ -11,7 +11,7 @@ import pukan.vulkan;
 import pukan.vulkan.bindings;
 
 /// Vertex input binding of the per-instance transform matrix
-enum staticInstanceBinding = 5;
+enum staticInstanceBinding = 6;
 
 struct IndicesDescr
 {
@@ -34,6 +34,7 @@ package(pukan) struct MeshStreams
     IndicesDescr indices;
     BufAccess vertices;
     BufAccess texCoords;
+    BufAccess texCoords1;
 
     // Skin support
     BufAccess joints;
@@ -53,6 +54,7 @@ struct MeshGeometry
     Vector3f[] normals;
     Vector4f[] tangents;
     Vector2f[] texCoords;
+    Vector2f[] texCoords1;
     uint[] colors; /// Packed RGBA8
     Vector4us[] joints;
     Vector4f[] weights;
@@ -148,6 +150,7 @@ final class PbrGeometry
         streams ~= vert.normals.viewIdx >= 0 ? stream(vert.normals) : constantVertex();
         streams ~= vert.tangents.viewIdx >= 0 ? stream(vert.tangents) : constantVertex();
         streams ~= vert.colors.viewIdx >= 0 ? stream(vert.colors) : constantVertex();
+        streams ~= vert.texCoords1.viewIdx >= 0 ? stream(vert.texCoords1) : constantVertex();
 
         setStreams(streams);
         vertexCount = vert.vertices.count;

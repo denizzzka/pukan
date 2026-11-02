@@ -40,6 +40,7 @@ layout(location = 1) in vec2 fragTextureCoord;
 layout(location = 2) in vec3 fragNormal;
 layout(location = 3) in vec3 fragPosition;
 layout(location = 4) in vec4 fragTangent;
+layout(location = 5) in vec2 fragTextureCoord1;
 
 layout(location = 0) out vec4 outColor;
 
@@ -135,8 +136,9 @@ void main()
     uv = fragTextureCoord * material.uvTransform.xy + material.uvTransform.zw;
 #endif
 
+    const vec2 uv1 = fragTextureCoord1;
 
-    const vec4 base = materialBaseColor(material, fragColor, uv, baseColorTexture);
+    const vec4 base = materialBaseColor(material, fragColor, materialUV(material, MATERIAL_BASE_COLOR, uv, uv1), baseColorTexture);
 
     const uint alphaMode = uint(material.params.z);
     const bool masked = alphaMode == MATERIAL_ALPHA_MASK;
@@ -174,7 +176,7 @@ void main()
 
     vec3 emissive = material.emissiveFactor.rgb;
     if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
-        emissive *= texture(emissiveTexture, uv).rgb;
+        emissive *= texture(emissiveTexture, materialUV(material, MATERIAL_EMISSIVE, uv, uv1)).rgb;
 
     const vec3 lightDirection = sunDirection();
     const float direct = max(dot(normal, lightDirection), 0.0)
@@ -188,10 +190,12 @@ void main()
             normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));
         if((flags & MATERIAL_FLAG_NORMAL_TEXTURE) != 0u)
         {
+            const vec2 normalUv = materialUV(material, MATERIAL_NORMAL, uv, uv1);
+
             if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
-                normal = perturbNormalFromTangent(normalTexture, material.metallicRoughness.z, normal, fragPosition, uv, fragTangent, (flags & MATERIAL_FLAG_GODOT_NORMAL_TWO_CHANNEL) != 0u);
+                normal = perturbNormalFromTangent(normalTexture, material.metallicRoughness.z, normal, fragPosition, normalUv, fragTangent, (flags & MATERIAL_FLAG_GODOT_NORMAL_TWO_CHANNEL) != 0u);
             else
-                normal = perturbNormalFromDerivatives(normalTexture, material.metallicRoughness.z, normal, fragPosition, uv, (flags & MATERIAL_FLAG_GODOT_NORMAL_TWO_CHANNEL) != 0u);
+                normal = perturbNormalFromDerivatives(normalTexture, material.metallicRoughness.z, normal, fragPosition, normalUv, (flags & MATERIAL_FLAG_GODOT_NORMAL_TWO_CHANNEL) != 0u);
         }
 
         // Isolated white pixels appeared on distant normal-mapped surfaces:
@@ -203,13 +207,13 @@ void main()
         vec2 metallicRoughness = material.metallicRoughness.xy;
 #ifdef GODOT_MATERIAL
         if((flags & MATERIAL_FLAG_GODOT_METALLIC_TEXTURE) != 0u)
-            metallicRoughness.x *= materialChannel(godotMetallicTexture, uv, material.textureChannels.x);
+            metallicRoughness.x *= materialChannel(godotMetallicTexture, materialUV(material, MATERIAL_GODOT_METALLIC, uv, uv1), material.textureChannels.x);
         if((flags & MATERIAL_FLAG_GODOT_ROUGHNESS_TEXTURE) != 0u)
-            metallicRoughness.y *= materialChannel(godotRoughnessTexture, uv, material.textureChannels.y);
+            metallicRoughness.y *= materialChannel(godotRoughnessTexture, materialUV(material, MATERIAL_GODOT_ROUGHNESS, uv, uv1), material.textureChannels.y);
 #else
         if((flags & MATERIAL_FLAG_METALLIC_ROUGHNESS_TEXTURE) != 0u)
         {
-            const vec3 sampled = texture(metallicRoughnessTexture, uv).rgb;
+            const vec3 sampled = texture(metallicRoughnessTexture, materialUV(material, MATERIAL_METALLIC_ROUGHNESS, uv, uv1)).rgb;
             metallicRoughness.y *= sampled.g;
             metallicRoughness.x *= sampled.b;
         }
@@ -218,13 +222,13 @@ void main()
         float ao = 1.0;
         if((flags & MATERIAL_FLAG_OCCLUSION_TEXTURE) != 0u)
         {
-            const float occlusion = materialChannel(occlusionTexture, uv, material.textureChannels.z);
+            const float occlusion = materialChannel(occlusionTexture, materialUV(material, MATERIAL_OCCLUSION, uv, uv1), material.textureChannels.z);
             ao = mix(1.0, occlusion, material.metallicRoughness.w);
         }
 
         vec3 emissive = material.emissiveFactor.rgb;
         if((flags & MATERIAL_FLAG_EMISSIVE_TEXTURE) != 0u)
-            emissive *= texture(emissiveTexture, uv).rgb;
+            emissive *= texture(emissiveTexture, materialUV(material, MATERIAL_EMISSIVE, uv, uv1)).rgb;
 
         Surface surface;
         surface.albedo = base.rgb;
@@ -241,44 +245,46 @@ void main()
         vec3 specularColor = material.specular.rgb;
         float specularWeight = material.specular.a;
         if((flags & MATERIAL_FLAG_SPECULAR_TEXTURE) != 0u)
-            specularWeight *= texture(specularTexture, uv).a;
+            specularWeight *= texture(specularTexture, materialUV(material, MATERIAL_SPECULAR, uv, uv1)).a;
         if((flags & MATERIAL_FLAG_SPECULAR_COLOR_TEXTURE) != 0u)
-            specularColor *= texture(specularColorTexture, uv).rgb;
+            specularColor *= texture(specularColorTexture, materialUV(material, MATERIAL_SPECULAR_COLOR, uv, uv1)).rgb;
 
         // The IOR sets the base reflectance, specular tints and scales it
         const vec3 specularF0 = dielectricF0(material, specularColor, specularWeight);
 
         float clearcoat = material.clearcoat.x;
         if((flags & MATERIAL_FLAG_CLEARCOAT_TEXTURE) != 0u)
-            clearcoat *= texture(clearcoatTexture, uv).r;
+            clearcoat *= texture(clearcoatTexture, materialUV(material, MATERIAL_CLEARCOAT, uv, uv1)).r;
 
         float clearcoatRoughness = material.clearcoat.y;
         if((flags & MATERIAL_FLAG_CLEARCOAT_ROUGHNESS_TEXTURE) != 0u)
-            clearcoatRoughness *= texture(clearcoatRoughnessTexture, uv).g;
+            clearcoatRoughness *= texture(clearcoatRoughnessTexture, materialUV(material, MATERIAL_CLEARCOAT_ROUGHNESS, uv, uv1)).g;
 
         vec3 clearcoatNormal = normal;
         if(clearcoat > 0.0 && (flags & MATERIAL_FLAG_CLEARCOAT_NORMAL_TEXTURE) != 0u)
         {
+            const vec2 clearcoatNormalUv = materialUV(material, MATERIAL_CLEARCOAT_NORMAL, uv, uv1);
+
             if((flags & MATERIAL_FLAG_VERTEX_TANGENT) != 0u)
-                clearcoatNormal = perturbNormalFromTangent(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, uv, fragTangent, false);
+                clearcoatNormal = perturbNormalFromTangent(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, clearcoatNormalUv, fragTangent, false);
             else
-                clearcoatNormal = perturbNormalFromDerivatives(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, uv, false);
+                clearcoatNormal = perturbNormalFromDerivatives(clearcoatNormalTexture, material.clearcoat.z, normal, fragPosition, clearcoatNormalUv, false);
         }
 
         vec3 sheenColor = material.sheen.rgb;
         if((flags & MATERIAL_FLAG_SHEEN_COLOR_TEXTURE) != 0u)
-            sheenColor *= texture(sheenColorTexture, uv).rgb;
+            sheenColor *= texture(sheenColorTexture, materialUV(material, MATERIAL_SHEEN_COLOR, uv, uv1)).rgb;
 
         float sheenRoughness = material.sheen.a;
         if((flags & MATERIAL_FLAG_SHEEN_ROUGHNESS_TEXTURE) != 0u)
-            sheenRoughness *= texture(sheenRoughnessTexture, uv).a;
+            sheenRoughness *= texture(sheenRoughnessTexture, materialUV(material, MATERIAL_SHEEN_ROUGHNESS, uv, uv1)).a;
 
         float anisotropy = material.anisotropy.x;
         vec2 anisotropyDirection = vec2(1.0, 0.0);
 
         if((flags & MATERIAL_FLAG_ANISOTROPY_TEXTURE) != 0u)
         {
-            const vec3 sampled = texture(anisotropyTexture, uv).rgb;
+            const vec3 sampled = texture(anisotropyTexture, materialUV(material, MATERIAL_ANISOTROPY, uv, uv1)).rgb;
             anisotropyDirection = sampled.rg * 2.0 - 1.0;
             anisotropy *= sampled.b;
         }
@@ -319,12 +325,12 @@ void main()
 
         float iridescenceFactor = material.iridescence.x;
         if((flags & MATERIAL_FLAG_IRIDESCENCE_TEXTURE) != 0u)
-            iridescenceFactor *= texture(iridescenceTexture, uv).r;
+            iridescenceFactor *= texture(iridescenceTexture, materialUV(material, MATERIAL_IRIDESCENCE, uv, uv1)).r;
 
         float iridescenceThickness = material.iridescence.w;
         if((flags & MATERIAL_FLAG_IRIDESCENCE_THICKNESS_TEXTURE) != 0u)
         {
-            const float sampled = texture(iridescenceThicknessTexture, uv).g;
+            const float sampled = texture(iridescenceThicknessTexture, materialUV(material, MATERIAL_IRIDESCENCE_THICKNESS, uv, uv1)).g;
             iridescenceThickness = mix(material.iridescence.z, material.iridescence.w, sampled);
         }
 
@@ -333,11 +339,11 @@ void main()
 
         float transmission = material.transmission.x;
         if((flags & MATERIAL_FLAG_TRANSMISSION_TEXTURE) != 0u)
-            transmission *= texture(transmissionTexture, uv).r;
+            transmission *= texture(transmissionTexture, materialUV(material, MATERIAL_TRANSMISSION, uv, uv1)).r;
 
         float volumeThickness = material.volume.x;
         if((flags & MATERIAL_FLAG_VOLUME_THICKNESS_TEXTURE) != 0u)
-            volumeThickness *= texture(volumeThicknessTexture, uv).g;
+            volumeThickness *= texture(volumeThicknessTexture, materialUV(material, MATERIAL_VOLUME_THICKNESS, uv, uv1)).g;
 
         surface.dielectricF0 = specularF0;
         surface.dielectricF90 = specularWeight;
