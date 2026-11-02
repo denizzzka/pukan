@@ -12,6 +12,18 @@ enum DerivativeStep: float
     sixtyHz = 1.0f / 60.0f,
 }
 
+/// Bone names a locomotion schema is built from, for rigs that disagree with the defaults.
+struct LocomotionBones
+{
+    string root = "root";
+    string pelvis = "pelvis";
+    string head = "head";
+    string handLeft = "hand_l";
+    string handRight = "hand_r";
+    string footLeft = "foot_l";
+    string footRight = "foot_r";
+}
+
 /// A bone that takes part in a match, with the parts of its motion that matter.
 struct BoneChannel
 {
@@ -107,9 +119,10 @@ struct Schema
     /// `poseWeight` is the share of the cost the pose may take. Normalized dimensions put a
     /// bone position and a speed on the same footing, and a bone moves over centimetres where
     /// the trajectory moves over metres, so the pose stays a tie breaker unless it is raised.
-    static Schema locomotion(float poseWeight = 0.01f)
+    static Schema locomotion(float poseWeight = 0.01f, LocomotionBones bones = LocomotionBones())
     {
         Schema result;
+        result.rootBone = bones.root;
 
         result.trajectory = [
             TrajectoryChannel(-0.4, true, false, false, 7),
@@ -119,12 +132,12 @@ struct Schema
         ];
 
         result.bones = [
-            BoneChannel("foot_l", true, true, poseWeight),
-            BoneChannel("foot_r", true, true, poseWeight),
-            BoneChannel("hand_l", true, true, poseWeight),
-            BoneChannel("hand_r", true, true, poseWeight),
-            BoneChannel("pelvis", true, true, poseWeight),
-            BoneChannel("head", true, true, poseWeight),
+            BoneChannel(bones.footLeft, true, true, poseWeight),
+            BoneChannel(bones.footRight, true, true, poseWeight),
+            BoneChannel(bones.handLeft, true, true, poseWeight),
+            BoneChannel(bones.handRight, true, true, poseWeight),
+            BoneChannel(bones.pelvis, true, true, poseWeight),
+            BoneChannel(bones.head, true, true, poseWeight),
         ];
 
         return result;
