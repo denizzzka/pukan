@@ -526,6 +526,9 @@ void main(string[] args)
 
                 motionSampler = new MotionSampler(characterModel.asset, schema);
 
+                // The capsule follows the clip, so the clip must not move the mesh a second time
+                characterModel.setRootMotionNode(motionSampler.rootNodeIndex);
+
                 const modelClips = motionSampler.clips();
 
                 foreach(i, ref clip; modelClips)

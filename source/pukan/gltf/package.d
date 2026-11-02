@@ -222,6 +222,8 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
     private float fadingTime;
     private float blendDuration;
     private float blendRemaining;
+    /// Node whose horizontal motion the caller applies itself, -1 to keep it in the pose
+    private int rootMotionNode = -1;
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
@@ -390,6 +392,13 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
     }
 
     bool isAnimated() const => animation.animations.length > 0;
+
+    /// Keeps the drawn pose in place: the horizontal motion of `node` is dropped, because the
+    /// caller moves the character itself. The root bone of a locomotion clip is that node.
+    void setRootMotionNode(int node)
+    {
+        rootMotionNode = node;
+    }
 
     /// Number of clips the model carries.
     size_t animationCount() const
@@ -971,6 +980,13 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
                 // No clip was chosen, so the model walks its last one on its own
                 animation.currTime += 0.005;
                 applyAnimation();
+            }
+
+            if(rootMotionNode >= 0)
+            {
+                auto root = &animation.perNodeTranslations[rootMotionNode];
+                root.transl.x = 0;
+                root.transl.z = 0;
             }
 
             rootSceneNode.refreshTransFromRootValues;

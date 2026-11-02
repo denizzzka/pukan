@@ -54,6 +54,12 @@ final class MotionSampler
         cycleKnown.length = asset.content.animations.length;
     }
 
+    /// Node the sampler measures every pose from.
+    int rootNodeIndex() const
+    {
+        return rootNode;
+    }
+
     /// Clips of the model, ready for `Database.build`.
     Clip[] clips()
     {
