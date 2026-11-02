@@ -146,6 +146,15 @@ final class MotionSampler
             if(node.payload.name == name)
                 return cast(int) i;
 
+        // Exporters disagree about the case of bone names, so the second pass ignores it
+        import std.uni: toLower;
+
+        const wanted = name.toLower;
+
+        foreach(i, ref node; asset.nodes)
+            if(node.payload.name.toLower == wanted)
+                return cast(int) i;
+
         throw new Exception("the model has no node named " ~ name);
     }
 }
