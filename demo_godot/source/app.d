@@ -923,16 +923,21 @@ void main(string[] args)
                     const picked = motionDatabase.samples[decision.sample];
                     motionClip = picked.clip;
                     motionTime = picked.time;
+
+                    characterModel.blendToAnimation(motionModelClips[motionClip], motionTime, 0.15f);
                 }
                 else
-                    motionTime += dt * decision.playRate;
+                {
+                    const float advance = dt * decision.playRate;
+
+                    motionTime += advance;
+                    characterModel.advanceAnimation(advance);
+                }
 
                 const float clipLength = motionDatabase.clips[motionClip].duration;
 
                 if(clipLength > 0)
                     motionTime %= clipLength;
-
-                characterModel.playAnimation(motionModelClips[motionClip], motionTime);
 
                 if(frameIndex % 60 == 0)
                     writeln("motion: ", motionDatabase.clips[motionClip].name,

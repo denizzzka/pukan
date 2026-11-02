@@ -652,7 +652,7 @@ locomotion only.
 
 - [x] Hard switch to the chosen pose: set the clip and its time. Matching picks a near pose, so
       the switch is mostly invisible.
-- [ ] Then crossfade over a short window: sample the outgoing and the incoming pose, lerp the
+- [x] Then crossfade over a short window: sample the outgoing and the incoming pose, lerp the
       bone transforms on the CPU and reuse the existing skinning path.
 
 ### Later

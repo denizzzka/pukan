@@ -74,6 +74,29 @@ private Boxf accessorAabb(in Accessor accessor)
     );
 }
 
+/// Mixes two node transforms; a part that is not authored counts as its neutral value.
+private Trans blendTrans(in Trans from, in Trans to, float alpha)
+{
+    import dlib.math: slerp;
+    import std.math.traits: isNaN;
+
+    Trans result;
+
+    const fromTransl = from.transl.x.isNaN ? Vector3f(0, 0, 0) : from.transl;
+    const toTransl = to.transl.x.isNaN ? Vector3f(0, 0, 0) : to.transl;
+    result.transl = fromTransl + (toTransl - fromTransl) * alpha;
+
+    const fromRot = from.rot.x.isNaN ? Quaternionf.identity : from.rot;
+    const toRot = to.rot.x.isNaN ? Quaternionf.identity : to.rot;
+    result.rot = slerp(fromRot, toRot, alpha);
+
+    const fromScale = from.scale.x.isNaN ? Vector3f(1, 1, 1) : from.scale;
+    const toScale = to.scale.x.isNaN ? Vector3f(1, 1, 1) : to.scale;
+    result.scale = fromScale + (toScale - fromScale) * alpha;
+
+    return result;
+}
+
 struct Trans
 {
     Vector3f transl;
@@ -193,6 +216,12 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
     /// Clip chosen with `playAnimation`, -1 while the model picks one itself
     private int playingClip = -1;
     private float playingTime;
+    /// Pose being blended out of after a jump
+    private AnimationSupport fading;
+    private int fadingClip = -1;
+    private float fadingTime;
+    private float blendDuration;
+    private float blendRemaining;
 
     // TODO: create GlTF class which uses LoaderNode[] as base for internal tree for faster loading
     // The downside of this is that such GlTF characters will not be able to pick up objects in their hands and so like.
@@ -224,6 +253,7 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
         assert(content.meshes.length > 0);
 
         animation = AnimationSupport(&content, asset.nodes.length);
+        fading = AnimationSupport(&content, asset.nodes.length);
         skinsBaked = content.skins.length > 0 && !isSkinAnimated(content, asset.nodes);
 
         {
@@ -376,6 +406,23 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
         playingTime = time;
     }
 
+    /// Blends into `clip` at `time` over `duration` seconds: the pose playing now fades out
+    /// while the new one fades in, so a jump between clips reads as a transition.
+    void blendToAnimation(size_t clip, float time, float duration)
+    {
+        enforce(clip < content.animations.length, "the model has no such clip");
+
+        if(playingClip >= 0 && duration > 0)
+        {
+            fadingClip = playingClip;
+            fadingTime = playingTime;
+            blendDuration = duration;
+            blendRemaining = duration;
+        }
+
+        playAnimation(clip, time);
+    }
+
     /// Advances the clip being played by `dt` seconds; the time wraps over the clip.
     void advanceAnimation(float dt)
     {
@@ -392,6 +439,12 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
 
             if(playingTime < 0)
                 playingTime += length;
+        }
+
+        if(blendRemaining > 0)
+        {
+            blendRemaining -= dt;
+            fadingTime += dt;
         }
     }
 
@@ -895,6 +948,23 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
             {
                 animation.currTime = playingTime;
                 animation.setPose(&animations[playingClip], baseNodeTranslations);
+
+                if(blendRemaining > 0 && fadingClip >= 0)
+                {
+                    fading.currTime = fadingTime;
+                    fading.setPose(&animations[fadingClip], baseNodeTranslations);
+
+                    const float alpha = blendRemaining >= blendDuration
+                        ? 0
+                        : 1 - blendRemaining / blendDuration;
+
+                    foreach(i; 0 .. animation.perNodeTranslations.length)
+                        animation.perNodeTranslations[i] = blendTrans(
+                            fading.perNodeTranslations[i],
+                            animation.perNodeTranslations[i],
+                            alpha,
+                        );
+                }
             }
             else
             {
