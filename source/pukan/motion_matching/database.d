@@ -1,7 +1,7 @@
 module pukan.motion_matching.database;
 
 import dlib.math: Vector3f;
-import pukan.axes: Axis, planeComponents;
+import pukan.axes: Axis, onPlane, planeComponents;
 import pukan.motion_matching.schema: Schema;
 import pukan.motion_matching.transform: Transform;
 import std.algorithm: min;
@@ -121,7 +121,9 @@ struct Database
                 foreach(ref channel; schema.trajectory)
                 {
                     const at = sampler(clipIdx, time + channel.offset).root;
-                    const position = now.applyInverse(up, at.translation);
+                    // Only the ground plane matters: a character running down a slope must not
+                    // look different from one running on the flat
+                    const position = up.onPlane(now.applyInverse(up, at.translation));
 
                     if(channel.position)
                         putPosition(vectors, valueIdx, position);
@@ -129,7 +131,7 @@ struct Database
                     if(channel.velocity)
                     {
                         const before = sampler(clipIdx, time + channel.offset - step).root;
-                        const positionBefore = now.applyInverse(up, before.translation);
+                        const positionBefore = up.onPlane(now.applyInverse(up, before.translation));
                         putPosition(vectors, valueIdx, (position - positionBefore) / step);
                     }
 

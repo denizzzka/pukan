@@ -33,6 +33,14 @@ struct Matching
     /// Slowest and fastest playback rate.
     float minRate = 0.5f;
     float maxRate = 1.5f;
+    /// How much better another pose has to be, as a fraction of the cost of the one playing,
+    /// before the character interrupts it. Without it two clips of similar speed flip-flop.
+    float switchMargin = 0.2f;
+    /// Seconds one clip keeps the character before another clip may take over. Positions
+    /// inside the same clip still change at any search, which is what motion matching does.
+    float clipSwitchInterval = 0.4f;
+    /// Seconds the current clip has been playing
+    private float inClip = 0;
 
     /// Chooses the pose to play and how fast. Updates `currentSample` and `sinceSearch`.
     Decision step(const Database database, const Query query, float dt)
@@ -51,12 +59,20 @@ struct Matching
         // search does not wait
         const bool due = !hasCurrent || sinceSearch >= searchInterval;
 
-        if(due && hasBest && (!hasCurrent || best.cost < current.cost))
+        const bool better = !hasCurrent || best.cost < current.cost * (1 - switchMargin);
+        const bool sameClip = hasCurrent && hasBest
+            && database.samples[best.sample].clip == database.samples[currentSample].clip;
+        const bool clipMayChange = !hasCurrent || sameClip || inClip >= clipSwitchInterval;
+
+        if(due && hasBest && better && clipMayChange)
         {
             decision.sample = best.sample;
+            inClip = sameClip ? inClip : 0;
             currentSample = best.sample;
             sinceSearch = 0;
         }
+
+        inClip += dt;
 
         const chosen = currentSample != invalidSample
             ? currentSample

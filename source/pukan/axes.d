@@ -67,6 +67,14 @@ Axis dominantAxis(Vector3f direction)
     return y >= z ? Axis.y : Axis.z;
 }
 
+/// Drops the component of `v` along the axis, leaving what lies in the ground plane.
+Vector3f onPlane(Axis up, Vector3f v)
+{
+    const normal = up.axisVector();
+
+    return v - normal * dot(v, normal);
+}
+
 /// The two components of `v` that span the plane the axis leaves free, in x, y, z order.
 float[2] planeComponents(Axis up, Vector3f v)
 {

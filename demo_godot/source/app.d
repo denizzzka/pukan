@@ -548,6 +548,7 @@ void main(string[] args)
                     foreach(i; motionModelClips)
                         locomotionClips ~= modelClips[i];
 
+
                     motionDatabase.build(schema, scene.up, locomotionClips,
                         (size_t clip, float time) => motionSampler.sample(motionModelClips[clip], time));
 
@@ -1005,6 +1006,7 @@ void main(string[] args)
                 if(decision.sample != invalidSample)
                 {
                     const picked = motionDatabase.samples[decision.sample];
+
                     motionClip = picked.clip;
                     motionTime = picked.time;
 
