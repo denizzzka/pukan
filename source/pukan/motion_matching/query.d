@@ -1,6 +1,7 @@
 module pukan.motion_matching.query;
 
 import dlib.math: Vector3f;
+import pukan.axes: Axis, planeComponents;
 import pukan.motion_matching.database: putPosition;
 import pukan.motion_matching.history: PoseHistory;
 import pukan.motion_matching.schema: Schema;
@@ -17,7 +18,7 @@ struct Query
 ///
 /// The root of the query is the character's own transform; bone positions are measured from
 /// it, the same way the database measures them from the clip's root bone.
-void buildQuery(ref Query query, Schema schema, const Trajectory trajectory, const PoseHistory history)
+void buildQuery(ref Query query, Schema schema, Axis up, const Trajectory trajectory, const PoseHistory history)
 {
     const dimensions = schema.dimensions;
     const float step = schema.derivativeStep;
@@ -31,7 +32,7 @@ void buildQuery(ref Query query, Schema schema, const Trajectory trajectory, con
     foreach(ref channel; schema.trajectory)
     {
         const at = trajectory.sampleAt(channel.offset).transform;
-        const position = now.applyInverse(at.translation);
+        const position = now.applyInverse(up, at.translation);
 
         if(channel.position)
             putPosition(query.values, index, position);
@@ -39,15 +40,16 @@ void buildQuery(ref Query query, Schema schema, const Trajectory trajectory, con
         if(channel.velocity)
         {
             const before = trajectory.sampleAt(channel.offset - step).transform;
-            const positionBefore = now.applyInverse(before.translation);
+            const positionBefore = now.applyInverse(up, before.translation);
             putPosition(query.values, index, (position - positionBefore) / step);
         }
 
         if(channel.heading)
         {
-            const heading = now.rotateInverse(at.forward());
-            query.values[index] = heading.x;
-            query.values[index + 1] = heading.z;
+            const heading = now.rotateInverse(up, at.forward(up));
+            const plane = up.planeComponents(heading);
+            query.values[index] = plane[0];
+            query.values[index + 1] = plane[1];
             index += 2;
         }
     }
@@ -86,6 +88,8 @@ unittest
     import pukan.motion_matching.transform: Transform;
     import std.math: abs, sin;
 
+    enum up = Axis.y;
+
     // Root slides along +Z at 2 m/s, a single bone bobs above it
     static ClipPose sampleStraightLine(size_t clip, float time)
     {
@@ -107,7 +111,7 @@ unittest
     ];
 
     Database database;
-    database.build(schema, [Clip("run", 2)], &sampleStraightLine);
+    database.build(schema, up, [Clip("run", 2)], &sampleStraightLine);
 
     // Nothing else in the clip moves like the character does at t = 1: the path is straight
     // but the bone keeps changing, so the right pose is the only one that fits
@@ -125,7 +129,7 @@ unittest
         trajectory.push(dt, Transform(Vector3f(0, 0, 2 * time), 0), Vector3f(0, 0, 2), Vector3f(0, 0, 2), 0);
 
     Query query;
-    buildQuery(query, schema, trajectory, history);
+    buildQuery(query, schema, up, trajectory, history);
 
     assert(query.values.length == schema.dimensions);
 

@@ -1,6 +1,7 @@
 module pukan.mover.quake;
 
 import dlib.math: Vector3f, dot;
+import pukan.axes: Axis, axisVector;
 import pukan.physics.narrowphase: sweepCapsuleBox;
 import pukan.physics.world: CollisionWorld;
 import std.algorithm: min;
@@ -26,7 +27,8 @@ struct QuakeMovementConfig
 /// Capsule dimensions and collision filter of one body
 struct QuakeBody
 {
-    Vector3f up = Vector3f(0, 1, 0);
+    /// Axis the body stands on: the ground normal of the scene
+    Axis up = Axis.y;
     float radius = 0.4f;
     float height = 1.8f;
     float eyeHeight = 1.6f;
@@ -48,7 +50,8 @@ struct QuakeMoveState
     Vector3f velocity;
     bool onGround;
     bool noclip;
-    Vector3f groundNormal = Vector3f(0, 1, 0);
+    /// Normal of the ground under the body, filled by whoever places or moves it
+    Vector3f groundNormal;
 }
 
 /// What one `pmMove` produced
@@ -57,7 +60,8 @@ struct QuakeMoveResult
     Vector3f position;
     Vector3f velocity;
     bool onGround;
-    Vector3f groundNormal = Vector3f(0, 1, 0);
+    /// Normal of the ground the body ended on, or the body's up axis in the air
+    Vector3f groundNormal;
     bool hitWall;
     uint slides;
 }
@@ -134,12 +138,14 @@ Vector3f pmGravity(Vector3f velocity, Vector3f up, float gravity, float dt)
 
 private Vector3f capsuleBottom(in Vector3f feet, in QuakeBody body)
 {
-    return feet + body.up * body.radius;
+    const up = body.up.axisVector;
+    return feet + up * body.radius;
 }
 
 private Vector3f capsuleTop(in Vector3f feet, in QuakeBody body)
 {
-    return feet + body.up * (body.height - body.radius);
+    const up = body.up.axisVector;
+    return feet + up * (body.height - body.radius);
 }
 
 private float horizontalLength(in Vector3f delta, in Vector3f up)
@@ -161,7 +167,9 @@ private QuakeMoveResult pmSlideMove(
     result.position = position;
     result.velocity = velocity;
     result.onGround = startsOnGround;
-    result.groundNormal = body.up;
+
+    const up = body.up.axisVector;
+    result.groundNormal = up;
 
     const floorLimit = cos(config.floorMaxAngle);
     float timeLeft = dt;
@@ -203,7 +211,7 @@ private QuakeMoveResult pmSlideMove(
         timeLeft -= timeLeft * hit.fraction;
         ++result.slides;
 
-        const normalDot = dot(hit.normal, body.up);
+        const normalDot = dot(hit.normal, up);
 
         if(normalDot > floorLimit)
         {
@@ -232,6 +240,8 @@ private QuakeMoveResult pmStepSlideMove(
     bool startsOnGround,
 )
 {
+    const up = body.up.axisVector;
+
     auto flat = pmSlideMove(world, position, velocity, dt, body, config, startsOnGround);
 
     if(!startsOnGround || !flat.hitWall)
@@ -241,26 +251,26 @@ private QuakeMoveResult pmStepSlideMove(
         capsuleBottom(position, body),
         capsuleTop(position, body),
         body.radius,
-        body.up * config.maxStepHeight,
+        up * config.maxStepHeight,
         body.mask,
         config.safeMargin,
     );
 
     const upBlocked = upHit.hit
-        && dot(upHit.normal, body.up) < -cos(config.floorMaxAngle);
+        && dot(upHit.normal, up) < -cos(config.floorMaxAngle);
     const upFraction = upBlocked ? upHit.fraction : 1.0f;
-    const raised = position + body.up * (config.maxStepHeight * upFraction);
+    const raised = position + up * (config.maxStepHeight * upFraction);
 
     auto stepVelocity = velocity;
-    const vertical = dot(stepVelocity, body.up);
+    const vertical = dot(stepVelocity, up);
 
     if(vertical < 0.0f)
-        stepVelocity -= body.up * vertical;
+        stepVelocity -= up * vertical;
 
     auto forward = pmSlideMove(world, raised, stepVelocity, dt, body, config, false);
 
-    const flatDistance = horizontalLength(flat.position - position, body.up);
-    const forwardDistance = horizontalLength(forward.position - position, body.up);
+    const flatDistance = horizontalLength(flat.position - position, up);
+    const forwardDistance = horizontalLength(forward.position - position, up);
 
     // A tiny gain means the raised capsule still hits the obstacle
     if(forwardDistance - flatDistance < config.safeMargin * 5.0f)
@@ -270,21 +280,21 @@ private QuakeMoveResult pmStepSlideMove(
         capsuleBottom(forward.position, body),
         capsuleTop(forward.position, body),
         body.radius,
-        -body.up * config.maxStepHeight,
+        -up * config.maxStepHeight,
         body.mask,
         config.safeMargin,
     );
 
-    if(!downHit.hit || dot(downHit.normal, body.up) <= cos(config.floorMaxAngle))
+    if(!downHit.hit || dot(downHit.normal, up) <= cos(config.floorMaxAngle))
         return forward;
 
     auto stepped = forward;
-    stepped.position = forward.position - body.up * (config.maxStepHeight * downHit.fraction);
+    stepped.position = forward.position - up * (config.maxStepHeight * downHit.fraction);
     stepped.onGround = true;
     stepped.groundNormal = downHit.normal;
 
     // Landing lower than the start is not a step
-    if(dot(stepped.position - position, body.up) <= 1e-3f)
+    if(dot(stepped.position - position, up) <= 1e-3f)
         return forward;
 
     return stepped;
@@ -300,6 +310,8 @@ QuakeMoveResult pmMove(
     in QuakeMovementConfig config = QuakeMovementConfig(),
 )
 {
+    const up = body.up.axisVector;
+
     auto velocity = state.velocity;
     Vector3f wishDir = command.wishDir;
 
@@ -317,7 +329,7 @@ QuakeMoveResult pmMove(
         result.position = state.position + noclipVelocity * dt;
         result.velocity = noclipVelocity;
         result.onGround = false;
-        result.groundNormal = body.up;
+        result.groundNormal = up;
 
         return result;
     }
@@ -328,17 +340,17 @@ QuakeMoveResult pmMove(
     {
         velocity = pmFriction(velocity, dt, config.friction, config.stopSpeed);
         velocity = pmAccelerate(velocity, wishDir, wishSpeed, config.accelerate, dt);
-        velocity = pmGravity(velocity, body.up, config.gravity, dt);
+        velocity = pmGravity(velocity, up, config.gravity, dt);
 
         if(command.jump)
         {
-            velocity = pmJump(velocity, body.up, config.jumpVelocity);
+            velocity = pmJump(velocity, up, config.jumpVelocity);
             onGround = false;
         }
     }
     else
     {
-        velocity = pmGravity(velocity, body.up, config.gravity, dt);
+        velocity = pmGravity(velocity, up, config.gravity, dt);
         velocity = pmAirAccelerate(velocity, wishDir, wishSpeed, config.airAccelerate, dt);
     }
 

@@ -1,6 +1,7 @@
 module pukan.mover.component;
 
 import dlib.math: Vector3f;
+import pukan.axes: axisVector;
 import pukan.mover.quake:
     QuakeBody,
     QuakeCommand,
@@ -28,7 +29,7 @@ final class MoverComponent
         this.world = world;
         this.body = body;
         this.config = config;
-        state.groundNormal = body.up;
+        state.groundNormal = body.up.axisVector;
     }
 
     void setNoclip(bool enabled)
@@ -41,7 +42,7 @@ final class MoverComponent
         state.position = position;
         state.velocity = Vector3f(0, 0, 0);
         state.onGround = false;
-        state.groundNormal = body.up;
+        state.groundNormal = body.up.axisVector;
         previousPosition = position;
     }
 
@@ -68,7 +69,7 @@ final class MoverComponent
 
     Vector3f eyePosition(float alpha = 1.0f) const
     {
-        return renderPosition(alpha) + body.up * body.eyeHeight;
+        return renderPosition(alpha) + body.up.axisVector * body.eyeHeight;
     }
 }
 

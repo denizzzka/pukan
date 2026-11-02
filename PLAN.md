@@ -580,10 +580,13 @@ animation delta replaces the usual input and physics velocity for that step.
 ## Motion Matching
 
 The target is the pose search system Unreal ships as the `PoseSearch` plugin: animation
-segments are sampled into a database of feature vectors, and every search compares a query
+segments are sampled into a database of channel vectors, and every search compares a query
 built from the current pose, velocity and predicted trajectory against them. It replaces
 hand-authored locomotion state machines and blend trees, so it comes after the Mover and
 root motion are solid.
+
+Up is not a constant of the animation code: the scene owns it as an `Axis`, because the
+ground normal is what lets a heading stay a single angle.
 
 ### Skeleton
 
@@ -631,7 +634,8 @@ locomotion only.
 ### Search
 
 - [ ] Linear scan over the whole table, `cost = sum(w * (query - pose)^2)` per dimension, and
-      the lowest cost wins. A few hundred poses do not need a tree.
+      the lowest cost wins. A few hundred poses do not need a tree; a query built for another
+      up axis than the database was built with is a bug and must be caught.
 - [ ] Evaluate the continuing pose as a candidate too, with a database-level bias in its
       favour, and search only when it cannot be continued or the throttle interval elapsed.
 - [ ] Play rate from the ratio between the query speed and the speed of the chosen pose,

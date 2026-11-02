@@ -604,6 +604,7 @@ void main(string[] args)
     camera.speed = speedOption;
 
     QuakeBody characterBody;
+    characterBody.up = scene.up;
     QuakeMovementConfig characterConfig;
     MoverComponent mover;
     QuakeCommand characterCommand;

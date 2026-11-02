@@ -2,6 +2,7 @@ module pukan.scene;
 
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
+import pukan.axes: Axis;
 import pukan.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired, Variants;
 import pukan.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActive;
 import pukan.pbr.pipeline_set: PbrPipelineSet, createPbrPipelineSet;
@@ -21,6 +22,9 @@ import std.uuid: UUID;
 class SceneWith(Modules...)
 {
     alias PipelineVariants = Variants!Modules;
+
+    /// The axis the ground lies across: characters turn around it and take their heading from it
+    Axis up = Axis.y;
 
     LogicalDevice device;
     VkSurfaceKHR surface;

@@ -1,6 +1,7 @@
 module pukan.motion_matching.database;
 
 import dlib.math: Vector3f;
+import pukan.axes: Axis, planeComponents;
 import pukan.motion_matching.schema: Schema;
 import pukan.motion_matching.transform: Transform;
 import std.algorithm: min;
@@ -59,7 +60,7 @@ struct Database
 
     /// Indexes `clips`. The sampler is asked for times outside a clip as well, to measure
     /// velocities and the trajectory points at the ends, so it must wrap or clamp them.
-    void build(Sampler)(Schema schema, const(Clip)[] clips, Sampler sampler)
+    void build(Sampler)(Schema schema, Axis up, const(Clip)[] clips, Sampler sampler)
     {
         static assert(is(typeof(sampler(size_t(0), 0.0f)) == ClipPose),
             "the sampler must take a clip index and a time and return a ClipPose");
@@ -104,7 +105,7 @@ struct Database
                 foreach(ref channel; schema.trajectory)
                 {
                     const at = sampler(clipIdx, time + channel.offset).root;
-                    const position = now.applyInverse(at.translation);
+                    const position = now.applyInverse(up, at.translation);
 
                     if(channel.position)
                         putPosition(vectors, valueIdx, position);
@@ -112,15 +113,16 @@ struct Database
                     if(channel.velocity)
                     {
                         const before = sampler(clipIdx, time + channel.offset - step).root;
-                        const positionBefore = now.applyInverse(before.translation);
+                        const positionBefore = now.applyInverse(up, before.translation);
                         putPosition(vectors, valueIdx, (position - positionBefore) / step);
                     }
 
                     if(channel.heading)
                     {
-                        const heading = now.rotateInverse(at.forward());
-                        vectors[valueIdx] = heading.x;
-                        vectors[valueIdx + 1] = heading.z;
+                        const heading = now.rotateInverse(up, at.forward(up));
+                        const plane = up.planeComponents(heading);
+                        vectors[valueIdx] = plane[0];
+                        vectors[valueIdx + 1] = plane[1];
                         valueIdx += 2;
                     }
                 }
@@ -183,6 +185,8 @@ unittest
     import pukan.motion_matching.schema: BoneChannel, TrajectoryChannel;
     import std.math: abs, sin;
 
+    enum up = Axis.y;
+
     // Root slides along +Z at 2 m/s, a single bone bobs above it
     static ClipPose sampleStraightLine(size_t clip, float time)
     {
@@ -203,7 +207,7 @@ unittest
     assert(schema.dimensions == 14);
 
     Database database;
-    database.build(schema, [Clip("walk", 2)], &sampleStraightLine);
+    database.build(schema, up, [Clip("walk", 2)], &sampleStraightLine);
 
     // Two seconds at 30 Hz, both ends included
     assert(database.samples.length == 61);
@@ -247,6 +251,8 @@ unittest
 {
     import pukan.motion_matching.schema: BoneChannel;
 
+    enum up = Axis.y;
+
     static ClipPose sampleStill(size_t clip, float time)
     {
         ClipPose result;
@@ -261,7 +267,7 @@ unittest
     Database database;
     database.baseBias = 0.5f;
     database.loopBias = 0.25f;
-    database.build(schema, [Clip("idle", 1), Clip("turn", 1, false)], &sampleStill);
+    database.build(schema, up, [Clip("idle", 1), Clip("turn", 1, false)], &sampleStill);
 
     assert(database.samples.length == 62);
     assert(database.samples[0].bias == 0.75f);

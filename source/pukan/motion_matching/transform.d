@@ -1,14 +1,17 @@
 module pukan.motion_matching.transform;
 
 import dlib.math: Vector3f;
-import std.math: PI, abs, cos, sin;
+import pukan.axes: Axis, axisForward, rotateAround;
+import std.math: PI;
 
 /// Position and heading of a character, or of the root bone of a clip.
-/// Only movement over the ground is described: the up axis is Y.
+///
+/// Only movement over the ground is described: the heading is a single angle around the up
+/// axis, which the scene owns.
 struct Transform
 {
     Vector3f translation;
-    /// Radians around the up axis; zero looks along +Z.
+    /// Radians around the up axis; zero looks along `Axis.axisForward`.
     float yaw;
 
     static Transform identity()
@@ -17,30 +20,30 @@ struct Transform
     }
 
     /// Turns a point of the local space into the world space.
-    Vector3f apply(Vector3f point) const
+    Vector3f apply(Axis up, Vector3f point) const
     {
-        return rotate(point) + translation;
+        return rotate(up, point) + translation;
     }
 
     /// Turns a world point into the local space.
-    Vector3f applyInverse(Vector3f point) const
+    Vector3f applyInverse(Axis up, Vector3f point) const
     {
-        return rotateInverse(point - translation);
+        return rotateInverse(up, point - translation);
     }
 
-    Vector3f rotate(Vector3f direction) const
+    Vector3f rotate(Axis up, Vector3f direction) const
     {
-        return rotateAroundUp(direction, yaw);
+        return direction.rotateAround(up, yaw);
     }
 
-    Vector3f rotateInverse(Vector3f direction) const
+    Vector3f rotateInverse(Axis up, Vector3f direction) const
     {
-        return rotateAroundUp(direction, -yaw);
+        return direction.rotateAround(up, -yaw);
     }
 
-    Vector3f forward() const
+    Vector3f forward(Axis up) const
     {
-        return Vector3f(sin(yaw), 0, cos(yaw));
+        return rotate(up, up.axisForward);
     }
 
     /// Interpolates position linearly and heading along the shorter arc;
@@ -69,27 +72,18 @@ float wrapAngle(float angle)
     return angle;
 }
 
-/// Rotates around the up axis, the one direction the ground leaves free.
-Vector3f rotateAroundUp(Vector3f v, float angle)
-{
-    const c = cos(angle);
-    const s = sin(angle);
-
-    return Vector3f(
-        v.x * c + v.z * s,
-        v.y,
-        -v.x * s + v.z * c,
-    );
-}
-
 unittest
 {
+    import std.math: abs;
+
+    enum up = Axis.y;
+
     const t = Transform(Vector3f(3, 0, 0), PI / 2);
 
     // A quarter turn sends +Z to +X
-    const p = t.rotate(Vector3f(0, 0, 1));
+    const p = t.rotate(up, Vector3f(0, 0, 1));
     assert((p - Vector3f(1, 0, 0)).length < 1e-5);
-    assert((t.applyInverse(t.apply(Vector3f(1, 2, 3))) - Vector3f(1, 2, 3)).length < 1e-5);
+    assert((t.applyInverse(up, t.apply(up, Vector3f(1, 2, 3))) - Vector3f(1, 2, 3)).length < 1e-5);
 
     assert(wrapAngle(3 * PI / 2) < 0);
     assert(wrapAngle(cast(float) PI) == cast(float) PI);
@@ -97,6 +91,8 @@ unittest
 
 unittest
 {
+    import std.math: abs;
+
     const a = Transform(Vector3f(0, 0, 0), 0.1);
     const b = Transform(Vector3f(10, 0, 0), 0.3);
 
