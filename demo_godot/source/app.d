@@ -920,6 +920,8 @@ void main(string[] args)
                 // that fits it, and the chosen clip is played from the chosen time
                 const float yaw = atan2(flatForward.x, flatForward.z);
 
+                // The wanted velocity only shapes the prediction, so a change of intent settles
+                // over a few searches; clips at more speeds or a heavier trajectory sharpen it
                 trajectory.push(dt, Transform(mover.state.position, yaw),
                     mover.state.velocity,
                     characterCommand.wishDir * characterCommand.wishSpeed,
