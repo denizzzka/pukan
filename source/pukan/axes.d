@@ -1,7 +1,7 @@
 module pukan.axes;
 
 import dlib.math: Vector3f, cross, dot;
-import std.math: cos, sin;
+import std.math: abs, cos, sin;
 
 /// One of the coordinate axes, for a direction that is fixed for a whole scene.
 ///
@@ -53,6 +53,19 @@ Vector3f axisForward(Axis up)
     }
 }
 
+/// The coordinate axis `direction` points along most.
+Axis dominantAxis(Vector3f direction)
+{
+    const x = abs(direction.x);
+    const y = abs(direction.y);
+    const z = abs(direction.z);
+
+    if(x >= y && x >= z)
+        return Axis.x;
+
+    return y >= z ? Axis.y : Axis.z;
+}
+
 /// The two components of `v` that span the plane the axis leaves free, in x, y, z order.
 float[2] planeComponents(Axis up, Vector3f v)
 {
@@ -82,4 +95,6 @@ unittest
     // The up component is not part of the plane
     const plane = Axis.y.planeComponents(Vector3f(1, 5, 2));
     assert(plane[0] == 1 && plane[1] == 2);
+
+    assert(Vector3f(0.1f, -3, 0.2f).dominantAxis == Axis.y);
 }

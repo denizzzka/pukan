@@ -590,14 +590,14 @@ void main(string[] args)
 
     if(useSceneCamera && godotScene.hasCamera)
     {
-        camera = FlyCamera.fromView(godotScene.camera.view);
+        camera = FlyCamera.fromView(godotScene.camera.view, scene.up);
         camera.fov = godotScene.camera.fov;
         nearPlane = godotScene.camera.nearPlane;
         farPlane = godotScene.camera.farPlane;
     }
     else
     {
-        camera = FlyCamera.lookingAt(eye, target);
+        camera = FlyCamera.lookingAt(eye, target, scene.up);
         camera.fov = fovOption;
     }
 

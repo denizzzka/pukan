@@ -1,11 +1,11 @@
 module pukan.fly_camera;
 
 import dlib.math: Matrix4x4f, Quaternionf, Vector3f, cross, degtorad, dot, rotationQuaternion;
+import pukan.axes: Axis, axisForward, axisVector, dominantAxis;
 import pukan.camera: cameraTransform, cameraView;
 import std.algorithm: clamp;
 import std.math: isClose, pow;
 
-private enum worldUp = Vector3f(0, 1, 0);
 private enum cameraRight = Vector3f(1, 0, 0);
 private enum cameraUp = Vector3f(0, 1, 0);
 private enum cameraBack = Vector3f(0, 0, 1);
@@ -33,23 +33,27 @@ struct FlyCamera
     /// Rotation from camera space to world space
     Quaternionf orientation = Quaternionf(0, 0, 0, 1);
     LookAxis lookAxis = LookAxis.horizontal;
+    /// Up axis of the world the camera flies in, taken from the scene
+    Axis worldUp = Axis.y;
     float fov = 45.0f;
 
     /// A camera at `eye` whose -Z axis points at `target`
-    static FlyCamera lookingAt(Vector3f eye, Vector3f target)
+    static FlyCamera lookingAt(Vector3f eye, Vector3f target, Axis worldUp = Axis.y)
     {
         FlyCamera result;
+        result.worldUp = worldUp;
         result.position = eye;
-        result.orientation = orientationOf(cameraTransform(eye, target, worldUp));
+        result.orientation = orientationOf(cameraTransform(eye, target, worldUp.axisVector));
         return result;
     }
 
     /// The camera whose view matrix is `view`, so its first frame matches it
-    static FlyCamera fromView(in Matrix4x4f view)
+    static FlyCamera fromView(in Matrix4x4f view, Axis worldUp = Axis.y)
     {
         const transform = view.inverse;
 
         FlyCamera result;
+        result.worldUp = worldUp;
         result.position = Vector3f(transform.a14, transform.a24, transform.a34);
         result.orientation = orientationOf(transform);
         return result;
@@ -82,8 +86,8 @@ struct FlyCamera
     {
         const yaw = -dx * sensitivity;
 
-        if(lookAxis == LookAxis.horizontal && dot(up, worldUp) >= 0)
-            orientation = (rotationQuaternion(worldUp, yaw) * orientation).normalized();
+        if(lookAxis == LookAxis.horizontal && dot(up, worldUp.axisVector) >= 0)
+            orientation = (rotationQuaternion(worldUp.axisVector, yaw) * orientation).normalized();
         else
             orientation = (orientation * rotationQuaternion(cameraUp, yaw)).normalized();
 
@@ -104,7 +108,7 @@ struct FlyCamera
     /// Moves along `local` (x right, y world up, z forward) by `distance` units
     void move(Vector3f local, float distance)
     {
-        const direction = right * local.x + worldUp * local.y + forward * local.z;
+        const direction = right * local.x + worldUp.axisVector * local.y + forward * local.z;
 
         if(direction.lengthsqr == 0)
             return;
@@ -117,7 +121,7 @@ struct FlyCamera
     void pan(float rightDistance, float upDistance)
     {
         position += right * rightDistance;
-        position += (lookAxis == LookAxis.horizontal ? worldUp : up) * upDistance;
+        position += (lookAxis == LookAxis.horizontal ? worldUp.axisVector : up) * upDistance;
     }
 
     /// Wheel notches: positive zooms in by narrowing the field of view
@@ -136,9 +140,9 @@ struct FlyCamera
     {
         const forward = this.forward;
 
-        auto reference = worldUp;
+        auto reference = worldUp.axisVector;
         if(cross(forward, reference).length < 1e-6f)
-            reference = cameraBack;
+            reference = forward.dominantAxis.axisForward;
 
         const right = cross(forward, reference).normalized();
         const up = cross(right, forward);
@@ -409,4 +413,21 @@ unittest
 
     // Moving the cursor right must turn the view right
     assert(camera.forward.x > 0.0f);
+}
+
+unittest
+{
+    // A camera in a Z-up world turns around Z and climbs along it
+    auto camera = FlyCamera.lookingAt(Vector3f(0, 0, 0), Vector3f(0, -1, 0), Axis.z);
+
+    assert(camera.worldUp == Axis.z);
+
+    camera.look(100, 0);
+
+    assert(isClose(camera.forward.z, 0, 1e-5f, 1e-5f));
+    assert(camera.forward.x < 0);
+    requireOrthonormal(camera.view);
+
+    camera.move(Vector3f(0, 1, 0), 2);
+    assert(isClose(camera.position.z, 2, 1e-4f, 1e-4f));
 }

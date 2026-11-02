@@ -294,6 +294,7 @@ void main(string[] args) {
     camera = FlyCamera.lookingAt(
         Vector3f(0, 0.2f, -initialCameraDistance),
         Vector3f(0, 0, 0),
+        scene.up,
     );
     camera.fov = cameraFovY;
     camera.speed = 1.0f;

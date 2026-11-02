@@ -1,19 +1,20 @@
 module pukan.camera;
 
 import dlib.math: Matrix4x4f, Vector3f, dot, perspectiveMatrix;
+import pukan.axes: axisForward, dominantAxis;
 
 /// Transform of a camera placed at `eye` and looking at `target`
 Matrix4x4f cameraTransform(Vector3f eye, Vector3f target, Vector3f up)
 {
     import dlib.math: cross;
-    import std.math: abs;
 
     const forward = (target - eye).normalized;
     auto realUp = up;
 
-    // A view parallel to the up axis has no right axis, so any other axis serves
+    // A view parallel to its up has no right axis, so the axis after the one it looks
+    // along serves
     if(cross(forward, realUp).length < 1e-6f)
-        realUp = abs(forward.y) > 0.9f ? Vector3f(0, 0, 1) : Vector3f(0, 1, 0);
+        realUp = forward.dominantAxis.axisForward;
 
     const right = cross(forward, realUp).normalized;
     realUp = cross(right, forward);
