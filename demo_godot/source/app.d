@@ -10,7 +10,7 @@ import pukan.motion_matching.search: currentVelocity;
 import pukan.motion_matching.query: Query, buildQuery;
 import pukan.motion_matching.schema: Schema;
 import pukan.motion_matching.trajectory: Trajectory;
-import pukan.motion_matching.transform: Transform;
+import pukan.motion_matching.transform: Transform, wrapAngle;
 import pukan.mover.component: MoverComponent;
 import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
 import pukan.pbr.pipelines: plainShading;
@@ -787,6 +787,9 @@ void main(string[] args)
     bool characterCursorKnown;
     float characterMaxHeight = -float.infinity;
     float characterYaw = 0.0f;
+    /// Direction the character faces, in the `Transform` convention; third person turns it
+    /// towards the movement, first person keeps it on the camera
+    float characterFacing = atan2(camera.forward.x, camera.forward.z);
     float thirdPersonDistance = 6.0f;
     bool thirdPersonKeyWasDown;
     bool characterVisible = true;
@@ -898,8 +901,8 @@ void main(string[] args)
                     // The clip owns the motion, so the feet cannot slide; the input then reaches
                     // the search only as the wanted velocity of the predicted trajectory
                     const float speed = motionSpeed * motionRate;
-                    const float yaw = -characterYaw;
-                    const Vector3f forward = Vector3f(sin(yaw), 0, cos(yaw));
+                    const Vector3f forward = Vector3f(sin(characterFacing), 0,
+                        cos(characterFacing));
 
                     mover.state.velocity = Vector3f(forward.x * speed,
                         mover.state.velocity.y, forward.z * speed);
@@ -923,21 +926,43 @@ void main(string[] args)
             Vector3f flatForward = camera.forward;
             flatForward.y = 0;
 
-            if(flatForward.length > 1e-4f)
-                characterYaw = -atan2(flatForward.x, flatForward.z);
+            if(thirdPerson)
+            {
+                Vector3f wish = characterCommand.wishDir;
+                wish.y = 0;
+
+                if(wish.length > 1e-4f)
+                {
+                    // A limited turn keeps the feet plausible while strafing or backing up
+                    const float wanted = atan2(wish.x, wish.z);
+                    const float limit = 10.0f * dt;
+                    const float turn = wrapAngle(wanted - characterFacing);
+
+                    characterFacing += turn > limit ? limit : (turn < -limit ? -limit : turn);
+                }
+            }
+            else if(flatForward.length > 1e-4f)
+                characterFacing = atan2(flatForward.x, flatForward.z);
+
+            characterYaw = -characterFacing;
 
             if(motionReady)
             {
                 // The query describes the capsule as it moves; the search then picks the pose
                 // that fits it, and the chosen clip is played from the chosen time
-                const float yaw = atan2(flatForward.x, flatForward.z);
-
                 // The wanted velocity only shapes the prediction, so a change of intent settles
                 // over a few searches; clips at more speeds or a heavier trajectory sharpen it
-                trajectory.push(dt, Transform(mover.state.position, yaw),
+                Vector3f wish = characterCommand.wishDir;
+                wish.y = 0;
+
+                const float wantedYaw = wish.length > 1e-4f
+                    ? atan2(wish.x, wish.z)
+                    : characterFacing;
+
+                trajectory.push(dt, Transform(mover.state.position, characterFacing),
                     mover.state.velocity,
                     characterCommand.wishDir * characterCommand.wishSpeed,
-                    yaw);
+                    wantedYaw);
 
                 const playing = motionSampler.sample(motionModelClips[motionClip], motionTime);
                 poseHistory.push(dt, playing.bones);
