@@ -6,9 +6,9 @@ import pukan.gltf.animation: AnimationSupport;
 import pukan.gltf.loader: GltfAsset;
 import pukan.motion_matching.database: Clip, ClipPose;
 import pukan.motion_matching.schema: Schema;
-import pukan.motion_matching.transform: Transform;
+import pukan.motion_matching.transform: Transform, wrapAngle;
 import std.exception: enforce;
-import std.math: atan2;
+import std.math: atan2, floor;
 
 /// Reads the clips of a loaded model into the space motion matching compares.
 ///
@@ -23,6 +23,10 @@ final class MotionSampler
     private int rootNode;
     private int[] boneNodes;
     private Matrix4x4f[] worldMatrices;
+    /// Displacement and turn of one whole cycle of a clip, measured on first use
+    private Vector3f[] cycleShift;
+    private float[] cycleYaw;
+    private bool[] cycleKnown;
 
     this(GltfAsset asset, Schema schema)
     {
@@ -44,6 +48,10 @@ final class MotionSampler
 
         foreach(i, ref bone; schema.bones)
             boneNodes[i] = findNode(bone.bone);
+
+        cycleShift.length = asset.content.animations.length;
+        cycleYaw.length = asset.content.animations.length;
+        cycleKnown.length = asset.content.animations.length;
     }
 
     /// Clips of the model, ready for `Database.build`.
@@ -81,23 +89,41 @@ final class MotionSampler
         return result;
     }
 
-    /// Pose of `clip` at `time`; the time wraps around the clip.
+    /// Pose of `clip` at `time`.
+    ///
+    /// The pose repeats every cycle, but the root does not return to where it started: whole
+    /// cycles add up, so the root keeps moving past the clip ends. A clip of a character
+    /// walking forward therefore describes a walk that never turns back at its loop point.
     ClipPose sample(size_t clip, float time)
     {
         const length = duration(clip);
 
         float local = time;
+        float cycles = 0;
 
         if(length > 0)
         {
-            local %= length;
-
-            if(local < 0)
-                local += length;
+            cycles = floor(time / length);
+            local = time - cycles * length;
         }
         else
             local = 0;
 
+        auto result = evaluate(clip, local);
+
+        if(cycles != 0)
+        {
+            measureCycle(clip);
+
+            result.root.translation += cycleShift[clip] * cycles;
+            result.root.yaw += cycleYaw[clip] * cycles;
+        }
+
+        return result;
+    }
+
+    private ClipPose evaluate(size_t clip, float local)
+    {
         support.currTime = local;
         support.setPose(&asset.content.animations[clip], basePose);
 
@@ -119,6 +145,28 @@ final class MotionSampler
             result.bones ~= translation(rootInverse * worldMatrices[node]);
 
         return result;
+    }
+
+    /// Measures what one whole cycle of `clip` adds to the root.
+    private void measureCycle(size_t clip)
+    {
+        if(cycleKnown[clip])
+            return;
+
+        cycleKnown[clip] = true;
+
+        const length = duration(clip);
+
+        if(length <= 0)
+            return;
+
+        const start = evaluate(clip, 0);
+
+        // The last key sits at the clip length, which the sampler would wrap back to zero
+        const finish = evaluate(clip, length - 1e-4f);
+
+        cycleShift[clip] = finish.root.translation - start.root.translation;
+        cycleYaw[clip] = wrapAngle(finish.root.yaw - start.root.yaw);
     }
 
     private void accumulate(size_t node, Matrix4x4f parent)
