@@ -504,9 +504,7 @@ void main(string[] args)
     /// Horizontal speed of the pose playing and how fast it plays: together they move the capsule
     float motionSpeed = 0;
     float motionRate = 1;
-    float characterModelScaleX = 1.0f;
-    float characterModelScaleY = 1.0f;
-    float characterModelScaleZ = 1.0f;
+    float characterModelScale = 1.0f;
 
     if(characterMode)
     {
@@ -622,20 +620,10 @@ void main(string[] args)
 
         if(bounds.min.y == bounds.min.y && bounds.max.y > bounds.min.y)
         {
-            characterModelScaleY = 1.8f / (bounds.max.y - bounds.min.y);
-
-            const width = bounds.max.x - bounds.min.x;
-            const depth = bounds.max.z - bounds.min.z;
-            const capsuleDiameter = 0.8f;
-
-            characterModelScaleX = width > 0.0f
-                ? min(characterModelScaleY, capsuleDiameter / width)
-                : characterModelScaleY;
-            characterModelScaleZ = depth > 0.0f
-                ? min(characterModelScaleY, capsuleDiameter / depth)
-                : characterModelScaleY;
-
-            characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScaleY, 0);
+            // Even scaling only: a bind pose with the arms out is wider than the capsule, and
+            // squeezing the width to fit it flattens the whole body
+            characterModelScale = 1.8f / (bounds.max.y - bounds.min.y);
+            characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScale, 0);
         }
     }
 
@@ -1046,7 +1034,7 @@ void main(string[] args)
             characterTransform = trsMatrix(
                 characterRenderPosition + characterModelOffset,
                 rotationMatrix!float(Axis.y, characterYaw),
-                Vector3f(characterModelScaleX, characterModelScaleY, characterModelScaleZ),
+                Vector3f(characterModelScale, characterModelScale, characterModelScale),
             );
 
         if(debugCapsuleLines && characterMode)
