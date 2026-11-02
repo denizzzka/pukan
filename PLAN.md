@@ -551,6 +551,9 @@ animation delta replaces the usual input and physics velocity for that step.
 - [ ] `CharacterInput` from GLFW: WASD, mouse look, Space, Ctrl and attack.
 - [x] First-person camera at eye height and third-person camera with a collision-aware
       spring arm.
+- [ ] The spring arm only shortens on a ray from the eye, so dropping off a ledge leaves the
+      camera on the old line and inside the block behind it; sweep a sphere, or push the
+      camera out of the colliders it ended up in.
 - [x] `demo_godot --character` and `--third-person` spawn the preset on the platformer
       stage and on the movement gym; a mode switch returns to the fly camera without
       losing the body state.
