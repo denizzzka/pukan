@@ -48,8 +48,9 @@ fixture passed to `--model`, simply plays its own animation.
 In third person the camera pulls in when a wall is behind the character; `--no-spring-arm`
 keeps the distance fixed.
 
-`--debug-capsule` draws the collision capsule, `--walk` holds forward, `--noclip` ignores
-collisions, and `--physics-hz` sets the character tick rate.
+`--debug-capsule` draws the collision capsule, `--walk` holds forward, `--move-speed` sets how
+fast the character runs (the Quake maximum by default), `--noclip` ignores collisions, and
+`--physics-hz` sets the character tick rate.
 
 ## Controls
 

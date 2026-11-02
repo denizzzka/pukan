@@ -294,6 +294,7 @@ void main(string[] args)
     bool debugCapsule;
     string modelOption;
     float physicsHz = 60.0f;
+    float moveSpeedOption;
     float fovOption = cameraFov;
     float nearOption = cameraNear;
     float farOption = cameraFar;
@@ -324,6 +325,7 @@ void main(string[] args)
         "model", "character model path; defaults to CesiumMan", &modelOption,
         "third-person", "draw the character from behind", &thirdPerson,
         "physics-hz", "fixed character tick rate", &physicsHz,
+        "move-speed", "character speed in units per second; defaults to the Quake maximum", &moveSpeedOption,
         "fov", "vertical field of view in degrees", &fovOption,
         "near", "near clipping distance", &nearOption,
         "far", "far clipping distance", &farOption,
@@ -705,6 +707,9 @@ void main(string[] args)
     QuakeBody characterBody;
     characterBody.up = scene.up;
     QuakeMovementConfig characterConfig;
+
+    if(moveSpeedOption > 0)
+        characterConfig.maxSpeed = moveSpeedOption;
     MoverComponent mover;
     QuakeCommand characterCommand;
     characterCommand.wishDir = Vector3f(0, 0, 0);
