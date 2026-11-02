@@ -39,6 +39,12 @@ The capsule starts at `--spawn x,y,z` when given, else at the first `Marker3D` o
 start point inside the geometry is lifted out along the up axis, so a marker under the
 terrain cannot trap it.
 
+The default model is `demo/assets/motion/UAL1_Standard_RM.glb`, and its `Idle_Loop`,
+`Walk_Loop`, `Jog_Fwd_Loop` and `Sprint_Loop` clips drive motion matching: the Mover still
+moves the capsule, the search picks the pose that fits its speed and turn, and the chosen
+clip plays from the chosen time. A model without those clips, such as the CesiumMan
+fixture passed to `--model`, simply plays its own animation.
+
 In third person the camera pulls in when a wall is behind the character; `--no-spring-arm`
 keeps the distance fixed.
 

@@ -621,8 +621,10 @@ locomotion only.
       path, so the two can never measure velocities differently.
 - [ ] No normalization in the first slice: weights carry the units, so a cost is comparable
       only inside one database.
-- [ ] Build the database at load from the clips the model carries; a serialized cache is a
-      later item. Needs the sampler over the glTF content.
+- [x] Build the database at load from the clips the model carries; a serialized cache is a
+      later item.
+- [x] Whole cycles add up: the root of a looping clip keeps moving past its loop point, so
+      the seam does not read as one huge step backwards.
 
 ### Query
 
@@ -641,14 +643,14 @@ locomotion only.
       up axis than the database was built with is a bug and is caught.
 - [x] Evaluate the continuing pose as a candidate too, with a database-level bias in its
       favour, so the character is not interrupted for nothing.
-- [ ] Search only when the pose cannot be continued or the interval since the last search
+- [x] Search only when the pose cannot be continued or the interval since the last search
       elapsed.
 - [x] Play rate from the ratio between the query speed and the speed of the chosen pose,
       clamped to an interval.
 
 ### Playback
 
-- [ ] Hard switch to the chosen pose: set the clip and its time. Matching picks a near pose, so
+- [x] Hard switch to the chosen pose: set the clip and its time. Matching picks a near pose, so
       the switch is mostly invisible.
 - [ ] Then crossfade over a short window: sample the outgoing and the incoming pose, lerp the
       bone transforms on the CPU and reuse the existing skinning path.

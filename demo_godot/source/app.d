@@ -2,6 +2,14 @@ import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix;
 import pukan;
 import pukan.axes: axisVector;
 import pukan.misc: Boxf, trsMatrix;
+import pukan.gltf.motion_sampler: MotionSampler;
+import pukan.motion_matching.database: Clip, Database, invalidSample;
+import pukan.motion_matching.history: PoseHistory;
+import pukan.motion_matching.matching: Matching;
+import pukan.motion_matching.query: Query, buildQuery;
+import pukan.motion_matching.schema: Schema;
+import pukan.motion_matching.trajectory: Trajectory;
+import pukan.motion_matching.transform: Transform;
 import pukan.mover.component: MoverComponent;
 import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
 import pukan.pbr.pipelines: plainShading;
@@ -477,6 +485,17 @@ void main(string[] args)
 
     GlTF characterModel;
     Vector3f characterModelOffset;
+
+    MotionSampler motionSampler;
+    Database motionDatabase;
+    Matching matching;
+    Trajectory trajectory;
+    PoseHistory poseHistory;
+    Query motionQuery;
+    size_t[] motionModelClips;
+    size_t motionClip;
+    float motionTime;
+    bool motionReady;
     float characterModelScaleX = 1.0f;
     float characterModelScaleY = 1.0f;
     float characterModelScaleZ = 1.0f;
@@ -487,10 +506,50 @@ void main(string[] args)
 
         const modelPath = modelOption.length
             ? modelOption
-            : "demo/assets/gltf_samples/CesiumMan/glTF-Binary/CesiumMan.glb";
+            : "demo/assets/motion/UAL1_Standard_RM.glb";
 
         if(exists(modelPath))
             characterModel = scene.gltfFactory.create(modelPath);
+
+        if(characterModel)
+        {
+            try
+            {
+                auto schema = Schema.locomotion;
+                schema.rootBone = "root";
+
+                motionSampler = new MotionSampler(characterModel.asset, schema);
+
+                const modelClips = motionSampler.clips();
+
+                foreach(i, ref clip; modelClips)
+                    if(clip.name == "Idle_Loop" || clip.name == "Walk_Loop"
+                        || clip.name == "Jog_Fwd_Loop" || clip.name == "Sprint_Loop")
+                        motionModelClips ~= i;
+
+                if(motionModelClips.length > 0)
+                {
+                    Clip[] locomotionClips;
+
+                    foreach(i; motionModelClips)
+                        locomotionClips ~= modelClips[i];
+
+                    motionDatabase.build(schema, scene.up, locomotionClips,
+                        (size_t clip, float time) => motionSampler.sample(motionModelClips[clip], time));
+
+                    motionReady = true;
+                    motionClip = 0;
+                    motionTime = 0;
+                    characterModel.playAnimation(motionModelClips[0], 0);
+
+                    writeln("motion matching: ", locomotionClips.length, " clips ",
+                        motionDatabase.samples.length, " poses ",
+                        schema.dimensions, " channels");
+                }
+            }
+            catch(Exception e)
+                writeln("motion matching off: ", e.msg);
+        }
     }
     scope(exit) if(characterModel) destroy(characterModel);
     writeln("loaded ", packPath.length ? packPath : scenePath, ": meshes ", godotScene.meshCount,
@@ -833,6 +892,47 @@ void main(string[] args)
 
             if(flatForward.length > 1e-4f)
                 characterYaw = -atan2(flatForward.x, flatForward.z);
+
+            if(motionReady)
+            {
+                // The query describes the capsule as it moves; the search then picks the pose
+                // that fits it, and the chosen clip is played from the chosen time
+                const float yaw = atan2(flatForward.x, flatForward.z);
+
+                trajectory.push(dt, Transform(mover.state.position, yaw),
+                    mover.state.velocity,
+                    characterCommand.wishDir * characterCommand.wishSpeed,
+                    yaw);
+
+                const playing = motionSampler.sample(motionModelClips[motionClip], motionTime);
+                poseHistory.push(dt, playing.bones);
+
+                buildQuery(motionQuery, motionDatabase.schema, scene.up, trajectory, poseHistory);
+
+                matching.currentSample = motionDatabase.sampleIndex(motionClip, motionTime);
+
+                const decision = matching.step(motionDatabase, motionQuery, dt);
+
+                if(decision.sample != invalidSample)
+                {
+                    const picked = motionDatabase.samples[decision.sample];
+                    motionClip = picked.clip;
+                    motionTime = picked.time;
+                }
+                else
+                    motionTime += dt * decision.playRate;
+
+                const float clipLength = motionDatabase.clips[motionClip].duration;
+
+                if(clipLength > 0)
+                    motionTime %= clipLength;
+
+                characterModel.playAnimation(motionModelClips[motionClip], motionTime);
+
+                if(frameIndex % 60 == 0)
+                    writeln("motion: ", motionDatabase.clips[motionClip].name,
+                        " t=", motionTime, " rate=", decision.playRate);
+            }
 
             if(thirdPerson)
             {
