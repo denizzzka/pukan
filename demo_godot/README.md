@@ -54,7 +54,8 @@ of the chosen pose times its play rate, so the feet cannot slide. Collisions sta
 Mover. A model without those clips, such as the CesiumMan
 fixture passed to `--model`, simply plays its own animation.
 
-Movement is camera-relative: W runs where the view looks, A and D to the sides, S back. The
+Movement is camera-relative: W runs where the view looks, A and D to the sides, S back, and
+Shift walks instead of running. The
 character turns towards where it moves and plays its forward clips, because the library has
 no strafing or backwards motion.
 

@@ -34,6 +34,9 @@ else alias DebugEntities = AliasSeq!();
 
 alias appEntities = AliasSeq!(DebugEntities, WindowSurface);
 
+/// Share of the run speed that makes the search pick a walk instead of a run
+private enum walkSpeedFactor = 0.2f;
+
 const(char)*[] glfwExtraExtensions(Modules...)()
 {
     import std.algorithm: canFind;
@@ -895,9 +898,13 @@ void main(string[] args)
                     - (pressed(GLFW_KEY_A) ? 1.0f : 0.0f);
                 const wish = forward * forwardInput + right * rightInput;
 
+                const bool walk = pressed(GLFW_KEY_LEFT_SHIFT)
+                    || pressed(GLFW_KEY_RIGHT_SHIFT);
+
                 characterCommand.wishDir = wish;
                 characterCommand.wishSpeed = wish.length > 1e-6f
-                    ? characterConfig.maxSpeed
+                    ? (walk ? characterConfig.maxSpeed * walkSpeedFactor
+                        : characterConfig.maxSpeed)
                     : 0.0f;
                 characterCommand.jump = pressed(GLFW_KEY_SPACE);
             }
