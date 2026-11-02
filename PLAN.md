@@ -598,6 +598,58 @@ rig has to be predictable. glTF 2.0 carries whatever hierarchy the exporter prod
       ground level nor at the pelvis, so a bad export fails at load instead of yielding a
       database that matches nothing.
 
+### Database
+
+Motion matching indexes animation instead of playing it: every clip is sampled ahead of time,
+and the samples become points in a feature space. First slice: one skeleton, one database,
+locomotion only.
+
+- [x] Sample every clip at 30 Hz. A sample stores the feature vector, the clip, the time inside
+      the clip and a cost bias; the vectors of one database form a flat table.
+- [x] Describe the layout with a schema: channels with weights, flattened into one float array
+      per pose, so the query and the database cannot drift apart.
+- [x] Channels: positions and velocities of feet, pelvis, head and hands in the root bone's
+      space, derivatives over 1/60 s; trajectory positions, velocities and heading at -0.4, 0,
+      +0.35 and +0.7 s.
+- [x] The derivative step is an enum with a DDoc comment, shared by the indexing and the query
+      path, so the two can never measure velocities differently.
+- [ ] No normalization in the first slice: weights carry the units, so a cost is comparable
+      only inside one database.
+- [ ] Build the database at load from the clips the model carries; a serialized cache is a
+      later item. Needs the sampler over the glTF content.
+
+### Query
+
+- [x] Keep the positions of the bones the schema names in a ring buffer, about half a second
+      back. A position is stored relative to the root, so the world position at time t is the
+      stored one moved by the root transform the trajectory gives for t. Rotations are not
+      stored: no feature needs them yet.
+- [x] Trajectory: history from the character's own past motion, prediction by extrapolating
+      velocity and yaw rate. No floor traces, gravity or landing in the first slice.
+- [x] Build the query vector from the same channels, then search.
+
+### Search
+
+- [ ] Linear scan over the whole table, `cost = sum(w * (query - pose)^2)` per dimension, and
+      the lowest cost wins. A few hundred poses do not need a tree.
+- [ ] Evaluate the continuing pose as a candidate too, with a database-level bias in its
+      favour, and search only when it cannot be continued or the throttle interval elapsed.
+- [ ] Play rate from the ratio between the query speed and the speed of the chosen pose,
+      clamped to an interval.
+
+### Playback
+
+- [ ] Hard switch to the chosen pose: set the clip and its time. Matching picks a near pose, so
+      the switch is mostly invisible.
+- [ ] Then crossfade over a short window: sample the outgoing and the incoming pose, lerp the
+      bone transforms on the CPU and reuse the existing skinning path.
+
+### Later
+
+- [ ] KD-tree or VP-tree over the feature vectors, once a profile shows the scan matters.
+- [ ] Normalization over the database, so weights mean the same thing across databases.
+- [ ] Notifies, events, mirrored clips, blend spaces and montages, interaction searches.
+
 ## Geometric algebra: PGA and CGA
 
 - [ ] Spike: evaluate adding PGA (Projective Geometric Algebra) and CGA
