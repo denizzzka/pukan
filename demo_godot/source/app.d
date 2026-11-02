@@ -416,9 +416,9 @@ void main(string[] args)
 
     Scene scene;
     if(offscreen)
-        scene = new Scene(device, VkExtent2D(width, height), VK_FORMAT_R8G8B8A8_SRGB);
+        scene = new Scene(device, VkExtent2D(width, height), VK_FORMAT_R8G8B8A8_SRGB, "demo_godot");
     else
-        scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat);
+        scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat, "demo_godot");
     scope(exit) destroy(scene);
 
     scene.sunShadow.enabled = !noShadows;

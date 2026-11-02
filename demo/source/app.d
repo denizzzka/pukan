@@ -276,13 +276,14 @@ void main(string[] args) {
 
     Scene scene;
     if(offscreen)
-        scene = new Scene(device, VkExtent2D(stereo ? width * 2 : width, height), VK_FORMAT_R8G8B8A8_SRGB);
+        scene = new Scene(device, VkExtent2D(stereo ? width * 2 : width, height), VK_FORMAT_R8G8B8A8_SRGB, "demo");
     else
         scene = new Scene(
             device,
             surface,
             &windowSizeChanged,
             surfaceFormat,
+            "demo",
             benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
         );
     scope(exit) destroy(scene);

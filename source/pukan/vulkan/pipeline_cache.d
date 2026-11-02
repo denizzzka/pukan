@@ -1,6 +1,7 @@
 module pukan.vulkan.pipeline_cache;
 
 import pukan.exceptions: PukanException;
+import std.algorithm: canFind;
 import std.conv: to;
 import std.digest.sha: SHA256, toHexString;
 import std.exception: enforce;
@@ -9,6 +10,13 @@ import std.uuid: UUID;
 
 /// Layout of the container around a driver pipeline cache blob
 enum pipelineCacheFormatVersion = 1;
+
+
+/// Record directory name for an on-disk format version
+string pipelineCacheDirectoryName(uint formatVersion = pipelineCacheFormatVersion)
+{
+    return "vkpipelines-v" ~ formatVersion.to!string;
+}
 
 
 /// Identifies a pipeline variant regardless of the shader content behind it
@@ -280,10 +288,17 @@ final class FilePipelineCacheStore: PipelineCacheStore
         this.maxRecords = maxRecords;
     }
 
-    /// Per-user cache directory, null when the environment names none
+    /// Per-user cache directory of one application, null when the environment names none
     static string defaultDirectory(
-        uint formatVersion = pipelineCacheFormatVersion,
+        string appName,
+        string directoryName = pipelineCacheDirectoryName(),
     )
+    in(appName.length > 0)
+    in(!appName.canFind('/', '\\'))
+    in(appName != "." && appName != "..")
+    in(directoryName.length > 0)
+    in(!directoryName.canFind('/', '\\'))
+    in(directoryName != "." && directoryName != "..")
     {
         import std.process: environment;
 
@@ -309,7 +324,7 @@ final class FilePipelineCacheStore: PipelineCacheStore
         if(base.length == 0)
             return null;
 
-        return buildPath(base, "pukan", "pipelines-v" ~ formatVersion.to!string);
+        return base.buildPath(appName, directoryName);
     }
 
     override void trim()
@@ -414,6 +429,29 @@ final class FilePipelineCacheStore: PipelineCacheStore
     {
         return buildPath(directory, identity.slot.toString() ~ ".pipelinecache");
     }
+}
+
+version(Posix) unittest
+{
+    import std.process: environment;
+
+    const previous = environment.get("XDG_CACHE_HOME");
+
+    scope(exit)
+    {
+        if(previous.length)
+            environment["XDG_CACHE_HOME"] = previous;
+        else
+            environment.remove("XDG_CACHE_HOME");
+    }
+
+    environment["XDG_CACHE_HOME"] = "/xdg-cache-check";
+
+    assert(FilePipelineCacheStore.defaultDirectory("demo")
+        == buildPath("/xdg-cache-check", "demo", "vkpipelines-v1"));
+
+    assert(FilePipelineCacheStore.defaultDirectory("demo", "shared")
+        == buildPath("/xdg-cache-check", "demo", "shared"));
 }
 
 unittest

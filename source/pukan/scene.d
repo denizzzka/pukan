@@ -158,11 +158,12 @@ class SceneWith(Modules...)
         VkSurfaceKHR surf,
         WindowSizeChangeDetectedCallback wsc,
         VkSurfaceFormatKHR surfaceFormat,
+        string appName,
         VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR,
         PipelineCacheStore pipelineCacheStore = null,
     )
     {
-        this(dev, surf, wsc, surfaceFormat, presentMode, pipelineCacheStore, false, VkExtent2D.init);
+        this(dev, surf, wsc, surfaceFormat, appName, presentMode, pipelineCacheStore, false, VkExtent2D.init);
     }
 
     /// Renders into owned images without a surface or a window
@@ -170,6 +171,7 @@ class SceneWith(Modules...)
         LogicalDevice dev,
         VkExtent2D extent,
         VkFormat format,
+        string appName,
         PipelineCacheStore pipelineCacheStore = null,
     )
     {
@@ -178,6 +180,7 @@ class SceneWith(Modules...)
             null,
             null,
             VkSurfaceFormatKHR(format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
+            appName,
             VK_PRESENT_MODE_FIFO_KHR,
             pipelineCacheStore,
             true,
@@ -190,6 +193,7 @@ class SceneWith(Modules...)
         VkSurfaceKHR surf,
         WindowSizeChangeDetectedCallback wsc,
         VkSurfaceFormatKHR surfaceFormat,
+        string appName,
         VkPresentModeKHR presentMode,
         PipelineCacheStore pipelineCacheStore,
         bool offscreen,
@@ -220,7 +224,7 @@ class SceneWith(Modules...)
             this.pipelineCacheStore = pipelineCacheStore;
         else
         {
-            const cacheDirectory = FilePipelineCacheStore.defaultDirectory();
+            const cacheDirectory = FilePipelineCacheStore.defaultDirectory(appName);
 
             if(cacheDirectory.length > 0)
                 this.pipelineCacheStore = new FilePipelineCacheStore(

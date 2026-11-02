@@ -65,7 +65,7 @@ void main()
     auto device = selected.createLogicalDevice();
     scope(exit) destroy(device);
 
-    const cacheDirectory = FilePipelineCacheStore.defaultDirectory();
+    const cacheDirectory = FilePipelineCacheStore.defaultDirectory("demo_compute");
     PipelineCacheManager cacheManager;
 
     if(cacheDirectory.length)
