@@ -596,6 +596,9 @@ rig has to be predictable. glTF 2.0 carries whatever hierarchy the exporter prod
 - [ ] Root bone at ground level (or at the pelvis) and animated. When the glTF root is a
       static `Armature` or scene root, the animation holds no displacement and the database
       gets no usable trajectory or speed.
+- [ ] Two characters in `demo_godot`: the biped `CesiumMan` and the quadruped Fox, which runs
+      on four legs; the Fox proves nothing in the database or the query assumes two legs. Bone
+      names differ per rig, so a schema names its own.
 - [ ] Check the rig in debug builds, the way `debugVerifySkinJoints` checks the GPU skinning:
       report a root joint without a translation channel and a bind pose that is neither at
       ground level nor at the pelvis, so a bad export fails at load instead of yielding a

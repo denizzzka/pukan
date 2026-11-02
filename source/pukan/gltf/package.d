@@ -163,7 +163,8 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
     package GltfContent content;
     alias this = content;
 
-    package GltfAsset asset;
+    /// Parsed content the drawable was built from, for reading clips and the skeleton
+    GltfAsset asset;
     private VkDescriptorImageInfo[] texturesDescrInfos;
     private VkDescriptorImageInfo fakeTextureInfo;
     private VkBuffer vertexFallback;
