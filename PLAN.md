@@ -633,12 +633,14 @@ locomotion only.
 
 ### Search
 
-- [ ] Linear scan over the whole table, `cost = sum(w * (query - pose)^2)` per dimension, and
+- [x] Linear scan over the whole table, `cost = sum(w * (query - pose)^2)` per dimension, and
       the lowest cost wins. A few hundred poses do not need a tree; a query built for another
-      up axis than the database was built with is a bug and must be caught.
-- [ ] Evaluate the continuing pose as a candidate too, with a database-level bias in its
-      favour, and search only when it cannot be continued or the throttle interval elapsed.
-- [ ] Play rate from the ratio between the query speed and the speed of the chosen pose,
+      up axis than the database was built with is a bug and is caught.
+- [x] Evaluate the continuing pose as a candidate too, with a database-level bias in its
+      favour, so the character is not interrupted for nothing.
+- [ ] Search only when the pose cannot be continued or the interval since the last search
+      elapsed.
+- [x] Play rate from the ratio between the query speed and the speed of the chosen pose,
       clamped to an interval.
 
 ### Playback

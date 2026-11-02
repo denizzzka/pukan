@@ -28,6 +28,16 @@ struct ClipPose
 /// Reads a clip at any time, wrapping or clamping that time to the clip itself.
 alias ClipSampler = ClipPose delegate(size_t clipIndex, float time);
 
+/// Marks a sample index that points at nothing.
+enum size_t invalidSample = size_t.max;
+
+/// Where the samples of one clip start and how many there are.
+struct ClipRange
+{
+    size_t first;
+    size_t count;
+}
+
 /// One indexed pose.
 struct Sample
 {
@@ -44,19 +54,21 @@ struct Sample
 struct Database
 {
     Schema schema;
+    Axis up;
     Clip[] clips;
+    ClipRange[] ranges;
     Sample[] samples;
     /// `samples.length * schema.dimensions()` floats.
     float[] vectors;
     /// One multiplier per dimension, applied to squared differences.
     float[] dimensionWeights;
     /// Added to every sample.
-    float baseBias;
+    float baseBias = 0;
     /// Added to the samples of looping clips, since they can repeat themselves.
-    float loopBias;
+    float loopBias = 0;
     /// Added to the distance of the pose that is already playing: the bias for not
     /// interrupting it.
-    float keepPlayingBias;
+    float keepPlayingBias = 0;
 
     /// Indexes `clips`. The sampler is asked for times outside a clip as well, to measure
     /// velocities and the trajectory points at the ends, so it must wrap or clamp them.
@@ -68,7 +80,9 @@ struct Database
         enforce(schema.dimensions > 0, "schema has no channels");
 
         this.schema = schema;
+        this.up = up;
         this.clips = clips.dup;
+        this.ranges.length = clips.length;
         dimensionWeights = schema.weights;
 
         const dimensions = schema.dimensions;
@@ -87,6 +101,8 @@ struct Database
         foreach(clipIdx, ref clip; clips)
         {
             const size_t steps = sampleSteps(clip, schema.sampleRate);
+
+            ranges[clipIdx] = ClipRange(sampleIdx, steps + 1);
 
             foreach(i; 0 .. steps + 1)
             {
@@ -145,6 +161,39 @@ struct Database
                 }
             }
         }
+    }
+
+    /// Index of the sample nearest to `time` inside `clip`: a looping clip wraps the time,
+    /// the others clamp it. `invalidSample` when the clip has no samples at all.
+    size_t sampleIndex(size_t clip, float time) const
+    {
+        if(clip >= ranges.length)
+            return invalidSample;
+
+        const range = ranges[clip];
+
+        if(range.count == 0)
+            return invalidSample;
+
+        const source = clips[clip];
+        float local = time;
+
+        if(source.duration > 0 && source.looping)
+        {
+            local %= source.duration;
+
+            if(local < 0)
+                local += source.duration;
+        }
+        else
+            local = local < 0 ? 0 : (local > source.duration ? source.duration : local);
+
+        size_t offset = cast(size_t) (local * schema.sampleRate + 0.5f);
+
+        if(offset >= range.count)
+            offset = range.count - 1;
+
+        return range.first + offset;
     }
 
     /// Weighted squared distance between a stored pose and a query vector.

@@ -11,6 +11,8 @@ import std.algorithm: min;
 /// One channel vector describing the character right now, laid out like a database vector.
 struct Query
 {
+    /// Up axis the vector was built for; the database must share it
+    Axis up;
     float[] values;
 }
 
@@ -23,6 +25,7 @@ void buildQuery(ref Query query, Schema schema, Axis up, const Trajectory trajec
     const dimensions = schema.dimensions;
     const float step = schema.derivativeStep;
 
+    query.up = up;
     query.values.length = dimensions;
     query.values[] = 0;
     size_t index;
