@@ -479,7 +479,9 @@ void main(string[] args)
     scene.godotFactory.preloadShadows = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
-        scenePath = "demo_godot/godot_samples/truck_town/town_view.tscn";
+        scenePath = characterMode
+            ? "demo_godot/godot_samples/platformer/stage/stage.tscn"
+            : "demo_godot/godot_samples/truck_town/town_view.tscn";
 
     auto godotScene = packPath.length
         ? scene.godotFactory.createPacked(packPath, scenePath)
@@ -691,6 +693,13 @@ void main(string[] args)
         eye = parseVector(eyeOption);
     if(targetOption.length)
         target = parseVector(targetOption);
+
+    // The platformer stage runs along X, so that is where a walk without steering goes
+    if(characterMode && !eyeOption.length && !targetOption.length)
+    {
+        eye = Vector3f(0, 3, 0);
+        target = Vector3f(1, 3, 0);
+    }
 
     FlyCamera camera;
     float nearPlane = nearOption;

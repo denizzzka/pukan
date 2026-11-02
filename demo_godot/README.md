@@ -2,24 +2,17 @@
 
 Run from the repository root; a Vulkan driver and a D compiler are required.
 
-## Truck town
+## Platformer
 
 ```sh
 dub run :demo_godot
 ```
 
-No arguments loads the truck town, walks a capsule through it and follows it in third
-person. `V` switches between third and first person while it runs, `--first-person` starts
-in the character's eyes.
-
-`--no-character` gives the free camera instead, and `--scene-camera` starts it from the
-`Camera3D` stored in the scene:
-
-```sh
-dub run :demo_godot -- --no-character --scene-camera
-```
-
-## Platformer
+No arguments loads the platformer stage, which is flat, walks a capsule through it and
+follows it in third person; that is where locomotion and motion matching are tested. The
+capsule starts on the platform under the middle of the stage and the view faces along the
+platform. `V` switches between third and first person while it runs, `--first-person`
+starts in the character's eyes.
 
 ```sh
 dub run :demo_godot -- --no-character --scene demo_godot/godot_samples/platformer/stage/stage.tscn --eye 8,8,-12 --target 0,1,0
@@ -27,6 +20,16 @@ dub run :demo_godot -- --no-character --scene demo_godot/godot_samples/platforme
 
 The stage has no scene camera, and the free camera would start inside a wall, so the eye
 and target place it outside.
+
+## Truck town
+
+```sh
+dub run :demo_godot -- --scene demo_godot/godot_samples/truck_town/town_view.tscn --scene-camera
+```
+
+`--no-character` with `--scene-camera` starts the free camera from the `Camera3D` stored in
+the scene; the town has no spawn marker, so a character starts on the surface under the
+middle of the level, which is a slope.
 
 ## Character
 
