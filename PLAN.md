@@ -1139,9 +1139,9 @@ rebuild replaces. A `VkObj` never calls the driver from a destructor: it hands
 the handle to a queue that frees it once the frames in flight pass, and an
 owner hands its holders to the same queue.
 
-- [ ] Delete the last per-type device registries: pipelines and shaders still
-      belong to the device until it dies. Buffers, images and memory free
-      themselves now.
+- [ ] Move the shader module registry onto the pipeline factory's owner. It is
+      also a cache keyed by shader bytes and stage, so it must keep answering
+      for a module that another technique already uploaded.
 - [ ] Move the impostor capture targets onto the scene owner once that work
       lands.
 - [ ] Add `share` to the owning asset and move `meshRefs` and `pieceRefs` out of
