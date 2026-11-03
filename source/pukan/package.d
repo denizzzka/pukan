@@ -10,6 +10,8 @@ public import pukan.graphics.common.webp;
 public import pukan.graphics.g2d.background;
 public import pukan.graphics.g3d.camera;
 public import pukan.graphics.g3d.camera_controls;
+public import pukan.graphics.g3d.cell_index;
+public import pukan.graphics.g3d.cells;
 public import pukan.graphics.g3d.fly_camera;
 public import pukan.graphics.g3d.material;
 public import pukan.graphics.g3d.mesh;

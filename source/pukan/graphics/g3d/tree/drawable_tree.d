@@ -2,6 +2,9 @@ module pukan.graphics.g3d.tree.drawable_tree;
 
 import dlib.math;
 import std.algorithm: sort;
+import pukan.graphics.common.misc: Boxf, transformAabb;
+import pukan.graphics.g3d.cell_index: Bounded, CellIndex, DrawItem;
+import pukan.graphics.g3d.cells: CellGrid, hasBounds;
 import pukan.graphics.g3d.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
@@ -33,10 +36,45 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
     Node root;
     alias this = root;
 
+    private CellIndex!DrawItem cellIndex;
+
     this()
     {
         root = new Node;
     }
+
+    /// Partitions the tree into cells; rebuild when a drawable crosses a border
+    void rebuildCells(CellGrid grid)
+    {
+        auto index = new CellIndex!DrawItem(grid);
+
+        void walk(Node node, Matrix4x4f trans)
+        {
+            if(node.payload.type == typeid(DrawableByVulkan))
+            {
+                auto drawable = *node.payload.peek!DrawableByVulkan;
+                auto bounded = cast(Bounded) drawable;
+                const local = bounded is null ? Boxf.init : bounded.localBounds;
+
+                index.insert(
+                    DrawItem(drawable, trans),
+                    hasBounds(local) ? transformAabb(local, trans) : Boxf.init,
+                );
+            }
+            else if(node.payload.type == typeid(Bone))
+                trans *= node.payload.peek!Bone.mat;
+
+            foreach(ref c; node.children)
+                walk(cast(Node) c, trans);
+        }
+
+        walk(root, Matrix4x4f.identity);
+
+        cellIndex = index;
+    }
+
+    /// Cells of the last `rebuildCells`; null before the first one
+    CellIndex!DrawItem cells() => cellIndex;
 
     ~this()
     {

@@ -3,6 +3,7 @@ module pukan.graphics.g3d.scene;
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.graphics.common.frame_bindings: frameBindings, frameSetBindings;
+import pukan.graphics.g3d.cells: CellGrid;
 import pukan.graphics.common.screenshot: Screenshot;
 import pukan.graphics.g3d.axes: Axis;
 import pukan.graphics.g3d.ibl: createIblTextures, IblTextures;
@@ -88,6 +89,9 @@ class SceneWith(Modules...)
     /// Godot tonemap mode: linear, Reinhard, Filmic, ACES, AgX
     uint tonemapMode = 3;
     float tonemapWhite = 1.0f;
+    /// Partition of the world that cells and streaming work from
+    CellGrid cellGrid;
+
     /// Uploaded with the frame; the first entry is the sun
     private Light[maxLights] lights;
     private uint lightCount;

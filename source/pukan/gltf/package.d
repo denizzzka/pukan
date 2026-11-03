@@ -8,6 +8,8 @@ import pukan.gltf.loader;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.graphics.common.misc: Boxf, isVisible, mergeAabb, transformAabb;
+import pukan.graphics.g3d.cell_index: Bounded;
+import pukan.graphics.g3d.cells: hasBounds;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor;
@@ -178,7 +180,7 @@ class Node : BaseNode
     }
 }
 
-class GlTF : DrawableByVulkan, Blended, PipelineWarmup
+class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
 {
     LoadStats loadStats;
 
@@ -508,6 +510,22 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
 
     auto calcAABB()
     {
+        bool complete;
+        return calcAABB(complete);
+    }
+
+    /// Bounds of everything the model draws; NaN when a part cannot bound itself
+    Boxf localBounds()
+    {
+        bool complete;
+        const box = calcAABB(complete);
+
+        return complete ? box : Boxf.init;
+    }
+
+    /// Bounds of the visible parts; `complete` reports whether each one could bound itself
+    private Boxf calcAABB(ref bool complete)
+    {
         Boxf result;
 
         void collect(Node node, Matrix4x4f trans)
@@ -517,7 +535,10 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
             trans *= node.trans.calcMatrix;
 
             foreach(mesh; node.meshes)
-                mergeAabb(result, transformAabb(mesh.localAABB, trans));
+                if(hasBounds(mesh.localAABB))
+                    mergeAabb(result, transformAabb(mesh.localAABB, trans));
+                else
+                    complete = false;
 
             foreach(child; node.children)
                 collect(cast(Node) child, trans);

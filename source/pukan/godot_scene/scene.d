@@ -4,6 +4,8 @@ import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
 import pukan.graphics.common.misc: Boxf, isVisible, mergeAabb, transformAabb;
+import pukan.graphics.g3d.cell_index: Bounded;
+import pukan.graphics.g3d.cells: hasBounds;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor: BufferPieceOnGPU;
@@ -110,7 +112,7 @@ class GodotNode
 }
 
 /// One loaded Godot scene tree and its GPU resources
-final class GodotScene : DrawableByVulkan, Blended, PipelineWarmup
+final class GodotScene : DrawableByVulkan, Blended, Bounded, PipelineWarmup
 {
     private PbrPipelines pipelines;
     private LogicalDevice device;
@@ -243,6 +245,22 @@ final class GodotScene : DrawableByVulkan, Blended, PipelineWarmup
 
     Boxf calcAABB()
     {
+        bool complete;
+        return calcAABB(complete);
+    }
+
+    /// Bounds of everything the scene draws; NaN when a part cannot bound itself
+    Boxf localBounds()
+    {
+        bool complete;
+        const box = calcAABB(complete);
+
+        return complete ? box : Boxf.init;
+    }
+
+    /// Bounds of the visible parts; `complete` reports whether each one could bound itself
+    private Boxf calcAABB(ref bool complete)
+    {
         Boxf result;
 
         void collect(Matrix4x4f trans, GodotNode node)
@@ -253,12 +271,27 @@ final class GodotScene : DrawableByVulkan, Blended, PipelineWarmup
             trans *= node.local;
 
             foreach(mesh; node.meshes)
-                mergeAabb(result, transformAabb(mesh.localAABB, trans));
+                if(hasBounds(mesh.localAABB))
+                    mergeAabb(result, transformAabb(mesh.localAABB, trans));
+                else
+                    complete = false;
 
-            if(auto gltf = cast(GlTF) node.instance)
-                mergeAabb(result, transformAabb(gltf.calcAABB, trans));
-            else if(auto scene = cast(GodotScene) node.instance)
-                mergeAabb(result, transformAabb(scene.calcAABB, trans));
+            if(node.instance !is null)
+            {
+                auto bounded = cast(Bounded) node.instance;
+
+                if(bounded is null)
+                    complete = false;
+                else
+                {
+                    const box = bounded.localBounds;
+
+                    if(hasBounds(box))
+                        mergeAabb(result, transformAabb(box, trans));
+                    else
+                        complete = false;
+                }
+            }
 
             foreach(child; node.children)
                 collect(trans, child);
