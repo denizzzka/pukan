@@ -1141,8 +1141,8 @@ owner hands its holders to the same queue.
 
 - [ ] Move the impostor capture targets onto the scene owner once that work
       lands.
-- [ ] Add `share` to the owning asset and move `meshRefs` and `pieceRefs` out of
-      `GodotScene`.
+- [ ] Move `meshRefs` and `meshReady` onto a shared mesh node, the way the GPU
+      pieces already count their holders.
 - [ ] Split the tree into threaded and per-thread owners once a real
       multi-threaded loader lands. `mark` and `releaseTo` stay a pair on one
       thread either way.
