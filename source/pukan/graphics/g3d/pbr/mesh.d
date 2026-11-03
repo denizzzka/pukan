@@ -6,6 +6,7 @@ import pukan.graphics.common.misc: Boxf, expandAABB, hasBounds, mergeAabb;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.graphics.g3d.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
 import pukan.graphics.g3d.pbr.accessor;
+import pukan.graphics.g3d.pbr.culling: CullBatch, cullCountOffset;
 import pukan.graphics.g3d.pbr.instancing: InstanceBatch, currentInstanceArena;
 import pukan.vulkan.bindings;
 import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
@@ -309,6 +310,84 @@ final class PbrGeometry
             vkCmdDraw(buf, vertexCount, batch.count, 0, batch.firstInstance);
     }
 
+    package(pukan) void drawInstancedIndirect(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        in CullBatch batch,
+        VkFrontFace frontFace,
+        VkDescriptorSet descriptorSet,
+    )
+    {
+        // The handles are taken by address, so the const of the argument goes
+        auto visible = cast(VkBuffer) batch.visible;
+        auto args = cast(VkBuffer) batch.args;
+        auto argsOffset = batch.argsOffset;
+
+        assert(buffers.length == staticInstanceBinding);
+
+        if(buffers.length)
+            vkCmdBindVertexBuffers2(
+                buf,
+                0,
+                cast(uint) buffers.length,
+                buffers.ptr,
+                offsets.ptr,
+                sizes.ptr,
+                strides.ptr,
+            );
+
+        VkDeviceSize instanceOffset = batch.visibleOffset;
+        VkDeviceSize instanceSize = batch.visibleSize;
+        VkDeviceSize instanceStride = Matrix4x4f.sizeof;
+        vkCmdBindVertexBuffers2(
+            buf,
+            staticInstanceBinding,
+            1,
+            &visible,
+            &instanceOffset,
+            &instanceSize,
+            &instanceStride,
+        );
+
+        if(indexCount)
+            vkCmdBindIndexBuffer(buf, indexBuffer, indexOffset, indexType);
+
+        if(descriptorSet)
+            vkCmdBindDescriptorSets(
+                buf,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineLayout,
+                0,
+                1,
+                &descriptorSet,
+                0,
+                null,
+            );
+
+        vkCmdSetFrontFace(buf, frontFace);
+
+        if(indexCount)
+            vkCmdDrawIndexedIndirectCount(
+                buf,
+                args,
+                argsOffset,
+                args,
+                argsOffset + cullCountOffset,
+                1,
+                VkDrawIndexedIndirectCommand.sizeof,
+            );
+        else
+            vkCmdDrawIndirectCount(
+                buf,
+                args,
+                argsOffset,
+                args,
+                argsOffset + cullCountOffset,
+                1,
+                VkDrawIndirectCommand.sizeof,
+            );
+    }
+
     package(pukan) auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
     {
         if(hasBounds(vert.aabb))
@@ -468,6 +547,36 @@ final class PbrMesh : Mesh
 
         geometry.drawInstanced(buf, pipeline, batch, frontFace, descriptorSet);
     }
+
+    /// Draws the instances the cull kernel kept for this mesh in one indirect call
+    package(pukan) void drawCulled(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        in CullBatch batch,
+        VkDescriptorSet frameSet,
+    )
+    {
+        assert(!hasSkin);
+
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+
+        if(frameSet)
+            vkCmdBindDescriptorSets(
+                buf,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.pipelineLayout,
+                1,
+                1,
+                &frameSet,
+                0,
+                null,
+            );
+
+        geometry.drawInstancedIndirect(buf, pipeline, batch, frontFace, descriptorSet);
+    }
+
+    /// Index count of the geometry; zero when it draws vertices
+    package(pukan) uint indexCount() const => geometry.indexCount;
 
     package(pukan) void bindTexture(size_t binding, MaterialFlag flag, VkDescriptorImageInfo image)
     {

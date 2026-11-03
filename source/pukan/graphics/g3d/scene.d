@@ -9,6 +9,7 @@ import pukan.graphics.g3d.axes: Axis;
 import pukan.graphics.g3d.ibl: createIblTextures, IblTextures;
 import pukan.graphics.g3d.mesh: MeshResources;
 import pukan.graphics.g3d.oit: DepthResolve, OitFrame, OitResolve;
+import pukan.graphics.g3d.pbr.culling: CullFrame, currentCullFrame;
 import pukan.graphics.g3d.pbr.instancing: InstanceArena, currentInstanceArena;
 import pukan.graphics.g3d.pbr.pipeline_set: PbrPipelineSet, createPbrPipelineSet;
 import pukan.graphics.g3d.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired, Variants;
@@ -97,6 +98,7 @@ class SceneWith(Modules...)
     private uint lightCount;
     private MemoryBufferMappedToCPU[] lightBufs;
     private InstanceArena[] instanceArenas;
+    private CullFrame[] cullFrames;
 
     void addPointLight(Vector3f position, Vector3f color, float radius)
     {
@@ -358,6 +360,10 @@ class SceneWith(Modules...)
             if(arena)
                 destroy(arena);
 
+        foreach(ref culled; cullFrames)
+            if(culled)
+                destroy(culled);
+
         if(sunShadow)
             destroy(sunShadow);
 
@@ -435,6 +441,13 @@ class SceneWith(Modules...)
         instanceArenas.length = swapChain.frames.length;
         foreach(i; 0 .. instanceArenas.length)
             instanceArenas[i] = new InstanceArena(device);
+
+        foreach(ref culled; cullFrames)
+            if(culled)
+                destroy(culled);
+        cullFrames.length = swapChain.frames.length;
+        foreach(i; 0 .. cullFrames.length)
+            cullFrames[i] = new CullFrame(device, pipelineFactory);
 
         sunShadow.recreate(swapChain.frames.length);
 
@@ -744,12 +757,23 @@ class SceneWith(Modules...)
         SceneDrawCallback drawScene,
         SceneDrawCallback drawTransmission = null,
         void delegate(ref VkCommandBuffer) drawShadow = null,
+        void delegate(ref VkCommandBuffer) prepare = null,
     )
     {
         auto commandBuffer = frame.commandBuffer;
 
         currentInstanceArena = instanceArenas[frameIndex(frame)];
         currentInstanceArena.reset();
+
+        if(cullFrames.length)
+        {
+            currentCullFrame = cullFrames[frameIndex(frame)];
+            currentCullFrame.reset();
+        }
+
+        // Compute work, such as a cull kernel, has to finish before a pass begins
+        if(prepare !is null)
+            prepare(commandBuffer);
 
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;
@@ -848,6 +872,8 @@ class SceneWith(Modules...)
 
         currentInstanceArena = instanceArenas[frameIndex(frame)];
         currentInstanceArena.reset();
+        // Each eye has its own frustum, so this path gathers nothing for the kernel
+        currentCullFrame = null;
 
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;

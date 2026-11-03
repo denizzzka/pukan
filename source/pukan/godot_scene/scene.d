@@ -4,10 +4,11 @@ import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
 import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergePartAabb;
-import pukan.graphics.g3d.cell_index: Bounded, Part, PartDrawable, wholePart;
+import pukan.graphics.g3d.cell_index: Bounded, CulledParts, Part, PartDrawable, wholePart;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor: BufferPieceOnGPU;
+import pukan.graphics.g3d.pbr.culling: CullBatch, CullFrame, CullInstance, currentCullFrame;
 import pukan.graphics.g3d.pbr.mesh: PbrMesh;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.physics.shapes: Collider, CollisionShape;
@@ -111,7 +112,7 @@ class GodotNode
 }
 
 /// One loaded Godot scene tree and its GPU resources
-final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, PipelineWarmup
+final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, CulledParts, PipelineWarmup
 {
     private PbrPipelines pipelines;
     private LogicalDevice device;
@@ -164,6 +165,41 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
         Matrix4x4f base;
         Boxf bounds;
     }
+
+    /// A mesh's instances of one phase, culled by the kernel before the pass
+    private struct GatheredMesh
+    {
+        PbrMesh mesh;
+        CullInstance[] instances;
+        CullBatch batch;
+        bool culled;
+    }
+
+    /// A mesh the kernel cannot cull, drawn as before
+    private struct GatheredDraw
+    {
+        PbrMesh mesh;
+        Matrix4x4f trans;
+    }
+
+    private struct GatheredNested
+    {
+        DrawableByVulkan drawable;
+        /// Clip-space placement of this scene
+        Matrix4x4f trans;
+        Matrix4x4f base;
+        size_t[] keys;
+    }
+
+    private struct GatherPhase
+    {
+        bool started;
+        GatheredMesh[] meshes;
+        GatheredDraw[] draws;
+        GatheredNested[] nested;
+    }
+
+    private GatherPhase[4] gatherPhases;
 
     package(pukan) this(
         PbrPipelines pipelines,
@@ -558,6 +594,123 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                 perPart.drawParts(buf, trans * group.base, group.keys, frameSet, phase);
             else
                 group.drawable.drawingBufferFilling(buf, trans * group.base, frameSet, phase);
+    }
+
+    void beginGather(DrawPhase phase)
+    {
+        registerParts();
+
+        gatherPhases[cast(uint) phase] = GatherPhase(started: true);
+    }
+
+    void gatherParts(VkCommandBuffer buf, in Matrix4x4f trans, scope const(size_t)[] keys, DrawPhase phase)
+    {
+        auto gathered = &gatherPhases[cast(uint) phase];
+
+        foreach(key; keys)
+        {
+            auto record = &parts[key];
+
+            if(record.mesh is null)
+            {
+                size_t found = gathered.nested.length;
+
+                foreach(g, group; gathered.nested)
+                    if(group.drawable is record.nested && group.base == record.base)
+                    {
+                        found = g;
+                        break;
+                    }
+
+                if(found == gathered.nested.length)
+                    gathered.nested ~= GatheredNested(record.nested, trans, record.base);
+
+                gathered.nested[found].keys ~= record.nestedKey;
+                continue;
+            }
+
+            // A part whose pieces are not on the GPU yet has no buffer to bind
+            if(!meshReady.get(record.mesh, false))
+                continue;
+
+            if(!matchesPhase(record.mesh, phase))
+                continue;
+
+            const mvp = trans * record.world;
+
+            // A skinned mesh keeps the CPU path until its posed bounds are known
+            if(record.mesh.hasSkin)
+            {
+                gathered.draws ~= GatheredDraw(record.mesh, mvp);
+                continue;
+            }
+
+            size_t found = gathered.meshes.length;
+
+            foreach(g, batch; gathered.meshes)
+                if(batch.mesh is record.mesh)
+                {
+                    found = g;
+                    break;
+                }
+
+            if(found == gathered.meshes.length)
+                gathered.meshes ~= GatheredMesh(record.mesh);
+
+            gathered.meshes[found].instances ~= cullInstance(record.bounds, mvp);
+        }
+    }
+
+    void endGather(VkCommandBuffer buf, DrawPhase phase)
+    {
+        auto gathered = &gatherPhases[cast(uint) phase];
+
+        assert(currentCullFrame !is null, "gathering outside Scene recording");
+
+        foreach(ref gatheredMesh; gathered.meshes)
+        {
+            if(gatheredMesh.instances.length == 0)
+                continue;
+
+            const count = cast(uint) gatheredMesh.instances.length;
+
+            gatheredMesh.batch = currentCullFrame.reserve(gatheredMesh.instances, gatheredMesh.mesh.indexCount);
+            currentCullFrame.dispatch(buf, gatheredMesh.batch, count);
+            gatheredMesh.culled = true;
+        }
+    }
+
+    void drawGathered(VkCommandBuffer buf, VkDescriptorSet frameSet, DrawPhase phase)
+    {
+        auto gathered = &gatherPhases[cast(uint) phase];
+
+        assert(gathered.started, "drawing a phase that was never gathered");
+
+        foreach(draw; gathered.draws)
+            draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+
+        foreach(batch; gathered.meshes)
+            if(batch.culled)
+                batch.mesh.drawCulled(buf, selectPipeline(batch.mesh, phase), batch.batch, frameSet);
+
+        foreach(group; gathered.nested)
+            if(auto perPart = cast(PartDrawable) group.drawable)
+                perPart.drawParts(buf, group.trans * group.base, group.keys, frameSet, phase);
+            else
+                group.drawable.drawingBufferFilling(buf, group.trans * group.base, frameSet, phase);
+    }
+
+    /// Part bounds in the form the cull kernel reads; a part without bounds stays visible
+    private static CullInstance cullInstance(in Boxf bounds, in Matrix4x4f mvp)
+    {
+        if(!hasBounds(bounds))
+            return CullInstance(mvp, Vector4f(0, 0, 0, 1), Vector4f(0, 0, 0, 0));
+
+        return CullInstance(
+            mvp,
+            Vector4f(bounds.min.x, bounds.min.y, bounds.min.z, 0),
+            Vector4f(bounds.max.x, bounds.max.y, bounds.max.z, 0),
+        );
     }
 
     void holdParts(scope const(size_t)[] keys)

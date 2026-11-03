@@ -28,7 +28,7 @@ import std.meta: AliasSeq;
 import std.stdio: writeln;
 import std.string: toStringz;
 
-alias appRequirements = Requirements!(SwapChain, GodotFactory, FrameBuilder);
+alias appRequirements = Requirements!(SwapChain, GodotFactory, FrameBuilder, CullFrame);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
 else alias DebugEntities = AliasSeq!();
 
@@ -314,6 +314,7 @@ void main(string[] args)
     float speedOption = cameraSpeed;
     float cellRange = 128.0f;
     bool noCells;
+    bool noGpuCull;
     string pickOrigin;
     string pickDirection;
 
@@ -339,6 +340,7 @@ void main(string[] args)
         "noclip", "ignore collision in character mode", &noclip,
         "cell-range", "stream cells within this distance in metres", &cellRange,
         "no-cells", "load every cell at start instead of streaming them", &noCells,
+        "no-gpu-cull", "cull the parts of a cell on the CPU instead of the GPU", &noGpuCull,
         "pick", "report what a ray from this point hits, x,y,z", &pickOrigin,
         "pick-dir", "ray direction for --pick, x,y,z", &pickDirection,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
@@ -1369,12 +1371,17 @@ void main(string[] args)
             if(screenshotPath.length && frameIndex == captureFrame)
                 scene.captureFrame(screenshotPath);
 
+            const cellCulling = noGpuCull ? CellCulling.cpu : CellCulling.gpu;
+            const shadowViewProj = scene.sunShadow.viewProj * wtb.model;
+            const activeCells = streaming ? residency.active() : levelCells;
+
             scene.recordCommandBuffer(
                 frame,
                 (buf, phase) {
-                    drawCells(levelIndex, buf, modelViewProj,
-                        streaming ? residency.active() : levelCells,
-                        frame.frameSets[0].descriptorSet, phase);
+                    // Blended draws keep the CPU path, which sorts them by depth
+                    drawCells(levelIndex, buf, modelViewProj, activeCells,
+                        frame.frameSets[0].descriptorSet, phase,
+                        phase == DrawPhase.blended ? CellCulling.cpu : cellCulling);
 
                     if(characterModel && thirdPerson && characterVisible)
                         characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
@@ -1387,9 +1394,15 @@ void main(string[] args)
                 },
                 null,
                 (buf) {
-                    drawCells(levelIndex, buf, scene.sunShadow.viewProj * wtb.model,
-                        streaming ? residency.active() : levelCells,
-                        frame.frameSets[0].descriptorSet, DrawPhase.shadow);
+                    drawCells(levelIndex, buf, shadowViewProj, activeCells,
+                        frame.frameSets[0].descriptorSet, DrawPhase.shadow, cellCulling);
+                },
+                (buf) {
+                    if(cellCulling != CellCulling.gpu)
+                        return;
+
+                    gatherCells(levelIndex, buf, modelViewProj, activeCells, DrawPhase.surface);
+                    gatherCells(levelIndex, buf, shadowViewProj, activeCells, DrawPhase.shadow);
                 },
             );
         });

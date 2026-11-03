@@ -79,6 +79,38 @@ interface PartDrawable
     );
 }
 
+/// Who decides which parts of the cells a view records
+enum CellCulling
+{
+    /// The cell trees and the part bounds decide on the CPU
+    cpu,
+    /// The cull kernel decides on the GPU, from what `gatherCells` collected
+    gpu,
+}
+
+/**
+    A drawable that culls its parts on the GPU.
+
+    `gatherCells` calls `beginGather` once per view, hands every placement to
+    `gatherParts` and then lets `endGather` upload the instances and dispatch
+    the cull kernel. `drawCells` records what the kernel kept, so a phase is
+    gathered and drawn once per frame.
+*/
+interface CulledParts
+{
+    /// Starts a new instance list for the phase
+    void beginGather(DrawPhase phase);
+
+    /// Adds the parts of one placement to the list; `trans` maps it into clip space
+    void gatherParts(VkCommandBuffer buf, in Matrix4x4f trans, scope const(size_t)[] keys, DrawPhase phase);
+
+    /// Uploads the gathered instances and dispatches the cull kernel
+    void endGather(VkCommandBuffer buf, DrawPhase phase);
+
+    /// Records the draws the kernel kept
+    void drawGathered(VkCommandBuffer buf, VkDescriptorSet frameSet, DrawPhase phase);
+}
+
 /// `DrawItem.part` of a drawable that records as a whole
 enum wholePart = size_t.max;
 
@@ -209,6 +241,49 @@ size_t uploadCells(
     return used;
 }
 
+/// Collects the parts of the cells for the cull kernel; `drawCells` draws what it kept
+void gatherCells(
+    CellIndex!DrawItem index,
+    VkCommandBuffer buf,
+    in Matrix4x4f viewProj,
+    scope const(CellCoord)[] cells,
+    DrawPhase phase,
+)
+{
+    auto items = index.collect(cells);
+
+    DrawableByVulkan[] cullable;
+
+    foreach(item; items)
+    {
+        if(!(cast(CulledParts) item.drawable))
+            continue;
+
+        bool seen;
+
+        foreach(drawable; cullable)
+            if(drawable is item.drawable)
+            {
+                seen = true;
+                break;
+            }
+
+        if(!seen)
+            cullable ~= item.drawable;
+    }
+
+    foreach(drawable; cullable)
+        (cast(CulledParts) drawable).beginGather(phase);
+
+    groupItems(items, (drawable, world, keys) {
+        if(auto parts = cast(CulledParts) drawable)
+            parts.gatherParts(buf, viewProj * world, keys, phase);
+    });
+
+    foreach(drawable; cullable)
+        (cast(CulledParts) drawable).endGather(buf, phase);
+}
+
 /// What one view took from the cells
 struct DrawStats
 {
@@ -236,13 +311,16 @@ DrawStats drawCells(
     scope const(CellCoord)[] cells,
     VkDescriptorSet frameSet,
     DrawPhase phase = DrawPhase.surface,
+    CellCulling culling = CellCulling.cpu,
 )
 {
     DrawStats stats;
     stats.cells = cells.length;
     stats.placements = index.placementsIn(cells);
 
-    auto items = index.visible(cells, viewProj);
+    auto items = culling == CellCulling.gpu
+        ? index.collect(cells)
+        : index.visible(cells, viewProj);
 
     foreach(i, item; items)
     {
@@ -270,7 +348,21 @@ DrawStats drawCells(
     }
 
     // Parts of one drawable go together, so it still batches them
+    DrawableByVulkan[] drawn;
+
     groupItems(items, (drawable, world, keys) {
+        if(culling == CellCulling.gpu)
+            if(auto parts = cast(CulledParts) drawable)
+            {
+                foreach(d; drawn)
+                    if(d is drawable)
+                        return;
+
+                drawn ~= drawable;
+                parts.drawGathered(buf, frameSet, phase);
+                return;
+            }
+
         stats.parts += keys.length;
 
         (cast(PartDrawable) drawable).drawParts(buf, viewProj * world, keys, frameSet, phase);
