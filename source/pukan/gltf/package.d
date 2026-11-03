@@ -7,7 +7,7 @@ public import pukan.gltf.loader: GltfAsset, LoadStats, createGltfInstance, loadG
 import pukan.gltf.loader;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.gltf.skin_matrices: SkinMatrices;
-import pukan.graphics.common.misc: Boxf, isVisible, mergePartAabb, pointsAabb;
+import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergePartAabb, pointsAabb;
 import pukan.graphics.g3d.cell_index: Bounded;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.graphics.g3d.mesh: mirrors;
@@ -604,6 +604,9 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
 
             uplVert.vertices = content.getAccess!(Type.VEC3, Vector3f)(*vertices);
             uplVert.aabb = accessorAabb(*vertices);
+
+            // glTF requires min/max on a POSITION accessor; a file without them is broken
+            assert(hasBounds(uplVert.aabb), "position accessor without bounds");
         }
 
         const vertexCount = uplVert.vertices.count;
