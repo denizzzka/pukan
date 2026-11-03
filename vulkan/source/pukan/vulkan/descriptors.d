@@ -42,8 +42,7 @@ package mixin template DescriptorPools()
         synchronized(this)
         {
             return VkObj!VkDescriptorSetLayout(
-                this.device,
-                this.alloc,
+                this.releaseQueue,
                 VkDescriptorSetLayoutCreateInfo(
                     bindingCount: cast(uint) descriptorSetLayoutBindings.length,
                     pBindings: descriptorSetLayoutBindings.ptr,

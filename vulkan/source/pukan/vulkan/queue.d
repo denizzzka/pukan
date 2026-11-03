@@ -17,6 +17,12 @@ class Queue
         sync = dev.create!Fence;
     }
 
+    ~this()
+    {
+        if(sync)
+            destroy(sync);
+    }
+
     // Not same as CommandPool.submit() - blocks on start and don't waits on end
     void syncSubmit(ref VkSubmitInfo submitInfo)
     {

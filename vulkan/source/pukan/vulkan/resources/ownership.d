@@ -2,6 +2,9 @@ module pukan.vulkan.resources.ownership;
 
 import core.sync.mutex: Mutex;
 import core.thread.osthread: Thread;
+import pukan.vulkan.bindings;
+import pukan.vulkan.resources.release: ReleaseQueue;
+import pukan.vulkan.resources.vkobj: VkHandleInfo, VkObj, VkParentKind;
 
 /**
     Owns the objects that hold Vulkan handles and destroys them as a group.
@@ -10,28 +13,58 @@ import core.thread.osthread: Thread;
     release it. The owner keeps its holders alive and calls `destroy` on them
     in reverse creation order, so a resource created later goes first.
 
+    An owner that knows a device hands its releases to that device's queue, so
+    a group that unloads during a frame waits for the frames in flight.
+
     `threaded` locks the owner for any thread. The other variant is for one
     thread only and pays for no lock; it checks that in debug.
 */
 final class ResourceOwner(bool threaded = true)
 {
+    /// One thing the owner releases: a holder or a handle taken from a slot
+    private struct Entry
+    {
+        Object holder;
+        void function(VkDevice, void*, VkAllocationCallbacks*) release;
+        void* handle;
+    }
+
     private string name;
-    private Object[] holders;
+    private Entry[] entries;
     private bool closed;
+    /// Releases go through this queue; null frees at once
+    private ReleaseQueue queue;
 
     static if(threaded)
         private Mutex mutex;
     else
         private Thread ownerThread;
 
-    this(string name = null)
+    /**
+        Opens an owner; `host` supplies the device its releases wait for.
+
+        Params:
+            name = label used in debug output and assertions.
+            host = owner that knows the device, or null to free at once.
+    */
+    this(string name = null, ReleaseQueue queue = null)
     {
         this.name = name;
+        this.queue = queue;
 
         static if(threaded)
             mutex = new Mutex;
         else
             ownerThread = Thread.getThis();
+    }
+
+    /// Sink this owner releases through, null when it frees at once
+    ReleaseQueue releaseQueue() => queue;
+
+    /// Opens a child owner that releases through the same device
+    ResourceOwner!threaded open(string name)
+    {
+        return new ResourceOwner!threaded(name, queue);
     }
 
     /// Destroys what is left, so a dropped owner frees instead of leaking
@@ -50,7 +83,7 @@ final class ResourceOwner(bool threaded = true)
         lockOwner();
         scope(exit) unlockOwner();
 
-        return holders.length;
+        return entries.length;
     }
 
     /// Takes `holder` into this owner; `releaseTo` and `close` destroy it
@@ -61,7 +94,40 @@ final class ResourceOwner(bool threaded = true)
         scope(exit) unlockOwner();
 
         assert(!closed, "owning into a closed ResourceOwner");
-        holders ~= holder;
+        entries ~= Entry(holder);
+    }
+
+    /**
+        Takes the handle out of `slot` and releases it with the group.
+
+        Params:
+            slot = wrapper whose handle moves here; only device handles fit.
+    */
+    void accept(Handle)(ref VkObj!Handle slot)
+    {
+        static assert(VkHandleInfo!Handle.destroyParent == VkParentKind.device,
+            "only a device handle can be accepted from a slot");
+
+        accept(&VkObj!Handle.retire, cast(void*) slot.take());
+    }
+
+    /**
+        Releases `handle` with the group, using `release` to free it.
+
+        Params:
+            release = function that frees the handle.
+            handle = handle from `VkObj.take`; the owner frees it once.
+    */
+    void accept(void function(VkDevice, void*, VkAllocationCallbacks*) release, void* handle)
+    in(handle !is null)
+    {
+        assert(queue !is null, "a ResourceOwner accepts handles only with a device");
+
+        lockOwner();
+        scope(exit) unlockOwner();
+
+        assert(!closed, "accepting into a closed ResourceOwner");
+        entries ~= Entry(null, release, handle);
     }
 
     /**
@@ -74,10 +140,10 @@ final class ResourceOwner(bool threaded = true)
         lockOwner();
         scope(exit) unlockOwner();
 
-        foreach(i, held; holders)
-            if(held is holder)
+        foreach(i, entry; entries)
+            if(entry.holder is holder)
             {
-                holders = holders[0 .. i] ~ holders[i + 1 .. $];
+                entries = entries[0 .. i] ~ entries[i + 1 .. $];
                 return true;
             }
 
@@ -92,22 +158,20 @@ final class ResourceOwner(bool threaded = true)
     */
     void releaseTo(size_t mark)
     {
-        Object[] releasing;
+        Entry[] releasing;
 
         lockOwner();
         {
             scope(exit) unlockOwner();
 
             assert(!closed, "releasing a closed ResourceOwner");
-            assert(mark <= holders.length, "ResourceOwner mark is past its holders");
+            assert(mark <= entries.length, "ResourceOwner mark is past its entries");
 
-            releasing = holders[mark .. $];
-            holders.length = mark;
+            releasing = entries[mark .. $];
+            entries.length = mark;
         }
 
-        // Outside the lock: a holder may close an owner of its own
-        foreach_reverse(holder; releasing)
-            destroy(holder);
+        releaseEntries(releasing);
     }
 
     /**
@@ -117,7 +181,7 @@ final class ResourceOwner(bool threaded = true)
     */
     void close()
     {
-        Object[] releasing;
+        Entry[] releasing;
 
         lockOwner();
         {
@@ -126,20 +190,19 @@ final class ResourceOwner(bool threaded = true)
             if(closed)
                 return;
 
-            releasing = holders;
-            holders = null;
+            releasing = entries;
+            entries = null;
             closed = true;
         }
 
-        foreach_reverse(holder; releasing)
-            destroy(holder);
+        releaseEntries(releasing);
     }
 
     /// Whether `close` has run
     bool isClosed() const => closed;
 
-    /// Holders this owner still keeps alive
-    size_t length() const => holders.length;
+    /// Entries this owner still keeps alive
+    size_t length() const => entries.length;
 
     /// Releases without the lock: a dropping owner is already unreachable
     private void closeUnlocked()
@@ -147,12 +210,26 @@ final class ResourceOwner(bool threaded = true)
         if(closed)
             return;
 
-        auto releasing = holders;
-        holders = null;
+        auto releasing = entries;
+        entries = null;
         closed = true;
 
-        foreach_reverse(holder; releasing)
-            destroy(holder);
+        releaseEntries(releasing);
+    }
+
+    /// Runs outside the lock: a holder may close an owner of its own
+    private void releaseEntries(Entry[] releasing)
+    {
+        foreach_reverse(entry; releasing)
+            if(entry.holder !is null)
+            {
+                if(queue !is null)
+                    queue.retireHolder(entry.holder);
+                else
+                    destroy(entry.holder);
+            }
+            else
+                queue.retire(entry.release, entry.handle);
     }
 
     private void lockOwner()

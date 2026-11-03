@@ -40,7 +40,7 @@ abstract class Compute
         pipelineLayout = layout.pipelineLayout;
         pushConstantSize = shader.pushConstantRange.size;
 
-        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(shader.layoutBindings, 1), device, device.alloc);
+        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(shader.layoutBindings, 1), device.releaseQueue);
         descriptorSet = device.allocateDescriptorSet(pool.vk, layout.setLayout);
 
         if(pipelines.eagerCompute)

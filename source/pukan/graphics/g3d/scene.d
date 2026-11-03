@@ -83,9 +83,6 @@ class SceneWith(Modules...)
     private OitFrame[] oitFrames;
     /// OIT images of the current swapchain; released before its frame sets go
     private ResourceOwner!false oitOwner;
-    /// OIT images of a replaced swapchain, kept until its commands are done
-    private ResourceOwner!false[] retiredOitOwners;
-    private uint framesSinceOitRetire;
     /// Set after the first frame has waited for the preload queue
     private bool pipelinesReady;
 
@@ -221,13 +218,13 @@ class SceneWith(Modules...)
         VkExtent2D offscreenExtent,
     )
     {
-        sceneOwner = new ResourceOwner!false("scene");
-
         device = dev;
         surface = surf;
         windowSizeChanged = wsc;
         this.surfaceFormat = surfaceFormat;
         this.presentMode = presentMode;
+
+        sceneOwner = new ResourceOwner!false("scene", device.rootOwner.releaseQueue);
 
         const sun = Vector3f(0.35f, 0.5f, -0.8f).normalized;
         lights[0] = Light(
@@ -287,7 +284,7 @@ class SceneWith(Modules...)
                 compareEnable: VK_FALSE,
                 unnormalizedCoordinates: VK_FALSE,
             };
-            resolveSampler = VkObj!VkSampler(device.device, device.alloc, samplerInfo);
+            resolveSampler = VkObj!VkSampler(device.releaseQueue, samplerInfo);
         }
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
@@ -376,10 +373,6 @@ class SceneWith(Modules...)
         if(gltfFactory)
             gltfFactory.destroyAssets();
 
-        foreach(owner; retiredOitOwners)
-            if(owner)
-                destroy(owner);
-
         if(screenOwner)
             destroy(screenOwner);
 
@@ -407,20 +400,15 @@ class SceneWith(Modules...)
         auto prefiltered = imageInfo(ibl.prefiltered);
         auto brdfLut = imageInfo(ibl.brdfLut);
 
-        // OIT images outlive the rest of the screen, so a replaced chain keeps them
-        if(oitOwner && oitOwner.length)
-        {
-            screenOwner.forget(oitOwner);
-            retiredOitOwners ~= oitOwner;
-            framesSinceOitRetire = 0;
-        }
+        // The device queue keeps the OIT images of a replaced chain for its
+        // frames in flight, so everything here can go at once
         oitOwner = null;
 
         if(screenOwner)
             destroy(screenOwner);
-        screenOwner = new ResourceOwner!false("screen");
+        screenOwner = new ResourceOwner!false("screen", sceneOwner.releaseQueue);
 
-        oitOwner = new ResourceOwner!false("oit");
+        oitOwner = new ResourceOwner!false("oit", screenOwner.releaseQueue);
         screenOwner.own(oitOwner);
 
         lightBufs.length = swapChain.frames.length;
@@ -914,23 +902,6 @@ class SceneWith(Modules...)
         presentColor(frame);
     }
 
-    /// Drops a replaced swapchain's lists after its commands have completed
-    private void retireOitFrames()
-    {
-        if(retiredOitOwners.length == 0)
-            return;
-
-        if(++framesSinceOitRetire < SwapChain.oldSwapchainFrames)
-            return;
-
-        foreach(owner; retiredOitOwners)
-            if(owner)
-                destroy(owner);
-
-        retiredOitOwners = null;
-        framesSinceOitRetire = 0;
-    }
-
     private size_t frameIndex(ref Frame frame)
     {
         foreach(i, f; swapChain.frames)
@@ -1089,8 +1060,6 @@ class SceneWith(Modules...)
                 pipelinesReady = true;
             }
         }
-
-        retireOitFrames();
 
         swapChain.oldSwapchainsMaintenance();
 

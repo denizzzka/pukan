@@ -121,10 +121,12 @@ mixin template ScopedLogicalDeviceTemplateMixin(alias M)
         private static class Enclosure
         {
             import pukan.vulkan.bindings;
+            import pukan.vulkan.resources.release: ReleaseQueue;
 
-            // Only these two variables are needed to be accessible from a template mixins:
+            // Only these are needed to be accessible from a template mixin:
             VkDevice device;
             VkAllocationCallbacks* alloc;
+            ReleaseQueue releaseQueue;
 
             mixin M;
         }

@@ -44,7 +44,7 @@ class CommandPool
         auto cinf = defaultPoolCreateInfo;
         cinf.queueFamilyIndex = queueFamilyIndex;
 
-        commandPool = VkObj!VkCommandPool(device.device, device.alloc, cinf);
+        commandPool = VkObj!VkCommandPool(device.releaseQueue, cinf);
     }
 
     VkCommandBuffer[] allocateBuffers(uint count)

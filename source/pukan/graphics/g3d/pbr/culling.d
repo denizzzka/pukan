@@ -95,7 +95,7 @@ final class CullFrame
 
         key = declared.key;
         layout = declared.pipelineLayout;
-        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 1), device, device.alloc);
+        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 1), device.releaseQueue);
         set = device.allocateDescriptorSet(pool.vk, declared.setLayout);
     }
 

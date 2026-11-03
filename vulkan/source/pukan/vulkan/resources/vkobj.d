@@ -3,6 +3,7 @@ module pukan.vulkan.resources.vkobj;
 import core.atomic: atomicLoad, atomicOp;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers: vkCheck;
+import pukan.vulkan.resources.release: ReleaseQueue;
 import pukan.vulkan.stype_list: getCreateInfoStructureType;
 import pukan.vulkan.vkname: VkInfoNames;
 
@@ -22,6 +23,9 @@ enum VkHandleKind: uint
     fence,
     commandPool,
     sampler,
+    buffer,
+    image,
+    memory,
     descriptorSetLayout,
     descriptorPool,
 
@@ -79,6 +83,30 @@ template VkHandleInfo(Handle)
         enum destroyParent = VkParentKind.device;
         enum kind = VkHandleKind.commandPool;
     }
+    else static if(is(Handle == VkBuffer))
+    {
+        alias CreateInfo = VkBufferCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.buffer;
+    }
+    else static if(is(Handle == VkImage))
+    {
+        alias CreateInfo = VkImageCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.image;
+    }
+    else static if(is(Handle == VkDeviceMemory))
+    {
+        alias CreateInfo = VkMemoryAllocateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.memory;
+    }
     else static if(is(Handle == VkSampler))
     {
         alias CreateInfo = VkSamplerCreateInfo;
@@ -129,7 +157,10 @@ struct VkObj(Handle)
     static if(Info.destroyParent == VkParentKind.instance)
         private VkInstance parentInstance;
     else static if(Info.destroyParent == VkParentKind.device)
-        private VkDevice parentDevice;
+    {
+        /// Releases the handle once the frames in flight pass
+        private ReleaseQueue queue;
+    }
 
     static if(Info.hasCreate && Info.createParent == VkParentKind.none)
     {
@@ -147,15 +178,16 @@ struct VkObj(Handle)
 
     static if(Info.hasCreate && Info.createParent == VkParentKind.device)
     {
-        this(VkDevice device, VkAllocationCallbacks* allocator, Info.CreateInfo createInfo)
+        this(ReleaseQueue queue, Info.CreateInfo createInfo)
+        in(queue !is null)
         {
-            this.parentDevice = device;
-            this.allocator = allocator;
+            this.queue = queue;
+            this.allocator = queue.allocator;
 
             auto ci = createInfo;
             ci.sType = getCreateInfoStructureType!(Info.CreateInfo*);
 
-            Info.create(device, &ci, allocator, &handle).vkCheck(Info.name ~ " creation failed");
+            Info.create(queue.device, &ci, allocator, &handle).vkCheck(Info.name ~ " creation failed");
             noteAlive();
         }
     }
@@ -181,11 +213,13 @@ struct VkObj(Handle)
     }
     else static if(Info.destroyParent == VkParentKind.device)
     {
-        this(Handle existing, VkDevice device, VkAllocationCallbacks* allocator)
+        this(Handle existing, ReleaseQueue queue)
+        in(existing !is Handle.init)
+        in(queue !is null)
         {
             handle = existing;
-            parentDevice = device;
-            this.allocator = allocator;
+            this.queue = queue;
+            this.allocator = queue.allocator;
             noteAlive();
         }
     }
@@ -207,20 +241,41 @@ struct VkObj(Handle)
     /// Whether the wrapper still owns a handle
     bool isAlive() const @safe pure nothrow => handle != Handle.init;
 
-    /// Destroys the handle now and empties the wrapper
+    /// Frees the handle and empties the wrapper
     void release()
     {
         if(handle == Handle.init)
             return;
 
+        auto releasing = handle;
+
+        handle = Handle.init;
+        allocator = null;
+
         static if(Info.destroyParent == VkParentKind.none)
-            Info.destroy(handle, allocator);
+            Info.destroy(releasing, allocator);
         else static if(Info.destroyParent == VkParentKind.instance)
-            Info.destroy(parentInstance, handle, allocator);
+        {
+            Info.destroy(parentInstance, releasing, allocator);
+            parentInstance = VkInstance.init;
+        }
         else static if(Info.destroyParent == VkParentKind.device)
-            Info.destroy(parentDevice, handle, allocator);
+        {
+            queue.retire(&retire, cast(void*) releasing);
+            queue = null;
+        }
 
         debug noteReleased();
+    }
+
+    /**
+        Takes the handle out and empties the slot.
+
+        Returns: the handle, which the caller frees.
+    */
+    Handle take()
+    {
+        auto taken = handle;
 
         handle = Handle.init;
         allocator = null;
@@ -228,7 +283,21 @@ struct VkObj(Handle)
         static if(Info.destroyParent == VkParentKind.instance)
             parentInstance = VkInstance.init;
         else static if(Info.destroyParent == VkParentKind.device)
-            parentDevice = VkDevice.init;
+            queue = null;
+
+        debug if(taken !is Handle.init)
+            noteReleased();
+
+        return taken;
+    }
+
+    /// Frees a handle taken from a wrapper, for an owner's deferred queue
+    static void retire(VkDevice device, void* handle, VkAllocationCallbacks* alloc)
+    {
+        static if(Info.destroyParent == VkParentKind.device)
+            Info.destroy(device, cast(Handle) handle, alloc);
+        else
+            assert(false, "a " ~ Info.name ~ " does not belong to a device");
     }
 
     ref VkObj opAssign(VkObj rhs)
@@ -244,7 +313,7 @@ struct VkObj(Handle)
         static if(Info.destroyParent == VkParentKind.instance)
             parentInstance = rhs.parentInstance;
         else static if(Info.destroyParent == VkParentKind.device)
-            parentDevice = rhs.parentDevice;
+            queue = rhs.queue;
 
         // The handle moves, so the live count stays the same
         rhs.handle = Handle.init;
@@ -252,7 +321,7 @@ struct VkObj(Handle)
         static if(Info.destroyParent == VkParentKind.instance)
             rhs.parentInstance = VkInstance.init;
         else static if(Info.destroyParent == VkParentKind.device)
-            rhs.parentDevice = VkDevice.init;
+            rhs.queue = null;
 
         return this;
     }

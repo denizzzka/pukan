@@ -72,6 +72,9 @@ class Texture
 
         if(imageView)
             vkDestroyImageView(device, imageView, device.alloc);
+
+        if(textureImageMemory)
+            destroy(textureImageMemory);
     }
 }
 

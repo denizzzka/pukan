@@ -641,7 +641,7 @@ final class PipelineFactory
 
         mutex = new Mutex;
         condition = new Condition(mutex);
-        owner = new ResourceOwner!true("pipeline factory");
+        owner = new ResourceOwner!true("pipeline factory", device.rootOwner.releaseQueue);
 
         // Taken first, so it goes after every pool built from it
         frameSetLayout = new SetLayoutHandle;

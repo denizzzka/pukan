@@ -9,6 +9,8 @@ import pukan.vulkan.memory: DeviceMemory, MemoryBufferMappedToCPU;
 import pukan.vulkan.physical_device: PhysicalDevice;
 import pukan.vulkan.pipelines: PipelineCacheManager;
 import pukan.vulkan.renderpass: RenderPass;
+import pukan.vulkan.resources.ownership: ResourceOwner;
+import pukan.vulkan.resources.release: ReleaseQueue;
 import pukan.vulkan.requirements: ChainMask, DeviceContext, FeatureChain, ImageFormatRequest, linkDeviceFeatures, requireEnabled;
 import pukan.vulkan.shaders: ShaderDecl, ShaderInfo, ShaderVertexInput, createLayoutBinding;
 import pukan.vulkan.resources.vkobj: VkObj;
@@ -33,17 +35,12 @@ class LogicalDevice
     private bool[ImageFormatRequest] supportedImageFormats;
     private Mutex queueMutex;
 
-    /// A handle release queued until no frame in flight can still reference it
-    private struct RetiredRelease
-    {
-        void function(LogicalDevice, void*, VkAllocationCallbacks*) release;
-        void* handle;
-        uint age;
-    }
+    /// Owner of what the device itself holds; every scene owner hangs from it
+    ResourceOwner!true rootOwner;
 
-    /// Filled in place, because a destructor may retire during a collection
-    private RetiredRelease[] retired;
-    private size_t retiredCount;
+    /// Holds every release that waits for the frames in flight
+    ReleaseQueue releaseQueue;
+
     private Mutex retiredMutex;
     /// Optional persistent caches shared by graphics pipelines and compute kernels
     PipelineCacheManager pipelineCacheManager;
@@ -54,8 +51,6 @@ class LogicalDevice
         physicalDevice = pd;
         selectedQueueFlags = requiredQueueFlags;
         queueMutex = new Mutex;
-        retiredMutex = new Mutex;
-        retired.length = 4096;
 
         const fqIdxs = pd.findSuitableQueueFamilies(requiredQueueFlags);
         enforce(fqIdxs.length > 0);
@@ -113,6 +108,8 @@ class LogicalDevice
         }
 
         vkCreateDevice(pd.physicalDevice, &createInfo, alloc, &device).vkCheck;
+        releaseQueue = new ReleaseQueue(device, alloc);
+        rootOwner = new ResourceOwner!true("device", releaseQueue);
         this.enabledFeatures = enabledFeatures;
         this.enabledChainMask = enabledChainMask;
         this.enabledExtensions = extension_list.dup;
@@ -151,48 +148,22 @@ class LogicalDevice
         requireEnabled!Reqs(ctx, entity, file, line);
     }
 
-    /// Queues a release for the next flush that outlives every frame in flight
-    void retire(void function(LogicalDevice, void*, VkAllocationCallbacks*) release, void* handle)
+    /// Queues a handle release for the next flush that outlives a frame in flight
+    void retire(void function(VkDevice, void*, VkAllocationCallbacks*) release, void* handle)
     {
-        synchronized(retiredMutex)
-        {
-            if(retiredCount < retired.length)
-            {
-                retired[retiredCount++] = RetiredRelease(release, handle);
-                return;
-            }
-        }
+        releaseQueue.retire(release, handle);
+    }
 
-        // The queue is full, so the handle goes now rather than never
-        release(this, handle, alloc);
+    /// Queues a holder, whose destructor releases what it owns
+    void retireHolder(Object holder)
+    {
+        releaseQueue.retireHolder(holder);
     }
 
     /// Runs the queued releases no frame in flight can still reference
     void flushRetired(uint framesInFlight)
     {
-        synchronized(retiredMutex)
-        {
-            size_t released;
-
-            while(released < retiredCount)
-            {
-                if(++retired[released].age <= framesInFlight)
-                    break;
-
-                ++released;
-            }
-
-            foreach(i; 0 .. released)
-            {
-                auto entry = retired[i];
-                entry.release(this, entry.handle, alloc);
-            }
-
-            foreach(i; released .. retiredCount)
-                retired[i - released] = retired[i];
-
-            retiredCount -= released;
-        }
+        releaseQueue.flush(framesInFlight);
     }
 
     ~this()
@@ -200,7 +171,16 @@ class LogicalDevice
         if(device)
         {
             vkDeviceWaitIdle(device);
-            flushRetired(0);
+
+            if(rootOwner)
+                destroy(rootOwner);
+
+            // A queued holder releases more, so drain until nothing is left
+            while(releaseQueue.hasRetired())
+                releaseQueue.flush(0);
+
+            // A later finalizer must not call into a device that is gone
+            releaseQueue.close();
 
             pipelinesDtor();
             shadersDtor();
@@ -220,6 +200,8 @@ class LogicalDevice
             }
 
             vkDestroyDevice(device, alloc);
+            // Later finalizers must not touch a device the driver took away
+            this.device = VkDevice.init;
         }
     }
 
@@ -288,8 +270,6 @@ class LogicalDevice
     import pukan.vulkan.pipelines: Pipelines;
     mixin ScopedLogicalDeviceTemplateMixin!Pipelines;
 
-    import pukan.vulkan.image: Images;
-    mixin ScopedLogicalDeviceTemplateMixin!Images;
 
     import pukan.vulkan.memory: Memory;
     mixin ScopedLogicalDeviceTemplateMixin!Memory;
@@ -312,7 +292,7 @@ class Semaphore
             sType: VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
 
-        semaphore = VkObj!VkSemaphore(device.device, device.alloc, cinf);
+        semaphore = VkObj!VkSemaphore(device.releaseQueue, cinf);
     }
 }
 
@@ -334,7 +314,7 @@ class Fence
             flags: VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        fence = VkObj!VkFence(device.device, device.alloc, cinf);
+        fence = VkObj!VkFence(device.releaseQueue, cinf);
     }
 
     void wait()

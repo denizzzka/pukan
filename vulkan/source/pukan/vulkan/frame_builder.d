@@ -49,6 +49,9 @@ class FrameBuilder
     ~this()
     {
         destroy(commandPool);
+
+        if(graphicsQueue)
+            destroy(graphicsQueue);
     }
 
     ///
@@ -253,6 +256,15 @@ class SyncFramesInFlight
 
         imageAvailableSemaphores = [imageAvailable.semaphore.vk];
         renderFinishedSemaphores = [renderFinished.semaphore.vk];
+    }
+
+    ~this()
+    {
+        if(imageAvailable)
+            destroy(imageAvailable);
+
+        if(renderFinished)
+            destroy(renderFinished);
     }
 }
 
