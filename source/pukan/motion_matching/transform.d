@@ -1,7 +1,7 @@
 module pukan.motion_matching.transform;
 
 import dlib.math: Vector3f;
-import pukan.axes: Axis, axisForward, rotateAround;
+import pukan.graphics.g3d.axes: Axis, axisForward, rotateAround;
 import std.math: PI;
 
 /// Position and heading of a character, or of the root bone of a clip.

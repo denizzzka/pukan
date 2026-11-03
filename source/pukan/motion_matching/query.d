@@ -1,7 +1,7 @@
 module pukan.motion_matching.query;
 
 import dlib.math: Vector3f;
-import pukan.axes: Axis, onPlane, planeComponents;
+import pukan.graphics.g3d.axes: Axis, onPlane, planeComponents;
 import pukan.motion_matching.database: putPosition;
 import pukan.motion_matching.history: PoseHistory;
 import pukan.motion_matching.schema: Schema;

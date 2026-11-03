@@ -18,12 +18,12 @@ import pukan.godot_scene.text: GodotTextDocument, GodotTextExternal, GodotTextNo
 import pukan.godot_scene.value;
 import pukan.gltf: GlTF;
 import pukan.gltf.factory: GltfFactory;
-import pukan.material: AlphaMode, Material, MaterialFlag, MaterialMode;
-import pukan.misc: linearFormat, loadImageFromMemory;
-import pukan.pbr.accessor: BufAccess, BufferPieceOnGPU;
-import pukan.pbr.pipelines: PbrPipelines;
-import pukan.pbr.factory: PbrFactory;
-import pukan.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
+import pukan.graphics.g3d.material: AlphaMode, Material, MaterialFlag, MaterialMode;
+import pukan.graphics.common.misc: linearFormat, loadImageFromMemory;
+import pukan.graphics.g3d.pbr.accessor: BufAccess, BufferPieceOnGPU;
+import pukan.graphics.g3d.pbr.pipelines: PbrPipelines;
+import pukan.graphics.g3d.pbr.factory: PbrFactory;
+import pukan.graphics.g3d.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
 import pukan.physics.shapes: CollisionShape;
 import pukan.vulkan;
 import pukan.vulkan.bindings;

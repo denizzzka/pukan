@@ -2,8 +2,8 @@ module pukan.godot_scene.primitives;
 
 import dlib.math: Vector2f, Vector3f, cross, dot;
 import pukan.godot_scene.value;
-import pukan.misc: Boxf;
-import pukan.pbr.mesh: MeshGeometry;
+import pukan.graphics.common.misc: Boxf;
+import pukan.graphics.g3d.pbr.mesh: MeshGeometry;
 import std.algorithm: min, max;
 import std.math: PI, cos, sin;
 

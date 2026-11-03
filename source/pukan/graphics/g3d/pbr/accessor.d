@@ -1,0 +1,94 @@
+module pukan.graphics.g3d.pbr.accessor;
+
+import pukan.vulkan.bindings;
+import pukan.vulkan;
+import std.exception: enforce;
+
+class BufferPieceOnGPU
+{
+    TransferBuffer buffer;
+
+    //TODO: add flag if CPU buf is not needed after uploading
+    void recordUpload(scope VkCommandBuffer commandBuffer)
+    {
+        buffer.recordUpload(commandBuffer);
+    }
+}
+
+struct BufAccess
+{
+    ptrdiff_t viewIdx = -1;
+    uint offset;
+    ubyte stride;
+    uint count;
+}
+
+package(pukan) struct AccessRange(T, bool isOutput)
+{
+    private const void[] buf;
+    const BufAccess accessor;
+    private const uint bufEnd;
+    private uint currByte;
+    private uint currStep;
+
+    alias Elem = T;
+
+    package(pukan) this(in void[] b, in BufAccess a)
+    {
+        buf = b;
+
+        BufAccess tmp = a;
+        if(tmp.stride == 0)
+        {
+            // tightly packed data
+            tmp.stride = T.sizeof;
+        }
+
+        accessor = tmp;
+        currByte = accessor.offset;
+        bufEnd = cast(uint) buf.length;
+
+        enforce(accessor.stride >= T.sizeof);
+
+        assert(!empty);
+    }
+
+    void popFront()
+    {
+        enforce(currByte <= bufEnd - T.sizeof);
+        enforce(!empty);
+
+        currStep++;
+        currByte += accessor.stride;
+    }
+
+    uint length() const => accessor.count;
+    bool empty() const => currStep >= length;
+
+    version(BigEndian)
+    static assert(false, "big endian not implemented");
+
+    //TODO: currByte and currStep is not need for random access range implementation
+    ref T opIndex(size_t idx) const
+    {
+        auto i = accessor.offset + accessor.stride * idx;
+        return *cast(T*) cast(void*) &buf[i];
+    }
+
+    int opDollar(uint i)() => length - i;
+
+    private T* frontPtr() inout
+    {
+        return cast(T*) cast(void*) &buf[currByte];
+    }
+
+    static if(!isOutput)
+    ref T front() const => *frontPtr();
+
+    static if(isOutput)
+    void put(ref T val)
+    {
+        *frontPtr = val;
+        popFront;
+    }
+}

@@ -5,18 +5,18 @@ only a suggested grouping.
 
 - [x] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
       used independently of the rest of `pukan`. Keep module names unchanged.
-- [ ] Split the graphics code out of the flat `pukan.*` modules into
+- [x] Split the graphics code out of the flat `pukan.*` modules into
       `pukan.graphics.g3d`, `pukan.graphics.g2d` and `pukan.graphics.common`,
       moving the corresponding functions and updating imports, the demos and
       the `pukan/package.d` re-exports. `pukan.vulkan` stays untouched, and the
       new packages get no `package.d` files.
-  - [ ] `g3d`, a first pass: `axes`, `background`, `camera`, `camera_controls`,
+  - [x] `g3d`, a first pass: `axes`, `background`, `camera`, `camera_controls`,
         `fly_camera`, `ibl`, `material`, `mesh`, `oit`, `scene`, `scene_tree`,
         `shadow`, `stereo`, `pbr`, `primitives_tree`, `tree`. Content loaders
         stay in `pukan.gltf` and `pukan.godot_scene`.
   - [ ] `g2d`: create the package for the `## 2D` work; no drawing code moves
         there yet.
-  - [ ] `common`: `misc`, `exceptions`, `screenshot`, `webp`, `zstd`.
+  - [x] `common`: `misc`, `screenshot`, `webp`, `zstd`.
 
 ## Open GitHub issues
 
@@ -49,7 +49,7 @@ What is there today:
   `AABB`, `OBB`, `MPR`, `TriMesh`, ray and triangle intersection. Borrow the
   tests and the formulas, not the types: dlib's `AABB` is a center and a
   half-size with cached `pmin`/`pmax`, while `pukan.physics.shapes.Aabb` and
-  `pukan.misc.Boxf` keep min and max and need union, sweep and surface area.
+  `pukan.graphics.common.misc.Boxf` keep min and max and need union, sweep and surface area.
 - `dlib.math`: matrix decomposition, dual quaternions, SSE helpers.
 - `dlib.concurrency`: thread pool, task queue, worker threads and an SPSC
   queue, the pieces a streaming path needs for upload and build workers.
@@ -1318,7 +1318,7 @@ whole engine costs.
 
 - [ ] Replace the internal `import pukan.vulkan;` and `import pukan;` with
       explicit imports. That alone drops the closure to 35 modules from
-      `pukan.scene`, 28 from `pukan.gltf` and 18 from `pukan.vulkan.core`,
+      `pukan.graphics.g3d.scene`, 28 from `pukan.gltf` and 18 from `pukan.vulkan.core`,
       with no public API change.
 - [ ] Then decide whether the two umbrellas stay as an opt-in import or go.
       Deleting them breaks `import pukan;` and makes the module layout part of

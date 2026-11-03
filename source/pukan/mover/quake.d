@@ -1,7 +1,7 @@
 module pukan.mover.quake;
 
 import dlib.math: Vector3f, dot;
-import pukan.axes: Axis, axisVector;
+import pukan.graphics.g3d.axes: Axis, axisVector;
 import pukan.physics.narrowphase: sweepCapsuleBox;
 import pukan.physics.world: CollisionWorld;
 import std.algorithm: min;

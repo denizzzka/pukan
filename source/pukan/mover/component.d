@@ -1,7 +1,7 @@
 module pukan.mover.component;
 
 import dlib.math: Vector3f;
-import pukan.axes: axisVector;
+import pukan.graphics.g3d.axes: axisVector;
 import pukan.mover.quake:
     QuakeBody,
     QuakeCommand,

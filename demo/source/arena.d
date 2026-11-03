@@ -2,7 +2,7 @@ module arena;
 
 import dlib.math;
 import pukan.gltf: GlTF;
-import pukan.primitives_tree: Bone;
+import pukan.graphics.g3d.primitives_tree: Bone;
 import std.algorithm: max, min, sort;
 import std.format: format;
 import std.math: atan2, lrint, sqrt;

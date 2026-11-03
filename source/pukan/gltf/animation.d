@@ -2,7 +2,7 @@ module pukan.gltf.animation;
 
 import dlib.math;
 import pukan.gltf: Node;
-import pukan.pbr.accessor: BufAccess;
+import pukan.graphics.g3d.pbr.accessor: BufAccess;
 import pukan.gltf.loader;
 
 /// Interpolation types supported by GLTF animation samplers

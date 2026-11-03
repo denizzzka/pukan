@@ -2,7 +2,7 @@ module pukan.godot_scene.material;
 
 import dlib.math: Vector3f, Vector4f, Vector4i;
 import pukan.godot_scene.value;
-import pukan.material: AlphaMode, Material, MaterialFlag, MaterialFlags, MaterialMode;
+import pukan.graphics.g3d.material: AlphaMode, Material, MaterialFlag, MaterialFlags, MaterialMode;
 
 /// Material state read from a Godot BaseMaterial3D resource
 struct GodotMaterialData

@@ -3,7 +3,7 @@ module pukan.godot_scene.mesh;
 import dlib.math: Vector2f, Vector3f, Vector4f;
 import pukan.exceptions: PukanException;
 import pukan.godot_scene.value;
-import pukan.pbr.mesh: MeshGeometry, Vector4us;
+import pukan.graphics.g3d.pbr.mesh: MeshGeometry, Vector4us;
 import std.conv: to;
 import std.math: PI, abs, cos, sin;
 

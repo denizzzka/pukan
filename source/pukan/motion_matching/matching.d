@@ -100,7 +100,7 @@ struct Matching
 unittest
 {
     import dlib.math: Vector3f;
-    import pukan.axes: Axis;
+    import pukan.graphics.g3d.axes: Axis;
     import pukan.motion_matching.database: Clip, ClipPose;
     import pukan.motion_matching.query: Query;
     import pukan.motion_matching.schema: BoneChannel, Schema, TrajectoryChannel;

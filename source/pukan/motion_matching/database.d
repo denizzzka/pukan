@@ -1,7 +1,7 @@
 module pukan.motion_matching.database;
 
 import dlib.math: Vector3f;
-import pukan.axes: Axis, onPlane, planeComponents;
+import pukan.graphics.g3d.axes: Axis, onPlane, planeComponents;
 import pukan.motion_matching.schema: Schema;
 import pukan.motion_matching.transform: Transform;
 import std.algorithm: min;

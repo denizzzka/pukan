@@ -1,26 +1,26 @@
 module pukan;
 
-public import pukan.background;
-public import pukan.camera;
-public import pukan.camera_controls;
 public import pukan.compressed_texture;
-public import pukan.fly_camera;
 public import pukan.gltf;
 public import pukan.godot_scene;
-public import pukan.material;
-public import pukan.mesh;
-public import pukan.misc;
+public import pukan.graphics.common.misc;
+public import pukan.graphics.common.screenshot;
+public import pukan.graphics.common.webp;
+public import pukan.graphics.g3d.background;
+public import pukan.graphics.g3d.camera;
+public import pukan.graphics.g3d.camera_controls;
+public import pukan.graphics.g3d.fly_camera;
+public import pukan.graphics.g3d.material;
+public import pukan.graphics.g3d.mesh;
+public import pukan.graphics.g3d.pbr;
+public import pukan.graphics.g3d.primitives_tree;
+public import pukan.graphics.g3d.primitives_tree.mesh;
+public import pukan.graphics.g3d.primitives_tree.tree;
+public import pukan.graphics.g3d.scene;
+public import pukan.graphics.g3d.stereo;
 public import pukan.mover;
-public import pukan.pbr;
 public import pukan.physics;
-public import pukan.primitives_tree;
-public import pukan.primitives_tree.mesh;
-public import pukan.primitives_tree.tree;
-public import pukan.scene;
-public import pukan.screenshot;
-public import pukan.stereo;
 public import pukan.vulkan;
-public import pukan.webp;
 
 import pukan.vulkan.bindings;
 

@@ -128,7 +128,7 @@ private float lengthAt(const(float)[] values, size_t offset)
 unittest
 {
     import dlib.math: Vector3f;
-    import pukan.axes: Axis;
+    import pukan.graphics.g3d.axes: Axis;
     import pukan.motion_matching.database: Clip, ClipPose;
     import pukan.motion_matching.schema: BoneChannel, TrajectoryChannel;
     import pukan.motion_matching.transform: Transform;
@@ -188,7 +188,7 @@ unittest
 unittest
 {
     import dlib.math: Vector3f;
-    import pukan.axes: Axis;
+    import pukan.graphics.g3d.axes: Axis;
     import pukan.motion_matching.database: Clip, ClipPose;
     import pukan.motion_matching.schema: BoneChannel;
     import pukan.motion_matching.transform: Transform;

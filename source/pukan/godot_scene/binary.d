@@ -95,7 +95,7 @@ GodotTextDocument parseGodotResourceFile(string path)
 /// Decodes the RSCC block stream of a compressed resource
 private ubyte[] decompressGodotResource(const(ubyte)[] data, string label)
 {
-    import pukan.zstd: decompressZstd;
+    import pukan.graphics.common.zstd: decompressZstd;
     import std.algorithm: min;
 
     size_t pos = 4;

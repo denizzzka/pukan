@@ -2,12 +2,12 @@ module pukan.gltf.loader;
 
 import dlib.math;
 import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
-import pukan.pbr.accessor;
+import pukan.graphics.g3d.pbr.accessor;
 import pukan.gltf.animation;
-import pukan.pbr.pipelines: PbrPipelines;
-import pukan.material: MaterialBuffer;
+import pukan.graphics.g3d.pbr.pipelines: PbrPipelines;
+import pukan.graphics.g3d.material: MaterialBuffer;
 import pukan.exceptions: PukanException;
-import pukan.misc: linearFormat;
+import pukan.graphics.common.misc: linearFormat;
 import pukan.vulkan.bindings;
 import pukan.vulkan;
 import std.algorithm;
@@ -563,7 +563,7 @@ package GltfAsset loadGltfAsset(
             {
                 const viewIdxPtr = "bufferView" in img;
 
-                import pukan.misc: loadImageFromMemory;
+                import pukan.graphics.common.misc: loadImageFromMemory;
                 import std.traits: ReturnType;
 
                 ReturnType!loadImageFromMemory extFormatImg;
@@ -1096,7 +1096,7 @@ private void enforceImageMime(string mime)
 
 private auto loadImageFromUri(string dir, string uri, out VkFormat format)
 {
-    import pukan.misc: loadImageFromFile, loadImageFromMemory;
+    import pukan.graphics.common.misc: loadImageFromFile, loadImageFromMemory;
     import std.algorithm.searching: startsWith;
 
     if(!uri.startsWith("data:"))
