@@ -1,5 +1,9 @@
 module pukan.vulkan.memory;
 
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.helpers: vkCheck;
+import pukan.vulkan.logical_device: LogicalDevice;
+
 package mixin template Memory()
 {
     import core.atomic: atomicLoad, atomicOp, atomicStore;
@@ -81,8 +85,6 @@ import lockfree.list: LockFreeList;
 
 alias MemChunk = LockFreeList!(VkDeviceMemory).Elem;
 alias BufChunk = LockFreeList!(VkBuffer).Elem;
-
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 
 class MemoryBufferMappedToCPU : MemoryBuffer

@@ -1,10 +1,13 @@
 module pukan.gltf.skin_matrices;
 
 import dlib.math;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.computation: Compute;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBuffer, TransferBuffer;
+import pukan.vulkan.pipelines: PipelineFactory;
 import pukan.vulkan.requirements: Requirement;
+import pukan.vulkan.shaders: shaderStage;
 import std.meta: AliasSeq;
 
 /// GPU kernel that calculates skin joint matrices:

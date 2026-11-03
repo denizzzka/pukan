@@ -2,9 +2,13 @@ module pukan.graphics.g3d.primitives_tree.lines;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector4f;
 import pukan.graphics.g3d.primitives_tree: DrawablePrimitive;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
+import pukan.vulkan.renderpass: RenderPass;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, shaderStage;
 
 struct LineInstance
 {

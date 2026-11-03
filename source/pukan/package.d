@@ -20,7 +20,23 @@ public import pukan.graphics.g3d.scene;
 public import pukan.graphics.g3d.stereo;
 public import pukan.mover;
 public import pukan.physics;
-public import pukan.vulkan;
+public import pukan.vulkan.api_version;
+public import pukan.vulkan.commands;
+public import pukan.vulkan.computation;
+public import pukan.vulkan.core;
+public import pukan.vulkan.descriptors;
+public import pukan.vulkan.frame_builder;
+public import pukan.vulkan.image;
+public import pukan.vulkan.logical_device;
+public import pukan.vulkan.memory;
+public import pukan.vulkan.pipeline_cache;
+public import pukan.vulkan.pipelines;
+public import pukan.vulkan.renderpass;
+public import pukan.vulkan.requirements;
+public import pukan.vulkan.shaders;
+public import pukan.vulkan.surface;
+public import pukan.vulkan.swapchain;
+public import pukan.vulkan.textures;
 
 import pukan.vulkan.bindings;
 

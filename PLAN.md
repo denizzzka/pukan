@@ -1311,18 +1311,19 @@ The README asks for builds assembled from the features a project uses.
 
 ## Module selection
 
-`pukan/package.d` and `pukan/vulkan/package.d` re-export everything, and 38
-library files import the `pukan.vulkan` umbrella themselves, so any entry point
-reaches 93 of the 94 modules. Importing one module costs what importing the
-whole engine costs.
+`pukan/package.d` re-exports everything, and five library and demo files still
+import it, so any entry point reaches 93 of the 94 modules. Importing one module
+costs what importing the whole engine costs.
 
-- [ ] Replace the internal `import pukan.vulkan;` and `import pukan;` with
-      explicit imports. That alone drops the closure to 35 modules from
-      `pukan.graphics.g3d.scene`, 28 from `pukan.gltf` and 18 from `pukan.vulkan.core`,
-      with no public API change.
-- [ ] Then decide whether the two umbrellas stay as an opt-in import or go.
-      Deleting them breaks `import pukan;` and makes the module layout part of
-      the contract, so it comes after the internal cleanup.
+- [x] Delete the `pukan.vulkan` umbrella. The 38 files that imported it name
+      their modules directly, and `pukan/package.d` re-exports the same 17
+      Vulkan modules itself, so the public API is unchanged.
+- [ ] Replace the internal `import pukan;` with explicit imports. That alone
+      drops the closure to 35 modules from `pukan.graphics.g3d.scene`, 28 from
+      `pukan.gltf` and 18 from `pukan.vulkan.core`.
+- [ ] Then decide whether `pukan` stays as an opt-in import or goes. Deleting it
+      breaks `import pukan;` and makes the module layout part of the contract,
+      so it comes after the internal cleanup.
 - `public import` and plain `import` compile the same; only deleting a line
   helps. The library build compiles all sources either way, so the gain is on
   the application side: 3.2 s against 0.4 s and 5 MB against 0.6 MB for a

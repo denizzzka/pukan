@@ -1,19 +1,25 @@
 module pukan.gltf.loader;
 
 import dlib.math;
-import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
-import pukan.graphics.g3d.pbr.accessor;
-import pukan.gltf.animation;
-import pukan.graphics.g3d.pbr.pipelines: PbrPipelines;
-import pukan.graphics.g3d.material: MaterialBuffer;
 import pukan.exceptions: PukanException;
+import pukan.gltf: GlTF, SkinnedGlTF, SkinnedGlTF_skinJointsGPU, Trans;
+import pukan.gltf.animation;
 import pukan.graphics.common.misc: linearFormat;
+import pukan.graphics.g3d.material: MaterialBuffer;
+import pukan.graphics.g3d.pbr.accessor;
+import pukan.graphics.g3d.pbr.pipelines: PbrPipelines;
 import pukan.vulkan.bindings;
-import pukan.vulkan;
+import pukan.vulkan.commands: beginOneTimeCommandBuffer, endCommandBuffer;
+import pukan.vulkan.image: ImageMemory, loadImageToMemory;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU, TransferBuffer;
+import pukan.vulkan.pipelines: DescriptorAllocator;
+import pukan.vulkan.textures: Texture, requiredAnisotropy;
 import std.algorithm;
 import std.array;
 import std.conv: to;
 import std.exception: enforce;
+
 static import std.file;
 static import std.path;
 static import std.uri;

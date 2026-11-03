@@ -1,7 +1,9 @@
 module pukan.vulkan.commands;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.helpers: vkCheck;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.vkobj: VkObj;
 
 /**
 Command pools are externally synchronized, meaning that a command pool

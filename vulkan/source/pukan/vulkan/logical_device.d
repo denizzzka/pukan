@@ -1,10 +1,19 @@
 module pukan.vulkan.logical_device;
 
 import core.sync.mutex: Mutex;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.core: Instance;
+import pukan.vulkan.descriptors: PoolAndLayoutInfo;
+import pukan.vulkan.helpers: vkCall, vkCheck;
+import pukan.vulkan.memory: DeviceMemory, MemoryBufferMappedToCPU;
 import pukan.vulkan.physical_device: PhysicalDevice;
+import pukan.vulkan.pipelines: PipelineCacheManager;
+import pukan.vulkan.renderpass: RenderPass;
 import pukan.vulkan.requirements: ChainMask, DeviceContext, FeatureChain, ImageFormatRequest, linkDeviceFeatures, requireEnabled;
+import pukan.vulkan.shaders: ShaderDecl, ShaderInfo, ShaderVertexInput, createLayoutBinding;
+import pukan.vulkan.vkobj: VkObj;
+
 import log = std.logger;
 import std.exception: enforce;
 import std.string: toStringz;

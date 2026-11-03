@@ -1,10 +1,11 @@
 module pukan.graphics.g3d.primitives_tree.factory;
 
 import pukan.graphics.g3d.mesh: MeshResources;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.frame_builder: FrameBuilder;
+import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
+import pukan.vulkan.renderpass: RenderPass;
 import pukan.vulkan.requirements: Requirement;
 import std.meta: AliasSeq;
 

@@ -2,9 +2,10 @@ module pukan.graphics.common.screenshot;
 
 import dlib.image: ImageRGBA8, savePNG;
 import pukan.exceptions: PukanException;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.image: transitionImageLayout;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 import std.conv: to;
 
 /// Copies the last rendered frame to a PNG on the CPU

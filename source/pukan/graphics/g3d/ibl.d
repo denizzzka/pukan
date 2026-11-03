@@ -1,8 +1,9 @@
 module pukan.graphics.g3d.ibl;
 
 import dlib.math: Vector2f, Vector3f, cross, dot;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.image: loadImageToMemory, loadImageWithMips;
+import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.textures: Texture;
 import std.algorithm: max;
 import std.math: PI, abs, acos, atan2, cos, floor, pow, sin, sqrt;

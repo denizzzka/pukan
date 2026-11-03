@@ -3,8 +3,11 @@ module pukan.graphics.g3d.shadow;
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.graphics.common.misc: Boxf, vulkanOrthographicMatrix;
 import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.frame_builder: DepthBuf;
+import pukan.vulkan.helpers: vkCall, vkCheck;
+import pukan.vulkan.image: ImageMemory;
+import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.renderpass: RenderPass;
 
 /// Depth-only pass that renders the sun's view of the scene

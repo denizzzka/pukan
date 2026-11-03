@@ -1,15 +1,17 @@
 module pukan.vulkan.pipelines;
 
-import frame_bindings;
-
-import pukan.vulkan.exceptions: PukanVulkanException;
-import pukan.vulkan;
-import pukan.vulkan.bindings;
-import pukan.vulkan.helpers;
-import pukan.vulkan.pipeline_cache: PipelineCacheLoadException, PipelineCacheStore, PipelineVariantKey, PipelineVariantKeyBuilder;
 import core.sync.condition: Condition;
 import core.sync.mutex: Mutex;
 import core.thread: Thread;
+import frame_bindings;
+import pukan.vulkan.bindings;
+import pukan.vulkan.core: Instance;
+import pukan.vulkan.exceptions: PukanVulkanException;
+import pukan.vulkan.helpers;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.pipeline_cache: PipelineCacheLoadException, PipelineCacheStore, PipelineVariantKey, PipelineVariantKeyBuilder;
+import pukan.vulkan.renderpass: RenderPass;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, createLayoutBinding;
 import std.conv: to;
 
 debug

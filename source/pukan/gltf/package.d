@@ -1,26 +1,31 @@
 module pukan.gltf;
 
 import dlib.math;
-public import pukan.gltf.loader: GltfAsset, LoadStats, createGltfInstance, loadGltfAsset;
-public import pukan.gltf.factory: GltfFactory;
-import pukan.graphics.g3d.pbr.accessor;
 import pukan.gltf.animation: AnimationSupport;
+public import pukan.gltf.factory: GltfFactory;
+public import pukan.gltf.loader: GltfAsset, LoadStats, createGltfInstance, loadGltfAsset;
 import pukan.gltf.loader;
-import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.gltf.material: applyGltfMaterial;
-import pukan.graphics.g3d.mesh: mirrors;
-import pukan.graphics.g3d.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
-import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
-import pukan.graphics.common.misc: Boxf, isVisible, mergeAabb, transformAabb;
 import pukan.gltf.skin_matrices: SkinMatrices;
+import pukan.graphics.common.misc: Boxf, isVisible, mergeAabb, transformAabb;
+import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
+import pukan.graphics.g3d.mesh: mirrors;
+import pukan.graphics.g3d.pbr.accessor;
+import pukan.graphics.g3d.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
+import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.graphics.g3d.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
-import pukan.vulkan;
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: ReadableTransferBuffer, TransferBuffer;
+import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg;
+import pukan.vulkan.renderpass: Blended, DrawPhase, DrawableByVulkan, PipelineWarmup;
+import pukan.vulkan.textures: Texture;
 import std.algorithm;
 import std.array;
-import std.range;
 import std.conv: to;
 import std.exception: enforce;
+import std.range;
 import vibe.data.json;
 
 alias LoaderNode = pukan.gltf.loader.Node;
@@ -1120,7 +1125,6 @@ class GlTF : DrawableByVulkan, Blended, PipelineWarmup
 
         return !blended && !ownPass;
     }
-
 
     private LazyPipeline* selectPipelineSlot(
         const MeshClass mesh,

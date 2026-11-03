@@ -1,9 +1,16 @@
 module pukan.vulkan.frame_builder;
 
 import frame_bindings;
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
+import pukan.vulkan.image: ImageMemory, identityComponentMapping;
+import pukan.vulkan.logical_device: LogicalDevice, Semaphore;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU;
+import pukan.vulkan.pipelines: DescriptorAllocator;
+import pukan.vulkan.requirements: ImageFormatRequirement;
+import pukan.vulkan.textures: Texture;
 
 //~ import pukan.vulkan.exceptions;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;

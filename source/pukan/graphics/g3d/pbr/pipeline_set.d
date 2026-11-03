@@ -4,9 +4,10 @@ import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import material_bindings;
 import pukan.graphics.g3d.pbr.mesh: staticInstanceBinding;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, PbrProfile, pbrGltfActive, pbrGodotActive;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: FixedState, PipelineFactory, PipelineKey, RenderTechnique;
+import pukan.vulkan.renderpass: RenderPass;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, shaderStage;
 import std.algorithm: canFind;
 
 private ShaderVertexInput vertexInput()

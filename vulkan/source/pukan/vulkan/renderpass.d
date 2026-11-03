@@ -1,8 +1,10 @@
 module pukan.vulkan.renderpass;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.frame_builder: DepthBuf;
 import pukan.vulkan.helpers;
+import pukan.vulkan.logical_device: LogicalDevice;
 
 abstract class RenderPass
 {

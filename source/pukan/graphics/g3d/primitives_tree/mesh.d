@@ -5,8 +5,13 @@ import pukan.graphics.g3d.material: Material, MaterialFlag, MaterialFlags, Mater
 import pukan.graphics.g3d.mesh: Mesh, MeshResources, VertexStream;
 import pukan.graphics.g3d.primitives_tree: DrawablePrimitive;
 import pukan.graphics.g3d.scene: Vertex;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: TransferBuffer;
+import pukan.vulkan.pipelines: GraphicsPipelineCfg;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, shaderStage;
 import pukan.vulkan.textures: Texture;
 
 struct LitVertex

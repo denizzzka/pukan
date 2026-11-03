@@ -2,8 +2,11 @@ module pukan.graphics.g3d.mesh;
 
 import dlib.math: Matrix4x4f, Vector4f;
 import pukan.graphics.g3d.material: Material, MaterialBuffer;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU;
+import pukan.vulkan.pipelines: GraphicsPipelineCfg;
+import pukan.vulkan.textures: Texture, createFakeTexture1x1;
 
 /// One vertex buffer bound to a vertex input binding
 struct VertexStream

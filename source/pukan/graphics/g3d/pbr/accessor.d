@@ -1,7 +1,7 @@
 module pukan.graphics.g3d.pbr.accessor;
 
 import pukan.vulkan.bindings;
-import pukan.vulkan;
+import pukan.vulkan.memory: TransferBuffer;
 import std.exception: enforce;
 
 class BufferPieceOnGPU

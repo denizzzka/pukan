@@ -1,8 +1,13 @@
 module pukan.vulkan.computation;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.descriptors: PoolAndLayoutInfo, bufferWriteDescriptor, imageWriteDescriptor;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU, TransferBuffer;
+import pukan.vulkan.pipelines: PipelineFactory, PipelineKey;
 import pukan.vulkan.requirements: Requirement;
+import pukan.vulkan.shaders: ShaderDecl, shaderStage;
 import std.meta: AliasSeq;
 
 /// Base class for GPU compute kernels

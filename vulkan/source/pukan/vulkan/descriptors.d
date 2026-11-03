@@ -1,6 +1,7 @@
 module pukan.vulkan.descriptors;
 
 import pukan.vulkan.bindings;
+import pukan.vulkan.helpers: vkCall, vkCheck;
 
 package mixin template DescriptorPools()
 {

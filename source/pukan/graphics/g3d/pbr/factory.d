@@ -1,7 +1,7 @@
 module pukan.graphics.g3d.pbr.factory;
 
 import pukan.graphics.g3d.mesh: MeshResources;
-import pukan.vulkan;
+import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipelines: DescriptorAllocator, PipelineFactory, PipelineKey;
 
 class PbrFactory

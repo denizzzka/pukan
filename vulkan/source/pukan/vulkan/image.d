@@ -1,5 +1,10 @@
 module pukan.vulkan.image;
 
+import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: DeviceMemory, MemoryBufferMappedToCPU;
+import pukan.vulkan.requirements: ImageFormatRequest;
+
 package mixin template Images()
 {
     import lockfree.list: LockFreeList;
@@ -19,7 +24,6 @@ package mixin template Images()
 }
 
 import pukan.vulkan.exceptions: PukanVulkanException;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 

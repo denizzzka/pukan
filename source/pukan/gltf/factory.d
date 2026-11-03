@@ -4,8 +4,8 @@ import pukan.gltf;
 import pukan.gltf.loader: GltfAsset, GltfLoadOptions, createGltfInstance, loadGltfAsset;
 import pukan.graphics.g3d.pbr.factory: PbrFactory;
 import pukan.graphics.g3d.pbr.pipelines: PbrPipelines, PbrProfile, pipelineWarmupPerScene;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.requirements: FormatRequirement, ImageFormatRequirement, Requirement;
 import std.conv: to;
 import std.meta: AliasSeq;
 

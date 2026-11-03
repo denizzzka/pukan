@@ -2,13 +2,15 @@ module pukan.graphics.g3d.pbr.mesh;
 
 import dlib.math;
 import material_bindings;
-import pukan.graphics.g3d.pbr.accessor;
-import pukan.graphics.g3d.pbr.instancing: InstanceBatch, currentInstanceArena;
+import pukan.graphics.common.misc: Boxf, expandAABB;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.graphics.g3d.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
-import pukan.graphics.common.misc: Boxf, expandAABB;
-import pukan.vulkan;
+import pukan.graphics.g3d.pbr.accessor;
+import pukan.graphics.g3d.pbr.instancing: InstanceBatch, currentInstanceArena;
 import pukan.vulkan.bindings;
+import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg;
 
 /// Vertex input binding of the per-instance transform matrix
 enum staticInstanceBinding = 6;

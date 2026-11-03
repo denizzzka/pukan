@@ -1,11 +1,10 @@
 module pukan.vulkan.helpers;
 
-import pukan.vulkan.exceptions: PukanVulkanExceptionWithCode;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.exceptions: PukanVulkanExceptionWithCode;
 public import pukan.vulkan.stype_list: getCreateInfoStructureType;
-public import pukan.vulkan.vkobj: VkObj;
 import pukan.vulkan.vkname: VkInfoNames;
+public import pukan.vulkan.vkobj: VkObj;
 
 auto vkCheck(VkResult ret, string err_descr = __FUNCTION__, string file = __FILE__, size_t line = __LINE__)
 {

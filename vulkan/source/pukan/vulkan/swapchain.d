@@ -1,7 +1,11 @@
 module pukan.vulkan.swapchain;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.frame_builder: Frame, FrameBuilder;
+import pukan.vulkan.helpers: getArrayFrom, vkCheck;
+import pukan.vulkan.image: ImageMemory;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.renderpass: RenderPass;
 import pukan.vulkan.requirements: Requirement;
 import std.exception: enforce;
 import std.meta: AliasSeq;

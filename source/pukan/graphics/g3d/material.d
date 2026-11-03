@@ -3,8 +3,9 @@ module pukan.graphics.g3d.material;
 import core.atomic: atomicOp;
 import core.sync.mutex: Mutex;
 import dlib.math: Vector3f, Vector4f, Vector4i;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 import std.typecons: BitFlags;
 
 enum MaterialMode: uint

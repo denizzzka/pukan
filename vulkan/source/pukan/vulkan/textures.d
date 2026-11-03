@@ -1,8 +1,10 @@
 module pukan.vulkan.textures;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.frame_builder: createImageView;
 import pukan.vulkan.helpers;
+import pukan.vulkan.image: ImageMemory, createFakeImage1x1, identityComponentMapping;
+import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.requirements: Requirement, getOptionalRequirements;
 import std.conv: to;
 import std.exception: enforce;

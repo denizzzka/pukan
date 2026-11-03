@@ -1,9 +1,14 @@
 module pukan.graphics.g3d.oit;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.frame_builder: createImageView;
+import pukan.vulkan.helpers: vkCall, vkCheck;
+import pukan.vulkan.image: ImageMemory;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBuffer;
 import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: RenderPass;
+import pukan.vulkan.shaders: shaderStage;
 
 /// Fragments the per-frame buffer holds; must match OIT_MAX_FRAGMENTS in oit.glsl
 enum oitMaxFragments = 524288;

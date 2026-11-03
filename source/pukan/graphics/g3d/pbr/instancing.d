@@ -1,8 +1,9 @@
 module pukan.graphics.g3d.pbr.instancing;
 
 import dlib.math: Matrix4x4f;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 
 /// Destination of one instanced draw inside an arena chunk
 struct InstanceBatch

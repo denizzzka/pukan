@@ -1,9 +1,11 @@
 module pukan.vulkan.core;
 
-import pukan.vulkan.exceptions;
-import pukan.vulkan;
 import pukan.vulkan.bindings;
+import pukan.vulkan.exceptions;
 import pukan.vulkan.helpers;
+import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.surface: SurfaceMethods;
+
 public import pukan.vulkan.helpers; //TODO: remove public
 import pukan.vulkan.physical_device: PhysicalDevice, SelectedDevice;
 import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;

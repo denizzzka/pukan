@@ -1,8 +1,8 @@
 module pukan.vulkan.queue;
 
-import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
+import pukan.vulkan.logical_device: Fence, LogicalDevice;
 
 class Queue
 {
