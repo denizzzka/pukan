@@ -104,6 +104,9 @@ The end goal is a game exported by Godot, not only a source project.
       `nodes/apply_root_scale` and `nodes/root_scale`, which is what makes the
       town tree stand at the right size, plus `nodes/use_name_suffixes` and
       `materials/extract` when a project relies on them.
+- [ ] `project.binary`: decode object-typed settings (variant type 24), the
+      resource references newer exports carry. `platformer.pck` and
+      `generated/fixtures.pck` fail to load until then.
 - [ ] Stream or memory-map pack files instead of loading the whole archive.
 - [ ] Resource deduplication across a scene.
 
@@ -768,22 +771,15 @@ up. Before each slice, read the matching reference named in
   The grid is in: `CellGrid` holds the cell size and the level origin,
   `Scene.cellGrid` owns it, and `SceneTree.rebuildCells` places every drawable in
   each cell its transformed bounds touch. A drawable that reports no bounds at
-  all stays visible from every cell. Still open:
+  all stays visible from every cell; a part that reports none contributes only
+  its origin to `cellBounds`, so it lands in a cell anyway. `calcAABB` keeps the
+  real extents, and `mergePartAabb` chooses between the two.
+
+  Still open:
 
   - [ ] Content sources expose their own nodes with bounds instead of reporting
         one box per drawable, so a loaded level is placed per object and a node
         that spans cells lands in each.
-  - [ ] Bounds of loaded content:
-    - [ ] glTF: compute the bounds from the vertex data when the accessor omits
-          `min`/`max` instead of leaving them NaN.
-    - [ ] Godot: a surface without `aabb` is a loader bug, so assert on the NaN
-          box instead of carrying it into the scene.
-    - [ ] Find out why the baked skinning path in the glTF loader sets
-          `uplVert.aabb = Boxf.init` although the positions are already baked.
-
-        Until those land, a part without bounds contributes only its origin to
-        `localBounds`, so it still lands in a cell; `calcAABB` keeps real
-        extents. See `mergePartAabb`.
   - [ ] The loaded set around the camera: a radius of resident cells plus a
         prefetch ring ordered by distance, with one budget per frame for mesh
         upload and pipeline warmup. A cell is released only when no recorded

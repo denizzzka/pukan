@@ -2,7 +2,7 @@ module pukan.godot_scene.primitives;
 
 import dlib.math: Vector2f, Vector3f, cross, dot;
 import pukan.godot_scene.value;
-import pukan.graphics.common.misc: Boxf;
+import pukan.graphics.common.misc: pointsAabb;
 import pukan.graphics.g3d.pbr.mesh: MeshGeometry;
 import std.algorithm: min, max;
 import std.math: PI, cos, sin;
@@ -47,7 +47,7 @@ MeshGeometry decodePrimitiveMesh(string type, in GodotVariant[string] properties
     if(flipFaces)
         flipTriangles(result.indices);
 
-    result.aabb = calculateAabb(result.positions);
+    result.aabb = pointsAabb(result.positions);
     return result;
 }
 
@@ -84,29 +84,6 @@ private Vector3f propertyVector3(in GodotVariant[string] properties, string name
 {
     auto value = find(properties, name);
     return value is null ? defaultValue : as!(Vector3f)(*value, name);
-}
-
-private Boxf calculateAabb(in Vector3f[] positions)
-{
-    Boxf result;
-
-    if(positions.length == 0)
-        return result;
-
-    result.min = positions[0];
-    result.max = positions[0];
-
-    foreach(position; positions[1 .. $])
-    {
-        result.min.x = min(result.min.x, position.x);
-        result.min.y = min(result.min.y, position.y);
-        result.min.z = min(result.min.z, position.z);
-        result.max.x = max(result.max.x, position.x);
-        result.max.y = max(result.max.y, position.y);
-        result.max.z = max(result.max.z, position.z);
-    }
-
-    return result;
 }
 
 private void addQuad(

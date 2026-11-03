@@ -289,6 +289,33 @@ void expandAABB(ref Boxf box, in Vector3f v)
     if(v.z > box.max.z) box.max.z = v.z;
 }
 
+/// Bounds of the points; a box without bounds when the range is empty
+Boxf pointsAabb(Range)(Range points)
+{
+    Boxf result;
+    bool started;
+
+    foreach(p; points)
+        if(started)
+            expandAABB(result, p);
+        else
+        {
+            result = Boxf(p, p);
+            started = true;
+        }
+
+    return result;
+}
+
+unittest
+{
+    assert(!hasBounds(pointsAabb(Vector3f[].init)));
+    assert(pointsAabb([Vector3f(1, 2, 3)]) == Boxf(Vector3f(1, 2, 3), Vector3f(1, 2, 3)));
+
+    assert(pointsAabb([Vector3f(1, 2, 3), Vector3f(-1, 5, 0)])
+        == Boxf(Vector3f(-1, 2, 0), Vector3f(1, 5, 3)));
+}
+
 /// Merges `other` into `box`; a box without bounds takes the other one
 void mergeAabb(ref Boxf box, in Boxf other)
 in

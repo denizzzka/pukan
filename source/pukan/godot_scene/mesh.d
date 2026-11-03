@@ -3,6 +3,7 @@ module pukan.godot_scene.mesh;
 import dlib.math: Vector2f, Vector3f, Vector4f;
 import pukan.exceptions: PukanException;
 import pukan.godot_scene.value;
+import pukan.graphics.common.misc: hasBounds;
 import pukan.graphics.g3d.pbr.mesh: MeshGeometry, Vector4us;
 import std.conv: to;
 import std.math: PI, abs, cos, sin;
@@ -118,6 +119,9 @@ GodotArraySurface[] decodeArrayMesh(GodotVariant surfacesValue)
         decoded.name = propertyString(surface, "name");
         decoded.aabb = propertyAs!GodotAabb(surface, "aabb", GodotAabb.init);
         decoded.geometry.aabb = decoded.aabb.toBox();
+
+        // Every ArrayMesh surface carries its bounds; a missing one means a decode bug
+        assert(hasBounds(decoded.geometry.aabb), "mesh surface without bounds");
 
         if(auto material = property(surface, "material"))
         {
