@@ -769,17 +769,15 @@ up. Before each slice, read the matching reference named in
 - **Cells and coordinates**
 
   The grid is in: `CellGrid` holds the cell size and the level origin,
-  `Scene.cellGrid` owns it, and `SceneTree.rebuildCells` places every drawable in
-  each cell its transformed bounds touch. A drawable that reports no bounds at
-  all stays visible from every cell; a part that reports none contributes only
-  its origin to `cellBounds`, so it lands in a cell anyway. `calcAABB` keeps the
-  real extents, and `mergePartAabb` chooses between the two.
+  `Scene.cellGrid` owns it, and `SceneTree.rebuildCells` places every part in
+  each cell its transformed bounds touch. Loaded scenes implement `Spatial` and
+  report each mesh with its own transform, so a level lands in cells per object;
+  a drawable that reports nothing stays visible from every cell, and a part
+  without bounds contributes its origin. `calcAABB` keeps the real extents while
+  `cellBounds` adds the origins.
 
   Still open:
 
-  - [ ] Content sources expose their own nodes with bounds instead of reporting
-        one box per drawable, so a loaded level is placed per object and a node
-        that spans cells lands in each.
   - [ ] The loaded set around the camera: a radius of resident cells plus a
         prefetch ring ordered by distance, with one budget per frame for mesh
         upload and pipeline warmup. A cell is released only when no recorded

@@ -400,20 +400,23 @@ Boxf transformAabb(in Boxf box, in Matrix4x4f transform)
 /// Merges a part's world box; without bounds it contributes its origin when `byOrigin`
 void mergePartAabb(ref Boxf box, in Boxf localBounds, in Matrix4x4f world, bool byOrigin)
 {
-    if(hasBounds(localBounds))
-    {
-        mergeAabb(box, transformAabb(localBounds, world));
+    if(!byOrigin && !hasBounds(localBounds))
         return;
-    }
 
-    if(!byOrigin)
-        return;
+    mergeAabb(box, partAabb(localBounds, world));
+}
+
+/// World box of a part; without bounds it is a point at the part origin
+Boxf partAabb(in Boxf localBounds, in Matrix4x4f world)
+{
+    if(hasBounds(localBounds))
+        return transformAabb(localBounds, world);
 
     // No extent to sort into cells, so the origin still places the part in one;
-    // the box stays a point until the loader supplies real bounds.
+    // the box stays a point until the source supplies real bounds.
     const p = Vector4f(0, 0, 0, 1) * world;
 
-    mergeAabb(box, Boxf(Vector3f(p.x, p.y, p.z), Vector3f(p.x, p.y, p.z)));
+    return Boxf(Vector3f(p.x, p.y, p.z), Vector3f(p.x, p.y, p.z));
 }
 
 unittest

@@ -8,7 +8,7 @@ import pukan.gltf.loader;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergePartAabb, pointsAabb;
-import pukan.graphics.g3d.cell_index: Bounded;
+import pukan.graphics.g3d.cell_index: Bounded, Spatial;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor;
@@ -179,7 +179,7 @@ class Node : BaseNode
     }
 }
 
-class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
+class GlTF : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWarmup
 {
     LoadStats loadStats;
 
@@ -515,10 +515,8 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
     /// Bounds for cell placement: a part without bounds still contributes its origin
     Boxf cellBounds() => collectBounds(true);
 
-    private Boxf collectBounds(bool byOrigin)
+    void eachPart(scope void delegate(in Boxf bounds, in Matrix4x4f local) dg)
     {
-        Boxf result;
-
         void collect(Node node, Matrix4x4f trans)
         {
             assert(node.trans !is null);
@@ -526,13 +524,22 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
             trans *= node.trans.calcMatrix;
 
             foreach(mesh; node.meshes)
-                mergePartAabb(result, mesh.localAABB, trans, byOrigin);
+                dg(mesh.localAABB, trans);
 
             foreach(child; node.children)
                 collect(cast(Node) child, trans);
         }
 
         collect(rootSceneNode, Matrix4x4f.identity);
+    }
+
+    private Boxf collectBounds(bool byOrigin)
+    {
+        Boxf result;
+
+        eachPart((in Boxf bounds, in Matrix4x4f local) {
+            mergePartAabb(result, bounds, local, byOrigin);
+        });
 
         return result;
     }

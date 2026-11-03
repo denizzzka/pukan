@@ -4,7 +4,7 @@ import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
 import pukan.graphics.common.misc: Boxf, isVisible, mergePartAabb;
-import pukan.graphics.g3d.cell_index: Bounded;
+import pukan.graphics.g3d.cell_index: Bounded, Spatial;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor: BufferPieceOnGPU;
@@ -111,7 +111,7 @@ class GodotNode
 }
 
 /// One loaded Godot scene tree and its GPU resources
-final class GodotScene : DrawableByVulkan, Blended, Bounded, PipelineWarmup
+final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWarmup
 {
     private PbrPipelines pipelines;
     private LogicalDevice device;
@@ -250,10 +250,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PipelineWarmup
     /// Bounds for cell placement: a part without bounds still contributes its origin
     Boxf cellBounds() => collectBounds(true);
 
-    private Boxf collectBounds(bool byOrigin)
+    void eachPart(scope void delegate(in Boxf bounds, in Matrix4x4f local) dg)
     {
-        Boxf result;
-
         void collect(Matrix4x4f trans, GodotNode node)
         {
             if(!node.visible)
@@ -262,17 +260,18 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PipelineWarmup
             trans *= node.local;
 
             foreach(mesh; node.meshes)
-                mergePartAabb(result, mesh.localAABB, trans, byOrigin);
+                dg(mesh.localAABB, trans);
 
             if(node.instance !is null)
             {
-                auto bounded = cast(Bounded) node.instance;
-
-                const box = bounded is null
-                    ? Boxf.init
-                    : byOrigin ? bounded.cellBounds : bounded.localBounds;
-
-                mergePartAabb(result, box, trans, byOrigin);
+                if(auto spatial = cast(Spatial) node.instance)
+                    spatial.eachPart((in Boxf bounds, in Matrix4x4f local) {
+                        dg(bounds, trans * local);
+                    });
+                else if(auto bounded = cast(Bounded) node.instance)
+                    dg(bounded.localBounds, trans);
+                else
+                    dg(Boxf.init, trans);
             }
 
             foreach(child; node.children)
@@ -280,6 +279,15 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PipelineWarmup
         }
 
         collect(Matrix4x4f.identity, root);
+    }
+
+    private Boxf collectBounds(bool byOrigin)
+    {
+        Boxf result;
+
+        eachPart((in Boxf bounds, in Matrix4x4f local) {
+            mergePartAabb(result, bounds, local, byOrigin);
+        });
 
         return result;
     }

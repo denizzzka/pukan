@@ -15,7 +15,15 @@ interface Bounded
     Boxf cellBounds();
 }
 
-/// One drawable with the transform that places it in the world
+/// A drawable that places its own parts, so a cell can hold each one
+interface Spatial
+{
+    /// Reports every part with bounds and transform, both in the drawable's space
+    void eachPart(scope void delegate(in Boxf bounds, in Matrix4x4f local) dg);
+}
+
+/// One drawable with the transform that places it in the world; a `Spatial`
+/// drawable contributes one item per part
 struct DrawItem
 {
     DrawableByVulkan drawable;

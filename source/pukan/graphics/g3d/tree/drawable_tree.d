@@ -2,8 +2,8 @@ module pukan.graphics.g3d.tree.drawable_tree;
 
 import dlib.math;
 import std.algorithm: sort;
-import pukan.graphics.common.misc: Boxf, hasBounds, transformAabb;
-import pukan.graphics.g3d.cell_index: Bounded, CellIndex, DrawItem;
+import pukan.graphics.common.misc: Boxf, hasBounds, partAabb, transformAabb;
+import pukan.graphics.g3d.cell_index: Bounded, CellIndex, DrawItem, Spatial;
 import pukan.graphics.g3d.cells: CellGrid;
 import pukan.graphics.g3d.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -53,13 +53,22 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
             if(node.payload.type == typeid(DrawableByVulkan))
             {
                 auto drawable = *node.payload.peek!DrawableByVulkan;
-                auto bounded = cast(Bounded) drawable;
-                const local = bounded is null ? Boxf.init : bounded.cellBounds;
 
-                index.insert(
-                    DrawItem(drawable, trans),
-                    hasBounds(local) ? transformAabb(local, trans) : Boxf.init,
-                );
+                if(auto spatial = cast(Spatial) drawable)
+                    spatial.eachPart((in Boxf bounds, in Matrix4x4f local) {
+                        const world = trans * local;
+                        index.insert(DrawItem(drawable, world), partAabb(bounds, world));
+                    });
+                else
+                {
+                    auto bounded = cast(Bounded) drawable;
+                    const local = bounded is null ? Boxf.init : bounded.cellBounds;
+
+                    index.insert(
+                        DrawItem(drawable, trans),
+                        hasBounds(local) ? transformAabb(local, trans) : Boxf.init,
+                    );
+                }
             }
             else if(node.payload.type == typeid(Bone))
                 trans *= node.payload.peek!Bone.mat;
