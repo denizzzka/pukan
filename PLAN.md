@@ -844,11 +844,19 @@ Before each slice, read the matching reference named in
   picks one by its screen-space error, on the CPU and in the cull kernel alike.
   Generated cluster levels fill the list today; a skinned mesh keeps the
   authored level, so its pose stays correct.
+
+  Far cells are cheap by two steps. A cell beyond `--impostor-distance` is one
+  card captured from the direction it arrived from. A cell beyond
+  `--proxy-distance` merges its static parts into one mesh per material, clipped
+  to the cell and carrying generated index levels; the merge runs once, on the
+  first frame the cell is far, from the CPU side of the pieces the cell already
+  holds.
   - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
         Godot importer stores, instead of only from the generated ones.
-  - [ ] HLOD: merge distant groups into one proxy per cell, with an impostor for
-        the far ring. Build the merged geometry offline per cell, like Unreal's
-        HLOD builder, not per frame.
+  - [ ] Build a cell's proxy when the cell arrives, not on its first far frame,
+        so the approach never shows the parts.
+  - [ ] Numbers per ring on the fixed scene: triangles, draws and frame time,
+        and a proxy budget that caps what a cell may upload in one frame.
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
