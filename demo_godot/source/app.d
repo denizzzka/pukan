@@ -8,7 +8,7 @@ import pukan.motion_matching.history: PoseHistory;
 import pukan.motion_matching.matching: Matching;
 import pukan.motion_matching.search: currentVelocity;
 import pukan.motion_matching.query: Query, buildQuery;
-import pukan.motion_matching.schema: Schema;
+import pukan.motion_matching.schema: LocomotionBones, Schema;
 import pukan.motion_matching.trajectory: Trajectory;
 import pukan.motion_matching.transform: Transform, wrapAngle;
 import pukan.mover.component: MoverComponent;
@@ -207,6 +207,14 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
         writeln(camera.lookAxis == LookAxis.horizontal
             ? "look axis: horizontal (world up)"
             : "look axis: screen (camera up)");
+}
+
+/// Turns `current` towards `wanted` by at most `step` radians, the short way round.
+private float turnTowards(float current, float wanted, float step)
+{
+    const float turn = wrapAngle(wanted - current);
+
+    return current + (turn > step ? step : (turn < -step ? -step : turn));
 }
 
 LineInstance[] capsuleLines(
@@ -509,6 +517,17 @@ void main(string[] args)
     /// Horizontal speed of the pose playing and how fast it plays: together they move the capsule
     float motionSpeed = 0;
     float motionRate = 1;
+    /// Horizontal root velocity of the playing pose, in the model's own axes
+    Vector3f motionVelocity = Vector3f(0, 0, 0);
+    /// Whether the set has sideways and backward clips, so the body keeps facing the view
+    bool hasStrafe;
+    /// Turn from the engine's forward to the way the mesh is authored; moves the mesh only,
+    /// since the pose velocities are already measured from the root bone
+    float modelFacingOffset = 0;
+    /// Bounds of the skeleton at the idle pose, in the model's own space
+    Vector3f idleLowest;
+    Vector3f idleHighest;
+    bool idleMeasured;
     float characterModelScale = 1.0f;
     /// Body measurements taken from the model, zero until they are known
     float capsuleRadius = 0;
@@ -529,8 +548,25 @@ void main(string[] args)
         {
             try
             {
-                auto schema = Schema.locomotion;
-                schema.rootBone = "root";
+                // TODO: a bone binding will pick the names of any rig; until then this flag
+                // stands in for it and only recognises the RPG one
+                bool rpgAsset;
+                // TODO: measure the facing from the rig instead of recognising the asset, so
+                // that any model works
+                /// The mesh is authored facing -Z, as Godot does, so it needs a half turn
+                bool godotForward;
+
+                foreach(ref node; characterModel.asset.nodes)
+                    if(node.payload.name == "Motion")
+                    {
+                        rpgAsset = true;
+                        godotForward = true;
+                    }
+
+                auto schema = rpgAsset
+                    ? Schema.locomotion(0.01f, LocomotionBones("Motion", "B_Pelvis", "B_Head",
+                        "B_L_Hand", "B_R_Hand", "B_L_Foot", "B_R_Foot"))
+                    : Schema.locomotion;
 
                 motionSampler = new MotionSampler(characterModel.asset, schema);
 
@@ -540,12 +576,38 @@ void main(string[] args)
                 const modelClips = motionSampler.clips();
 
                 foreach(i, ref clip; modelClips)
-                    if(clip.name == "Idle_Loop" || clip.name == "Walk_Loop"
-                        || clip.name == "Jog_Fwd_Loop" || clip.name == "Sprint_Loop")
+                {
+                    if(rpgAsset && (clip.name == "UnarmedIdle" || clip.name == "UnarmedWalkInjured"
+                        || clip.name == "UnarmedRunForward"
+                        || clip.name == "UnarmedSprint" || clip.name == "UnarmedStrafeLeft"
+                        || clip.name == "UnarmedStrafeRight" || clip.name == "UnarmedStrafeForward"
+                        || clip.name == "UnarmedStrafeBackward"
+                        || clip.name == "UnarmedStrafeForwardLeft"
+                        || clip.name == "UnarmedStrafeForwardRight"
+                        || clip.name == "UnarmedStrafeBackwardLeft"))
                         motionModelClips ~= i;
+
+                    if(!rpgAsset && (clip.name == "Idle_Loop" || clip.name == "Walk_Loop"
+                        || clip.name == "Jog_Fwd_Loop" || clip.name == "Sprint_Loop"))
+                        motionModelClips ~= i;
+                }
+
+                hasStrafe = rpgAsset;
+
+                if(godotForward)
+                    modelFacingOffset = PI;
 
                 if(motionModelClips.length > 0)
                 {
+                    size_t idleClip = motionModelClips[0];
+
+                    foreach(i, ref clip; modelClips)
+                        if(rpgAsset ? clip.name == "UnarmedIdle" : clip.name == "Idle_Loop")
+                            idleClip = i;
+
+                    motionSampler.boneBounds(idleClip, 0, idleLowest, idleHighest);
+                    idleMeasured = true;
+
                     Clip[] locomotionClips;
 
                     foreach(i; motionModelClips)
@@ -629,33 +691,27 @@ void main(string[] args)
 
         if(bounds.min.y == bounds.min.y && bounds.max.y > bounds.min.y)
         {
+            // A skinned mesh follows its skeleton, not its own node, so the taller of the two
+            // is what the character is scaled by
+            float height = bounds.max.y - bounds.min.y;
+
+            if(idleMeasured)
+                height = max(height, idleHighest.y - idleLowest.y);
+
             // Even scaling only: a bind pose with the arms out is wider than the capsule, and
             // squeezing the width to fit it flattens the whole body
-            characterModelScale = modelScaleOption > 0
-                ? modelScaleOption
-                : 1.8f / (bounds.max.y - bounds.min.y);
+            characterModelScale = modelScaleOption > 0 ? modelScaleOption : 1.8f / height;
 
             characterModelOffset = Vector3f(0, -bounds.min.y * characterModelScale, 0);
-            capsuleHeight = (bounds.max.y - bounds.min.y) * characterModelScale;
+            capsuleHeight = height * characterModelScale;
         }
 
-        if(motionReady)
+        if(idleMeasured)
         {
             // The capsule follows the body, not the other way round: the bind pose has the
             // arms out, so the body is measured on the idle pose, where they hang down
-            size_t idleClip = motionModelClips[0];
-
-            foreach(i, ref clip; motionDatabase.clips)
-                if(clip.name == "Idle_Loop")
-                    idleClip = motionModelClips[i];
-
-            Vector3f lowest;
-            Vector3f highest;
-
-            motionSampler.boneBounds(idleClip, 0, lowest, highest);
-
-            const float width = highest.x - lowest.x;
-            const float depth = highest.z - lowest.z;
+            const float width = idleHighest.x - idleLowest.x;
+            const float depth = idleHighest.z - idleLowest.z;
 
             capsuleRadius = (max(width, depth) / 2 + 0.04f) * characterModelScale;
         }
@@ -817,6 +873,8 @@ void main(string[] args)
     double characterCursorX = 0.0;
     double characterCursorY = 0.0;
     bool characterCursorKnown;
+    /// Whether the middle button is taking the camera around the body
+    bool orbitHeld;
     float characterMaxHeight = -float.infinity;
     float characterYaw = 0.0f;
     /// Direction the character faces, in the `Transform` convention; third person turns it
@@ -856,6 +914,10 @@ void main(string[] args)
                 const bool orbiting = thirdPerson
                     && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
 
+                // Without sideways clips the body follows its movement rather than the view, so
+                // only a strafing rig has to be held still for the orbit
+                orbitHeld = orbiting && hasStrafe;
+
                 // A held button owns the cursor, so the look does not stop at a border
                 if((looking || orbiting) != cursorCaptured)
                 {
@@ -880,8 +942,8 @@ void main(string[] args)
 
                 if(characterCursorKnown)
                 {
-                    const float dx = cast(float) (cursorX - characterCursorX);
-                    const float dy = cast(float) (cursorY - characterCursorY);
+                    const dx = cast(float) (cursorX - characterCursorX);
+                    const dy = cast(float) (cursorY - characterCursorY);
 
                     if(looking || orbiting)
                         camera.look(dx, dy);
@@ -961,12 +1023,17 @@ void main(string[] args)
                 {
                     // The clip owns the motion, so the feet cannot slide; the input then reaches
                     // the search only as the wanted velocity of the predicted trajectory
-                    const float speed = motionSpeed * motionRate * characterModelScale;
-                    const Vector3f forward = Vector3f(sin(characterFacing), 0,
-                        cos(characterFacing));
+                    // The pose velocity is measured from the root bone, so it already points the
+                    // way the body does; only the facing turns it into world space
+                    const float scale = motionRate * characterModelScale;
+                    const float c = cos(characterFacing);
+                    const float s = sin(characterFacing);
 
-                    mover.state.velocity = Vector3f(forward.x * speed,
-                        mover.state.velocity.y, forward.z * speed);
+                    mover.state.velocity = Vector3f(
+                        (motionVelocity.x * c + motionVelocity.z * s) * scale,
+                        mover.state.velocity.y,
+                        (-motionVelocity.x * s + motionVelocity.z * c) * scale,
+                    );
                 }
                 characterMaxHeight = characterMaxHeight > mover.state.position.y
                     ? characterMaxHeight
@@ -987,25 +1054,25 @@ void main(string[] args)
             Vector3f flatForward = camera.forward;
             flatForward.y = 0;
 
-            if(thirdPerson)
+            // The middle button takes the camera around the body, so the body keeps its facing
+            if(!orbitHeld)
             {
-                Vector3f wish = characterCommand.wishDir;
-                wish.y = 0;
-
-                if(wish.length > 1e-4f)
+                if(thirdPerson && !hasStrafe)
                 {
-                    // A limited turn keeps the feet plausible while strafing or backing up
-                    const float wanted = atan2(wish.x, wish.z);
-                    const float limit = 10.0f * dt;
-                    const float turn = wrapAngle(wanted - characterFacing);
+                    Vector3f wish = characterCommand.wishDir;
+                    wish.y = 0;
 
-                    characterFacing += turn > limit ? limit : (turn < -limit ? -limit : turn);
+                    if(wish.length > 1e-4f)
+                        // A limited turn keeps the feet plausible while strafing or backing up
+                        characterFacing = turnTowards(characterFacing,
+                            atan2(wish.x, wish.z), 10.0f * dt);
                 }
+                else if(flatForward.length > 1e-4f)
+                    characterFacing = turnTowards(characterFacing,
+                        atan2(flatForward.x, flatForward.z), 10.0f * dt);
             }
-            else if(flatForward.length > 1e-4f)
-                characterFacing = atan2(flatForward.x, flatForward.z);
 
-            characterYaw = -characterFacing;
+            characterYaw = -(characterFacing + modelFacingOffset);
 
             if(motionReady)
             {
@@ -1060,6 +1127,7 @@ void main(string[] args)
                 const Vector3f poseVelocity = currentVelocity(motionDatabase.schema,
                     motionDatabase.vectorOf(matching.currentSample));
 
+                motionVelocity = Vector3f(poseVelocity.x, 0, poseVelocity.z);
                 motionSpeed = sqrt(poseVelocity.x * poseVelocity.x + poseVelocity.z * poseVelocity.z);
                 motionRate = decision.playRate;
 

@@ -55,13 +55,18 @@ Mover. A model without those clips, such as the CesiumMan
 fixture passed to `--model`, simply plays its own animation.
 
 Movement is camera-relative: W runs where the view looks, A and D to the sides, S back, and
-Shift walks instead of running. The
-character turns towards where it moves and plays its forward clips, because the library has
-no strafing or backwards motion.
+Shift walks instead of running. A rig without sideways clips turns its body towards the
+movement, so it always plays forward motion. `--model demo/assets/motion/rpg/Unarmed_RM.glb`
+has strafing and backwards clips, diagonals included: the body then keeps facing the view,
+and the root velocity of the chosen clip moves it sideways or back. Its
+`UnarmedStrafeBackwardRight` carries no root motion in the root-motion build, so backing up
+and to the right falls back to the right strafe. The pack has no plain walk, so the limp of
+`UnarmedWalkInjured` stands in for it.
 
 In third person the camera pulls in when a wall is behind the character; `--no-spring-arm`
 keeps the distance fixed. Dragging with the middle mouse button takes the camera around the
-body while the body keeps its facing, so it can be inspected from every side.
+body while the body keeps its facing, so it can be inspected from every side; the right
+button turns the body with the view instead.
 
 `--debug-capsule` draws the collision capsule, `--walk` holds forward, `--move-speed` sets how
 fast the character runs (the Quake maximum by default), `--noclip` ignores collisions, and
