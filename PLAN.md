@@ -1099,6 +1099,23 @@ every blob in the binary is wrong when each is used once per process, and
       `VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT` in the
       preloader to tell a cache hit from a compile without paying for it.
 
+## Descriptor lifetime
+
+The device tracks every descriptor pool it hands out and destroys it with the
+device. A scene must free its sets before the textures and buffers they sample,
+so `DescriptorAllocator` destroys its own pools at scene teardown and creates
+them through `createDetachedDescriptorPool`, outside the device's tracking. Two
+ownership rules now live side by side: a pool is either owned by the device or
+by the allocator, and the allocator repeats the pool-size computation that
+`createDescriptorPool` already does.
+
+- [ ] Give a pool one owner. Either drop the device tracking of pools and let
+      every creator free its own, or add a removal path to the device registry,
+      like `destroyPipeline` below, so an owner can hand a pool back before the
+      device goes away.
+- [ ] Keep one place that turns layout bindings into pool sizes, shared by the
+      tracked and the detached path, so the two cannot drift apart.
+
 ## Pipeline lifetime
 
 Loading is now lazy and preloaded per scene, but nothing ever unloads a
