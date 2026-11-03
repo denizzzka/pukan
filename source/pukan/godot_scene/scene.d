@@ -343,10 +343,6 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
             return;
 
         commandPool.recordOneTimeAndSubmit(commandBuffer, (buf) {
-            foreach(ref piece; gpuBuffs)
-                if(piece)
-                    piece.recordUpload(buf);
-
             foreach(skin; skins)
                 skin.buffer.recordUpload(buf);
 
@@ -357,10 +353,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
             instance.uploadToGPUImmediate(device, commandPool, commandBuffer);
 
         foreach(mesh; meshes)
-        {
             mesh.updateDescriptorSetsAndUniformBuffers(device);
-            meshReady[mesh] = true;
-        }
 
         uploaded = true;
     }

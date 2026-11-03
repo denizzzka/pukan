@@ -109,6 +109,62 @@ void placeDrawable(CellIndex!DrawItem index, DrawableByVulkan drawable, in Matri
     }
 }
 
+/// Groups the keyed parts of the cells by drawable and the transform that places it
+private void groupParts(
+    CellIndex!DrawItem index,
+    scope const(CellCoord)[] cells,
+    scope void delegate(DrawableByVulkan drawable, in Matrix4x4f world, scope const(size_t)[] keys) dg,
+)
+{
+    static struct Group
+    {
+        DrawableByVulkan drawable;
+        Matrix4x4f world;
+        size_t[] keys;
+    }
+
+    Group[] groups;
+
+    foreach(item; index.collect(cells))
+    {
+        if(item.part == wholePart)
+            continue;
+
+        size_t found = groups.length;
+
+        foreach(g, group; groups)
+            if(group.drawable is item.drawable && group.world == item.world)
+            {
+                found = g;
+                break;
+            }
+
+        if(found == groups.length)
+            groups ~= Group(item.drawable, item.world);
+
+        groups[found].keys ~= item.part;
+    }
+
+    foreach(group; groups)
+        dg(group.drawable, group.world, group.keys);
+}
+
+/// Uploads the parts of the cells; a drawable that records as a whole loads itself
+void loadCells(CellIndex!DrawItem index, VkCommandBuffer buf, scope const(CellCoord)[] cells)
+{
+    groupParts(index, cells, (drawable, world, keys) {
+        (cast(PartDrawable) drawable).loadParts(buf, keys);
+    });
+}
+
+/// Drops the hold the cells had on their parts
+void releaseCells(CellIndex!DrawItem index, scope const(CellCoord)[] cells)
+{
+    groupParts(index, cells, (drawable, world, keys) {
+        (cast(PartDrawable) drawable).releaseParts(keys);
+    });
+}
+
 /**
     Records the parts of the given cells, as a view sees them.
 
@@ -127,35 +183,10 @@ void drawCells(
 {
     auto items = index.collect(cells);
 
-    static struct Group
-    {
-        DrawableByVulkan drawable;
-        Matrix4x4f world;
-        size_t[] keys;
-    }
-
-    Group[] groups;
-
     foreach(i, item; items)
     {
         if(item.part != wholePart)
-        {
-            size_t found = groups.length;
-
-            foreach(g, group; groups)
-                if(group.drawable is item.drawable)
-                {
-                    found = g;
-                    break;
-                }
-
-            if(found == groups.length)
-                groups ~= Group(item.drawable, item.world);
-
-            groups[found].keys ~= item.part;
-
             continue;
-        }
 
         bool seen;
 
@@ -170,9 +201,10 @@ void drawCells(
             item.drawable.drawingBufferFilling(buf, viewProj * item.world, frameSet, phase);
     }
 
-    foreach(group; groups)
-        (cast(PartDrawable) group.drawable).drawParts(
-            buf, viewProj * group.world, group.keys, frameSet, phase);
+    // Parts of one drawable go together, so it still batches them
+    groupParts(index, cells, (drawable, world, keys) {
+        (cast(PartDrawable) drawable).drawParts(buf, viewProj * world, keys, frameSet, phase);
+    });
 }
 
 /// Cells of a grid mapped to the items whose bounds touch them

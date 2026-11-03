@@ -16,7 +16,7 @@ unittest
 {
     import dlib.math: Matrix4x4f, translationMatrix, Vector3f;
     import pukan.graphics.common.misc: Boxf;
-    import pukan.graphics.g3d.cell_index: Bounded, DrawItem, Part, PartDrawable;
+    import pukan.graphics.g3d.cell_index: Bounded, DrawItem, Part, PartDrawable, loadCells, releaseCells;
     import pukan.graphics.g3d.cells: CellCoord, CellGrid;
     import pukan.vulkan.bindings;
     import pukan.vulkan.commands: CommandPool;
@@ -52,6 +52,8 @@ unittest
     {
         size_t[] drawnKeys;
         Matrix4x4f[] drawnTrans;
+        size_t[] loadedKeys;
+        size_t[] releasedKeys;
 
         void uploadToGPUImmediate(LogicalDevice, CommandPool, scope VkCommandBuffer) {}
 
@@ -72,9 +74,15 @@ unittest
             dg(Part(unit, Vector3f(100, 0, 0).translationMatrix, 1));
         }
 
-        void loadParts(VkCommandBuffer, scope const(size_t)[] keys) {}
+        void loadParts(VkCommandBuffer, scope const(size_t)[] keys)
+        {
+            loadedKeys ~= keys;
+        }
 
-        void releaseParts(scope const(size_t)[] keys) {}
+        void releaseParts(scope const(size_t)[] keys)
+        {
+            releasedKeys ~= keys;
+        }
 
         void drawParts(
             VkCommandBuffer,
@@ -162,4 +170,13 @@ unittest
     assert(bounded.drawn == 1, "a bounded drawable is recorded once");
     assert(wide.drawn == 1, "a drawable in two cells is not recorded twice");
     assert(unbounded.drawn == 1);
+
+    // Loading and releasing the cells group parts the same way
+    const far = grid.of(Vector3f(150.5f, 0.5f, 0.5f));
+
+    loadCells(tree.cells, VkCommandBuffer.init, [far]);
+    assert(split.loadedKeys == [1]);
+
+    releaseCells(tree.cells, [far]);
+    assert(split.releasedKeys == [1]);
 }
