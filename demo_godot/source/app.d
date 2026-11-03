@@ -410,7 +410,7 @@ void main(string[] args)
     {
         static import glfw3.internal;
         glfwCreateWindowSurface(
-            vk.instance,
+            vk.instance.vk,
             window,
             cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
             cast(ulong*) &surface,

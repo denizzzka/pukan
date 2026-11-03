@@ -4,7 +4,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.exceptions: PukanVulkanExceptionWithCode;
 public import pukan.vulkan.stype_list: getCreateInfoStructureType;
 import pukan.vulkan.vkname: VkInfoNames;
-public import pukan.vulkan.vkobj: VkObj;
+public import pukan.vulkan.resources.vkobj: VkObj;
 
 auto vkCheck(VkResult ret, string err_descr = __FUNCTION__, string file = __FILE__, size_t line = __LINE__)
 {

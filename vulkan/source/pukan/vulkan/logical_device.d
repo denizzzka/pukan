@@ -12,7 +12,7 @@ import pukan.vulkan.pipelines: PipelineCacheManager;
 import pukan.vulkan.renderpass: RenderPass;
 import pukan.vulkan.requirements: ChainMask, DeviceContext, FeatureChain, ImageFormatRequest, linkDeviceFeatures, requireEnabled;
 import pukan.vulkan.shaders: ShaderDecl, ShaderInfo, ShaderVertexInput, createLayoutBinding;
-import pukan.vulkan.vkobj: VkObj;
+import pukan.vulkan.resources.vkobj: VkObj;
 
 import log = std.logger;
 import std.exception: enforce;
@@ -226,7 +226,9 @@ class Semaphore
     ubyte[70000] FIXME_druntime_issue_REMOVE_ME;
     LogicalDevice device;
     VkObj!VkSemaphore semaphore;
-    alias this = semaphore;
+
+    /// The raw handle; asserts in debug after release
+    ref VkSemaphore vk() => semaphore.vk;
 
     this(LogicalDevice dev)
     {
@@ -245,7 +247,9 @@ class Fence
     //~ ubyte[70000] FIXME_druntime_issue_REMOVE_ME;
     LogicalDevice device;
     VkObj!VkFence fence;
-    alias this = fence;
+
+    /// The raw handle; asserts in debug after release
+    ref VkFence vk() => fence.vk;
 
     this(LogicalDevice dev)
     {
@@ -261,11 +265,11 @@ class Fence
 
     void wait()
     {
-        vkWaitForFences(device, 1, &fence.handle, VK_TRUE, uint.max).vkCheck;
+        vkWaitForFences(device, 1, fence.vkPtr, VK_TRUE, uint.max).vkCheck;
     }
 
     void reset()
     {
-        vkResetFences(device, 1, &fence.handle).vkCheck;
+        vkResetFences(device, 1, fence.vkPtr).vkCheck;
     }
 }

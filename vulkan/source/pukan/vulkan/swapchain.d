@@ -122,7 +122,7 @@ class SwapChain
         enforce(cap.minImageCount > 0);
         enforce(cap.maxImageCount == 0 || cap.maxImageCount >= 3, "maxImageCount: "~cap.maxImageCount.to!string);
 
-        auto surface = device.physicalDevice.instance.surface.handle;
+        auto surface = device.physicalDevice.instance.surface.vk;
         string reason;
         enforce(surfaceUsable(device.physicalDevice.physicalDevice, surface,
                 VkSurfaceFormatKHR(renderPass.imageFormat, imageColorSpace), reason),
@@ -148,7 +148,7 @@ class SwapChain
 
         VkSwapchainCreateInfoKHR cinf = {
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            surface: device.physicalDevice.instance.surface.handle,
+            surface: device.physicalDevice.instance.surface.vk,
             imageFormat: renderPass.imageFormat,
             imageColorSpace: imageColorSpace,
             imageExtent: capabilities.currentExtent,
@@ -279,7 +279,7 @@ class SwapChain
             return VK_SUCCESS;
         }
 
-        return vkAcquireNextImageKHR(device, swapchain, ulong.max /* timeout */, currSync.imageAvailable, null /* fence */, &imageIndex);
+        return vkAcquireNextImageKHR(device, swapchain, ulong.max /* timeout */, currSync.imageAvailable.vk, null /* fence */, &imageIndex);
     }
 
     /// Starts displaying frame on the screen; a no-op for an offscreen target

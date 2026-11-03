@@ -14,7 +14,7 @@ import pukan.vulkan.textures: Texture;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;
-import pukan.vulkan.vkobj: OwnedHandles;
+import pukan.vulkan.resources.vkobj: OwnedHandles;
 import std.meta: AliasSeq;
 
 // This class should gradually become shared thread-safe
@@ -251,8 +251,8 @@ class SyncFramesInFlight
         imageAvailable = fb.device.create!Semaphore;
         renderFinished = fb.device.create!Semaphore;
 
-        imageAvailableSemaphores = [imageAvailable.semaphore.handle];
-        renderFinishedSemaphores = [renderFinished.semaphore.handle];
+        imageAvailableSemaphores = [imageAvailable.semaphore.vk];
+        renderFinishedSemaphores = [renderFinished.semaphore.vk];
     }
 }
 

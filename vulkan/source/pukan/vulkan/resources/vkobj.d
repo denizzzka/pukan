@@ -1,5 +1,6 @@
-module pukan.vulkan.vkobj;
+module pukan.vulkan.resources.vkobj;
 
+import core.atomic: atomicLoad, atomicOp;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers: vkCheck;
 import pukan.vulkan.stype_list: getCreateInfoStructureType;
@@ -12,6 +13,26 @@ enum VkParentKind
     device,
 }
 
+/// Handle kinds the wrapper knows; also indexes the debug live counts
+enum VkHandleKind: uint
+{
+    instance,
+    surface,
+    semaphore,
+    fence,
+    commandPool,
+
+    count,
+}
+
+debug private shared size_t[VkHandleKind.count] liveVkCounts;
+
+/// Handles of a kind that are alive; nothing must be left at device teardown
+debug size_t liveVkHandles(VkHandleKind kind) in(kind < VkHandleKind.count)
+{
+    return atomicLoad(liveVkCounts[kind]);
+}
+
 template VkHandleInfo(Handle)
 {
     enum name = Handle.stringof;
@@ -22,12 +43,14 @@ template VkHandleInfo(Handle)
         enum hasCreate = true;
         enum createParent = VkParentKind.none;
         enum destroyParent = VkParentKind.none;
+        enum kind = VkHandleKind.instance;
     }
     else static if(is(Handle == VkSurfaceKHR))
     {
         enum hasCreate = false;
         enum createParent = VkParentKind.none;
         enum destroyParent = VkParentKind.instance;
+        enum kind = VkHandleKind.surface;
     }
     else static if(is(Handle == VkSemaphore))
     {
@@ -35,6 +58,7 @@ template VkHandleInfo(Handle)
         enum hasCreate = true;
         enum createParent = VkParentKind.device;
         enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.semaphore;
     }
     else static if(is(Handle == VkFence))
     {
@@ -42,6 +66,7 @@ template VkHandleInfo(Handle)
         enum hasCreate = true;
         enum createParent = VkParentKind.device;
         enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.fence;
     }
     else static if(is(Handle == VkCommandPool))
     {
@@ -49,6 +74,7 @@ template VkHandleInfo(Handle)
         enum hasCreate = true;
         enum createParent = VkParentKind.device;
         enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.commandPool;
     }
     else
         static assert(false, "unsupported Vulkan handle: " ~ name);
@@ -70,15 +96,13 @@ struct VkObj(Handle)
 {
     alias Info = VkHandleInfo!Handle;
 
-    Handle handle;
+    private Handle handle;
     VkAllocationCallbacks* allocator;
 
     static if(Info.destroyParent == VkParentKind.instance)
         private VkInstance parentInstance;
     else static if(Info.destroyParent == VkParentKind.device)
         private VkDevice parentDevice;
-
-    alias this = handle;
 
     static if(Info.hasCreate && Info.createParent == VkParentKind.none)
     {
@@ -90,6 +114,7 @@ struct VkObj(Handle)
             ci.sType = getCreateInfoStructureType!(Info.CreateInfo*);
 
             Info.create(&ci, allocator, &handle).vkCheck(Info.name ~ " creation failed");
+            noteAlive();
         }
     }
 
@@ -104,6 +129,7 @@ struct VkObj(Handle)
             ci.sType = getCreateInfoStructureType!(Info.CreateInfo*);
 
             Info.create(device, &ci, allocator, &handle).vkCheck(Info.name ~ " creation failed");
+            noteAlive();
         }
     }
 
@@ -113,6 +139,7 @@ struct VkObj(Handle)
         {
             handle = existing;
             this.allocator = allocator;
+            noteAlive();
         }
     }
     else static if(Info.destroyParent == VkParentKind.instance)
@@ -122,6 +149,7 @@ struct VkObj(Handle)
             handle = existing;
             parentInstance = instance;
             this.allocator = allocator;
+            noteAlive();
         }
     }
     else static if(Info.destroyParent == VkParentKind.device)
@@ -131,12 +159,57 @@ struct VkObj(Handle)
             handle = existing;
             parentDevice = device;
             this.allocator = allocator;
+            noteAlive();
         }
+    }
+
+    /// The raw handle; a released wrapper asserts in debug and is null in release
+    ref Handle vk()
+    {
+        debug assert(handle != Handle.init, Info.name ~ " used after release");
+        return handle;
+    }
+
+    /// Address of the raw handle, for calls that take a pointer
+    Handle* vkPtr()
+    {
+        debug assert(handle != Handle.init, Info.name ~ " used after release");
+        return &handle;
+    }
+
+    /// Whether the wrapper still owns a handle
+    bool isAlive() const @safe pure nothrow => handle != Handle.init;
+
+    /// Destroys the handle now and empties the wrapper
+    void release()
+    {
+        if(handle == Handle.init)
+            return;
+
+        static if(Info.destroyParent == VkParentKind.none)
+            Info.destroy(handle, allocator);
+        else static if(Info.destroyParent == VkParentKind.instance)
+            Info.destroy(parentInstance, handle, allocator);
+        else static if(Info.destroyParent == VkParentKind.device)
+            Info.destroy(parentDevice, handle, allocator);
+
+        debug noteReleased();
+
+        handle = Handle.init;
+        allocator = null;
+
+        static if(Info.destroyParent == VkParentKind.instance)
+            parentInstance = VkInstance.init;
+        else static if(Info.destroyParent == VkParentKind.device)
+            parentDevice = VkDevice.init;
     }
 
     ref VkObj opAssign(VkObj rhs)
     {
-        destroy(this);
+        if(&this is &rhs)
+            return this;
+
+        release();
 
         handle = rhs.handle;
         allocator = rhs.allocator;
@@ -146,6 +219,7 @@ struct VkObj(Handle)
         else static if(Info.destroyParent == VkParentKind.device)
             parentDevice = rhs.parentDevice;
 
+        // The handle moves, so the live count stays the same
         rhs.handle = Handle.init;
         rhs.allocator = null;
         static if(Info.destroyParent == VkParentKind.instance)
@@ -160,15 +234,17 @@ struct VkObj(Handle)
 
     ~this()
     {
-        if(handle == Handle.init)
-            return;
+        release();
+    }
 
-        static if(Info.destroyParent == VkParentKind.none)
-            Info.destroy(handle, allocator);
-        else static if(Info.destroyParent == VkParentKind.instance)
-            Info.destroy(parentInstance, handle, allocator);
-        else static if(Info.destroyParent == VkParentKind.device)
-            Info.destroy(parentDevice, handle, allocator);
+    private void noteAlive()
+    {
+        debug atomicOp!"+="(liveVkCounts[Info.kind], 1UL);
+    }
+
+    private void noteReleased()
+    {
+        debug atomicOp!"-="(liveVkCounts[Info.kind], 1UL);
     }
 }
 
@@ -221,4 +297,10 @@ unittest
     static assert(VkHandleInfo!VkSurfaceKHR.destroyParent == VkParentKind.instance);
     static assert(is(VkHandleInfo!VkSemaphore.CreateInfo == VkSemaphoreCreateInfo));
     static assert(VkHandleInfo!VkCommandPool.destroyParent == VkParentKind.device);
+
+    static assert(VkHandleInfo!VkInstance.kind == VkHandleKind.instance);
+    static assert(VkHandleInfo!VkSurfaceKHR.kind == VkHandleKind.surface);
+    static assert(VkHandleInfo!VkSemaphore.kind == VkHandleKind.semaphore);
+    static assert(VkHandleInfo!VkFence.kind == VkHandleKind.fence);
+    static assert(VkHandleInfo!VkCommandPool.kind == VkHandleKind.commandPool);
 }

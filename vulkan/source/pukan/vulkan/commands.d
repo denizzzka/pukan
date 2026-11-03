@@ -3,7 +3,7 @@ module pukan.vulkan.commands;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers: vkCheck;
 import pukan.vulkan.logical_device: LogicalDevice;
-import pukan.vulkan.vkobj: VkObj;
+import pukan.vulkan.resources.vkobj: VkObj;
 
 /**
 Command pools are externally synchronized, meaning that a command pool
@@ -54,7 +54,7 @@ class CommandPool
         ret.length = count;
 
         auto allocInfo = defaultBufferAllocateInfo;
-        allocInfo.commandPool = commandPool;
+        allocInfo.commandPool = commandPool.vk;
         allocInfo.commandBufferCount = count;
 
         vkAllocateCommandBuffers(device.device, &allocInfo, &ret[0]).vkCheck;
@@ -64,7 +64,7 @@ class CommandPool
 
     void freeBuffers(VkCommandBuffer[] buffs)
     {
-        vkFreeCommandBuffers(device, commandPool, cast(uint) buffs.length, &buffs[0]);
+        vkFreeCommandBuffers(device, commandPool.vk, cast(uint) buffs.length, &buffs[0]);
     }
 
     void recordOneTimeAndSubmit(VkCommandBuffer buf, void delegate(VkCommandBuffer) dg)
@@ -89,9 +89,9 @@ class CommandPool
         auto fence = device.createFence;
         scope(exit) destroy(fence);
 
-        vkResetFences(device, 1, &fence.fence.handle).vkCheck;
-        device.submitQueue(submitInfo, fence.fence.handle);
-        vkWaitForFences(device.device, 1, &fence.fence.handle, VK_TRUE, uint.max).vkCheck;
+        vkResetFences(device, 1, fence.fence.vkPtr).vkCheck;
+        device.submitQueue(submitInfo, fence.fence.vk);
+        vkWaitForFences(device.device, 1, fence.fence.vkPtr, VK_TRUE, uint.max).vkCheck;
     }
 }
 

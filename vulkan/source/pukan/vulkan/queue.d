@@ -22,6 +22,6 @@ class Queue
     {
         sync.wait();
         sync.reset();
-        device.submitQueue(submitInfo, sync.fence.handle);
+        device.submitQueue(submitInfo, sync.fence.vk);
     }
 }

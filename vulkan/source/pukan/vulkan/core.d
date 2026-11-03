@@ -141,7 +141,7 @@ class Instance
 
     void useSurface(VkSurfaceKHR s) @live
     {
-        surface = VkObj!VkSurfaceKHR(s, instance, allocator);
+        surface = VkObj!VkSurfaceKHR(s, instance.vk, allocator);
     }
 
     void printAllAvailableLayers()
@@ -154,7 +154,7 @@ class Instance
     /// Returns: array of pointers to devices descriptions
     VkPhysicalDevice[] devices()
     {
-        return getArrayFrom!vkEnumeratePhysicalDevices(instance);
+        return getArrayFrom!vkEnumeratePhysicalDevices(instance.vk);
     }
 
     uint findMemoryType(uint memoryTypeBitFilter, VkMemoryPropertyFlags properties)
@@ -173,9 +173,9 @@ class Instance
         auto d = new FlightRecorder!Instance(this);
 
         // Extension commands that are not core or WSI have to be loaded
-        auto fun = cast(PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+        auto fun = cast(PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance.vk, "vkCreateDebugUtilsMessengerEXT");
 
-        fun(instance, &d.createInfo, allocator, &d.messenger)
+        fun(instance.vk, &d.createInfo, allocator, &d.messenger)
             .vkCheck(__FUNCTION__);
 
         return d;
@@ -350,9 +350,9 @@ class FlightRecorder(TBackend)
 
     ~this()
     {
-        auto fun = cast(PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(backend.instance, "vkDestroyDebugUtilsMessengerEXT");
+        auto fun = cast(PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(backend.instance.vk, "vkDestroyDebugUtilsMessengerEXT");
 
-        fun(backend.instance, messenger, backend.allocator);
+        fun(backend.instance.vk, messenger, backend.allocator);
     }
 
     extern(C) static VkBool32 messenger_callback(
