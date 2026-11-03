@@ -1133,15 +1133,17 @@ Rules, and the debug nets that hold them:
 
 Where it stands: `pukan.vulkan.resources.ownership` and
 `pukan.vulkan.resources.vkobj` hold the two mechanisms and their unit tests.
-Descriptor pools and set layouts already belong to the pipeline factory's
-owner; the device keeps no registry for either.
+Descriptor pools and set layouts belong to the pipeline factory's owner, and a
+scene holds its lifetime in one owner plus a screen owner that a swapchain
+rebuild replaces. The device keeps no registry for any of it.
 
-- [ ] Move the scene, its frame sets, the OIT frames, the cull frames and the
-      impostor targets onto scene-local owners, then delete the per-type device
-      registries one type at a time.
+- [ ] Delete the per-type device registries one type at a time: memory, images,
+      pipelines and shaders still belong to the device until it dies.
+- [ ] Move the impostor capture targets onto the scene owner once that work
+      lands.
 - [ ] Add the deferred release queue: at runtime `releaseTo` hands holders to
       the frame that last used them and destroys them when its fence signals.
-      It replaces `retiredOitFrames` and `SwapChain.oldSwapchainFrames`.
+      It replaces `retiredOitOwners` and `SwapChain.oldSwapchainFrames`.
 - [ ] Add `share` to the owning asset and move `meshRefs` and `pieceRefs` out of
       `GodotScene`.
 - [ ] Split the tree into threaded and per-thread owners once a real
