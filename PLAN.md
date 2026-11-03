@@ -797,11 +797,9 @@ Before each slice, read the matching reference named in
 
 - **Spatial index and GPU-driven draws**
 
-  Cells bound the distance step, and each cell's `BoxBvh` answers the frustum
-  and a ray, so neither a view nor a pick walks every part.
-
-  - [ ] Wire the index raycast to picking and to the shadow queries, so they
-        share the same trees.
+  Cells bound the distance step, each cell's `BoxBvh` answers the frustum and a
+  ray, and `demo_godot --pick` reports what a ray hits, so neither a view nor a
+  pick walks every part.
   - [ ] GPU culling: keep the instance list in a storage buffer, cull in a
         compute shader and draw with `vkCmdDrawIndexedIndirectCount`, so the CPU
         uploads only the camera and the cell list.

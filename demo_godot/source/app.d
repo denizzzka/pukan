@@ -314,6 +314,8 @@ void main(string[] args)
     float speedOption = cameraSpeed;
     float cellRange = 128.0f;
     bool noCells;
+    string pickOrigin;
+    string pickDirection;
 
     auto getoptResult = getopt(
         args,
@@ -337,6 +339,8 @@ void main(string[] args)
         "noclip", "ignore collision in character mode", &noclip,
         "cell-range", "stream cells within this distance in metres", &cellRange,
         "no-cells", "load every cell at start instead of streaming them", &noCells,
+        "pick", "report what a ray from this point hits, x,y,z", &pickOrigin,
+        "pick-dir", "ray direction for --pick, x,y,z", &pickDirection,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
         "debug-capsule", "draw the character collision capsule", &debugCapsule,
         "model", "character model path; defaults to CesiumMan", &modelOption,
@@ -927,6 +931,31 @@ void main(string[] args)
     enum cellUploadBudget = 1 << 20;
     enum maxLoadingCells = 16;
     CellCoord[] loadingCells;
+
+    if(pickOrigin.length)
+    {
+        const origin = parseVector(pickOrigin);
+        const direction = pickDirection.length ? parseVector(pickDirection) : Vector3f(0, 0, -1);
+
+        DrawItem item;
+        float distance;
+
+        if(levelIndex.raycast(levelCells, origin, direction, float.max, item, distance))
+        {
+            string partName;
+
+            if(item.part != wholePart)
+                partName = (cast(PartDrawable) item.drawable).partName(item.part);
+            else if(auto level = cast(GodotScene) item.drawable)
+                partName = level.name;
+            else if(auto gltf = cast(GlTF) item.drawable)
+                partName = gltf.possibleName;
+
+            writeln("pick ", partName, " at ", distance, ": ", origin + direction * distance);
+        }
+        else
+            writeln("pick nothing");
+    }
 
     uint frameIndex;
     import core.time: MonoTime;

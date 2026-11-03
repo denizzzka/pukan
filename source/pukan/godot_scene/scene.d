@@ -711,6 +711,32 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                 perPart.releaseParts(group.keys);
     }
 
+    string partName(size_t key)
+    {
+        registerParts();
+
+        const record = &parts[key];
+
+        if(record.mesh !is null)
+            return record.mesh.name.length ? record.mesh.name : name;
+
+        if(record.nestedKey == wholePart)
+        {
+            if(auto scene = cast(GodotScene) record.nested)
+                return scene.name;
+
+            if(auto gltf = cast(GlTF) record.nested)
+                return gltf.possibleName;
+
+            return name;
+        }
+
+        if(auto perPart = cast(PartDrawable) record.nested)
+            return perPart.partName(record.nestedKey);
+
+        return name;
+    }
+
     void eachPart(scope void delegate(in Part part) dg)
     {
         registerParts();

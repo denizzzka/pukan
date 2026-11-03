@@ -60,6 +60,9 @@ interface PartDrawable
     /// Uploads what the held parts miss, at most `budget` bytes; returns bytes used
     size_t uploadParts(VkCommandBuffer buf, size_t budget);
 
+    /// Name of the part, for a pick report or a debug label
+    string partName(size_t key);
+
     /**
         Records the given parts in one batch.
 

@@ -86,6 +86,8 @@ unittest
 
         size_t uploadParts(VkCommandBuffer, size_t budget) => 0;
 
+        string partName(size_t key) => "split";
+
         void drawParts(
             VkCommandBuffer,
             in Matrix4x4f trans,
