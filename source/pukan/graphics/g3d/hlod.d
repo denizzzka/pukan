@@ -3,7 +3,9 @@ module pukan.graphics.g3d.hlod;
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import pukan.graphics.common.misc: Boxf, expandAABB;
 import pukan.graphics.g3d.mesh: mirrors;
-import pukan.graphics.g3d.pbr.mesh: MeshGeometry;
+import pukan.graphics.g3d.pbr.accessor: AccessRange, BufAccess;
+import pukan.graphics.g3d.pbr.mesh: MeshGeometry, MeshStreams, Vector4us;
+import pukan.vulkan.bindings;
 
 /// One geometry of a proxy and where it stands in the cell
 struct ProxyPiece
@@ -11,6 +13,64 @@ struct ProxyPiece
     /// Kept by the caller, which owns the pieces the cell loaded
     const(MeshGeometry)* geometry;
     Matrix4x4f transform;
+}
+
+/// Reads one vertex stream back from the CPU side of the buffer it points at
+private T[] readStream(T)(in BufAccess accessor, scope const(void[])[] buffers)
+{
+    if(accessor.viewIdx < 0 || accessor.count == 0)
+        return null;
+
+    const buffer = buffers[cast(size_t) accessor.viewIdx];
+    auto range = AccessRange!(T, false)(buffer, accessor);
+
+    T[] result;
+    result.length = accessor.count;
+
+    foreach(i; 0 .. accessor.count)
+        result[i] = range[i];
+
+    return result;
+}
+
+/**
+    Reads a mesh back from the CPU side of the buffers its pieces point at.
+
+    A proxy is built from what a cell already holds: the loaders keep the CPU
+    copy of every piece until nothing is left to upload, so a merge needs no
+    second decode and no extra copy per mesh.
+*/
+MeshGeometry readGeometry(in MeshStreams streams, scope const(void[])[] buffers)
+{
+    MeshGeometry result;
+
+    result.positions = readStream!Vector3f(streams.vertices, buffers);
+    result.normals = readStream!Vector3f(streams.normals, buffers);
+    result.tangents = readStream!Vector4f(streams.tangents, buffers);
+    result.texCoords = readStream!Vector2f(streams.texCoords, buffers);
+    result.texCoords1 = readStream!Vector2f(streams.texCoords1, buffers);
+    result.colors = readStream!uint(streams.colors, buffers);
+    result.joints = readStream!Vector4us(streams.joints, buffers);
+    result.weights = readStream!Vector4f(streams.weights, buffers);
+    result.aabb = streams.aabb;
+
+    const indices = streams.indices;
+
+    if(indices.accessor.viewIdx >= 0 && indices.accessor.count)
+    {
+        if(indices.indexType == VK_INDEX_TYPE_UINT16)
+        {
+            const packed = readStream!ushort(indices.accessor, buffers);
+            result.indices.length = packed.length;
+
+            foreach(i, value; packed)
+                result.indices[i] = value;
+        }
+        else
+            result.indices = readStream!uint(indices.accessor, buffers);
+    }
+
+    return result;
 }
 
 /// Moves a direction by the rotation and scale of a transform
@@ -175,6 +235,27 @@ MeshGeometry mergeGeometry(scope const(ProxyPiece)[] pieces)
     }
 
     return result;
+}
+
+unittest
+{
+    // A geometry reads back from the CPU side of the pieces it points at
+    import pukan.graphics.g3d.pbr.mesh: IndicesDescr;
+
+    Vector3f[3] positions = [Vector3f(0, 0, 0), Vector3f(1, 0, 0), Vector3f(0, 1, 0)];
+    ushort[3] indices = [0, 2, 1];
+
+    void[] positionBytes = positions[];
+    void[] indexBytes = indices[];
+
+    MeshStreams streams;
+    streams.vertices = BufAccess(0, 0, Vector3f.sizeof, 3);
+    streams.indices = IndicesDescr(BufAccess(1, 0, ushort.sizeof, 3), VK_INDEX_TYPE_UINT16);
+
+    const geometry = readGeometry(streams, [cast(const(void)[]) positionBytes, cast(const(void)[]) indexBytes]);
+
+    assert(geometry.positions == positions[]);
+    assert(geometry.indices == [0u, 2u, 1u]);
 }
 
 unittest
