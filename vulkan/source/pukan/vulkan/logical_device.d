@@ -193,6 +193,7 @@ class LogicalDevice
                 foreach(kind; [
                     VkHandleKind.semaphore, VkHandleKind.fence,
                     VkHandleKind.commandPool, VkHandleKind.sampler,
+                    VkHandleKind.imageView, VkHandleKind.framebuffer,
                     VkHandleKind.descriptorSetLayout, VkHandleKind.descriptorPool,
                 ])
                     assert(liveVkHandles(kind) == 0,

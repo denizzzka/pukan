@@ -5,6 +5,7 @@ import pukan.vulkan.frame_builder: createImageView;
 import pukan.vulkan.helpers;
 import pukan.vulkan.image: ImageMemory, createFakeImage1x1, identityComponentMapping;
 import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.resources.vkobj: VkObj;
 import pukan.vulkan.requirements: Requirement, getOptionalRequirements;
 import std.conv: to;
 import std.exception: enforce;
@@ -21,9 +22,12 @@ class Texture
 
     LogicalDevice device;
     ImageMemory textureImageMemory;
-    VkImageView imageView;
-    /// Null when the owner binds its own sampler
-    VkSampler sampler;
+    private VkObj!VkImageView imageViewObj;
+    private VkObj!VkSampler samplerObj;
+
+    @property ref VkImageView imageView() => imageViewObj.vk;
+    /// An empty slot when the owner binds its own sampler
+    @property ref VkSampler sampler() => samplerObj.vk;
     /// Godot normal map stores only X and Y and reconstructs Z
     bool normalTwoChannel;
 
@@ -37,8 +41,7 @@ class Texture
 
         textureImageMemory = image;
 
-        createImageView(
-            imageView,
+        imageViewObj = createImageView(
             device,
             textureImageMemory.format,
             textureImageMemory.image,
@@ -46,7 +49,7 @@ class Texture
             components,
         );
 
-        vkCall(device.device, cast() &samplerInfo, device.alloc, &sampler);
+        samplerObj = VkObj!VkSampler(device.releaseQueue, samplerInfo);
     }
 
     /// A texture without its own sampler; the owner binds the one it needs
@@ -55,8 +58,7 @@ class Texture
         this.device = device;
         textureImageMemory = image;
 
-        createImageView(
-            imageView,
+        imageViewObj = createImageView(
             device,
             textureImageMemory.format,
             textureImageMemory.image,
@@ -67,12 +69,6 @@ class Texture
 
     ~this()
     {
-        if(sampler)
-            vkDestroySampler(device, sampler, device.alloc);
-
-        if(imageView)
-            vkDestroyImageView(device, imageView, device.alloc);
-
         if(textureImageMemory)
             destroy(textureImageMemory);
     }

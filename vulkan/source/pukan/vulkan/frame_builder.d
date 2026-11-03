@@ -14,7 +14,7 @@ import pukan.vulkan.textures: Texture;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;
-import pukan.vulkan.resources.vkobj: OwnedHandles;
+import pukan.vulkan.resources.vkobj: OwnedHandles, VkObj;
 import std.meta: AliasSeq;
 
 // This class should gradually become shared thread-safe
@@ -144,12 +144,16 @@ class Frame
 {
     FrameBuilder fb;
     VkImage image;
-    VkImageView imageView;
+    private VkObj!VkImageView imageViewObj;
     ImageMemory multisampledColor;
-    VkImageView multisampledView;
+    private VkObj!VkImageView multisampledViewObj;
     Texture sceneColor;
     DepthBuf depthBuf;
-    VkFramebuffer frameBuffer;
+    private VkObj!VkFramebuffer frameBufferObj;
+
+    @property ref VkImageView imageView() => imageViewObj.vk;
+    @property ref VkImageView multisampledView() => multisampledViewObj.vk;
+    @property ref VkFramebuffer frameBuffer() => frameBufferObj.vk;
     FrameSet[2] frameSets;
     package SyncFramesInFlight syncPrimitives;
     private OwnedHandles!VkCommandBuffer _commandBuffer;
@@ -173,7 +177,7 @@ class Frame
             (VkCommandBuffer[] bufs) { fb.commandPool.freeBuffers(bufs); },
         );
 
-        createImageView(imageView, fb.device, imageFormat, image);
+        imageViewObj = createImageView(fb.device, imageFormat, image);
         depthBuf = DepthBuf(fb.device, imageExtent, samples);
 
         if(samples != VK_SAMPLE_COUNT_1_BIT)
@@ -192,7 +196,7 @@ class Frame
             };
 
             multisampledColor = fb.device.create!ImageMemory(cinf, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            createImageView(multisampledView, fb.device, imageFormat, multisampledColor.image);
+            multisampledViewObj = createImageView(fb.device, imageFormat, multisampledColor.image);
         }
 
         {
@@ -201,7 +205,6 @@ class Frame
                 : [imageView, depthBuf.depthView];
 
             VkFramebufferCreateInfo frameBufferInfo = {
-                sType: VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                 renderPass: renderPass,
                 attachmentCount: cast(uint) attachments.length,
                 pAttachments: attachments.ptr,
@@ -210,7 +213,7 @@ class Frame
                 layers: 1,
             };
 
-            vkCreateFramebuffer(fb.device, &frameBufferInfo, fb.device.alloc, &frameBuffer).vkCheck;
+            frameBufferObj = VkObj!VkFramebuffer(fb.device.releaseQueue, frameBufferInfo);
         }
     }
 
@@ -226,17 +229,8 @@ class Frame
         if(sceneColor)
             destroy(sceneColor);
 
-        if(frameBuffer)
-            vkDestroyFramebuffer(fb.device, frameBuffer, fb.device.alloc);
-
-        if(multisampledView)
-            vkDestroyImageView(fb.device, multisampledView, fb.device.alloc);
-
         if(multisampledColor)
             destroy(multisampledColor);
-
-        if(imageView)
-            vkDestroyImageView(fb.device, imageView, fb.device.alloc);
     }
 }
 
@@ -268,7 +262,7 @@ class SyncFramesInFlight
     }
 }
 
-void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat imageFormat, VkImage image,
+VkObj!VkImageView createImageView(LogicalDevice device, VkFormat imageFormat, VkImage image,
     uint levelCount = 1, VkComponentMapping components = identityComponentMapping)
 {
     VkImageViewCreateInfo cinf = {
@@ -286,14 +280,16 @@ void createImageView(ref VkImageView imgView, LogicalDevice device, VkFormat ima
         image: image,
     };
 
-    vkCreateImageView(device, &cinf, device.alloc, &imgView).vkCheck;
+    return VkObj!VkImageView(device.releaseQueue, cinf);
 }
 
 struct DepthBuf
 {
     LogicalDevice device;
     ImageMemory depthImage;
-    VkImageView depthView;
+    private VkObj!VkImageView depthViewObj;
+
+    @property ref VkImageView depthView() => depthViewObj.vk;
     //TODO: autodetection need
     enum format = VK_FORMAT_D24_UNORM_S8_UINT;
 
@@ -330,14 +326,11 @@ struct DepthBuf
             image: depthImage,
         };
 
-        vkCreateImageView(device, &cinf, device.alloc, &depthView).vkCheck;
+        depthViewObj = VkObj!VkImageView(device.releaseQueue, cinf);
     }
 
     ~this()
     {
-        if(depthView)
-            vkDestroyImageView(device, depthView, device.alloc);
-
         destroy(depthImage);
     }
 }

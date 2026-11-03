@@ -26,6 +26,8 @@ alias sType_list = AliasSeq!(
     Entry!(VkDescriptorPoolCreateInfo,  VkDescriptorPool,   ST.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO),
     Entry!(VkImageCreateInfo,           VkImage,            ST.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO),
     Entry!(VkSamplerCreateInfo,         VkSampler,          ST.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO),
+    Entry!(VkImageViewCreateInfo,       VkImageView,        ST.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO),
+    Entry!(VkFramebufferCreateInfo,     VkFramebuffer,      ST.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO),
 );
 
 template getEntry(InfoT)

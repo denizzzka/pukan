@@ -25,6 +25,8 @@ enum VkHandleKind: uint
     sampler,
     buffer,
     image,
+    imageView,
+    framebuffer,
     memory,
     descriptorSetLayout,
     descriptorPool,
@@ -98,6 +100,22 @@ template VkHandleInfo(Handle)
         enum createParent = VkParentKind.device;
         enum destroyParent = VkParentKind.device;
         enum kind = VkHandleKind.image;
+    }
+    else static if(is(Handle == VkImageView))
+    {
+        alias CreateInfo = VkImageViewCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.imageView;
+    }
+    else static if(is(Handle == VkFramebuffer))
+    {
+        alias CreateInfo = VkFramebufferCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.framebuffer;
     }
     else static if(is(Handle == VkDeviceMemory))
     {

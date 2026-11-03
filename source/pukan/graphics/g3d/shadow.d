@@ -8,6 +8,7 @@ import pukan.vulkan.frame_builder: DepthBuf;
 import pukan.vulkan.helpers: vkCall, vkCheck;
 import pukan.vulkan.image: ImageMemory;
 import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.resources.vkobj: VkObj;
 import pukan.vulkan.renderpass: RenderPass;
 
 /// Depth-only pass that renders the sun's view of the scene
@@ -120,8 +121,11 @@ final class ShadowMap
 {
     private LogicalDevice device;
     private ImageMemory depth;
-    private VkImageView view;
-    private VkFramebuffer frameBuffer;
+    private VkObj!VkImageView viewObj;
+    private VkObj!VkFramebuffer frameBufferObj;
+
+    @property ref VkImageView view() => viewObj.vk;
+    @property ref VkFramebuffer frameBuffer() => frameBufferObj.vk;
     private VkExtent2D extent;
 
     this(LogicalDevice device, ShadowPass pass, uint size)
@@ -146,7 +150,6 @@ final class ShadowMap
         depth = device.create!ImageMemory(imageInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         VkImageViewCreateInfo viewInfo = {
-            sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             viewType: VK_IMAGE_VIEW_TYPE_2D,
             format: pass.depthFormat,
             subresourceRange: VkImageSubresourceRange(
@@ -158,10 +161,10 @@ final class ShadowMap
             ),
             image: depth.image,
         };
-        vkCreateImageView(device, &viewInfo, device.alloc, &view).vkCheck;
+        viewObj = VkObj!VkImageView(device.releaseQueue, viewInfo);
+        auto view = viewObj.vk;
 
         VkFramebufferCreateInfo frameBufferInfo = {
-            sType: VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             renderPass: pass.vkRenderPass,
             attachmentCount: 1,
             pAttachments: &view,
@@ -169,7 +172,7 @@ final class ShadowMap
             height: size,
             layers: 1,
         };
-        vkCreateFramebuffer(device, &frameBufferInfo, device.alloc, &frameBuffer).vkCheck;
+        frameBufferObj = VkObj!VkFramebuffer(device.releaseQueue, frameBufferInfo);
 
         // Valid sampled layout even while the pass is off and nothing writes it
         {
@@ -214,12 +217,6 @@ final class ShadowMap
 
     ~this()
     {
-        if(frameBuffer)
-            vkDestroyFramebuffer(device, frameBuffer, device.alloc);
-
-        if(view)
-            vkDestroyImageView(device, view, device.alloc);
-
         if(depth)
             destroy(depth);
     }

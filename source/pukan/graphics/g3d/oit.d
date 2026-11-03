@@ -5,6 +5,7 @@ import pukan.vulkan.frame_builder: createImageView;
 import pukan.vulkan.helpers: vkCall, vkCheck;
 import pukan.vulkan.image: ImageMemory;
 import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.resources.vkobj: VkObj;
 import pukan.vulkan.memory: MemoryBuffer;
 import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: RenderPass;
@@ -258,13 +259,18 @@ final class OitFrame
 {
     private LogicalDevice device;
     private ImageMemory heads;
-    private VkImageView headsView;
+    private VkObj!VkImageView headsViewObj;
     private MemoryBuffer fragments;
     private MemoryBuffer counter;
-    private VkFramebuffer frameBuffer;
+    private VkObj!VkFramebuffer frameBufferObj;
     private ImageMemory sceneDepth;
-    private VkImageView sceneDepthView;
-    private VkFramebuffer sceneDepthFrameBuffer;
+    private VkObj!VkImageView sceneDepthViewObj;
+    private VkObj!VkFramebuffer sceneDepthFrameBufferObj;
+
+    @property ref VkImageView headsView() => headsViewObj.vk;
+    @property ref VkFramebuffer frameBuffer() => frameBufferObj.vk;
+    @property ref VkImageView sceneDepthView() => sceneDepthViewObj.vk;
+    @property ref VkFramebuffer sceneDepthFrameBuffer() => sceneDepthFrameBufferObj.vk;
 
     this(
         LogicalDevice device,
@@ -291,7 +297,7 @@ final class OitFrame
         };
 
         heads = device.create!ImageMemory(headsInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        createImageView(headsView, device, VK_FORMAT_R32_UINT, heads.image);
+        headsViewObj = createImageView(device, VK_FORMAT_R32_UINT, heads.image);
 
         VkBufferCreateInfo fragmentsInfo = {
             sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -310,7 +316,6 @@ final class OitFrame
         counter = device.create!MemoryBuffer(counterInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         VkFramebufferCreateInfo frameBufferInfo = {
-            sType: VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             renderPass: pass.vkRenderPass,
             attachmentCount: 1,
             pAttachments: &colorView,
@@ -318,7 +323,7 @@ final class OitFrame
             height: extent.height,
             layers: 1,
         };
-        vkCreateFramebuffer(device, &frameBufferInfo, device.alloc, &frameBuffer).vkCheck;
+        frameBufferObj = VkObj!VkFramebuffer(device.releaseQueue, frameBufferInfo);
 
         // Nearest depth the blended resolve compares against
         {
@@ -337,18 +342,19 @@ final class OitFrame
             };
 
             sceneDepth = device.create!ImageMemory(depthInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            createImageView(sceneDepthView, device, VK_FORMAT_R32_SFLOAT, sceneDepth.image);
+            sceneDepthViewObj = createImageView(device, VK_FORMAT_R32_SFLOAT, sceneDepth.image);
+
+            auto depthView = sceneDepthView;
 
             VkFramebufferCreateInfo depthFrameBufferInfo = {
-                sType: VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                 renderPass: depthPass.vkRenderPass,
                 attachmentCount: 1,
-                pAttachments: &sceneDepthView,
+                pAttachments: &depthView,
                 width: extent.width,
                 height: extent.height,
                 layers: 1,
             };
-            vkCreateFramebuffer(device, &depthFrameBufferInfo, device.alloc, &sceneDepthFrameBuffer).vkCheck;
+            sceneDepthFrameBufferObj = VkObj!VkFramebuffer(device.releaseQueue, depthFrameBufferInfo);
         }
 
         {
@@ -426,20 +432,8 @@ final class OitFrame
 
     ~this()
     {
-        if(sceneDepthFrameBuffer)
-            vkDestroyFramebuffer(device, sceneDepthFrameBuffer, device.alloc);
-
-        if(sceneDepthView)
-            vkDestroyImageView(device, sceneDepthView, device.alloc);
-
         if(sceneDepth)
             destroy(sceneDepth);
-
-        if(frameBuffer)
-            vkDestroyFramebuffer(device, frameBuffer, device.alloc);
-
-        if(headsView)
-            vkDestroyImageView(device, headsView, device.alloc);
 
         if(heads)
             destroy(heads);
