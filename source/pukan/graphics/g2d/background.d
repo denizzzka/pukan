@@ -1,4 +1,4 @@
-module pukan.graphics.g3d.background;
+module pukan.graphics.g2d.background;
 
 import dlib.math: Vector3f, Vector4f;
 import pukan.vulkan.bindings;

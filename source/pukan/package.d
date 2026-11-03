@@ -6,7 +6,7 @@ public import pukan.godot_scene;
 public import pukan.graphics.common.misc;
 public import pukan.graphics.common.screenshot;
 public import pukan.graphics.common.webp;
-public import pukan.graphics.g3d.background;
+public import pukan.graphics.g2d.background;
 public import pukan.graphics.g3d.camera;
 public import pukan.graphics.g3d.camera_controls;
 public import pukan.graphics.g3d.fly_camera;

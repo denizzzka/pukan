@@ -14,8 +14,8 @@ only a suggested grouping.
         `fly_camera`, `ibl`, `material`, `mesh`, `oit`, `scene`, `scene_tree`,
         `shadow`, `stereo`, `pbr`, `primitives_tree`, `tree`. Content loaders
         stay in `pukan.gltf` and `pukan.godot_scene`.
-  - [ ] `g2d`: create the package for the `## 2D` work; no drawing code moves
-        there yet.
+  - [x] `g2d`: create the package for the `## 2D` work; `background` is its
+        first module.
   - [x] `common`: `misc`, `screenshot`, `webp`, `zstd`.
 
 ## Open GitHub issues
