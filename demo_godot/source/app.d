@@ -1,6 +1,7 @@
 import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix;
 import pukan;
 import pukan.graphics.g3d.axes: axisVector;
+import pukan.graphics.g3d.impostor: CellImpostor, Impostors;
 import pukan.graphics.common.misc: Boxf, hasBounds, trsMatrix;
 import pukan.gltf.motion_sampler: MotionSampler;
 import pukan.motion_matching.database: Clip, Database, invalidSample;
@@ -13,7 +14,7 @@ import pukan.motion_matching.trajectory: Trajectory;
 import pukan.motion_matching.transform: Transform, wrapAngle;
 import pukan.mover.component: MoverComponent;
 import pukan.mover.quake: QuakeBody, QuakeCommand, QuakeMovementConfig;
-import pukan.graphics.g3d.pbr.pipelines: plainShading;
+import pukan.graphics.g3d.pbr.pipelines: LightingMode, lightingMode, oitPass, plainShading;
 import pukan.physics.simulation: Simulation;
 import pukan.physics.world: CollisionWorld, ShapeCastHit;
 import pukan.graphics.g3d.primitives_tree.lines: LineInstance, LineRenderer;
@@ -209,6 +210,70 @@ void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
             : "look axis: screen (camera up)");
 }
 
+/// Captures a card for a few cells whose geometry is on the GPU
+private void capturePendingCells(
+    VkCommandBuffer buf,
+    CellIndex!DrawItem index,
+    Scene scene,
+    Impostors impostors,
+    ref CellImpostor[CellCoord] cells,
+    ref CellCoord[] pending,
+    in Vector3f eye,
+    float range,
+    VkDescriptorSet frameSet,
+)
+{
+    if(impostors is null || pending.length == 0)
+        return;
+
+    // A frame pays for a few captures; the rest wait for the next ones
+    enum maxCapturesPerFrame = 8;
+
+    const count = min(cast(size_t) maxCapturesPerFrame, pending.length);
+    const taking = pending[0 .. count];
+    CellCoord[] waiting;
+
+    foreach(cell; taking)
+    {
+        if(cell in cells)
+            continue;
+
+        const bounds = scene.cellGrid.bounds(cell);
+        const center = (bounds.min + bounds.max) * 0.5f;
+
+        // Cards are drawn only within `range`, so farther cells are not worth one
+        if((center - eye).length > range)
+        {
+            waiting ~= cell;
+            continue;
+        }
+
+        Boxf[] parts;
+
+        foreach(item; index.collect([cell]))
+            parts ~= item.bounds;
+
+        const oldMode = lightingMode;
+        const oldOit = oitPass;
+        lightingMode = LightingMode.unlit;
+        oitPass = false;
+        scope(exit)
+        {
+            lightingMode = oldMode;
+            oitPass = oldOit;
+        }
+
+        const impostor = impostors.capture(buf, parts, eye, (b, viewProj) {
+            drawCells(index, b, viewProj, [cell], frameSet, DrawPhase.surface, CellCulling.cpu);
+        });
+
+        if(impostor.captured)
+            cells[cell] = impostor;
+    }
+
+    pending = pending[count .. $] ~ waiting;
+}
+
 /// Turns `current` towards `wanted` by at most `step` radians, the short way round.
 private float turnTowards(float current, float wanted, float step)
 {
@@ -315,6 +380,8 @@ void main(string[] args)
     float cellRange = 128.0f;
     bool noCells;
     bool noGpuCull;
+    float impostorDistance = 160.0f;
+    float impostorRange = 256.0f;
     string pickOrigin;
     string pickDirection;
 
@@ -341,6 +408,8 @@ void main(string[] args)
         "cell-range", "stream cells within this distance in metres", &cellRange,
         "no-cells", "load every cell at start instead of streaming them", &noCells,
         "no-gpu-cull", "cull the parts of a cell on the CPU instead of the GPU", &noGpuCull,
+        "impostor-distance", "draw cells beyond this distance as one captured card, 0 = off", &impostorDistance,
+        "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "pick", "report what a ray from this point hits, x,y,z", &pickOrigin,
         "pick-dir", "ray direction for --pick, x,y,z", &pickDirection,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
@@ -496,6 +565,15 @@ void main(string[] args)
     else
         scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat, "demo_godot");
     scope(exit) destroy(scene);
+
+    Impostors impostors;
+    scope(exit) if(impostors) destroy(impostors);
+
+    if(impostorDistance > 0)
+        impostors = new Impostors(device, scene.pipelineFactory, scene.renderPass,
+            scene.renderPass.imageFormat);
+
+    CellImpostor[CellCoord] cellImpostors;
 
     scene.sunShadow.enabled = !noShadows;
     scene.sunShadow.cache = true;
@@ -905,6 +983,9 @@ void main(string[] args)
         return source;
     }
 
+    // Cards are captured only for cells the streaming loaded
+    CellCoord[] pendingCaptures;
+
     if(streaming)
     {
         residency.update([
@@ -913,6 +994,7 @@ void main(string[] args)
         ], 0);
 
         scope initialCells = residency.active() ~ residency.take(size_t.max);
+        pendingCaptures ~= initialCells;
 
         // Holds are per cell, the same way releases will be
         foreach(cell; initialCells)
@@ -1351,6 +1433,8 @@ void main(string[] args)
                     // Zero bytes means the cell has everything it needs
                     if(used > 0)
                         stillLoading ~= cell;
+                    else
+                        pendingCaptures ~= cell;
                 }
 
                 loadingCells = stillLoading;
@@ -1375,13 +1459,50 @@ void main(string[] args)
             const shadowViewProj = scene.sunShadow.viewProj * wtb.model;
             const activeCells = streaming ? residency.active() : levelCells;
 
+            // A captured cell draws as one card; the rest keep their parts
+            CellCoord[] nearCells;
+            CellCoord[] farCells;
+            bool[CellCoord] activeCellsLookup;
+
+            foreach(cell; activeCells)
+            {
+                activeCellsLookup[cell] = true;
+
+                const bounds = scene.cellGrid.bounds(cell);
+                const center = (bounds.min + bounds.max) * 0.5f;
+
+                if(impostors !is null && (center - camera.position).length > impostorDistance
+                    && (cell in cellImpostors))
+                    farCells ~= cell;
+                else
+                    nearCells ~= cell;
+            }
+
+            // A cell the streaming dropped keeps showing its card from farther away
+            if(impostors !is null)
+                foreach(cell, impostor; cellImpostors)
+                {
+                    if(cell in activeCellsLookup)
+                        continue;
+
+                    if((impostor.center - camera.position).length > impostorRange)
+                        continue;
+
+                    farCells ~= cell;
+                }
+
             scene.recordCommandBuffer(
                 frame,
                 (buf, phase) {
                     // Blended draws keep the CPU path, which sorts them by depth
-                    drawCells(levelIndex, buf, modelViewProj, activeCells,
+                    drawCells(levelIndex, buf, modelViewProj, nearCells,
                         frame.frameSets[0].descriptorSet, phase,
                         phase == DrawPhase.blended ? CellCulling.cpu : cellCulling);
+
+                    if(phase == DrawPhase.surface)
+                        foreach(cell; farCells)
+                            if(auto impostor = cell in cellImpostors)
+                                impostors.draw(buf, *impostor, modelViewProj);
 
                     if(characterModel && thirdPerson && characterVisible)
                         characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
@@ -1394,17 +1515,22 @@ void main(string[] args)
                 },
                 null,
                 (buf) {
-                    drawCells(levelIndex, buf, shadowViewProj, activeCells,
+                    drawCells(levelIndex, buf, shadowViewProj, nearCells,
                         frame.frameSets[0].descriptorSet, DrawPhase.shadow, cellCulling);
                 },
                 (buf) {
+                    capturePendingCells(buf, levelIndex, scene, impostors, cellImpostors,
+                        pendingCaptures, camera.position, impostorRange,
+                        frame.frameSets[0].descriptorSet);
+
                     if(cellCulling != CellCulling.gpu)
                         return;
 
-                    gatherCells(levelIndex, buf, modelViewProj, activeCells, DrawPhase.surface);
-                    gatherCells(levelIndex, buf, shadowViewProj, activeCells, DrawPhase.shadow);
+                    gatherCells(levelIndex, buf, modelViewProj, nearCells, DrawPhase.surface);
+                    gatherCells(levelIndex, buf, shadowViewProj, nearCells, DrawPhase.shadow);
                 },
             );
+
         });
 
         if(screenshotPath.length && frameIndex == captureFrame)
