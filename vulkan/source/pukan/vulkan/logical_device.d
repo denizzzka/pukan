@@ -182,7 +182,6 @@ class LogicalDevice
             // A later finalizer must not call into a device that is gone
             releaseQueue.close();
 
-            shadersDtor();
 
             debug
             {
@@ -195,6 +194,7 @@ class LogicalDevice
                     VkHandleKind.imageView, VkHandleKind.framebuffer,
                     VkHandleKind.descriptorSetLayout, VkHandleKind.descriptorPool,
                     VkHandleKind.pipeline, VkHandleKind.pipelineLayout,
+                    VkHandleKind.shaderModule,
                 ])
                     assert(liveVkHandles(kind) == 0,
                         "a Vulkan object of kind " ~ kind.to!string ~ " outlived the device");

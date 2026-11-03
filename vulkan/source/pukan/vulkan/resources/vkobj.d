@@ -45,6 +45,7 @@ enum VkHandleKind: uint
     descriptorPool,
     pipeline,
     pipelineLayout,
+    shaderModule,
 
     count,
 }
@@ -162,6 +163,14 @@ template VkHandleInfo(Handle)
         enum createParent = VkParentKind.none;
         enum destroyParent = VkParentKind.device;
         enum kind = VkHandleKind.pipeline;
+    }
+    else static if(is(Handle == VkShaderModule))
+    {
+        alias CreateInfo = VkShaderModuleCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.shaderModule;
     }
     else static if(is(Handle == VkPipelineLayout))
     {

@@ -1,5 +1,7 @@
 module pukan.vulkan.shaders;
 
+import pukan.vulkan.resources.vkobj: VkObj;
+
 package mixin template Shaders()
 {
     import pukan.vulkan.exceptions: PukanVulkanException;
@@ -59,13 +61,18 @@ package mixin template Shaders()
             }
 
             VkShaderModuleCreateInfo cinf = {
-                sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 codeSize: sprivBinary.length,
                 pCode: cast(const uint*) sprivBinary.ptr,
             };
 
+            // The cache answers for this module as long as the device lives, so
+            // the device root owns it: a scene may still ask for the same
+            // shader after the frames that first uploaded it have passed.
+            auto slot = VkObj!VkShaderModule(releaseQueue, cinf);
+
             ShaderInfo add;
-            vkCreateShaderModule(device, &cinf, this.alloc, &add.shaderModule).vkCheck;
+            add.shaderModule = slot.vk;
+            rootOwner.accept(slot);
             add.stage = stage;
             add.layoutBindings = layoutBindings;
             add.pushConstantRange = pushConstant;
@@ -107,11 +114,6 @@ package mixin template Shaders()
         return uploadShaderToGPU(code, stage, layoutBindings, pushConstant, vertexInput);
     }
 
-    private void shadersDtor()
-    {
-        foreach(info; loadedShaders)
-            vkDestroyShaderModule(this.device, info.shaderModule, this.alloc);
-    }
 }
 
 import pukan.vulkan.bindings;
