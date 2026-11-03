@@ -798,9 +798,9 @@ Before each slice, read the matching reference named in
 - **Spatial index and GPU-driven draws**
   - [ ] Cull by cost in Unreal's order: distance first, then frustum, then
         occlusion. Cells bound the first step, the index the second.
-  - [ ] One index over the loaded cells: a BVH or octree per cell with a flat
-        top index over cell bounds, shared by frustum, shadow and picking
-        queries.
+  - [ ] A BVH or octree inside each cell, so a dense cell culls and picks
+        without walking every part. The flat cell index already answers the
+        frustum for whole drawables and for parts.
   - [ ] GPU culling: keep the instance list in a storage buffer, cull in a
         compute shader and draw with `vkCmdDrawIndexedIndirectCount`, so the CPU
         uploads only the camera and the cell list.

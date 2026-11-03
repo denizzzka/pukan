@@ -1,7 +1,7 @@
 module pukan.graphics.g3d.cell_index;
 
 import dlib.math: Matrix4x4f, Vector3f;
-import pukan.graphics.common.misc: Boxf, hasBounds, partAabb, transformAabb;
+import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, partAabb, transformAabb;
 import pukan.graphics.g3d.cells: CellCoord, CellGrid;
 import pukan.vulkan.bindings: VkCommandBuffer, VkDescriptorSet;
 import pukan.vulkan.renderpass: DrawableByVulkan, DrawPhase;
@@ -90,6 +90,8 @@ struct DrawItem
     DrawableByVulkan drawable;
     Matrix4x4f world;
     size_t part = wholePart;
+    /// Bounds in world space; NaN when the part reports none
+    Boxf bounds;
 }
 
 /// Places a drawable into the index at `world`, one item per part or one whole
@@ -98,17 +100,17 @@ void placeDrawable(CellIndex!DrawItem index, DrawableByVulkan drawable, in Matri
     if(auto partDrawable = cast(PartDrawable) drawable)
         partDrawable.eachPart((in Part part) {
             const placed = world * part.local;
-            index.insert(DrawItem(drawable, world, part.key), partAabb(part.bounds, placed));
+            const bounds = partAabb(part.bounds, placed);
+
+            index.insert(DrawItem(drawable, world, part.key, bounds), bounds);
         });
     else
     {
         auto bounded = cast(Bounded) drawable;
         const local = bounded is null ? Boxf.init : bounded.cellBounds;
+        const bounds = hasBounds(local) ? transformAabb(local, world) : Boxf.init;
 
-        index.insert(
-            DrawItem(drawable, world, wholePart),
-            hasBounds(local) ? transformAabb(local, world) : Boxf.init,
-        );
+        index.insert(DrawItem(drawable, world, wholePart, bounds), bounds);
     }
 }
 
@@ -117,6 +119,8 @@ private void groupParts(
     CellIndex!DrawItem index,
     scope const(CellCoord)[] cells,
     scope void delegate(DrawableByVulkan drawable, in Matrix4x4f world, scope const(size_t)[] keys) dg,
+    bool cull = false,
+    in Matrix4x4f viewProj = Matrix4x4f.identity,
 )
 {
     static struct Group
@@ -131,6 +135,9 @@ private void groupParts(
     foreach(item; index.collect(cells))
     {
         if(item.part == wholePart)
+            continue;
+
+        if(cull && !isVisible(item.bounds, viewProj))
             continue;
 
         size_t found = groups.length;
@@ -211,6 +218,10 @@ void drawCells(
         if(item.part != wholePart)
             continue;
 
+        // The index answers the frustum first, so a whole drawable never runs
+        if(!isVisible(item.bounds, viewProj))
+            continue;
+
         bool seen;
 
         foreach(j; 0 .. i)
@@ -227,7 +238,7 @@ void drawCells(
     // Parts of one drawable go together, so it still batches them
     groupParts(index, cells, (drawable, world, keys) {
         (cast(PartDrawable) drawable).drawParts(buf, viewProj * world, keys, frameSet, phase);
-    });
+    }, true, viewProj);
 }
 
 /// Cells of a grid mapped to the items whose bounds touch them

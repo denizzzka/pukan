@@ -14,7 +14,7 @@ alias SceneTree = DrawableTree!Payload;
 
 unittest
 {
-    import dlib.math: Matrix4x4f, translationMatrix, Vector3f;
+    import dlib.math: Matrix4x4f, scaleMatrix, translationMatrix, Vector3f;
     import pukan.graphics.common.misc: Boxf;
     import pukan.graphics.g3d.cell_index: Bounded, DrawItem, Part, PartDrawable, holdCells, releaseCells, uploadCells;
     import pukan.graphics.g3d.cells: CellCoord, CellGrid;
@@ -152,7 +152,8 @@ unittest
         if(item.drawable is split)
         {
             assert(item.part == 1);
-            assert(item.world.a14 == 150, "the part transform carries the node transform");
+            assert(item.world.a14 == 50, "the item carries the transform of the drawable");
+            assert(item.bounds.min.x == 149 && item.bounds.max.x == 151, "the part stays in its bounds");
         }
 
     // A view records the parts of its cells: one part per split item, and the
@@ -163,15 +164,33 @@ unittest
         grid.of(Vector3f(50.5f, 0.5f, 0.5f)),
     ];
 
-    tree.drawCells(VkCommandBuffer.init, Matrix4x4f.identity, cells, VkDescriptorSet.init);
+    // A view that fits the whole test level, so nothing is culled by distance
+    import std.math: isClose;
+
+    const view = Vector3f(0.005f, 0.005f, 0.005f).scaleMatrix;
+
+    tree.drawCells(VkCommandBuffer.init, view, cells, VkDescriptorSet.init);
 
     assert(split.drawnKeys.length == 1, "one split part is in those cells");
     assert(split.drawnKeys[0] == 0);
-    assert(split.drawnTrans[0].a14 == 50);
+    assert(isClose(split.drawnTrans[0].a14, 0.25f, 1e-5f, 1e-5f), "the drawable transform applies");
 
     assert(bounded.drawn == 1, "a bounded drawable is recorded once");
     assert(wide.drawn == 1, "a drawable in two cells is not recorded twice");
     assert(unbounded.drawn == 1);
+
+    // The index answers the frustum: parts outside it are not recorded
+    split.drawnKeys = null;
+    wide.drawn = 0;
+    bounded.drawn = 0;
+    unbounded.drawn = 0;
+
+    tree.drawCells(VkCommandBuffer.init, Vector3f(1000, 0, 0).translationMatrix, cells, VkDescriptorSet.init);
+
+    assert(split.drawnKeys.length == 0, "a part outside the frustum is not recorded");
+    assert(wide.drawn == 0);
+    assert(bounded.drawn == 0);
+    assert(unbounded.drawn == 1, "a drawable without bounds stays visible");
 
     // Loading and releasing the cells group parts the same way
     const far = grid.of(Vector3f(150.5f, 0.5f, 0.5f));
