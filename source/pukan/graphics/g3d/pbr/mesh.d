@@ -506,6 +506,8 @@ final class PbrMesh : Mesh
     package(pukan) AlphaMode alphaMode;
     package(pukan) bool doubleSided;
     package(pukan) bool hasSkin;
+    /// Set once the pieces of this mesh are on the GPU and its geometry built
+    bool geometryReady;
     bool castShadow = true;
     bool shadowsOnly;
 

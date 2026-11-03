@@ -150,12 +150,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     private size_t[] allKeys;
     private bool partsRegistered;
 
-    /// Holders per mesh and per GPU piece, so a released cell frees what nothing holds
-    private size_t[PbrMesh] meshRefs;
+    /// Counts the parts that hold each mesh; the last one drops its pieces
+    private SharedResource!PbrMesh[PbrMesh] meshNodes;
     /// GPU pieces several meshes share; the last holder releases the copy
     private SharedResource!BufferPieceOnGPU[] pieceNodes;
-    /// Meshes whose GPU handles are resolved and whose pieces are uploaded
-    private bool[PbrMesh] meshReady;
 
     private struct PartRecord
     {
@@ -409,7 +407,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         // A part no cell can hold stays loaded, since no cell will ever release it
         foreach(record; parts)
             if(record.mesh !is null && !hasBounds(record.bounds))
-                ++meshRefs[record.mesh];
+                acquireMesh(record.mesh);
 
         uploaded = true;
     }
@@ -549,7 +547,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             }
 
             // A part whose pieces are not on the GPU yet has no buffer to bind
-            if(!meshReady.get(record.mesh, false))
+            if(!record.mesh.geometryReady)
                 continue;
 
             const mvp = trans * record.world;
@@ -664,7 +662,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             }
 
             // A part whose pieces are not on the GPU yet has no buffer to bind
-            if(!meshReady.get(record.mesh, false))
+            if(!record.mesh.geometryReady)
                 continue;
 
             if(!matchesPhase(record.mesh, phase))
@@ -788,7 +786,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
             if(record.mesh !is null)
             {
-                ++meshRefs[record.mesh];
+                acquireMesh(record.mesh);
                 continue;
             }
 
@@ -812,6 +810,40 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 perPart.holdParts(group.keys);
     }
 
+    /// Takes one holder of `mesh`; true when it is the first
+    private bool acquireMesh(PbrMesh mesh)
+    {
+        auto node = mesh in meshNodes;
+
+        if(node is null)
+        {
+            auto created = new SharedResource!PbrMesh(mesh, (PbrMesh released) {
+                foreach(piece; released.pieces)
+                    pieceNodes[piece].release();
+
+                released.geometryReady = false;
+            });
+
+            meshNodes[mesh] = created;
+
+            return created.acquire();
+        }
+
+        return (*node).acquire();
+    }
+
+    /// Drops one holder; the last one releases the pieces of the mesh
+    private void releaseMesh(PbrMesh mesh)
+    {
+        auto node = mesh in meshNodes;
+
+        assert(node !is null, "releasing a mesh nothing holds");
+        (*node).release();
+
+        if((*node).userCount == 0)
+            meshNodes.remove(mesh);
+    }
+
     size_t uploadParts(VkCommandBuffer buf, size_t budget)
     {
         registerParts();
@@ -820,10 +852,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
         foreach(record; parts)
         {
-            if(record.mesh is null || meshReady.get(record.mesh, false))
+            if(record.mesh is null || record.mesh.geometryReady)
                 continue;
 
-            if(meshRefs.get(record.mesh, 0) == 0)
+            if((record.mesh in meshNodes) is null)
                 continue;
 
             size_t need;
@@ -841,7 +873,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                     gpuBuffs[piece].recordUpload(buf);
 
             record.mesh.buildGeometry(gpuBuffs);
-            meshReady[record.mesh] = true;
+            record.mesh.geometryReady = true;
             used += need;
         }
 
@@ -885,7 +917,6 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             size_t[] keys;
         }
 
-        PbrMesh[] released;
         NestedGroup[] groups;
 
         foreach(key; keys)
@@ -911,23 +942,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 continue;
             }
 
-            auto refs = record.mesh in meshRefs;
-
-            assert(refs !is null && *refs > 0, "releasing a part nothing holds");
-
-            if(--*refs == 0)
-            {
-                // A mesh that never uploaded holds no piece references
-                if(meshReady.get(record.mesh, false))
-                    released ~= record.mesh;
-
-                meshReady.remove(record.mesh);
-            }
+            releaseMesh(record.mesh);
         }
-
-        foreach(mesh; released)
-            foreach(piece; mesh.pieces)
-                pieceNodes[piece].release();
 
         foreach(group; groups)
             if(auto perPart = cast(PartDrawable) group.drawable)
