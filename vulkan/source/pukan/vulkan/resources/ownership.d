@@ -4,7 +4,8 @@ import core.sync.mutex: Mutex;
 import core.thread.osthread: Thread;
 import pukan.vulkan.bindings;
 import pukan.vulkan.resources.release: ReleaseQueue;
-import pukan.vulkan.resources.vkobj: VkHandleInfo, VkObj, VkParentKind;
+import pukan.vulkan.resources.vkobj: OwnerTag, VkHandleInfo, VkObj, VkParentKind;
+import std.traits: FieldNameTuple;
 
 /**
     Owns the objects that hold Vulkan handles and destroys them as a group.
@@ -19,7 +20,7 @@ import pukan.vulkan.resources.vkobj: VkHandleInfo, VkObj, VkParentKind;
     `threaded` locks the owner for any thread. The other variant is for one
     thread only and pays for no lock; it checks that in debug.
 */
-final class ResourceOwner(bool threaded = true)
+final class ResourceOwner(bool threaded = true): OwnerTag
 {
     /// One thing the owner releases: a holder or a handle taken from a slot
     private struct Entry
@@ -31,6 +32,8 @@ final class ResourceOwner(bool threaded = true)
 
     private string name;
     private Entry[] entries;
+    /// Handles this owner still expects to release
+    private size_t taggedHandles;
     private bool closed;
     /// Releases go through this queue; null frees at once
     private ReleaseQueue queue;
@@ -87,15 +90,42 @@ final class ResourceOwner(bool threaded = true)
     }
 
     /// Takes `holder` into this owner; `releaseTo` and `close` destroy it
-    void own(Object holder)
+    void own(T : Object)(T holder)
     in(holder !is null)
     {
         lockOwner();
-        scope(exit) unlockOwner();
+        {
+            scope(exit) unlockOwner();
 
-        assert(!closed, "owning into a closed ResourceOwner");
-        entries ~= Entry(holder);
+            assert(!closed, "owning into a closed ResourceOwner");
+            entries ~= Entry(holder);
+        }
+
+        debug stampFields(holder);
     }
+
+    /// Debug: marks the slots of `holder` with this owner, one level deep
+    private void stampFields(T)(T holder)
+    {
+        static foreach(name; FieldNameTuple!T)
+            static if(__traits(compiles, __traits(getMember, holder, name).stamp(this)))
+                __traits(getMember, holder, name).stamp(this);
+    }
+
+    /// Handles this owner still expects to release; debug only
+    size_t taggedHandleCount() const => taggedHandles;
+
+    void handleStamped()
+    {
+        ++taggedHandles;
+    }
+
+    void handleReleased()
+    {
+        --taggedHandles;
+    }
+
+    string ownerName() const => name;
 
     /**
         Takes the handle out of `slot` and releases it with the group.
@@ -128,6 +158,7 @@ final class ResourceOwner(bool threaded = true)
 
         assert(!closed, "accepting into a closed ResourceOwner");
         entries ~= Entry(null, release, handle);
+        ++taggedHandles;
     }
 
     /**
@@ -229,7 +260,10 @@ final class ResourceOwner(bool threaded = true)
                     destroy(entry.holder);
             }
             else
+            {
+                --taggedHandles;
                 queue.retire(entry.release, entry.handle);
+            }
     }
 
     private void lockOwner()

@@ -14,6 +14,19 @@ enum VkParentKind
     device,
 }
 
+/// Debug hook: the owner a wrapper expects to free it
+interface OwnerTag
+{
+    /// Called when a wrapper starts waiting for this owner
+    void handleStamped();
+
+    /// Called when the wrapper no longer waits
+    void handleReleased();
+
+    /// Name used in debug output
+    string ownerName() const;
+}
+
 /// Handle kinds the wrapper knows; also indexes the debug live counts
 enum VkHandleKind: uint
 {
@@ -198,6 +211,27 @@ struct VkObj(Handle)
         private ReleaseQueue queue;
     }
 
+    debug private OwnerTag ownerTag;
+
+    /// Debug: names the owner that is expected to free this handle
+    void stamp(OwnerTag tag)
+    {
+        debug
+        {
+            if(tag is null)
+                return;
+
+            assert(ownerTag is null || ownerTag is tag,
+                "a " ~ Info.name ~ " is already owned by '" ~ ownerTag.ownerName ~ "'");
+
+            if(ownerTag is tag)
+                return;
+
+            ownerTag = tag;
+            tag.handleStamped();
+        }
+    }
+
     static if(Info.hasCreate && Info.createParent == VkParentKind.none)
     {
         this(VkAllocationCallbacks* allocator, Info.CreateInfo createInfo)
@@ -283,6 +317,8 @@ struct VkObj(Handle)
         if(handle == Handle.init)
             return;
 
+        unstamp();
+
         auto releasing = handle;
 
         handle = Handle.init;
@@ -311,6 +347,8 @@ struct VkObj(Handle)
     */
     Handle take()
     {
+        unstamp();
+
         auto taken = handle;
 
         handle = Handle.init;
@@ -367,6 +405,19 @@ struct VkObj(Handle)
     ~this()
     {
         release();
+    }
+
+    private void unstamp()
+    {
+        debug
+        {
+            if(ownerTag !is null)
+            {
+                auto tag = ownerTag;
+                ownerTag = null;
+                tag.handleReleased();
+            }
+        }
     }
 
     private void noteAlive()
