@@ -312,6 +312,7 @@ void main(string[] args)
     float nearOption = cameraNear;
     float farOption = cameraFar;
     float speedOption = cameraSpeed;
+    float cellRange;
 
     auto getoptResult = getopt(
         args,
@@ -333,6 +334,7 @@ void main(string[] args)
         "walk", "hold forward, for headless movement tests", &walkForward,
         "fixed-step", "advance one physics tick per frame", &fixedStep,
         "noclip", "ignore collision in character mode", &noclip,
+        "cell-range", "stream cells within this distance in metres; 0 keeps every cell", &cellRange,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
         "debug-capsule", "draw the character collision capsule", &debugCapsule,
         "model", "character model path; defaults to CesiumMan", &modelOption,
@@ -871,6 +873,39 @@ void main(string[] args)
             : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
+    // Cells stream around the camera when a range is given; otherwise they all exist
+    auto residency = new Residency(scene.cellGrid);
+    residency.framesInFlight = 2;
+
+    const bool streaming = cellRange > 0;
+
+    StreamingSource cameraSource(float range, CellState state)
+    {
+        StreamingSource source;
+        source.position = camera.position;
+        source.range = range;
+        source.state = state;
+
+        return source;
+    }
+
+    if(streaming)
+    {
+        residency.update([
+            cameraSource(cellRange, CellState.active),
+            cameraSource(cellRange * 1.5f, CellState.loaded),
+        ], 0);
+
+        scene.frameBuilder.commandPool.recordOneTimeAndSubmit(*initialBuffer, (buf) {
+            loadCells(levelIndex, buf, residency.active());
+            loadCells(levelIndex, buf, residency.take(size_t.max));
+        });
+    }
+    else
+        scene.frameBuilder.commandPool.recordOneTimeAndSubmit(*initialBuffer, (buf) {
+            loadCells(levelIndex, buf, levelCells);
+        });
+
     uint frameIndex;
     import core.time: MonoTime;
     const start = MonoTime.currTime;
@@ -1213,6 +1248,20 @@ void main(string[] args)
             scene.updateFrameUniforms(frame, 0, wtb);
             godotScene.refreshBuffers(frame.commandBuffer);
 
+            if(streaming)
+            {
+                residency.update([
+                    cameraSource(cellRange, CellState.active),
+                    cameraSource(cellRange * 1.5f, CellState.loaded),
+                ], frameIndex);
+
+                foreach(cell; residency.take(4))
+                    loadCells(levelIndex, frame.commandBuffer(), [cell]);
+
+                foreach(cell; residency.release(frameIndex))
+                    releaseCells(levelIndex, [cell]);
+            }
+
             if(characterModel)
                 characterModel.refreshBuffers(frame.commandBuffer);
 
@@ -1225,7 +1274,8 @@ void main(string[] args)
             scene.recordCommandBuffer(
                 frame,
                 (buf, phase) {
-                    drawCells(levelIndex, buf, modelViewProj, levelCells,
+                    drawCells(levelIndex, buf, modelViewProj,
+                        streaming ? residency.active() : levelCells,
                         frame.frameSets[0].descriptorSet, phase);
 
                     if(characterModel && thirdPerson && characterVisible)
@@ -1239,7 +1289,8 @@ void main(string[] args)
                 },
                 null,
                 (buf) {
-                    drawCells(levelIndex, buf, scene.sunShadow.viewProj * wtb.model, levelCells,
+                    drawCells(levelIndex, buf, scene.sunShadow.viewProj * wtb.model,
+                        streaming ? residency.active() : levelCells,
                         frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                 },
             );

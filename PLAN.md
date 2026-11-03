@@ -780,7 +780,8 @@ Before each slice, read the matching reference named in
   real extents while `cellBounds` adds the origins. `Residency` keeps cells alive
   around a list of `StreamingSource`s: each carries a range, a priority and a
   state, the angle to a cell stretches its distance, and the retire delay covers
-  the frames in flight.
+  the frames in flight. `demo_godot --cell-range` loads, draws and frees the
+  cells around the camera; without it every cell loads at start.
 
   Still open:
 
@@ -790,10 +791,9 @@ Before each slice, read the matching reference named in
   - [ ] Limits and slow streaming: a cap on cells loading at once and a policy
         for when loading falls behind (stall or keep the old cells), the way
         `MaxLoadingLevelStreamingCells` and `Block on Slow Streaming` do.
-  - [ ] Content ownership per cell: a loader takes the cells `Residency.take`
-        hands out, uploads them under the per-frame budget and frees a cell's
-        resources when `Residency.release` returns it; the retire delay covers
-        the frames in flight.
+  - [ ] The streaming budget counts bytes, not cells: one cell with a large
+        mesh or texture now takes a whole frame, so its upload has to spread
+        over frames.
   - [ ] Floating origin: keep the camera at the origin and shift cell
         transforms, so single-precision positions stay precise far from the
         start.
@@ -847,6 +847,9 @@ Before each slice, read the matching reference named in
   - [ ] Keep queries in world space with the floating origin applied.
 
 - **Resources**
+  - [ ] Rebind fresh memory to a kept `VkBuffer` instead of destroying it on
+        release, so the geometry keeps its handles and no `buildGeometry` pass
+        is needed. It needs an allocator that owns memory apart from the buffer.
   - [ ] Async texture and mesh loading with a per-frame byte budget, replacing
         the immediate upload the loaders do today.
   - [ ] Virtual texturing or mip streaming for textures that exceed memory, with
