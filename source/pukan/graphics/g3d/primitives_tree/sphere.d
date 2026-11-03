@@ -12,7 +12,8 @@ import pukan.vulkan.memory: MemoryBuffer, MemoryBufferMappedToCPU, TransferBuffe
 import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: RenderPass;
 import pukan.vulkan.requirements: Requirement;
-import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, shaderStage;
+import pukan.graphics.common.shaders: shaderStage;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput;
 import pukan.vulkan.textures: Texture;
 import std.meta: AliasSeq;
 

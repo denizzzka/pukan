@@ -3,7 +3,6 @@ module pukan.vulkan.pipelines;
 import core.sync.condition: Condition;
 import core.sync.mutex: Mutex;
 import core.thread: Thread;
-import frame_bindings;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.exceptions: PukanVulkanException;
@@ -588,85 +587,17 @@ final class PipelineFactory
     private VkDescriptorSetLayout frameSetLayout;
     private VkDescriptorSetLayoutBinding[] frameBindings;
 
-    this(LogicalDevice device, PipelineCacheManager cacheManager = null, bool preload = true)
+    this(
+        LogicalDevice device,
+        VkDescriptorSetLayoutBinding[] frameBindings,
+        PipelineCacheManager cacheManager = null,
+        bool preload = true,
+    )
     {
         this.device = device;
         this.cacheManager = cacheManager;
+        this.frameBindings = frameBindings;
 
-        frameBindings = [
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_UNIFORM,
-                descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_IRRADIANCE,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_PREFILTERED,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_BRDF_LUT,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_SCENE_COLOR,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_OIT_HEADS,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_OIT_FRAGMENTS,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_OIT_COUNTER,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_LIGHTS,
-                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_SHADOW_MAP,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_SCENE_DEPTH,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-            VkDescriptorSetLayoutBinding(
-                binding: FRAME_DEPTH_MS,
-                descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                descriptorCount: 1,
-                stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
-            ),
-        ];
         frameSetLayout = device.createDescriptorSetLayout(frameBindings);
 
         mutex = new Mutex;

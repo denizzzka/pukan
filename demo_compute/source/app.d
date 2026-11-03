@@ -1,3 +1,5 @@
+import gemm;
+import pukan.graphics.common.frame_bindings: frameSetBindings;
 import pukan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirements;
@@ -84,7 +86,7 @@ void main()
         if(cacheManager)
             destroy(cacheManager);
 
-    scope pipelines = new PipelineFactory(device, cacheManager, false);
+    scope pipelines = new PipelineFactory(device, frameSetBindings, cacheManager, false);
 
     string formatReason;
     enforce(device.supportsImageFormat(sampled, formatReason),

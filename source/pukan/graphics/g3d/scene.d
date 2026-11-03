@@ -2,6 +2,7 @@ module pukan.graphics.g3d.scene;
 
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
+import pukan.graphics.common.frame_bindings: frameBindings, frameSetBindings;
 import pukan.graphics.common.screenshot: Screenshot;
 import pukan.graphics.g3d.axes: Axis;
 import pukan.graphics.g3d.ibl: createIblTextures, IblTextures;
@@ -242,7 +243,7 @@ class SceneWith(Modules...)
             device.pipelineCacheManager = pipelineCacheManager;
         }
 
-        pipelineFactory = new PipelineFactory(device, pipelineCacheManager, pipelineWarmupEnabled);
+        pipelineFactory = new PipelineFactory(device, frameSetBindings, pipelineCacheManager, pipelineWarmupEnabled);
         pipelineFactory.eagerCompute = pipelineWarmupEverything || pipelineWarmupRequired;
         frameAllocator = pipelineFactory.createFrameAllocator();
         meshResources = new MeshResources(device);
@@ -465,6 +466,7 @@ class SceneWith(Modules...)
                     device,
                     frameAllocator,
                     FrameUniforms.sizeof,
+                    frameBindings,
                     irradiance,
                     prefiltered,
                     brdfLut,

@@ -11,7 +11,8 @@ import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: TransferBuffer;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg;
-import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, shaderStage;
+import pukan.graphics.common.shaders: shaderStage;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput;
 import pukan.vulkan.textures: Texture;
 
 struct LitVertex

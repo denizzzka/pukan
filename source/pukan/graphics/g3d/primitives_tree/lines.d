@@ -8,7 +8,8 @@ import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: RenderPass;
-import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, shaderStage;
+import pukan.graphics.common.shaders: shaderStage;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput;
 
 struct LineInstance
 {

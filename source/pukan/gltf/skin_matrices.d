@@ -7,7 +7,7 @@ import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBuffer, TransferBuffer;
 import pukan.vulkan.pipelines: PipelineFactory;
 import pukan.vulkan.requirements: Requirement;
-import pukan.vulkan.shaders: shaderStage;
+import pukan.graphics.common.shaders: shaderStage;
 import std.meta: AliasSeq;
 
 /// GPU kernel that calculates skin joint matrices:

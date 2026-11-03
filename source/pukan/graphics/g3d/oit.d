@@ -8,7 +8,7 @@ import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBuffer;
 import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: RenderPass;
-import pukan.vulkan.shaders: shaderStage;
+import pukan.graphics.common.shaders: shaderStage;
 
 /// Fragments the per-frame buffer holds; must match OIT_MAX_FRAGMENTS in oit.glsl
 enum oitMaxFragments = 524288;

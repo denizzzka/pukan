@@ -7,7 +7,8 @@ import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrP
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipelines: FixedState, PipelineFactory, PipelineKey, RenderTechnique;
 import pukan.vulkan.renderpass: RenderPass;
-import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, shaderStage;
+import pukan.graphics.common.shaders: shaderStage;
+import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput;
 import std.algorithm: canFind;
 
 private ShaderVertexInput vertexInput()

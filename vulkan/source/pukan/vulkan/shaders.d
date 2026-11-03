@@ -165,31 +165,6 @@ struct ShaderDecl
     ubyte[16] checksum;
 }
 
-ShaderDecl shaderStage(string name)(
-    VkShaderStageFlagBits stage,
-    VkDescriptorSetLayoutBinding[] layoutBindings,
-    VkPushConstantRange pushConstant = VkPushConstantRange.init,
-    ShaderVertexInput vertexInput = ShaderVertexInput.init,
-)
-{
-    const sum = cast(const ubyte[]) import(name ~ ".sum");
-    static assert(import(name ~ ".sum").length == 16,
-        "shader checksum must be 16 bytes: " ~ name);
-
-    ubyte[16] checksum;
-    checksum[] = sum;
-
-    return ShaderDecl(
-        file: name,
-        stage: stage,
-        layoutBindings: layoutBindings,
-        pushConstantRange: pushConstant,
-        vertexInput: vertexInput,
-        binary: cast(const ubyte[]) import(name),
-        checksum: checksum,
-    );
-}
-
 VkDescriptorSetLayoutBinding[] createLayoutBinding(ShaderDecl[] shaders)
 {
     VkDescriptorSetLayoutBinding[] ret;

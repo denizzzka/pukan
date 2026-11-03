@@ -5,7 +5,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: DefaultRenderPass;
-import pukan.vulkan.shaders: shaderStage;
+import pukan.graphics.common.shaders: shaderStage;
 
 /// What the render pass clears to before the scene draws
 enum BackgroundMode: uint

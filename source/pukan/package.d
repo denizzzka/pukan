@@ -5,6 +5,7 @@ public import pukan.gltf;
 public import pukan.godot_scene;
 public import pukan.graphics.common.misc;
 public import pukan.graphics.common.screenshot;
+public import pukan.graphics.common.shaders;
 public import pukan.graphics.common.webp;
 public import pukan.graphics.g2d.background;
 public import pukan.graphics.g3d.camera;

@@ -1,7 +1,7 @@
 module pukan.vulkan.frame_builder;
 
-import frame_bindings;
 import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.frame_bindings: FrameBindings;
 import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.image: ImageMemory, identityComponentMapping;
 import pukan.vulkan.logical_device: LogicalDevice, Semaphore;
@@ -88,6 +88,7 @@ final class FrameSet
         LogicalDevice device,
         DescriptorAllocator allocator,
         size_t size,
+        FrameBindings bindings,
         VkDescriptorImageInfo irradiance,
         VkDescriptorImageInfo prefiltered,
         VkDescriptorImageInfo brdfLut,
@@ -106,18 +107,18 @@ final class FrameSet
 
         VkDescriptorBufferInfo info = { buffer: buffer.buf, offset: 0, range: size };
         VkWriteDescriptorSet[] writes = [
-            bufferWriteDescriptor(descriptorSet, FRAME_UNIFORM, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, info),
-            imageWriteDescriptor(descriptorSet, FRAME_IRRADIANCE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, irradiance),
-            imageWriteDescriptor(descriptorSet, FRAME_PREFILTERED, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, prefiltered),
-            imageWriteDescriptor(descriptorSet, FRAME_BRDF_LUT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, brdfLut),
-            imageWriteDescriptor(descriptorSet, FRAME_SCENE_COLOR, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneColor),
-            imageWriteDescriptor(descriptorSet, FRAME_OIT_HEADS, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, oitHeads),
-            bufferWriteDescriptor(descriptorSet, FRAME_OIT_FRAGMENTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitFragments),
-            bufferWriteDescriptor(descriptorSet, FRAME_OIT_COUNTER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitCounter),
-            bufferWriteDescriptor(descriptorSet, FRAME_LIGHTS, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, lights),
-            imageWriteDescriptor(descriptorSet, FRAME_SHADOW_MAP, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shadowMap),
-            imageWriteDescriptor(descriptorSet, FRAME_SCENE_DEPTH, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneDepth),
-            imageWriteDescriptor(descriptorSet, FRAME_DEPTH_MS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, depthMS),
+            bufferWriteDescriptor(descriptorSet, bindings.uniform, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, info),
+            imageWriteDescriptor(descriptorSet, bindings.irradiance, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, irradiance),
+            imageWriteDescriptor(descriptorSet, bindings.prefiltered, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, prefiltered),
+            imageWriteDescriptor(descriptorSet, bindings.brdfLut, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, brdfLut),
+            imageWriteDescriptor(descriptorSet, bindings.sceneColor, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneColor),
+            imageWriteDescriptor(descriptorSet, bindings.oitHeads, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, oitHeads),
+            bufferWriteDescriptor(descriptorSet, bindings.oitFragments, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitFragments),
+            bufferWriteDescriptor(descriptorSet, bindings.oitCounter, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitCounter),
+            bufferWriteDescriptor(descriptorSet, bindings.lights, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, lights),
+            imageWriteDescriptor(descriptorSet, bindings.shadowMap, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shadowMap),
+            imageWriteDescriptor(descriptorSet, bindings.sceneDepth, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneDepth),
+            imageWriteDescriptor(descriptorSet, bindings.depthMS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, depthMS),
         ];
         device.updateDescriptorSets(writes);
     }
