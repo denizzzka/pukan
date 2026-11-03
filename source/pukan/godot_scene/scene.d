@@ -145,6 +145,12 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
     private size_t[] allKeys;
     private bool partsRegistered;
 
+    /// Holders per mesh and per GPU piece, so a released cell frees what nothing holds
+    private size_t[PbrMesh] meshRefs;
+    private size_t[] pieceRefs;
+    /// Meshes whose GPU handles are resolved and whose pieces are uploaded
+    private bool[PbrMesh] meshReady;
+
     private struct PartRecord
     {
         PbrMesh mesh;
@@ -351,7 +357,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
             instance.uploadToGPUImmediate(device, commandPool, commandBuffer);
 
         foreach(mesh; meshes)
+        {
             mesh.updateDescriptorSetsAndUniformBuffers(device);
+            meshReady[mesh] = true;
+        }
 
         uploaded = true;
     }
@@ -415,6 +424,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
         }
 
         collect(Matrix4x4f.identity, root, false);
+
+        pieceRefs.length = gpuBuffs.length;
 
         allKeys.length = parts.length;
         foreach(i; 0 .. parts.length)
@@ -483,6 +494,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                 continue;
             }
 
+            // A part whose pieces are not on the GPU yet has no buffer to bind
+            if(!meshReady.get(record.mesh, false))
+                continue;
+
             const mvp = trans * record.world;
 
             //TODO: cull skinned meshes by their posed bounds
@@ -535,6 +550,126 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                 perPart.drawParts(buf, trans * group.base, group.keys, frameSet, phase);
             else
                 group.drawable.drawingBufferFilling(buf, trans * group.base, frameSet, phase);
+    }
+
+    void loadParts(VkCommandBuffer buf, scope const(size_t)[] keys)
+    {
+        registerParts();
+
+        static struct NestedGroup
+        {
+            DrawableByVulkan drawable;
+            size_t[] keys;
+        }
+
+        PbrMesh[] loaded;
+        NestedGroup[] groups;
+
+        foreach(key; keys)
+        {
+            auto record = &parts[key];
+
+            if(record.mesh is null)
+            {
+                size_t found = groups.length;
+
+                foreach(g, group; groups)
+                    if(group.drawable is record.nested)
+                    {
+                        found = g;
+                        break;
+                    }
+
+                if(found == groups.length)
+                    groups ~= NestedGroup(record.nested);
+
+                groups[found].keys ~= record.nestedKey;
+
+                continue;
+            }
+
+            if(meshRefs.get(record.mesh, 0) == 0)
+                loaded ~= record.mesh;
+
+            ++meshRefs[record.mesh];
+        }
+
+        foreach(mesh; loaded)
+            foreach(piece; mesh.pieces)
+                if(pieceRefs[piece]++ == 0 && !gpuBuffs[piece].isUploaded)
+                    gpuBuffs[piece].recordUpload(buf);
+
+        // Handles bake the buffer of the piece, so an upload or a release re-resolves them
+        foreach(mesh; loaded)
+        {
+            mesh.buildGeometry(gpuBuffs);
+            meshReady[mesh] = true;
+        }
+
+        foreach(group; groups)
+            if(auto perPart = cast(PartDrawable) group.drawable)
+                perPart.loadParts(buf, group.keys);
+    }
+
+    void releaseParts(scope const(size_t)[] keys)
+    {
+        registerParts();
+
+        static struct NestedGroup
+        {
+            DrawableByVulkan drawable;
+            size_t[] keys;
+        }
+
+        PbrMesh[] released;
+        NestedGroup[] groups;
+
+        foreach(key; keys)
+        {
+            auto record = &parts[key];
+
+            if(record.mesh is null)
+            {
+                size_t found = groups.length;
+
+                foreach(g, group; groups)
+                    if(group.drawable is record.nested)
+                    {
+                        found = g;
+                        break;
+                    }
+
+                if(found == groups.length)
+                    groups ~= NestedGroup(record.nested);
+
+                groups[found].keys ~= record.nestedKey;
+
+                continue;
+            }
+
+            auto refs = record.mesh in meshRefs;
+
+            assert(refs !is null && *refs > 0, "releasing a part nothing holds");
+
+            if(--*refs == 0)
+            {
+                released ~= record.mesh;
+                meshReady.remove(record.mesh);
+            }
+        }
+
+        foreach(mesh; released)
+            foreach(piece; mesh.pieces)
+            {
+                assert(pieceRefs[piece] > 0, "releasing a piece nothing holds");
+
+                if(--pieceRefs[piece] == 0)
+                    gpuBuffs[piece].releaseGPU();
+            }
+
+        foreach(group; groups)
+            if(auto perPart = cast(PartDrawable) group.drawable)
+                perPart.releaseParts(group.keys);
     }
 
     void eachPart(scope void delegate(in Part part) dg)

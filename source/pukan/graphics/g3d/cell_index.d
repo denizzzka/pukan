@@ -50,6 +50,12 @@ interface PartDrawable
     /// Reports every part once; the keys stay valid for the drawable's life
     void eachPart(scope void delegate(in Part part) dg);
 
+    /// Uploads the parts; the caller holds them until `releaseParts`
+    void loadParts(VkCommandBuffer buf, scope const(size_t)[] keys);
+
+    /// Drops the caller's hold; resources go when nothing else holds them
+    void releaseParts(scope const(size_t)[] keys);
+
     /**
         Records the given parts in one batch.
 

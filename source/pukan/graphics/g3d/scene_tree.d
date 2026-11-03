@@ -72,6 +72,10 @@ unittest
             dg(Part(unit, Vector3f(100, 0, 0).translationMatrix, 1));
         }
 
+        void loadParts(VkCommandBuffer, scope const(size_t)[] keys) {}
+
+        void releaseParts(scope const(size_t)[] keys) {}
+
         void drawParts(
             VkCommandBuffer,
             in Matrix4x4f trans,
