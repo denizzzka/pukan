@@ -15,18 +15,32 @@ struct CellCoord
 /// Fixed-size partition of the world, the unit of residency and culling
 struct CellGrid
 {
-    /// Edge length of a cell in world units
-    float cellSize = 64.0f;
+    /// Extent of a cell in world units, one per axis
+    Vector3f cellSize = Vector3f(64, 64, 64);
     /// Minimum corner of cell (0, 0, 0)
     Vector3f origin = Vector3f(0, 0, 0);
+
+    /// A cubic grid
+    this(float size, Vector3f origin = Vector3f(0, 0, 0))
+    {
+        cellSize = Vector3f(size, size, size);
+        this.origin = origin;
+    }
+
+    /// A grid with its own extent per axis
+    this(Vector3f size, Vector3f origin = Vector3f(0, 0, 0))
+    {
+        cellSize = size;
+        this.origin = origin;
+    }
 
     /// Cell that holds the point
     CellCoord of(Vector3f p) const
     {
         return CellCoord(
-            index(p.x, origin.x),
-            index(p.y, origin.y),
-            index(p.z, origin.z),
+            index(p.x, origin.x, cellSize.x),
+            index(p.y, origin.y, cellSize.y),
+            index(p.z, origin.z, cellSize.z),
         );
     }
 
@@ -35,7 +49,7 @@ struct CellGrid
     {
         const start = origin + Vector3f(cast(float) c.x, cast(float) c.y, cast(float) c.z) * cellSize;
 
-        return Boxf(start, start + Vector3f(cellSize, cellSize, cellSize));
+        return Boxf(start, start + cellSize);
     }
 
     /// Cells the box touches; empty when the box has no bounds
@@ -47,12 +61,12 @@ struct CellGrid
         return CellRange(of(box.min), of(box.max));
     }
 
-    private int index(float value, float start) const
+    private static int index(float value, float start, float size)
     {
-        assert(cellSize > 0, "cell size must be positive");
+        assert(size > 0, "cell size must be positive");
 
         // floor, not truncation: the point just below the origin is one cell back
-        return cast(int) floor((value - start) / cellSize);
+        return cast(int) floor((value - start) / size);
     }
 }
 
@@ -130,6 +144,12 @@ unittest
 
     // A box without bounds has no cells, so it never disappears by accident
     assert(grid.cellsIn(Boxf.init).walkLength == 0);
+
+    // Cells take their extent per axis: a flat grid keeps one layer
+    const flat = CellGrid(Vector3f(10, 100, 10));
+    assert(flat.of(Vector3f(0, 99, 0)) == CellCoord(0, 0, 0));
+    assert(flat.of(Vector3f(0, 101, 0)) == CellCoord(0, 1, 0));
+    assert(flat.bounds(CellCoord(1, 0, 0)) == Boxf(Vector3f(10, 0, 0), Vector3f(20, 100, 10)));
 
     // The range walks x first, then y, then z
     auto cells = grid.cellsIn(Boxf(Vector3f(0, 0, 0), Vector3f(20, 20, 20)));
