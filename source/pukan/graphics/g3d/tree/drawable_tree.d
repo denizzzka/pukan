@@ -54,7 +54,7 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
             {
                 auto drawable = *node.payload.peek!DrawableByVulkan;
                 auto bounded = cast(Bounded) drawable;
-                const local = bounded is null ? Boxf.init : bounded.localBounds;
+                const local = bounded is null ? Boxf.init : bounded.cellBounds;
 
                 index.insert(
                     DrawItem(drawable, trans),

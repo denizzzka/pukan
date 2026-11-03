@@ -3,7 +3,7 @@ module pukan.godot_scene.scene;
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
-import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergeAabb, transformAabb;
+import pukan.graphics.common.misc: Boxf, isVisible, mergePartAabb;
 import pukan.graphics.g3d.cell_index: Bounded;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.mesh: mirrors;
@@ -242,23 +242,15 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PipelineWarmup
         return false;
     }
 
-    Boxf calcAABB()
-    {
-        bool complete;
-        return calcAABB(complete);
-    }
+    /// Bounds of the parts that report extents; used for shadows and spawn
+    Boxf calcAABB() => collectBounds(false);
 
-    /// Bounds of everything the scene draws; NaN when a part cannot bound itself
-    Boxf localBounds()
-    {
-        bool complete;
-        const box = calcAABB(complete);
+    Boxf localBounds() => calcAABB;
 
-        return complete ? box : Boxf.init;
-    }
+    /// Bounds for cell placement: a part without bounds still contributes its origin
+    Boxf cellBounds() => collectBounds(true);
 
-    /// Bounds of the visible parts; `complete` reports whether each one could bound itself
-    private Boxf calcAABB(ref bool complete)
+    private Boxf collectBounds(bool byOrigin)
     {
         Boxf result;
 
@@ -270,26 +262,17 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PipelineWarmup
             trans *= node.local;
 
             foreach(mesh; node.meshes)
-                if(hasBounds(mesh.localAABB))
-                    mergeAabb(result, transformAabb(mesh.localAABB, trans));
-                else
-                    complete = false;
+                mergePartAabb(result, mesh.localAABB, trans, byOrigin);
 
             if(node.instance !is null)
             {
                 auto bounded = cast(Bounded) node.instance;
 
-                if(bounded is null)
-                    complete = false;
-                else
-                {
-                    const box = bounded.localBounds;
+                const box = bounded is null
+                    ? Boxf.init
+                    : byOrigin ? bounded.cellBounds : bounded.localBounds;
 
-                    if(hasBounds(box))
-                        mergeAabb(result, transformAabb(box, trans));
-                    else
-                        complete = false;
-                }
+                mergePartAabb(result, box, trans, byOrigin);
             }
 
             foreach(child; node.children)

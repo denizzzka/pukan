@@ -369,3 +369,41 @@ Boxf transformAabb(in Boxf box, in Matrix4x4f transform)
 
     return result;
 }
+
+/// Merges a part's world box; without bounds it contributes its origin when `byOrigin`
+void mergePartAabb(ref Boxf box, in Boxf localBounds, in Matrix4x4f world, bool byOrigin)
+{
+    if(hasBounds(localBounds))
+    {
+        mergeAabb(box, transformAabb(localBounds, world));
+        return;
+    }
+
+    if(!byOrigin)
+        return;
+
+    // No extent to sort into cells, so the origin still places the part in one;
+    // the box stays a point until the loader supplies real bounds.
+    const p = Vector4f(0, 0, 0, 1) * world;
+
+    mergeAabb(box, Boxf(Vector3f(p.x, p.y, p.z), Vector3f(p.x, p.y, p.z)));
+}
+
+unittest
+{
+    const world = Vector3f(10, 20, 30).translationMatrix;
+    const part = Boxf(Vector3f(0, 0, 0), Vector3f(1, 1, 1));
+
+    // Extents are merged from any part that has them
+    Boxf box;
+    mergePartAabb(box, part, world, false);
+    assert(box == Boxf(Vector3f(10, 20, 30), Vector3f(11, 21, 31)));
+
+    // A part without bounds is skipped or placed by its origin
+    mergePartAabb(box, Boxf.init, world, false);
+    assert(box == Boxf(Vector3f(10, 20, 30), Vector3f(11, 21, 31)));
+
+    Boxf byOrigin;
+    mergePartAabb(byOrigin, Boxf.init, world, true);
+    assert(byOrigin == Boxf(Vector3f(10, 20, 30), Vector3f(10, 20, 30)));
+}

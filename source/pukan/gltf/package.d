@@ -7,7 +7,7 @@ public import pukan.gltf.loader: GltfAsset, LoadStats, createGltfInstance, loadG
 import pukan.gltf.loader;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.gltf.skin_matrices: SkinMatrices;
-import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergeAabb, transformAabb;
+import pukan.graphics.common.misc: Boxf, isVisible, mergePartAabb;
 import pukan.graphics.g3d.cell_index: Bounded;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.graphics.g3d.mesh: mirrors;
@@ -507,23 +507,15 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
         }
     }
 
-    auto calcAABB()
-    {
-        bool complete;
-        return calcAABB(complete);
-    }
+    /// Bounds of the parts that report extents; used for shadows and placement
+    Boxf calcAABB() => collectBounds(false);
 
-    /// Bounds of everything the model draws; NaN when a part cannot bound itself
-    Boxf localBounds()
-    {
-        bool complete;
-        const box = calcAABB(complete);
+    Boxf localBounds() => calcAABB;
 
-        return complete ? box : Boxf.init;
-    }
+    /// Bounds for cell placement: a part without bounds still contributes its origin
+    Boxf cellBounds() => collectBounds(true);
 
-    /// Bounds of the visible parts; `complete` reports whether each one could bound itself
-    private Boxf calcAABB(ref bool complete)
+    private Boxf collectBounds(bool byOrigin)
     {
         Boxf result;
 
@@ -534,10 +526,7 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
             trans *= node.trans.calcMatrix;
 
             foreach(mesh; node.meshes)
-                if(hasBounds(mesh.localAABB))
-                    mergeAabb(result, transformAabb(mesh.localAABB, trans));
-                else
-                    complete = false;
+                mergePartAabb(result, mesh.localAABB, trans, byOrigin);
 
             foreach(child; node.children)
                 collect(cast(Node) child, trans);

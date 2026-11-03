@@ -8,8 +8,11 @@ import pukan.vulkan.renderpass: DrawableByVulkan;
 /// A drawable that can report its bounds in its own space, so cells can place it
 interface Bounded
 {
-    /// NaN when the drawable cannot bound itself, e.g. skin posed at runtime
+    /// Space the drawable occupies; NaN when no part reports extents
     Boxf localBounds();
+
+    /// Bounds for cell placement; a part without extents may contribute its origin
+    Boxf cellBounds();
 }
 
 /// One drawable with the transform that places it in the world

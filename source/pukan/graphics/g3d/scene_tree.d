@@ -39,6 +39,8 @@ unittest
         ) {}
 
         Boxf localBounds() => box;
+
+        Boxf cellBounds() => box;
     }
 
     auto tree = new SceneTree;

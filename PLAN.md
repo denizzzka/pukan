@@ -764,9 +764,26 @@ up. Before each slice, read the matching reference named in
 `dagon.collision.bvh` for the index and `dagon.graphics.lod` for LOD.
 
 - **Cells and coordinates**
-  - [ ] A cell grid owned by `Scene`: a fixed cell size, a level origin and the
-        world bounds of each cell. The glTF and Godot loaders assign nodes to
-        cells by their bounds, and a node that spans cells duplicates into each.
+
+  The grid is in: `CellGrid` holds the cell size and the level origin,
+  `Scene.cellGrid` owns it, and `SceneTree.rebuildCells` places every drawable in
+  each cell its transformed bounds touch. A drawable that reports no bounds at
+  all stays visible from every cell. Still open:
+
+  - [ ] Content sources expose their own nodes with bounds instead of reporting
+        one box per drawable, so a loaded level is placed per object and a node
+        that spans cells lands in each.
+  - [ ] Bounds of loaded content:
+    - [ ] glTF: compute the bounds from the vertex data when the accessor omits
+          `min`/`max` instead of leaving them NaN.
+    - [ ] Godot: a surface without `aabb` is a loader bug, so assert on the NaN
+          box instead of carrying it into the scene.
+    - [ ] Find out why the baked skinning path in the glTF loader sets
+          `uplVert.aabb = Boxf.init` although the positions are already baked.
+
+        Until those land, a part without bounds contributes only its origin to
+        `localBounds`, so it still lands in a cell; `calcAABB` keeps real
+        extents. See `mergePartAabb`.
   - [ ] The loaded set around the camera: a radius of resident cells plus a
         prefetch ring ordered by distance, with one budget per frame for mesh
         upload and pipeline warmup. A cell is released only when no recorded
