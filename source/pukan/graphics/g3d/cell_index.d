@@ -1,6 +1,7 @@
 module pukan.graphics.g3d.cell_index;
 
 import dlib.math: Matrix4x4f, Vector3f;
+import pukan.graphics.common.bvh: BoxBvh;
 import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, partAabb, transformAabb;
 import pukan.graphics.g3d.cells: CellCoord, CellGrid;
 import pukan.vulkan.bindings: VkCommandBuffer, VkDescriptorSet;
@@ -115,12 +116,9 @@ void placeDrawable(CellIndex!DrawItem index, DrawableByVulkan drawable, in Matri
 }
 
 /// Groups the keyed parts of the cells by drawable and the transform that places it
-private void groupParts(
-    CellIndex!DrawItem index,
-    scope const(CellCoord)[] cells,
+private void groupItems(
+    DrawItem[] items,
     scope void delegate(DrawableByVulkan drawable, in Matrix4x4f world, scope const(size_t)[] keys) dg,
-    bool cull = false,
-    in Matrix4x4f viewProj = Matrix4x4f.identity,
 )
 {
     static struct Group
@@ -132,12 +130,9 @@ private void groupParts(
 
     Group[] groups;
 
-    foreach(item; index.collect(cells))
+    foreach(item; items)
     {
         if(item.part == wholePart)
-            continue;
-
-        if(cull && !isVisible(item.bounds, viewProj))
             continue;
 
         size_t found = groups.length;
@@ -157,6 +152,16 @@ private void groupParts(
 
     foreach(group; groups)
         dg(group.drawable, group.world, group.keys);
+}
+
+/// Groups every part of the cells, without a view
+private void groupParts(
+    CellIndex!DrawItem index,
+    scope const(CellCoord)[] cells,
+    scope void delegate(DrawableByVulkan drawable, in Matrix4x4f world, scope const(size_t)[] keys) dg,
+)
+{
+    groupItems(index.collect(cells), dg);
 }
 
 /// Keeps the parts of the cells loaded; `releaseCells` drops the hold
@@ -211,14 +216,14 @@ void drawCells(
     DrawPhase phase = DrawPhase.surface,
 )
 {
-    auto items = index.collect(cells);
+    auto items = index.visible(cells, viewProj);
 
     foreach(i, item; items)
     {
         if(item.part != wholePart)
             continue;
 
-        // The index answers the frustum first, so a whole drawable never runs
+        // The tree culls by node bounds, so the item box answers for itself
         if(!isVisible(item.bounds, viewProj))
             continue;
 
@@ -236,9 +241,9 @@ void drawCells(
     }
 
     // Parts of one drawable go together, so it still batches them
-    groupParts(index, cells, (drawable, world, keys) {
+    groupItems(items, (drawable, world, keys) {
         (cast(PartDrawable) drawable).drawParts(buf, viewProj * world, keys, frameSet, phase);
-    }, true, viewProj);
+    });
 }
 
 /// Cells of a grid mapped to the items whose bounds touch them
@@ -246,11 +251,21 @@ final class CellIndex(T)
 {
     private CellGrid cellGrid;
     private T[] items;
+    /// Bounds per item, in world space; NaN for an item no cell can hold
+    private Boxf[] itemBounds;
     /// Cell to indices in `items`; one item may sit in several cells
     private size_t[][CellCoord] byCell;
     /// Items without bounds are visible from every cell
     private size_t[] always;
     private size_t placements;
+    /// Culling and picking tree per cell, built on the first query
+    private CellTree[CellCoord] cellTrees;
+
+    private struct CellTree
+    {
+        size_t[] items;
+        BoxBvh bvh;
+    }
 
     this(CellGrid grid)
     {
@@ -264,6 +279,7 @@ final class CellIndex(T)
     {
         const index = items.length;
         items ~= item;
+        itemBounds ~= bounds;
 
         if(!hasBounds(bounds))
         {
@@ -276,6 +292,108 @@ final class CellIndex(T)
             byCell[cell] ~= index;
             ++placements;
         }
+    }
+
+    /// Items of the cells that pass the frustum, each once, plus the unbounded ones
+    T[] visible(scope const(CellCoord)[] cells, in Matrix4x4f viewProj)
+    {
+        bool[] seen;
+        seen.length = items.length;
+
+        T[] result;
+
+        foreach(index; always)
+        {
+            seen[index] = true;
+            result ~= cast(T) items[index];
+        }
+
+        foreach(cell; cells)
+        {
+            auto tree = treeOf(cell);
+
+            if(tree is null || tree.bvh is null)
+                continue;
+
+            tree.bvh.queryVisible(viewProj, (local) {
+                const index = tree.items[local];
+
+                if(seen[index])
+                    return;
+
+                seen[index] = true;
+                result ~= cast(T) items[index];
+            });
+        }
+
+        return result;
+    }
+
+    /// Nearest item of the cells the ray enters within `maxT`
+    bool raycast(
+        scope const(CellCoord)[] cells,
+        in Vector3f origin,
+        in Vector3f direction,
+        float maxT,
+        out T item,
+        out float distance,
+    )
+    {
+        bool hit;
+
+        foreach(cell; cells)
+        {
+            auto tree = treeOf(cell);
+
+            if(tree is null || tree.bvh is null)
+                continue;
+
+            size_t local;
+            float t;
+
+            if(tree.bvh.raycast(origin, direction, maxT, local, t) && (!hit || t < distance))
+            {
+                hit = true;
+                item = cast(T) items[tree.items[local]];
+                distance = t;
+            }
+        }
+
+        return hit;
+    }
+
+    /// Culling tree of the cell, built once
+    private CellTree* treeOf(CellCoord cell)
+    {
+        if(auto found = cell in cellTrees)
+            return found;
+
+        auto ids = cell in byCell;
+
+        if(ids is null)
+            return null;
+
+        CellTree tree;
+
+        foreach(index; *ids)
+            if(hasBounds(itemBounds[index]))
+                tree.items ~= index;
+
+        if(tree.items.length)
+        {
+            Boxf[] boxes;
+            boxes.reserve(tree.items.length);
+
+            foreach(index; tree.items)
+                boxes ~= itemBounds[index];
+
+            tree.bvh = new BoxBvh;
+            tree.bvh.build(boxes);
+        }
+
+        cellTrees[cell] = tree;
+
+        return cell in cellTrees;
     }
 
     /// Items touching any of the cells, each once
@@ -338,6 +456,9 @@ final class CellIndex(T)
 
 unittest
 {
+    import std.algorithm: canFind;
+    import dlib.math: scaleMatrix;
+
     const grid = CellGrid(10);
     auto index = new CellIndex!int(grid);
 
@@ -366,4 +487,24 @@ unittest
     // Negative cells come from floor division, not truncation
     index.insert(4, box(-5, -5, -5));
     assert(index.collect([grid.of(Vector3f(-5, -5, -5))]) == [3, 4]);
+
+    // The cell tree answers the frustum and a ray
+    auto query = new CellIndex!int(grid);
+    query.insert(7, box(0, 0, 0));
+    query.insert(8, box(50, 0, 0));
+    query.insert(9, Boxf.init);
+
+    const near = grid.of(Vector3f(0.5f, 0.5f, 0.5f));
+    const far = grid.of(Vector3f(50.5f, 0.5f, 0.5f));
+    const view = Vector3f(0.05f, 0.05f, 0.05f).scaleMatrix;
+
+    const seen = query.visible([near], view);
+    assert(seen.canFind(7));
+    assert(seen.canFind(9), "an item without bounds stays visible");
+    assert(!seen.canFind(8), "the far item is culled");
+
+    int hit;
+    float t;
+    assert(query.raycast([far], Vector3f(40, 0.5f, 0.5f), Vector3f(1, 0, 0), 100, hit, t));
+    assert(hit == 8);
 }
