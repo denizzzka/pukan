@@ -10,9 +10,8 @@ import core.thread.osthread: Thread;
     release it. The owner keeps its holders alive and calls `destroy` on them
     in reverse creation order, so a resource created later goes first.
 
-    `threaded` locks the owner and checks in debug that it is used from the
-    thread that created it. A per-thread owner has one writer by construction
-    and pays for neither.
+    `threaded` locks the owner for any thread. The other variant is for one
+    thread only and pays for no lock; it checks that in debug.
 */
 final class ResourceOwner(bool threaded = true)
 {
@@ -21,36 +20,24 @@ final class ResourceOwner(bool threaded = true)
     private bool closed;
 
     static if(threaded)
-    {
         private Mutex mutex;
+    else
         private Thread ownerThread;
-    }
 
     this(string name = null)
     {
         this.name = name;
 
         static if(threaded)
-        {
             mutex = new Mutex;
+        else
             ownerThread = Thread.getThis();
-        }
     }
 
-    /// Destroys every holder; a dropped owner still frees, but late
+    /// Destroys what is left, so a dropped owner frees instead of leaking
     ~this()
     {
-        if(closed)
-            return;
-
-        debug if(holders.length)
-        {
-            import std.stdio: stderr;
-            stderr.writeln("ResourceOwner '", name, "' closed on drop with ",
-                holders.length, " holders");
-        }
-
-        close();
+        closeUnlocked();
     }
 
     /**
@@ -110,12 +97,22 @@ final class ResourceOwner(bool threaded = true)
     */
     void close()
     {
-        releaseTo(0);
+        Object[] releasing;
 
         lockOwner();
-        scope(exit) unlockOwner();
+        {
+            scope(exit) unlockOwner();
 
-        closed = true;
+            if(closed)
+                return;
+
+            releasing = holders;
+            holders = null;
+            closed = true;
+        }
+
+        foreach_reverse(holder; releasing)
+            destroy(holder);
     }
 
     /// Whether `close` has run
@@ -124,14 +121,27 @@ final class ResourceOwner(bool threaded = true)
     /// Holders this owner still keeps alive
     size_t length() const => holders.length;
 
+    /// Releases without the lock: a dropping owner is already unreachable
+    private void closeUnlocked()
+    {
+        if(closed)
+            return;
+
+        auto releasing = holders;
+        holders = null;
+        closed = true;
+
+        foreach_reverse(holder; releasing)
+            destroy(holder);
+    }
+
     private void lockOwner()
     {
         static if(threaded)
-        {
+            mutex.lock();
+        else
             debug assert(ownerThread is Thread.getThis(),
                 "ResourceOwner '" ~ name ~ "' used from another thread");
-            mutex.lock();
-        }
     }
 
     private void unlockOwner()
