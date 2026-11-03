@@ -1135,18 +1135,15 @@ Where it stands: `pukan.vulkan.resources.ownership` and
 `pukan.vulkan.resources.vkobj` hold the two mechanisms and their unit tests.
 Descriptor pools and set layouts belong to the pipeline factory's owner, and a
 scene holds its lifetime in one owner plus a screen owner that a swapchain
-rebuild replaces. A buffer, an image and a memory block free themselves and
-queue the handle until no frame in flight can use it.
+rebuild replaces. A `VkObj` never calls the driver from a destructor: it hands
+the handle to a queue that frees it once the frames in flight pass, and an
+owner hands its holders to the same queue.
 
 - [ ] Delete the last per-type device registries: pipelines and shaders still
       belong to the device until it dies. Buffers, images and memory free
       themselves now.
 - [ ] Move the impostor capture targets onto the scene owner once that work
       lands.
-- [ ] Extend the deferred release queue to holders: a buffer, an image and its
-      memory already wait for the frames in flight, but an owner still frees a
-      group in place. The queue replaces `retiredOitOwners` and
-      `SwapChain.oldSwapchainFrames` once it takes holders too.
 - [ ] Add `share` to the owning asset and move `meshRefs` and `pieceRefs` out of
       `GodotScene`.
 - [ ] Split the tree into threaded and per-thread owners once a real
