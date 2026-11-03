@@ -84,6 +84,15 @@ void applyWinding(N, Child)(N node, Matrix4x4f trans, bool counterClockwise, sco
         applyWinding!(N, Child)(cast(N) child, trans, counterClockwise, localOf);
 }
 
+/// One authored or generated index list of a geometry
+struct IndexLevel
+{
+    BufAccess accessor;
+    VkIndexType type;
+    /// Mesh-space error the level introduces, zero for the authored list
+    float error;
+}
+
 /// Vertex and index buffers shared by every instance of one mesh
 final class PbrGeometry
 {
@@ -94,6 +103,20 @@ final class PbrGeometry
     VkDeviceSize indexOffset;
     VkIndexType indexType;
     uint indexCount;
+
+    private struct ResolvedLevel
+    {
+        VkBuffer buffer;
+        VkDeviceSize offset;
+        uint count;
+        VkIndexType type;
+        float error;
+    }
+
+    /// Coarser index lists added before `build`; the authored list is level 0
+    private IndexLevel[] indexLevels;
+    /// Levels resolved against the GPU buffers, finest first
+    private ResolvedLevel[] levels;
 
     /// GPU pieces the geometry reads, so a cell can keep them while it lives
     package(pukan) size_t[] pieces;
@@ -172,19 +195,53 @@ final class PbrGeometry
         setStreams(streams);
         vertexCount = vert.vertices.count;
 
-        if(vert.indices.accessor.count)
+        levels = null;
+
+        void addLevel(BufAccess accessor, VkIndexType type, float error)
         {
-            auto indicesBuffer = gpuBuffs[vert.indices.accessor.viewIdx];
+            auto indicesBuffer = gpuBuffs[accessor.viewIdx];
             assert(indicesBuffer !is null);
 
-            usePiece(vert.indices.accessor.viewIdx);
+            usePiece(accessor.viewIdx);
 
-            indexBuffer = indicesBuffer.buffer.gpuBuffer;
-            indexOffset = vert.indices.accessor.offset;
-            indexType = vert.indices.indexType;
-            indexCount = vert.indices.accessor.count;
+            levels ~= ResolvedLevel(
+                indicesBuffer.buffer.gpuBuffer,
+                accessor.offset,
+                accessor.count,
+                type,
+                error,
+            );
+        }
+
+        if(vert.indices.accessor.count)
+            addLevel(vert.indices.accessor, vert.indices.indexType, 0);
+
+        foreach(level; indexLevels)
+            addLevel(level.accessor, level.type, level.error);
+
+        if(levels.length)
+        {
+            indexBuffer = levels[0].buffer;
+            indexOffset = levels[0].offset;
+            indexType = levels[0].type;
+            indexCount = levels[0].count;
         }
     }
+
+    /// Adds a coarser index list; call before `build`
+    package(pukan) void addIndexLevel(BufAccess accessor, VkIndexType type, float error)
+    {
+        indexLevels ~= IndexLevel(accessor, type, error);
+    }
+
+    /// Index lists the geometry can draw, the authored one first
+    size_t levelCount() const => levels.length ? levels.length : 1;
+
+    /// Index count of a level, zero when the geometry draws vertices
+    uint indexCountOf(size_t level) const => levels.length ? levels[level].count : 0;
+
+    /// Mesh-space error of a level
+    float levelError(size_t level) const => levels.length ? levels[level].error : 0;
 
     private void setStreams(VertexStream[] streams)
     {
@@ -230,8 +287,8 @@ final class PbrGeometry
                 strides.ptr,
             );
 
-        if(indexCount)
-            vkCmdBindIndexBuffer(buf, indexBuffer, indexOffset, indexType);
+        if(levels.length)
+            vkCmdBindIndexBuffer(buf, levels[0].buffer, levels[0].offset, levels[0].type);
 
         if(descriptorSet)
             vkCmdBindDescriptorSets(
@@ -247,8 +304,8 @@ final class PbrGeometry
 
         vkCmdSetFrontFace(buf, frontFace);
 
-        if(indexCount)
-            vkCmdDrawIndexed(buf, indexCount, 1, 0, 0, 0);
+        if(levels.length)
+            vkCmdDrawIndexed(buf, levels[0].count, 1, 0, 0, 0);
         else
             vkCmdDraw(buf, vertexCount, 1, 0, 0);
     }
@@ -259,6 +316,7 @@ final class PbrGeometry
         InstanceBatch batch,
         VkFrontFace frontFace,
         VkDescriptorSet descriptorSet,
+        size_t level = 0,
     )
     {
         assert(buffers.length == staticInstanceBinding);
@@ -287,8 +345,11 @@ final class PbrGeometry
             &instanceStride,
         );
 
-        if(indexCount)
-            vkCmdBindIndexBuffer(buf, indexBuffer, indexOffset, indexType);
+        if(levels.length)
+        {
+            ref levelData = levels[level];
+            vkCmdBindIndexBuffer(buf, levelData.buffer, levelData.offset, levelData.type);
+        }
 
         if(descriptorSet)
             vkCmdBindDescriptorSets(
@@ -304,8 +365,8 @@ final class PbrGeometry
 
         vkCmdSetFrontFace(buf, frontFace);
 
-        if(indexCount)
-            vkCmdDrawIndexed(buf, indexCount, batch.count, 0, 0, batch.firstInstance);
+        if(levels.length)
+            vkCmdDrawIndexed(buf, levels[level].count, batch.count, 0, 0, batch.firstInstance);
         else
             vkCmdDraw(buf, vertexCount, batch.count, 0, batch.firstInstance);
     }
@@ -316,6 +377,7 @@ final class PbrGeometry
         in CullBatch batch,
         VkFrontFace frontFace,
         VkDescriptorSet descriptorSet,
+        size_t level = 0,
     )
     {
         // The handles are taken by address, so the const of the argument goes
@@ -349,8 +411,11 @@ final class PbrGeometry
             &instanceStride,
         );
 
-        if(indexCount)
-            vkCmdBindIndexBuffer(buf, indexBuffer, indexOffset, indexType);
+        if(levels.length)
+        {
+            ref levelData = levels[level];
+            vkCmdBindIndexBuffer(buf, levelData.buffer, levelData.offset, levelData.type);
+        }
 
         if(descriptorSet)
             vkCmdBindDescriptorSets(
@@ -366,7 +431,7 @@ final class PbrGeometry
 
         vkCmdSetFrontFace(buf, frontFace);
 
-        if(indexCount)
+        if(levels.length)
             vkCmdDrawIndexedIndirectCount(
                 buf,
                 args,
@@ -523,6 +588,7 @@ final class PbrMesh : Mesh
         GraphicsPipelineCfg pipeline,
         const Matrix4x4f[] transforms,
         VkDescriptorSet frameSet,
+        size_t level = 0,
     )
     in(transforms.length > 0)
     {
@@ -545,7 +611,7 @@ final class PbrMesh : Mesh
 
         auto batch = currentInstanceArena.append(transforms);
 
-        geometry.drawInstanced(buf, pipeline, batch, frontFace, descriptorSet);
+        geometry.drawInstanced(buf, pipeline, batch, frontFace, descriptorSet, level);
     }
 
     /// Draws the instances the cull kernel kept for this mesh in one indirect call
@@ -554,6 +620,7 @@ final class PbrMesh : Mesh
         GraphicsPipelineCfg pipeline,
         in CullBatch batch,
         VkDescriptorSet frameSet,
+        size_t level = 0,
     )
     {
         assert(!hasSkin);
@@ -572,11 +639,17 @@ final class PbrMesh : Mesh
                 null,
             );
 
-        geometry.drawInstancedIndirect(buf, pipeline, batch, frontFace, descriptorSet);
+        geometry.drawInstancedIndirect(buf, pipeline, batch, frontFace, descriptorSet, level);
     }
 
-    /// Index count of the geometry; zero when it draws vertices
-    package(pukan) uint indexCount() const => geometry.indexCount;
+    /// Index lists of the geometry, the authored one first
+    package(pukan) size_t levelCount() const => geometry.levelCount;
+
+    /// Index count of a level; zero when the geometry draws vertices
+    package(pukan) uint indexCount(size_t level = 0) const => geometry.indexCountOf(level);
+
+    /// Mesh-space error of a level
+    package(pukan) float levelError(size_t level) const => geometry.levelError(level);
 
     package(pukan) void bindTexture(size_t binding, MaterialFlag flag, VkDescriptorImageInfo image)
     {

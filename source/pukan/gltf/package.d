@@ -12,6 +12,7 @@ import pukan.graphics.g3d.cell_index: Bounded;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor;
+import pukan.graphics.g3d.pbr.lod: generateLevels;
 import pukan.graphics.g3d.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.graphics.g3d.tree: BaseNode = Node;
@@ -919,8 +920,55 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
         );
 
         applyGltfMaterial(m, primitive.material, texturesDescrInfos, hasTexCoords, hasTexCoords1, hasNormals, hasTangents, hasVertexColors, loadOptions);
+
+        if(!hasSkin)
+            addGeneratedLevels(device, m, uplVert);
+
         m.buildGeometry(asset.gpuBuffs);
         return m;
+    }
+
+    /// Adds coarser index lists to a static mesh, so a distant draw costs less
+    private void addGeneratedLevels(LogicalDevice device, PbrMesh mesh, in MeshStreams streams)
+    {
+        if(streams.indices.accessor.count == 0 || streams.vertices.count == 0)
+            return;
+
+        auto positions = AccessRange!(Vector3f, false)(
+            asset.gpuBuffs[streams.vertices.viewIdx].buffer.cpuBuf,
+            streams.vertices,
+        );
+
+        Vector3f delegate(size_t) positionAt = (size_t i) => positions[i];
+
+        const indexBuf = asset.gpuBuffs[streams.indices.accessor.viewIdx].buffer.cpuBuf;
+        uint[] indices;
+
+        if(streams.indices.indexType == VK_INDEX_TYPE_UINT16)
+        {
+            auto range = AccessRange!(ushort, false)(indexBuf, streams.indices.accessor);
+            indices.reserve(range.length);
+
+            foreach(value; range)
+                indices ~= value;
+        }
+        else
+        {
+            auto range = AccessRange!(uint, false)(indexBuf, streams.indices.accessor);
+            indices.reserve(range.length);
+
+            foreach(value; range)
+                indices ~= value;
+        }
+
+        auto levels = generateLevels(positionAt, streams.vertices.count, indices, streams.aabb);
+
+        foreach(level; levels)
+        {
+            const accessor = createVertexBuffer(device, level.indices, asset.gpuBuffs,
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+            mesh.geometry.addIndexLevel(accessor, VK_INDEX_TYPE_UINT32, level.error);
+        }
     }
 
     private static bool hasNormalTexture(in Json json)

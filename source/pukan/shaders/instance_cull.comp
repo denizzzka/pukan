@@ -34,6 +34,9 @@ layout(push_constant) uniform Push
     uint visibleOffset;
     uint argsIndex;
     uint instanceCount;
+    // Clip depth range of this level; levels split the instances between them
+    float minDepth;
+    float maxDepth;
 } pc;
 
 // Same test as pukan.graphics.common.misc.isVisible
@@ -61,6 +64,12 @@ void main()
         return;
 
     const Instance instance = instances[pc.instanceOffset + i];
+
+    // The w of the transform origin is the view depth
+    const float depth = instance.mvp[3][3];
+
+    if(depth < pc.minDepth || depth >= pc.maxDepth)
+        return;
 
     if(instance.boundsMin.w < 0.5 && !insideFrustum(instance))
         return;

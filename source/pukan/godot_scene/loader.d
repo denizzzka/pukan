@@ -22,7 +22,8 @@ import pukan.graphics.common.misc: linearFormat, loadImageFromMemory;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialFlag, MaterialMode;
 import pukan.graphics.g3d.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.graphics.g3d.pbr.factory: PbrFactory;
-import pukan.graphics.g3d.pbr.mesh: IndicesDescr, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
+import pukan.graphics.g3d.pbr.lod: generateLevels;
+import pukan.graphics.g3d.pbr.mesh: IndicesDescr, MeshGeometry, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
 import pukan.graphics.g3d.pbr.pipelines: PbrPipelines;
 import pukan.physics.shapes: CollisionShape;
 import pukan.vulkan.bindings;
@@ -1675,6 +1676,26 @@ private final class GodotLoader
         return result;
     }
 
+    /// Adds coarser index lists to a static mesh, so a distant cell draws less
+    private void addGeneratedLevels(ref PbrGeometry geometry, ref MeshGeometry source, bool hasSkin)
+    {
+        if(hasSkin || source.indices.length == 0 || source.positions.length == 0)
+            return;
+
+        auto levels = generateLevels(
+            (size_t i) => source.positions[i],
+            cast(uint) source.positions.length,
+            source.indices,
+            source.aabb,
+        );
+
+        foreach(level; levels)
+        {
+            const indices = upload(level.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+            geometry.addIndexLevel(indices, VK_INDEX_TYPE_UINT32, level.error);
+        }
+    }
+
     private PbrMesh createMesh(
         ref GodotArraySurface surface,
         GodotMaterialData material,
@@ -1708,6 +1729,7 @@ private final class GodotLoader
             }
 
             geometry = new PbrGeometry(streams, hasSkin, pbr.resources.fallbackVertex.buf);
+            addGeneratedLevels(geometry, surface.geometry, hasSkin);
             geometry.build(gpuBuffs);
 
             if(geometryKey.length)

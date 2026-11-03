@@ -9,6 +9,7 @@ import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, Materia
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor: BufferPieceOnGPU;
 import pukan.graphics.g3d.pbr.culling: CullBatch, CullFrame, CullInstance, currentCullFrame;
+import pukan.graphics.g3d.pbr.lod: clipDepth, lodThresholds, pickLevel;
 import pukan.graphics.g3d.pbr.mesh: PbrMesh;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.physics.shapes: Collider, CollisionShape;
@@ -171,8 +172,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     {
         PbrMesh mesh;
         CullInstance[] instances;
-        CullBatch batch;
-        bool culled;
+        /// Clip-space placement of this scene, which sets the level thresholds
+        Matrix4x4f trans;
+        /// One batch per level, finest first
+        CullBatch[] batches;
     }
 
     /// A mesh the kernel cannot cull, drawn as before
@@ -557,8 +560,17 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
         if(phase == DrawPhase.surface || phase == DrawPhase.shadow)
         {
-            PbrMesh[] order;
-            Matrix4x4f[][PbrMesh] batches;
+            static struct Batch
+            {
+                PbrMesh mesh;
+                size_t level;
+                Matrix4x4f[] transforms;
+            }
+
+            Batch[] batches;
+
+            PbrMesh thresholdsMesh;
+            float[] thresholds;
 
             foreach(draw; draws)
             {
@@ -572,17 +584,32 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                     continue;
                 }
 
-                if(auto batch = draw.mesh in batches)
-                    *batch ~= draw.trans;
-                else
+                if(draw.mesh !is thresholdsMesh)
                 {
-                    order ~= draw.mesh;
-                    batches[draw.mesh] = [draw.trans];
+                    thresholds = meshThresholds(draw.mesh, trans);
+                    thresholdsMesh = draw.mesh;
                 }
+
+                const level = pickLevel(thresholds, clipDepth(draw.trans));
+
+                size_t found = batches.length;
+
+                foreach(b, batch; batches)
+                    if(batch.mesh is draw.mesh && batch.level == level)
+                    {
+                        found = b;
+                        break;
+                    }
+
+                if(found == batches.length)
+                    batches ~= Batch(draw.mesh, level);
+
+                batches[found].transforms ~= draw.trans;
             }
 
-            foreach(mesh; order)
-                mesh.drawBatch(buf, selectPipeline(mesh, phase), batches[mesh], frameSet);
+            foreach(batch; batches)
+                batch.mesh.drawBatch(buf, selectPipeline(batch.mesh, phase),
+                    batch.transforms, frameSet, batch.level);
         }
         else
             foreach(draw; draws)
@@ -655,7 +682,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 }
 
             if(found == gathered.meshes.length)
-                gathered.meshes ~= GatheredMesh(record.mesh);
+                gathered.meshes ~= GatheredMesh(record.mesh, null, trans);
 
             gathered.meshes[found].instances ~= cullInstance(record.bounds, mvp);
         }
@@ -672,11 +699,21 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             if(gatheredMesh.instances.length == 0)
                 continue;
 
-            const count = cast(uint) gatheredMesh.instances.length;
+            const instances = currentCullFrame.reserveInstances(gatheredMesh.instances);
+            const thresholds = meshThresholds(gatheredMesh.mesh, gatheredMesh.trans);
+            const levels = gatheredMesh.mesh.levelCount;
 
-            gatheredMesh.batch = currentCullFrame.reserve(gatheredMesh.instances, gatheredMesh.mesh.indexCount);
-            currentCullFrame.dispatch(buf, gatheredMesh.batch, count);
-            gatheredMesh.culled = true;
+            gatheredMesh.batches.length = levels;
+
+            foreach(level; 0 .. levels)
+            {
+                const maxDepth = level + 1 < levels ? thresholds[level + 1] : float.max;
+
+                gatheredMesh.batches[level] = currentCullFrame.reserveLevel(
+                    instances, gatheredMesh.mesh.indexCount(level));
+                currentCullFrame.dispatch(buf, instances, gatheredMesh.batches[level],
+                    thresholds[level], maxDepth);
+            }
         }
     }
 
@@ -689,15 +726,28 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         foreach(draw; gathered.draws)
             draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
 
-        foreach(batch; gathered.meshes)
-            if(batch.culled)
-                batch.mesh.drawCulled(buf, selectPipeline(batch.mesh, phase), batch.batch, frameSet);
+        foreach(gatheredMesh; gathered.meshes)
+            foreach(level, batch; gatheredMesh.batches)
+                gatheredMesh.mesh.drawCulled(buf, selectPipeline(gatheredMesh.mesh, phase),
+                    batch, frameSet, level);
 
         foreach(group; gathered.nested)
             if(auto perPart = cast(PartDrawable) group.drawable)
                 perPart.drawParts(buf, group.trans * group.base, group.keys, frameSet, phase);
             else
                 group.drawable.drawingBufferFilling(buf, group.trans * group.base, frameSet, phase);
+    }
+
+    /// Clip depth from which each level of the mesh is coarse enough
+    private static float[] meshThresholds(const PbrMesh mesh, in Matrix4x4f trans)
+    {
+        float[] errors;
+        errors.reserve(mesh.levelCount);
+
+        foreach(level; 0 .. mesh.levelCount)
+            errors ~= mesh.levelError(level);
+
+        return lodThresholds(errors, trans);
     }
 
     /// Part bounds in the form the cull kernel reads; a part without bounds stays visible

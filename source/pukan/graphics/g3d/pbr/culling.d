@@ -20,7 +20,14 @@ struct CullInstance
     Vector4f boundsMax;
 }
 
-/// What the kernel left for one mesh: its packed matrices and the draw command
+/// Input copy of one mesh's instances; the levels of the mesh share it
+struct CullInstances
+{
+    uint offset;
+    uint count;
+}
+
+/// What the kernel left for one level: its packed matrices and the draw command
 struct CullBatch
 {
     VkBuffer visible;
@@ -64,6 +71,8 @@ final class CullFrame
     private size_t instanceUsed;
     private size_t visibleUsed;
     private size_t argsUsed;
+    /// Set when a buffer moved, so the next dispatch rewrites the set
+    private bool setDirty;
 
     this(LogicalDevice device, PipelineFactory pipelines)
     {
@@ -109,29 +118,41 @@ final class CullFrame
         argsUsed = 0;
     }
 
-    /// Copies the instances of one mesh and prepares its draw command
-    CullBatch reserve(scope const(CullInstance)[] instances, uint indexCount)
+    /// Copies the instances of one mesh, so its levels all read one list
+    CullInstances reserveInstances(scope const(CullInstance)[] instances)
     in(instances.length > 0)
     {
         const instanceBytes = instances.length * CullInstance.sizeof;
-        auto instances_ = grow(instanceBuf, instanceUsed + instanceBytes);
+        auto grown = grow(instanceBuf, instanceUsed + instanceBytes);
 
-        const visibleBytes = instances.length * Matrix4x4f.sizeof;
-        auto visible = grow(visibleBuf, visibleUsed + visibleBytes);
-
-        auto args = grow(argsBuf, argsUsed + argsSize);
-
-        if(instances_ !is instanceBuf || visible !is visibleBuf || args !is argsBuf)
+        if(grown !is instanceBuf)
         {
-            instanceBuf = instances_;
-            visibleBuf = visible;
-            argsBuf = args;
-            writeSet();
+            instanceBuf = grown;
+            setDirty = true;
         }
 
         const first = instanceUsed / CullInstance.sizeof;
         auto destination = cast(CullInstance*) instanceBuf.cpuBuf.ptr;
         destination[first .. first + instances.length] = instances;
+
+        instanceUsed += instanceBytes;
+
+        return CullInstances(cast(uint) first, cast(uint) instances.length);
+    }
+
+    /// Prepares the output and the draw command of one level
+    CullBatch reserveLevel(CullInstances instances, uint indexCount)
+    {
+        const visibleBytes = instances.count * Matrix4x4f.sizeof;
+        auto visible = grow(visibleBuf, visibleUsed + visibleBytes);
+        auto args = grow(argsBuf, argsUsed + argsSize);
+
+        if(visible !is visibleBuf || args !is argsBuf)
+        {
+            visibleBuf = visible;
+            argsBuf = args;
+            setDirty = true;
+        }
 
         const wordsAt = argsUsed / uint.sizeof;
         auto words = cast(uint*) argsBuf.cpuBuf.ptr;
@@ -150,24 +171,29 @@ final class CullFrame
             visibleSize: visibleBytes,
             args: argsBuf.buf,
             argsOffset: argsUsed,
-            instanceOffset: cast(uint) first,
+            instanceOffset: instances.offset,
         );
 
-        instanceUsed += instanceBytes;
         visibleUsed += visibleBytes;
         argsUsed += argsSize;
 
         return batch;
     }
 
-    /// Runs the kernel over what `reserve` copied, keeping the visible ones
-    void dispatch(VkCommandBuffer buf, CullBatch batch, uint instanceCount)
+    /// Runs the kernel over the instance list, keeping the ones in the depth range
+    void dispatch(VkCommandBuffer buf, CullInstances instances, CullBatch batch, float minDepth, float maxDepth)
     {
         if(pipeline is null)
         {
             auto cfg = pipelines.acquireCompute(key);
             pipeline = cfg.pipeline;
             layout = cfg.pipelineLayout;
+        }
+
+        if(setDirty)
+        {
+            writeSet();
+            setDirty = false;
         }
 
         VkBufferMemoryBarrier[2] readable = [
@@ -199,15 +225,17 @@ final class CullFrame
         );
 
         const push = Push(
-            instanceOffset: batch.instanceOffset,
+            instanceOffset: instances.offset,
             visibleOffset: cast(uint)(batch.visibleOffset / Matrix4x4f.sizeof),
             argsIndex: cast(uint)(batch.argsOffset / uint.sizeof),
-            instanceCount: instanceCount,
+            instanceCount: instances.count,
+            minDepth: minDepth,
+            maxDepth: maxDepth,
         );
 
         vkCmdPushConstants(buf, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, push.sizeof, &push);
 
-        vkCmdDispatch(buf, (instanceCount + workgroupSize - 1) / workgroupSize, 1, 1);
+        vkCmdDispatch(buf, (instances.count + workgroupSize - 1) / workgroupSize, 1, 1);
 
         VkBufferMemoryBarrier[2] written = [
             shaderToVertexBarrier(visibleBuf.buf),
@@ -322,6 +350,8 @@ final class CullFrame
         uint visibleOffset;
         uint argsIndex;
         uint instanceCount;
+        float minDepth;
+        float maxDepth;
     }
 }
 

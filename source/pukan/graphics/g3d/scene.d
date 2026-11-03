@@ -11,6 +11,7 @@ import pukan.graphics.g3d.mesh: MeshResources;
 import pukan.graphics.g3d.oit: DepthResolve, OitFrame, OitResolve;
 import pukan.graphics.g3d.pbr.culling: CullFrame, currentCullFrame;
 import pukan.graphics.g3d.pbr.instancing: InstanceArena, currentInstanceArena;
+import pukan.graphics.g3d.pbr.lod: currentViewportHeight;
 import pukan.graphics.g3d.pbr.pipeline_set: PbrPipelineSet, createPbrPipelineSet;
 import pukan.graphics.g3d.pbr.pipelines: oitPass, transmissionPass, pipelineWarmupEnabled, pipelineWarmupEverything, pipelineWarmupPerScene, pipelineWarmupRequired, Variants;
 import pukan.graphics.g3d.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActive;
@@ -764,6 +765,7 @@ class SceneWith(Modules...)
 
         currentInstanceArena = instanceArenas[frameIndex(frame)];
         currentInstanceArena.reset();
+        currentViewportHeight = cast(float) swapChain.imageExtent.height;
 
         if(cullFrames.length)
         {
@@ -872,6 +874,7 @@ class SceneWith(Modules...)
 
         currentInstanceArena = instanceArenas[frameIndex(frame)];
         currentInstanceArena.reset();
+        currentViewportHeight = cast(float) swapChain.imageExtent.height;
         // Each eye has its own frustum, so this path gathers nothing for the kernel
         currentCullFrame = null;
 
