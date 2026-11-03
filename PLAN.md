@@ -771,27 +771,22 @@ Before each slice, read the matching reference named in
 
 - **Cells and coordinates**
 
-  The grid is in: `CellGrid` holds the cell size and the level origin,
-  `Scene.cellGrid` owns it, and `SceneTree.rebuildCells` places every part in
-  each cell its transformed bounds touch. Loaded scenes implement `PartDrawable` and
-  report each mesh with its own transform, so a level lands in cells per object;
-  a drawable that reports nothing stays visible from every cell, and a part
-  without bounds contributes its origin. `calcAABB` keeps the real extents while
-  `cellBounds` adds the origins. `Residency` holds the resident radius, the
-  prefetch ring ordered by distance and the per-frame budget.
+  The grid is in: `CellGrid` holds the cell extent per axis and the level
+  origin, `Scene.cellGrid` owns it, and `SceneTree.rebuildCells` places every
+  part in each cell its transformed bounds touch. Loaded scenes implement
+  `PartDrawable` and report each mesh with its own transform, so a level lands in
+  cells per object; a drawable that reports nothing stays visible from every
+  cell, and a part without bounds contributes its origin. `calcAABB` keeps the
+  real extents while `cellBounds` adds the origins. `Residency` keeps cells alive
+  around a list of `StreamingSource`s: each carries a range, a priority and a
+  state, the angle to a cell stretches its distance, and the retire delay covers
+  the frames in flight.
 
   Still open:
 
-  - [ ] Cells are axis-aligned boxes sized per axis, so the default grid can be
-        2D like Unreal's runtime hash: X and Z at 256 m, Y covering the level.
-        A 3D grid stays available for stacked levels.
-  - [ ] Streaming sources: positions with a loading radius, a priority and a
-        target state (loaded or active). The camera is one; a teleport adds a
-        temporary source at the destination. A cell takes the highest priority
-        and state among the sources that reach it.
-  - [ ] Cell importance is the distance to the source plus the angle between the
-        source's forward and the direction to the cell, so what lies ahead loads
-        first.
+  - [ ] The default grid is 2D like Unreal's runtime hash: X and Z around 256 m
+        and Y tall enough for the level, so a source scan walks one layer of
+        cells instead of a cube of mostly empty ones.
   - [ ] Limits and slow streaming: a cap on cells loading at once and a policy
         for when loading falls behind (stall or keep the old cells), the way
         `MaxLoadingLevelStreamingCells` and `Block on Slow Streaming` do.

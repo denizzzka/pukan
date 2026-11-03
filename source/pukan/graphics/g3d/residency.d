@@ -1,26 +1,49 @@
 module pukan.graphics.g3d.residency;
 
-import dlib.math: Vector3f;
+import dlib.math: dot, Vector3f;
 import pukan.graphics.common.misc: Boxf;
 import pukan.graphics.g3d.cells: CellCoord, CellGrid;
-import std.algorithm: canFind, max, sort;
+import std.algorithm: canFind, max, min, sort;
 import std.math: sqrt;
 
-/// Cells kept around the camera, nearest first, with one budget per update
+/// What a streaming source asks of the cells it reaches
+enum CellState
+{
+    /// No source reaches the cell
+    empty,
+    /// The cell exists but is not drawn
+    loaded,
+    /// The cell is drawn
+    active,
+}
+
+/// One point that keeps cells alive around itself
+struct StreamingSource
+{
+    Vector3f position;
+    /// Heading that makes cells ahead load first; zero ignores the angle
+    Vector3f forward = Vector3f(0, 0, 0);
+    /// Cells whose bounds lie within this distance of the point are wanted
+    float range = 384.0f;
+    /// The highest priority wins when sources disagree about a cell
+    uint priority;
+    /// What the source asks of the cells it reaches
+    CellState state = CellState.active;
+}
+
+/// Cells kept around the streaming sources, nearest first, with one budget per update
 final class Residency
 {
     /// Cell size and level origin; set before the first update
     CellGrid grid;
-    /// Cells within this distance of the eye are the ones the camera draws
-    float residentRadius = 256.0f;
-    /// Cells within this distance are prefetched, nearest first
-    float prefetchRadius = 384.0f;
+    /// How much the angle to a cell stretches its distance, like Unreal's angle contribution
+    float angleWeight = 0.25f;
     /// A retired cell waits this many frames, so the frames in flight can still draw it
     uint framesInFlight = 2;
 
     private CellCoord[] loadedCells;
     private CellCoord[] pendingCells;
-    private CellCoord[] residentCells;
+    private CellCoord[] activeCells;
     /// Frame a retired cell may leave after
     private size_t[CellCoord] retiredAt;
 
@@ -29,47 +52,75 @@ final class Residency
         this.grid = grid;
     }
 
-    /// The cells the camera draws from
-    const(CellCoord)[] resident() const => residentCells;
+    /// The cells the camera draws
+    const(CellCoord)[] active() const => activeCells;
 
-    /// The cells the eye wants and that are not loaded yet, nearest first
+    /// The cells the sources want and that are not loaded yet, most important first
     const(CellCoord)[] pending() const => pendingCells;
 
     /// The cells the caller has loaded and not released
     const(CellCoord)[] loaded() const => loadedCells;
 
-    /// Recomputes the wanted set and its order for the eye
-    void update(Vector3f eye, size_t frame)
+    /// Recomputes the wanted cells and their order for the sources
+    void update(scope const(StreamingSource)[] sources, size_t frame)
     {
-        const float reach = max(residentRadius, prefetchRadius);
-        const margin = Vector3f(reach, reach, reach);
-
         struct Wanted
         {
             CellCoord cell;
-            float distance;
+            CellState state;
+            uint priority;
+            float importance;
         }
 
-        Wanted[] wanted;
+        Wanted[CellCoord] wanted;
 
-        foreach(cell; grid.cellsIn(Boxf(eye - margin, eye + margin)))
+        foreach(source; sources)
         {
-            const distance = distanceTo(cell, eye);
+            const margin = Vector3f(source.range, source.range, source.range);
 
-            if(distance <= reach)
-                wanted ~= Wanted(cell, distance);
+            foreach(cell; grid.cellsIn(Boxf(source.position - margin, source.position + margin)))
+            {
+                const distance = distanceTo(cell, source.position);
+
+                if(distance > source.range)
+                    continue;
+
+                const importance = importanceOf(source, cell, distance);
+
+                if(auto existing = cell in wanted)
+                {
+                    existing.state = max(existing.state, source.state);
+                    existing.priority = max(existing.priority, source.priority);
+                    existing.importance = min(existing.importance, importance);
+                }
+                else
+                    wanted[cell] = Wanted(cell, source.state, source.priority, importance);
+            }
         }
 
-        // Nearest first, so the budget spends on what the camera reaches next
-        wanted.sort!((a, b) => a.distance < b.distance);
+        Wanted[] ordered;
+
+        foreach(value; wanted.byValue)
+            ordered ~= value;
+
+        // A cell of higher priority goes first; then what the sources reach soonest
+        ordered.sort!((a, b) => a.priority != b.priority
+            ? a.priority > b.priority
+            : a.importance < b.importance);
 
         bool[CellCoord] wantedCells;
+        CellCoord[] active;
 
-        foreach(w; wanted)
+        foreach(w; ordered)
+        {
             wantedCells[w.cell] = true;
 
-        // A retired cell the eye needs again never left, so it keeps its resources
-        foreach(w; wanted)
+            if(w.state == CellState.active)
+                active ~= w.cell;
+        }
+
+        // A retired cell the sources need again never left, so it keeps its resources
+        foreach(w; ordered)
             retiredAt.remove(w.cell);
 
         foreach(cell; loadedCells)
@@ -81,14 +132,11 @@ final class Residency
         foreach(cell; loadedCells)
             known[cell] = true;
 
-        residentCells = null;
+        activeCells = active;
         pendingCells = null;
 
-        foreach(w; wanted)
+        foreach(w; ordered)
         {
-            if(w.distance <= residentRadius)
-                residentCells ~= w.cell;
-
             if(w.cell in known)
                 continue;
 
@@ -97,7 +145,7 @@ final class Residency
         }
     }
 
-    /// Cells to load now, at most `budget` of them, nearest first
+    /// Cells to load now, at most `budget` of them, most important first
     CellCoord[] take(size_t budget)
     {
         if(budget > pendingCells.length)
@@ -138,15 +186,15 @@ final class Residency
         return gone;
     }
 
-    /// Distance from the eye to the nearest point of the cell
-    private float distanceTo(CellCoord cell, Vector3f eye) const
+    /// Distance from the point to the nearest point of the cell
+    private float distanceTo(CellCoord cell, Vector3f position) const
     {
         const box = grid.bounds(cell);
         float squared = 0;
 
         foreach(axis; 0 .. 3)
         {
-            const v = eye[axis];
+            const v = position[axis];
 
             if(v < box.min[axis])
                 squared += (box.min[axis] - v) * (box.min[axis] - v);
@@ -157,22 +205,51 @@ final class Residency
 
         return sqrt(squared);
     }
+
+    /// Distance stretched by the angle to the cell, so what lies ahead comes first
+    private float importanceOf(in StreamingSource source, CellCoord cell, float distance) const
+    {
+        const forward = source.forward.length;
+
+        if(forward < 1e-6f || distance < 1e-3f)
+            return distance;
+
+        const box = grid.bounds(cell);
+        const toCell = (box.min + box.max) * 0.5f - source.position;
+
+        if(toCell.length < 1e-6f)
+            return distance;
+
+        const cos = dot(toCell, source.forward) / (toCell.length * forward);
+
+        return distance * (1 + angleWeight * (1 - cos));
+    }
 }
 
 unittest
 {
-    import pukan.graphics.g3d.cells: CellCoord;
+    const grid = CellGrid(10);
 
-    auto residency = new Residency(CellGrid(10));
-    residency.residentRadius = 4;
-    residency.prefetchRadius = 6;
+    auto residency = new Residency(grid);
     residency.framesInFlight = 2;
+
+    // The active source draws its own range, a wider loaded source only keeps cells
+    StreamingSource activeSource(Vector3f position, float range, uint priority = 0)
+    {
+        return StreamingSource(position, Vector3f(0, 0, 0), range, priority, CellState.active);
+    }
+
+    StreamingSource loadedSource(Vector3f position, float range, uint priority = 0)
+    {
+        return StreamingSource(position, Vector3f(0, 0, 0), range, priority, CellState.loaded);
+    }
 
     const eye = Vector3f(5, 5, 5);
 
-    // The cell around the eye is resident, the six neighbours are prefetched
-    residency.update(eye, 0);
-    assert(residency.resident == [CellCoord(0, 0, 0)]);
+    residency.update([activeSource(eye, 4), loadedSource(eye, 6)], 0);
+
+    // The cell around the eye is active, the six neighbours are only loaded
+    assert(residency.active == [CellCoord(0, 0, 0)]);
     assert(residency.pending.length == 7);
     assert(residency.pending.canFind(CellCoord(1, 0, 0)));
     assert(!residency.pending.canFind(CellCoord(1, 1, 0)), "a diagonal cell is out of reach");
@@ -181,24 +258,50 @@ unittest
     assert(residency.take(4).length == 4);
     assert(residency.loaded.length == 4);
 
-    residency.update(eye, 1);
+    residency.update([activeSource(eye, 4), loadedSource(eye, 6)], 1);
     assert(residency.pending.length == 3);
-
     assert(residency.take(4).length == 3);
-    assert(residency.pending.length == 0);
     assert(residency.loaded.length == 7);
 
     // Leaving retires the cells, but their frames in flight keep them
-    residency.update(Vector3f(505, 5, 5), 2);
+    const away = Vector3f(505, 5, 5);
+    residency.update([activeSource(away, 4), loadedSource(away, 6)], 2);
     assert(residency.release(3).length == 0);
 
     // Coming back before the delay keeps them loaded
-    residency.update(eye, 3);
+    residency.update([activeSource(eye, 4), loadedSource(eye, 6)], 3);
     assert(residency.release(5).length == 0);
     assert(residency.loaded.length == 7);
 
     // Leaving for good releases them after the delay
-    residency.update(Vector3f(505, 5, 5), 6);
+    residency.update([activeSource(away, 4), loadedSource(away, 6)], 6);
     assert(residency.release(8).length == 7);
     assert(residency.loaded.length == 0);
+
+    // A cell ahead of the source comes before one behind it
+    auto ahead = new Residency(grid);
+    ahead.update([StreamingSource(Vector3f(5, 5, 5), Vector3f(1, 0, 0), 40)], 0);
+    assert(ahead.pending.canFind(CellCoord(3, 0, 0)));
+    assert(ahead.pending.canFind(CellCoord(-3, 0, 0)));
+    assert(ahead.pending[0] != CellCoord(-3, 0, 0), "the cell behind loads last");
+
+    bool aheadBeforeBehind;
+    foreach(cell; ahead.pending)
+    {
+        if(cell == CellCoord(3, 0, 0))
+            aheadBeforeBehind = true;
+        else if(cell == CellCoord(-3, 0, 0))
+            break;
+    }
+    assert(aheadBeforeBehind, "the cell ahead loads first");
+
+    // A higher priority wins over a closer, lower priority source
+    auto priorities = new Residency(grid);
+    priorities.update([
+        StreamingSource(Vector3f(5, 5, 5), Vector3f(0, 0, 0), 4, 0, CellState.loaded),
+        StreamingSource(Vector3f(45, 5, 5), Vector3f(0, 0, 0), 6, 5, CellState.loaded),
+    ], 0);
+
+    assert(priorities.pending.length > 0);
+    assert(priorities.pending[0] == CellCoord(4, 0, 0), "the priority source goes first");
 }
