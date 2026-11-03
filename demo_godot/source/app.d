@@ -912,7 +912,9 @@ void main(string[] args)
 
         scope initialCells = residency.active() ~ residency.take(size_t.max);
 
-        holdCells(levelIndex, initialCells);
+        // Holds are per cell, the same way releases will be
+        foreach(cell; initialCells)
+            holdCells(levelIndex, [cell]);
 
         scene.frameBuilder.commandPool.recordOneTimeAndSubmit(*initialBuffer, (buf) {
             uploadCells(levelIndex, buf, initialCells, size_t.max);
@@ -920,7 +922,8 @@ void main(string[] args)
     }
     else
     {
-        holdCells(levelIndex, levelCells);
+        foreach(cell; levelCells)
+            holdCells(levelIndex, [cell]);
 
         scene.frameBuilder.commandPool.recordOneTimeAndSubmit(*initialBuffer, (buf) {
             uploadCells(levelIndex, buf, levelCells, size_t.max);

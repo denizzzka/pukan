@@ -122,6 +122,7 @@ void placeDrawable(CellIndex!DrawItem index, DrawableByVulkan drawable, in Matri
 private void groupItems(
     DrawItem[] items,
     scope void delegate(DrawableByVulkan drawable, in Matrix4x4f world, scope const(size_t)[] keys) dg,
+    bool boundedOnly = false,
 )
 {
     static struct Group
@@ -136,6 +137,10 @@ private void groupItems(
     foreach(item; items)
     {
         if(item.part == wholePart)
+            continue;
+
+        // A part without bounds belongs to no cell, so no cell may hold or release it
+        if(boundedOnly && !hasBounds(item.bounds))
             continue;
 
         size_t found = groups.length;
@@ -162,9 +167,10 @@ private void groupParts(
     CellIndex!DrawItem index,
     scope const(CellCoord)[] cells,
     scope void delegate(DrawableByVulkan drawable, in Matrix4x4f world, scope const(size_t)[] keys) dg,
+    bool boundedOnly = false,
 )
 {
-    groupItems(index.collect(cells), dg);
+    groupItems(index.collect(cells), dg, boundedOnly);
 }
 
 /// Keeps the parts of the cells loaded; `releaseCells` drops the hold
@@ -172,7 +178,7 @@ void holdCells(CellIndex!DrawItem index, scope const(CellCoord)[] cells)
 {
     groupParts(index, cells, (drawable, world, keys) {
         (cast(PartDrawable) drawable).holdParts(keys);
-    });
+    }, true);
 }
 
 /// Drops the hold the cells had on their parts
@@ -180,7 +186,7 @@ void releaseCells(CellIndex!DrawItem index, scope const(CellCoord)[] cells)
 {
     groupParts(index, cells, (drawable, world, keys) {
         (cast(PartDrawable) drawable).releaseParts(keys);
-    });
+    }, true);
 }
 
 /// Uploads what the held parts of the cells miss, at most `budget` bytes
@@ -203,6 +209,19 @@ size_t uploadCells(
     return used;
 }
 
+/// What one view took from the cells
+struct DrawStats
+{
+    /// Cells the view asked for
+    size_t cells;
+    /// Item placements in those cells, one per cell an item touches
+    size_t placements;
+    /// Parts the drawables recorded
+    size_t parts;
+    /// Whole drawables recorded
+    size_t drawables;
+}
+
 /**
     Records the parts of the given cells, as a view sees them.
 
@@ -210,7 +229,7 @@ size_t uploadCells(
     still batches them; a drawable that records as a whole is recorded once,
     even when the cells hold several of its items.
 */
-void drawCells(
+DrawStats drawCells(
     CellIndex!DrawItem index,
     VkCommandBuffer buf,
     in Matrix4x4f viewProj,
@@ -219,6 +238,10 @@ void drawCells(
     DrawPhase phase = DrawPhase.surface,
 )
 {
+    DrawStats stats;
+    stats.cells = cells.length;
+    stats.placements = index.placementsIn(cells);
+
     auto items = index.visible(cells, viewProj);
 
     foreach(i, item; items)
@@ -240,13 +263,20 @@ void drawCells(
             }
 
         if(!seen)
+        {
             item.drawable.drawingBufferFilling(buf, viewProj * item.world, frameSet, phase);
+            ++stats.drawables;
+        }
     }
 
     // Parts of one drawable go together, so it still batches them
     groupItems(items, (drawable, world, keys) {
+        stats.parts += keys.length;
+
         (cast(PartDrawable) drawable).drawParts(buf, viewProj * world, keys, frameSet, phase);
     });
+
+    return stats;
 }
 
 /// Cells of a grid mapped to the items whose bounds touch them
@@ -445,6 +475,18 @@ final class CellIndex(T)
 
         foreach(index; always)
             result ~= cast(T) items[index];
+
+        return result;
+    }
+
+    /// Item placements in the cells, counting an item once per cell it touches
+    size_t placementsIn(scope const(CellCoord)[] cells) const
+    {
+        size_t result;
+
+        foreach(cell; cells)
+            if(auto found = cell in byCell)
+                result += found.length;
 
         return result;
     }

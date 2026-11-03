@@ -3,7 +3,7 @@ module pukan.godot_scene.scene;
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
-import pukan.graphics.common.misc: Boxf, isVisible, mergePartAabb;
+import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergePartAabb;
 import pukan.graphics.g3d.cell_index: Bounded, Part, PartDrawable, wholePart;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.mesh: mirrors;
@@ -355,6 +355,13 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
         foreach(mesh; meshes)
             mesh.updateDescriptorSetsAndUniformBuffers(device);
 
+        registerParts();
+
+        // A part no cell can hold stays loaded, since no cell will ever release it
+        foreach(record; parts)
+            if(record.mesh !is null && !hasBounds(record.bounds))
+                ++meshRefs[record.mesh];
+
         uploaded = true;
     }
 
@@ -612,7 +619,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                 continue;
 
             foreach(piece; record.mesh.pieces)
-                if(!gpuBuffs[piece].isUploaded)
+                if(pieceRefs[piece]++ == 0 && !gpuBuffs[piece].isUploaded)
                     gpuBuffs[piece].recordUpload(buf);
 
             record.mesh.buildGeometry(gpuBuffs);
@@ -692,7 +699,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
 
             if(--*refs == 0)
             {
-                released ~= record.mesh;
+                // A mesh that never uploaded holds no piece references
+                if(meshReady.get(record.mesh, false))
+                    released ~= record.mesh;
+
                 meshReady.remove(record.mesh);
             }
         }

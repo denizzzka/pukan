@@ -4,7 +4,7 @@ import cell_index = pukan.graphics.g3d.cell_index;
 import dlib.math;
 import std.algorithm: sort;
 import pukan.graphics.common.misc: Boxf, hasBounds, transformAabb;
-import pukan.graphics.g3d.cell_index: CellIndex, DrawItem, placeDrawable;
+import pukan.graphics.g3d.cell_index: CellIndex, DrawItem, DrawStats, placeDrawable;
 import pukan.graphics.g3d.cells: CellCoord, CellGrid;
 import pukan.graphics.g3d.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
@@ -70,7 +70,7 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
 
     /// Records the parts of the cells; a drawable that records as a whole is
     /// drawn once, at the first item of it the cells hold
-    void drawCells(
+    DrawStats drawCells(
         VkCommandBuffer buf,
         in Matrix4x4f viewProj,
         scope const(CellCoord)[] cells,
@@ -78,7 +78,7 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
         DrawPhase phase = DrawPhase.surface,
     )
     {
-        cell_index.drawCells(cellIndex, buf, viewProj, cells, frameSet, phase);
+        return cell_index.drawCells(cellIndex, buf, viewProj, cells, frameSet, phase);
     }
 
     ~this()
