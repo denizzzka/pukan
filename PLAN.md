@@ -781,17 +781,13 @@ Before each slice, read the matching reference named in
   around a list of `StreamingSource`s: each carries a range, a priority and a
   state, the angle to a cell stretches its distance, and the retire delay covers
   the frames in flight. `demo_godot` loads, draws and frees the cells around the
-  camera by default; `--cell-range` sets the distance and `--no-cells` loads
-  every cell at start.
+  camera by default, on one tall layer of square cells like Unreal's runtime
+  hash: it keeps at most 16 cells loading, uploads a byte budget per frame and
+  stalls the body while the camera's cell is still arriving. `--cell-range` sets
+  the distance and `--no-cells` loads every cell at start.
 
   Still open:
 
-  - [ ] The default grid is 2D like Unreal's runtime hash: X and Z around 256 m
-        and Y tall enough for the level, so a source scan walks one layer of
-        cells instead of a cube of mostly empty ones.
-  - [ ] Limits and slow streaming: a cap on cells loading at once and a policy
-        for when loading falls behind (stall or keep the old cells), the way
-        `MaxLoadingLevelStreamingCells` and `Block on Slow Streaming` do.
   - [ ] Floating origin: keep the camera at the origin and shift cell
         transforms, so single-precision positions stay precise far from the
         start.

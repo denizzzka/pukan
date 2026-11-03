@@ -1,7 +1,7 @@
 import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix;
 import pukan;
 import pukan.graphics.g3d.axes: axisVector;
-import pukan.graphics.common.misc: Boxf, trsMatrix;
+import pukan.graphics.common.misc: Boxf, hasBounds, trsMatrix;
 import pukan.gltf.motion_sampler: MotionSampler;
 import pukan.motion_matching.database: Clip, Database, invalidSample;
 import pukan.motion_matching.history: PoseHistory;
@@ -687,7 +687,15 @@ void main(string[] args)
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
 
-    // Nothing streams yet, so the level is one index and every cell exists
+    // A flat grid like Unreal's runtime hash: one tall layer of square cells
+    const levelBounds = godotScene.calcAABB;
+
+    if(hasBounds(levelBounds))
+        scene.cellGrid = CellGrid(
+            Vector3f(64, levelBounds.max.y - levelBounds.min.y + 2, 64),
+            Vector3f(0, levelBounds.min.y, 0),
+        );
+
     scope levelIndex = new CellIndex!DrawItem(scene.cellGrid);
     placeDrawable(levelIndex, godotScene, Matrix4x4f.identity);
     const levelCells = levelIndex.cells;
@@ -917,6 +925,7 @@ void main(string[] args)
 
     // Taken cells upload a byte budget at a time, so a heavy cell never stalls a frame
     enum cellUploadBudget = 1 << 20;
+    enum maxLoadingCells = 16;
     CellCoord[] loadingCells;
 
     uint frameIndex;
@@ -1069,6 +1078,18 @@ void main(string[] args)
                 characterCommand.wishSpeed = characterConfig.maxSpeed;
             }
 
+            // Block on slow streaming: the camera's cell arrives before the body moves
+            bool waitingForCell;
+
+            if(streaming)
+                foreach(cell; loadingCells)
+                    if(cell == scene.cellGrid.of(camera.position))
+                    {
+                        waitingForCell = true;
+                        break;
+                    }
+
+            if(!waitingForCell)
             simulation.step(dt, (tickDt) {
                 mover.step(characterCommand, tickDt);
 
@@ -1268,11 +1289,16 @@ void main(string[] args)
                     cameraSource(cellRange * 1.5f, CellState.loaded),
                 ], frameIndex);
 
-                foreach(cell; residency.take(4))
-                {
-                    holdCells(levelIndex, [cell]);
-                    loadingCells ~= cell;
-                }
+                const freeSlots = loadingCells.length >= maxLoadingCells
+                    ? 0
+                    : maxLoadingCells - loadingCells.length;
+
+                if(freeSlots)
+                    foreach(cell; residency.take(freeSlots))
+                    {
+                        holdCells(levelIndex, [cell]);
+                        loadingCells ~= cell;
+                    }
 
                 size_t budget = cellUploadBudget;
                 CellCoord[] stillLoading;
