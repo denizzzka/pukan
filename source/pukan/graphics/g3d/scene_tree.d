@@ -16,7 +16,7 @@ unittest
 {
     import dlib.math: Matrix4x4f, translationMatrix, Vector3f;
     import pukan.graphics.common.misc: Boxf;
-    import pukan.graphics.g3d.cell_index: Bounded, DrawItem, Spatial;
+    import pukan.graphics.g3d.cell_index: Bounded, DrawItem, Part, PartDrawable;
     import pukan.graphics.g3d.cells: CellCoord, CellGrid;
     import pukan.vulkan.bindings;
     import pukan.vulkan.commands: CommandPool;
@@ -26,6 +26,7 @@ unittest
     static class Stub : DrawableByVulkan, Bounded
     {
         Boxf box;
+        size_t drawn;
 
         void uploadToGPUImmediate(LogicalDevice, CommandPool, scope VkCommandBuffer) {}
 
@@ -36,7 +37,10 @@ unittest
             Matrix4x4f,
             VkDescriptorSet,
             DrawPhase = DrawPhase.surface,
-        ) {}
+        )
+        {
+            ++drawn;
+        }
 
         Boxf localBounds() => box;
 
@@ -44,8 +48,11 @@ unittest
     }
 
     /// Two parts 100 m apart, so one drawable lands in two cells
-    static class Split : DrawableByVulkan, Spatial
+    static class Split : DrawableByVulkan, PartDrawable
     {
+        size_t[] drawnKeys;
+        Matrix4x4f[] drawnTrans;
+
         void uploadToGPUImmediate(LogicalDevice, CommandPool, scope VkCommandBuffer) {}
 
         void refreshBuffers(VkCommandBuffer) {}
@@ -57,12 +64,24 @@ unittest
             DrawPhase = DrawPhase.surface,
         ) {}
 
-        void eachPart(scope void delegate(in Boxf bounds, in Matrix4x4f local) dg)
+        void eachPart(scope void delegate(in Part part) dg)
         {
             const unit = Boxf(Vector3f(-1, -1, -1), Vector3f(1, 1, 1));
 
-            dg(unit, Vector3f(0, 0, 0).translationMatrix);
-            dg(unit, Vector3f(100, 0, 0).translationMatrix);
+            dg(Part(unit, Vector3f(0, 0, 0).translationMatrix, 0));
+            dg(Part(unit, Vector3f(100, 0, 0).translationMatrix, 1));
+        }
+
+        void drawPart(
+            VkCommandBuffer,
+            in Matrix4x4f trans,
+            size_t key,
+            VkDescriptorSet,
+            DrawPhase,
+        )
+        {
+            drawnKeys ~= key;
+            drawnTrans ~= trans;
         }
     }
 
@@ -84,6 +103,11 @@ unittest
     auto unbounded = new Stub;
     tree.addChild(cast(DrawableByVulkan) unbounded);
 
+    // A wide drawable sits in two cells but is recorded once as a whole
+    auto wide = new Stub;
+    wide.box = Boxf(Vector3f(-10, 0, 0), Vector3f(19, 1, 1));
+    tree.addChild(cast(DrawableByVulkan) wide);
+
     tree.rebuildCells(grid);
 
     DrawItem[] itemsAt(CellCoord cell) => tree.cells.collect([cell]);
@@ -101,22 +125,34 @@ unittest
     assert(holds(itemsAt(grid.of(Vector3f(50.5f, 0.5f, 0.5f))), bounded));
 
     // A split drawable places its parts under the same node transform
-    auto near = itemsAt(grid.of(Vector3f(50.5f, 0.5f, 0.5f)));
-    auto far = itemsAt(grid.of(Vector3f(150.5f, 0.5f, 0.5f)));
-
-    assert(holds(near, split), "the first part lands 50 m out");
-    assert(holds(far, split), "the second part lands 150 m out");
+    assert(holds(itemsAt(grid.of(Vector3f(50.5f, 0.5f, 0.5f))), split), "the first part lands 50 m out");
+    assert(holds(itemsAt(grid.of(Vector3f(150.5f, 0.5f, 0.5f))), split), "the second part lands 150 m out");
     assert(!holds(itemsAt(grid.of(Vector3f(100.5f, 0.5f, 0.5f))), split),
         "the split drawable holds no part at 100 m");
 
-    foreach(item; far)
+    // Parts keep the key their drawable reported
+    foreach(item; itemsAt(grid.of(Vector3f(150.5f, 0.5f, 0.5f))))
         if(item.drawable is split)
+        {
+            assert(item.part == 1);
             assert(item.world.a14 == 150, "the part transform carries the node transform");
+        }
 
-    // One unbounded drawable, and nothing else, is visible everywhere
-    assert(tree.cells.alwaysVisible.length == 1);
-    assert(tree.cells.alwaysVisible[0].drawable is unbounded);
+    // A view records the parts of its cells: one part per split item, and the
+    // whole drawables once, even when a cell set holds several of their items
+    const cells = [
+        grid.of(Vector3f(0.5f, 0.5f, 0.5f)),
+        grid.of(Vector3f(10.5f, 0.5f, 0.5f)),
+        grid.of(Vector3f(50.5f, 0.5f, 0.5f)),
+    ];
 
-    // The cell at the origin holds only the always visible drawable
-    assert(itemsAt(grid.of(Vector3f(0, 0, 0))).length == 1);
+    tree.drawCells(VkCommandBuffer.init, Matrix4x4f.identity, cells, VkDescriptorSet.init);
+
+    assert(split.drawnKeys.length == 1, "one split part is in those cells");
+    assert(split.drawnKeys[0] == 0);
+    assert(split.drawnTrans[0].a14 == 50);
+
+    assert(bounded.drawn == 1, "a bounded drawable is recorded once");
+    assert(wide.drawn == 1, "a drawable in two cells is not recorded twice");
+    assert(unbounded.drawn == 1);
 }

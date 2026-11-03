@@ -4,7 +4,7 @@ import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
 import pukan.graphics.common.misc: Boxf, isVisible, mergePartAabb;
-import pukan.graphics.g3d.cell_index: Bounded, Spatial;
+import pukan.graphics.g3d.cell_index: Bounded, Part, PartDrawable, wholePart;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor: BufferPieceOnGPU;
@@ -111,7 +111,7 @@ class GodotNode
 }
 
 /// One loaded Godot scene tree and its GPU resources
-final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWarmup
+final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, PipelineWarmup
 {
     private PbrPipelines pipelines;
     private LogicalDevice device;
@@ -140,14 +140,23 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
     private DrawableByVulkan[] instances;
     private GodotSkin[] skins;
 
-    /// Every part of the scene, registered once so a frame does not walk the nodes
-    private Part[] parts;
+    /// Leaf parts and nested drawables, registered once so a frame walks no nodes
+    private PartRecord[] parts;
+    private NestedDraw[] nestedDraws;
     private bool partsRegistered;
 
-    private struct Part
+    private struct PartRecord
     {
         PbrMesh mesh;
-        DrawableByVulkan instance;
+        DrawableByVulkan nested;
+        size_t nestedKey;
+        Matrix4x4f world;
+        Boxf bounds;
+    }
+
+    private struct NestedDraw
+    {
+        DrawableByVulkan drawable;
         Matrix4x4f world;
     }
 
@@ -261,44 +270,14 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
     /// Bounds for cell placement: a part without bounds still contributes its origin
     Boxf cellBounds() => collectBounds(true);
 
-    void eachPart(scope void delegate(in Boxf bounds, in Matrix4x4f local) dg)
-    {
-        void collect(Matrix4x4f trans, GodotNode node)
-        {
-            if(!node.visible)
-                return;
-
-            trans *= node.local;
-
-            foreach(mesh; node.meshes)
-                dg(mesh.localAABB, trans);
-
-            if(node.instance !is null)
-            {
-                if(auto spatial = cast(Spatial) node.instance)
-                    spatial.eachPart((in Boxf bounds, in Matrix4x4f local) {
-                        dg(bounds, trans * local);
-                    });
-                else if(auto bounded = cast(Bounded) node.instance)
-                    dg(bounded.localBounds, trans);
-                else
-                    dg(Boxf.init, trans);
-            }
-
-            foreach(child; node.children)
-                collect(trans, child);
-        }
-
-        collect(Matrix4x4f.identity, root);
-    }
-
     private Boxf collectBounds(bool byOrigin)
     {
+        registerParts();
+
         Boxf result;
 
-        eachPart((in Boxf bounds, in Matrix4x4f local) {
-            mergePartAabb(result, bounds, local, byOrigin);
-        });
+        foreach(record; parts)
+            mergePartAabb(result, record.bounds, record.world, byOrigin);
 
         return result;
     }
@@ -405,11 +384,34 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
             {
                 debug assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
 
-                parts ~= Part(mesh, null, trans);
+                parts ~= PartRecord(mesh, null, wholePart, trans, mesh.localAABB);
             }
 
             if(node.instance !is null)
-                parts ~= Part(null, node.instance, trans);
+            {
+                nestedDraws ~= NestedDraw(node.instance, trans);
+
+                if(auto perPart = cast(PartDrawable) node.instance)
+                    perPart.eachPart((in Part part) {
+                        parts ~= PartRecord(
+                            nested: node.instance,
+                            nestedKey: part.key,
+                            world: trans * part.local,
+                            bounds: part.bounds,
+                        );
+                    });
+                else
+                {
+                    auto bounded = cast(Bounded) node.instance;
+
+                    parts ~= PartRecord(
+                        nested: node.instance,
+                        nestedKey: wholePart,
+                        world: trans,
+                        bounds: bounded is null ? Boxf.init : bounded.localBounds,
+                    );
+                }
+            }
 
             foreach(child; node.children)
                 collect(trans, child, mirrored);
@@ -436,31 +438,21 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
             float depth;
         }
 
-        static struct InstanceDraw
-        {
-            DrawableByVulkan instance;
-            Matrix4x4f trans;
-        }
-
         MeshDraw[] draws;
-        InstanceDraw[] instancesToDraw;
 
-        foreach(part; parts)
+        foreach(record; parts)
         {
-            if(part.mesh is null)
-            {
-                instancesToDraw ~= InstanceDraw(part.instance, trans * part.world);
+            if(record.mesh is null)
                 continue;
-            }
 
-            const mvp = trans * part.world;
+            const mvp = trans * record.world;
 
             //TODO: cull skinned meshes by their posed bounds
-            if(!part.mesh.hasSkin && !isVisible(part.mesh.localAABB, mvp))
+            if(!record.mesh.hasSkin && !isVisible(record.mesh.localAABB, mvp))
                 continue;
 
             const clip = Vector4f(0, 0, 0, 1) * mvp;
-            draws ~= MeshDraw(part.mesh, mvp, clip.w);
+            draws ~= MeshDraw(record.mesh, mvp, clip.w);
         }
 
         if(phase == DrawPhase.blended)
@@ -500,8 +492,36 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
                 if(matchesPhase(draw.mesh, phase))
                     draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
 
-        foreach(draw; instancesToDraw)
-            draw.instance.drawingBufferFilling(buf, draw.trans, frameSet, phase);
+        foreach(nested; nestedDraws)
+            nested.drawable.drawingBufferFilling(buf, trans * nested.world, frameSet, phase);
+    }
+
+    void eachPart(scope void delegate(in Part part) dg)
+    {
+        registerParts();
+
+        foreach(i, record; parts)
+            dg(Part(record.bounds, record.world, i));
+    }
+
+    void drawPart(
+        VkCommandBuffer buf,
+        in Matrix4x4f trans,
+        size_t key,
+        VkDescriptorSet frameSet,
+        DrawPhase phase,
+    )
+    {
+        registerParts();
+
+        auto record = &parts[key];
+
+        if(record.mesh !is null)
+            record.mesh.draw(buf, selectPipeline(record.mesh, phase), trans, frameSet);
+        else if(record.nestedKey == wholePart)
+            record.nested.drawingBufferFilling(buf, trans, frameSet, phase);
+        else
+            (cast(PartDrawable) record.nested).drawPart(buf, trans, record.nestedKey, frameSet, phase);
     }
 
     private static void destroyInstance(DrawableByVulkan instance)

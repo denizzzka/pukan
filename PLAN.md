@@ -773,7 +773,7 @@ Before each slice, read the matching reference named in
 
   The grid is in: `CellGrid` holds the cell size and the level origin,
   `Scene.cellGrid` owns it, and `SceneTree.rebuildCells` places every part in
-  each cell its transformed bounds touch. Loaded scenes implement `Spatial` and
+  each cell its transformed bounds touch. Loaded scenes implement `PartDrawable` and
   report each mesh with its own transform, so a level lands in cells per object;
   a drawable that reports nothing stays visible from every cell, and a part
   without bounds contributes its origin. `calcAABB` keeps the real extents while
@@ -807,10 +807,10 @@ Before each slice, read the matching reference named in
         scene.
 
 - **Spatial index and GPU-driven draws**
-  - [ ] Cells own the parts of a drawable: `Spatial` reports each part with the
-        key that records it, so a cell can hold a part and a view can ask for
-        the parts of its resident cells. Static scenes register their parts once;
-        animated ones, such as glTF, still update transforms per frame.
+  - [ ] The frame loop draws from the cells: `demo_godot` asks
+        `SceneTree.drawCells` for the cells `Residency.resident` returns. glTF
+        becomes a `PartDrawable`, so an animated model is recorded per part with
+        its node transforms updated each frame, instead of as one whole.
   - [ ] Cull by cost in Unreal's order: distance first, then frustum, then
         occlusion. Cells bound the first step, the index the second.
   - [ ] One index over the loaded cells: a BVH or octree per cell with a flat

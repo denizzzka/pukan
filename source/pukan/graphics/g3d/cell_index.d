@@ -3,7 +3,8 @@ module pukan.graphics.g3d.cell_index;
 import dlib.math: Matrix4x4f, Vector3f;
 import pukan.graphics.common.misc: Boxf, hasBounds;
 import pukan.graphics.g3d.cells: CellCoord, CellGrid;
-import pukan.vulkan.renderpass: DrawableByVulkan;
+import pukan.vulkan.bindings: VkCommandBuffer, VkDescriptorSet;
+import pukan.vulkan.renderpass: DrawableByVulkan, DrawPhase;
 
 /// A drawable that can report its bounds in its own space, so cells can place it
 interface Bounded
@@ -15,19 +16,42 @@ interface Bounded
     Boxf cellBounds();
 }
 
-/// A drawable that places its own parts, so a cell can hold each one
-interface Spatial
+/// One part of a drawable, as a cell holds it
+struct Part
 {
-    /// Reports every part with bounds and transform, both in the drawable's space
-    void eachPart(scope void delegate(in Boxf bounds, in Matrix4x4f local) dg);
+    /// Bounds in the part's own space
+    Boxf bounds;
+    /// Transform in the drawable's space
+    Matrix4x4f local;
+    /// Handle that `drawPart` takes for this part
+    size_t key;
 }
 
-/// One drawable with the transform that places it in the world; a `Spatial`
-/// drawable contributes one item per part
+/// A drawable that places and records its own parts, so a cell can hold each one
+interface PartDrawable
+{
+    /// Reports every part with bounds and transform, both in the drawable's space
+    void eachPart(scope void delegate(in Part part) dg);
+
+    /// Records the part with `trans`, the view-projection times its world transform
+    void drawPart(
+        VkCommandBuffer buf,
+        in Matrix4x4f trans,
+        size_t key,
+        VkDescriptorSet frameSet,
+        DrawPhase phase,
+    );
+}
+
+/// `DrawItem.part` of a drawable that records as a whole
+enum wholePart = size_t.max;
+
+/// One part in the world; `part` is `wholePart` when the drawable records as a whole
 struct DrawItem
 {
     DrawableByVulkan drawable;
     Matrix4x4f world;
+    size_t part = wholePart;
 }
 
 /// Cells of a grid mapped to the items whose bounds touch them

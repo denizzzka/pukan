@@ -3,8 +3,8 @@ module pukan.graphics.g3d.tree.drawable_tree;
 import dlib.math;
 import std.algorithm: sort;
 import pukan.graphics.common.misc: Boxf, hasBounds, partAabb, transformAabb;
-import pukan.graphics.g3d.cell_index: Bounded, CellIndex, DrawItem, Spatial;
-import pukan.graphics.g3d.cells: CellGrid;
+import pukan.graphics.g3d.cell_index: Bounded, CellIndex, DrawItem, Part, PartDrawable, wholePart;
+import pukan.graphics.g3d.cells: CellCoord, CellGrid;
 import pukan.graphics.g3d.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
@@ -54,10 +54,13 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
             {
                 auto drawable = *node.payload.peek!DrawableByVulkan;
 
-                if(auto spatial = cast(Spatial) drawable)
-                    spatial.eachPart((in Boxf bounds, in Matrix4x4f local) {
-                        const world = trans * local;
-                        index.insert(DrawItem(drawable, world), partAabb(bounds, world));
+                if(auto partDrawable = cast(PartDrawable) drawable)
+                    partDrawable.eachPart((in Part part) {
+                        const world = trans * part.local;
+                        index.insert(
+                            DrawItem(drawable, world, part.key),
+                            partAabb(part.bounds, world),
+                        );
                     });
                 else
                 {
@@ -65,7 +68,7 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
                     const local = bounded is null ? Boxf.init : bounded.cellBounds;
 
                     index.insert(
-                        DrawItem(drawable, trans),
+                        DrawItem(drawable, trans, wholePart),
                         hasBounds(local) ? transformAabb(local, trans) : Boxf.init,
                     );
                 }
@@ -84,6 +87,42 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
 
     /// Cells of the last `rebuildCells`; null before the first one
     CellIndex!DrawItem cells() => cellIndex;
+
+    /// Records the parts of the cells; a drawable that records as a whole is
+    /// drawn once, at the first item of it the cells hold
+    void drawCells(
+        VkCommandBuffer buf,
+        in Matrix4x4f viewProj,
+        scope const(CellCoord)[] cells,
+        VkDescriptorSet frameSet,
+        DrawPhase phase = DrawPhase.surface,
+    )
+    {
+        auto items = cellIndex.collect(cells);
+
+        foreach(i, item; items)
+        {
+            if(item.part != wholePart)
+            {
+                (cast(PartDrawable) item.drawable).drawPart(
+                    buf, viewProj * item.world, item.part, frameSet, phase);
+
+                continue;
+            }
+
+            bool seen;
+
+            foreach(j; 0 .. i)
+                if(items[j].drawable is item.drawable)
+                {
+                    seen = true;
+                    break;
+                }
+
+            if(!seen)
+                item.drawable.drawingBufferFilling(buf, viewProj * item.world, frameSet, phase);
+        }
+    }
 
     ~this()
     {
