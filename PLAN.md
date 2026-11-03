@@ -839,8 +839,13 @@ Before each slice, read the matching reference named in
         runs on the CPU, so the numbers wait for a working GPU driver.
 
 - **LOD and HLOD**
-  - [ ] Mesh LOD from authored levels first, then generated ones; pick the level
-        by screen-space error and keep skinned meshes posed at every level.
+
+  A mesh carries a list of index lists, the authored one first, and the draw
+  picks one by its screen-space error, on the CPU and in the cull kernel alike.
+  Generated cluster levels fill the list today; a skinned mesh keeps the
+  authored level, so its pose stays correct.
+  - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
+        Godot importer stores, instead of only from the generated ones.
   - [ ] HLOD: merge distant groups into one proxy per cell, with an impostor for
         the far ring. Build the merged geometry offline per cell, like Unreal's
         HLOD builder, not per frame.
