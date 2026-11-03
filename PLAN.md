@@ -1139,12 +1139,6 @@ rebuild replaces. A `VkObj` never calls the driver from a destructor: it hands
 the handle to a queue that frees it once the frames in flight pass, and an
 owner hands its holders to the same queue.
 
-- [ ] Wrap image views, samplers and framebuffers in `VkObj`, so a destructor
-      stops calling `vkDestroy*` itself. Views are the biggest remaining set of
-      raw handles.
-- [ ] Free command buffers through the release queue instead of a delegate in
-      the frame destructor, which is only safe today because teardown waits
-      for the device to go idle.
 - [ ] Delete the last per-type device registries: pipelines and shaders still
       belong to the device until it dies. Buffers, images and memory free
       themselves now.
