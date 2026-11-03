@@ -65,6 +65,26 @@ final class ResourceOwner(bool threaded = true)
     }
 
     /**
+        Removes `holder` without destroying it, so the caller releases it later.
+
+        Returns: false when this owner does not keep `holder`.
+    */
+    bool forget(Object holder)
+    {
+        lockOwner();
+        scope(exit) unlockOwner();
+
+        foreach(i, held; holders)
+            if(held is holder)
+            {
+                holders = holders[0 .. i] ~ holders[i + 1 .. $];
+                return true;
+            }
+
+        return false;
+    }
+
+    /**
         Destroys the holders taken after `mark`, newest first.
 
         Params:
@@ -210,6 +230,25 @@ unittest
     parent.close();
 
     assert(recorder.ids == [7]);
+}
+
+unittest
+{
+    // A forgotten holder stays alive and leaves the owner untouched
+    auto recorder = new Recorder;
+    auto owner = new ResourceOwner!false("parent");
+    auto probe = new Probe(5, recorder);
+
+    owner.own(probe);
+    assert(owner.forget(probe));
+    assert(owner.length == 0);
+    assert(!owner.forget(probe));
+
+    owner.close();
+    assert(recorder.ids.length == 0);
+
+    destroy(probe);
+    assert(recorder.ids == [5]);
 }
 
 unittest

@@ -21,6 +21,7 @@ enum VkHandleKind: uint
     semaphore,
     fence,
     commandPool,
+    sampler,
     descriptorSetLayout,
     descriptorPool,
 
@@ -77,6 +78,14 @@ template VkHandleInfo(Handle)
         enum createParent = VkParentKind.device;
         enum destroyParent = VkParentKind.device;
         enum kind = VkHandleKind.commandPool;
+    }
+    else static if(is(Handle == VkSampler))
+    {
+        alias CreateInfo = VkSamplerCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.sampler;
     }
     else static if(is(Handle == VkDescriptorSetLayout))
     {
@@ -324,4 +333,5 @@ unittest
     static assert(is(VkHandleInfo!VkDescriptorPool.CreateInfo == VkDescriptorPoolCreateInfo));
     static assert(VkHandleInfo!VkDescriptorPool.kind == VkHandleKind.descriptorPool);
     static assert(VkHandleInfo!VkDescriptorSetLayout.kind == VkHandleKind.descriptorSetLayout);
+    static assert(is(VkHandleInfo!VkSampler.CreateInfo == VkSamplerCreateInfo));
 }

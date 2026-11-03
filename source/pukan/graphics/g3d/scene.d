@@ -20,6 +20,8 @@ import pukan.graphics.g3d.primitives_tree.sphere: SphereRenderer;
 import pukan.graphics.g3d.shadow: SunShadow;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipeline_cache: FilePipelineCacheStore, PipelineCacheStore;
+import pukan.vulkan.resources.ownership: ResourceOwner;
+import pukan.vulkan.resources.vkobj: VkObj;
 import std.uuid: UUID;
 
 class SceneWith(Modules...)
@@ -74,12 +76,15 @@ class SceneWith(Modules...)
 
     /// The sun's shadow map and its cache
     SunShadow sunShadow;
-    private VkSampler resolveSampler;
+    private VkObj!VkSampler resolveSampler;
     private OitResolve oitResolve;
     private DepthResolve depthResolve;
+    /// OIT images of the current swapchain, indexed like its frames
     private OitFrame[] oitFrames;
-    /// Lists of a replaced swapchain, kept until its commands are done
-    private OitFrame[][] retiredOitFrames;
+    /// OIT images of the current swapchain; released before its frame sets go
+    private ResourceOwner!false oitOwner;
+    /// OIT images of a replaced swapchain, kept until its commands are done
+    private ResourceOwner!false[] retiredOitOwners;
     private uint framesSinceOitRetire;
     /// Set after the first frame has waited for the preload queue
     private bool pipelinesReady;
@@ -100,6 +105,11 @@ class SceneWith(Modules...)
     private MemoryBufferMappedToCPU[] lightBufs;
     private InstanceArena[] instanceArenas;
     private CullFrame[] cullFrames;
+
+    /// Scene-lifetime resources; it destroys what it took newest first
+    private ResourceOwner!false sceneOwner;
+    /// What a swapchain rebuild replaces: lists, cull frames, OIT images
+    private ResourceOwner!false screenOwner;
 
     void addPointLight(Vector3f position, Vector3f color, float radius)
     {
@@ -211,6 +221,8 @@ class SceneWith(Modules...)
         VkExtent2D offscreenExtent,
     )
     {
+        sceneOwner = new ResourceOwner!false("scene");
+
         device = dev;
         surface = surf;
         windowSizeChanged = wsc;
@@ -275,7 +287,7 @@ class SceneWith(Modules...)
                 compareEnable: VK_FALSE,
                 unnormalizedCoordinates: VK_FALSE,
             };
-            vkCall(device.device, &samplerInfo, device.alloc, &resolveSampler);
+            resolveSampler = VkObj!VkSampler(device.device, device.alloc, samplerInfo);
         }
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
@@ -319,6 +331,35 @@ class SceneWith(Modules...)
             );
         sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
         cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
+
+        // Registered in the reverse of the destruction order: newest goes first
+        sceneOwner.own(renderPass);
+
+        if(pipelineCacheManager)
+            sceneOwner.own(pipelineCacheManager);
+
+        sceneOwner.own(meshResources);
+        sceneOwner.own(ibl.brdfLut);
+        sceneOwner.own(ibl.prefiltered);
+        sceneOwner.own(ibl.irradiance);
+
+        if(pbrFactory)
+            sceneOwner.own(pbrFactory);
+
+        if(gltfFactory)
+            sceneOwner.own(gltfFactory);
+
+        if(godotFactory)
+            sceneOwner.own(godotFactory);
+
+        sceneOwner.own(frameBuilder);
+        sceneOwner.own(swapChain);
+        sceneOwner.own(oitResolve);
+        sceneOwner.own(depthResolve);
+        sceneOwner.own(sunShadow);
+        sceneOwner.own(background);
+        sceneOwner.own(pipelineFactory);
+        sceneOwner.own(frameAllocator);
     }
 
     ~this()
@@ -331,81 +372,23 @@ class SceneWith(Modules...)
         if(pendingScreenshot)
             destroy(pendingScreenshot);
 
-        // The frame sets sample the OIT images, the shadow map and the IBL textures
-        if(frameAllocator)
-            destroy(frameAllocator);
-
-        // The technique pools sample the material buffer and the fake texture
-        if(pipelineFactory)
-            destroy(pipelineFactory);
-
+        // Asset sets live in the factory pools, so they go before them
         if(gltfFactory)
             gltfFactory.destroyAssets();
 
-        background.destroy;
+        foreach(owner; retiredOitOwners)
+            if(owner)
+                destroy(owner);
 
-        foreach(ref batch; retiredOitFrames)
-            foreach(ref oit; batch)
-                if(oit)
-                    destroy(oit);
+        if(screenOwner)
+            destroy(screenOwner);
 
-        foreach(ref oit; oitFrames)
-            if(oit)
-                destroy(oit);
-
-        foreach(ref buffer; lightBufs)
-            if(buffer)
-                destroy(buffer);
-
-        foreach(ref arena; instanceArenas)
-            if(arena)
-                destroy(arena);
-
-        foreach(ref culled; cullFrames)
-            if(culled)
-                destroy(culled);
-
-        if(sunShadow)
-            destroy(sunShadow);
-
-        if(resolveSampler)
-            vkDestroySampler(device.device, resolveSampler, device.alloc);
-
-        if(depthResolve)
-            destroy(depthResolve);
-
-        if(oitResolve)
-            destroy(oitResolve);
-
-        // swapChain.frames should be destroyed before frameBuider
-        swapChain.destroy;
-        frameBuilder.destroy;
-
-        if(godotFactory)
-            destroy(godotFactory);
-
-        if(gltfFactory)
-            destroy(gltfFactory);
-
-        if(pbrFactory)
-            destroy(pbrFactory);
-
-        if(ibl.brdfLut)
-            destroy(ibl.brdfLut);
-
-        if(ibl.prefiltered)
-            destroy(ibl.prefiltered);
-
-        if(ibl.irradiance)
-            destroy(ibl.irradiance);
-
-        if(meshResources)
-            destroy(meshResources);
-
-        if(pipelineCacheManager)
+        if(sceneOwner)
         {
-            device.pipelineCacheManager = null;
-            destroy(pipelineCacheManager);
+            if(pipelineCacheManager)
+                device.pipelineCacheManager = null;
+
+            destroy(sceneOwner);
         }
     }
 
@@ -424,37 +407,44 @@ class SceneWith(Modules...)
         auto prefiltered = imageInfo(ibl.prefiltered);
         auto brdfLut = imageInfo(ibl.brdfLut);
 
-        if(oitFrames.length)
+        // OIT images outlive the rest of the screen, so a replaced chain keeps them
+        if(oitOwner && oitOwner.length)
         {
-            retiredOitFrames ~= oitFrames;
+            screenOwner.forget(oitOwner);
+            retiredOitOwners ~= oitOwner;
             framesSinceOitRetire = 0;
         }
-        oitFrames = null;
+        oitOwner = null;
 
-        foreach(ref buffer; lightBufs)
-            if(buffer)
-                destroy(buffer);
+        if(screenOwner)
+            destroy(screenOwner);
+        screenOwner = new ResourceOwner!false("screen");
+
+        oitOwner = new ResourceOwner!false("oit");
+        screenOwner.own(oitOwner);
+
         lightBufs.length = swapChain.frames.length;
 
-        foreach(ref arena; instanceArenas)
-            if(arena)
-                destroy(arena);
         instanceArenas.length = swapChain.frames.length;
         foreach(i; 0 .. instanceArenas.length)
+        {
             instanceArenas[i] = new InstanceArena(device);
+            screenOwner.own(instanceArenas[i]);
+        }
 
-        foreach(ref culled; cullFrames)
-            if(culled)
-                destroy(culled);
         cullFrames.length = swapChain.frames.length;
         foreach(i; 0 .. cullFrames.length)
+        {
             cullFrames[i] = new CullFrame(device, pipelineFactory);
+            screenOwner.own(cullFrames[i]);
+        }
 
         sunShadow.recreate(swapChain.frames.length);
 
         foreach(ref frame; swapChain.frames)
             frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
 
+        oitFrames = null;
         oitFrames.length = swapChain.frames.length;
 
         foreach(i, ref frame; swapChain.frames)
@@ -462,6 +452,7 @@ class SceneWith(Modules...)
             auto sceneColor = imageInfo(frame.sceneColor);
 
             lightBufs[i] = device.create!MemoryBufferMappedToCPU(maxLights * Light.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            screenOwner.own(lightBufs[i]);
 
             auto shadowInfo = sunShadow.imageInfo(i);
             auto lightInfo = VkDescriptorBufferInfo(
@@ -471,17 +462,18 @@ class SceneWith(Modules...)
             );
 
             oitFrames[i] = new OitFrame(device, oitResolve.pass, depthResolve.pass, frame.imageView, swapChain.imageExtent);
+            oitOwner.own(oitFrames[i]);
 
             auto oitHeads = oitFrames[i].headsImageInfo;
             auto oitFragments = oitFrames[i].fragmentsInfo;
             auto oitCounter = oitFrames[i].counterInfo;
             auto sceneDepth = oitFrames[i].sceneDepthInfo();
-            sceneDepth.sampler = resolveSampler;
+            sceneDepth.sampler = resolveSampler.vk;
 
             auto depthMS = VkDescriptorImageInfo(
                 imageLayout: VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
                 imageView: frame.depthBuf.depthView,
-                sampler: resolveSampler,
+                sampler: resolveSampler.vk,
             );
 
             foreach(eye; 0 .. 2)
@@ -922,18 +914,17 @@ class SceneWith(Modules...)
     /// Drops a replaced swapchain's lists after its commands have completed
     private void retireOitFrames()
     {
-        if(retiredOitFrames.length == 0)
+        if(retiredOitOwners.length == 0)
             return;
 
         if(++framesSinceOitRetire < SwapChain.oldSwapchainFrames)
             return;
 
-        foreach(ref batch; retiredOitFrames)
-            foreach(ref oit; batch)
-                if(oit)
-                    destroy(oit);
+        foreach(owner; retiredOitOwners)
+            if(owner)
+                destroy(owner);
 
-        retiredOitFrames = null;
+        retiredOitOwners = null;
         framesSinceOitRetire = 0;
     }
 

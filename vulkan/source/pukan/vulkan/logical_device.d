@@ -152,8 +152,8 @@ class LogicalDevice
                 // The instance and its surface outlive their device
                 foreach(kind; [
                     VkHandleKind.semaphore, VkHandleKind.fence,
-                    VkHandleKind.commandPool, VkHandleKind.descriptorSetLayout,
-                    VkHandleKind.descriptorPool,
+                    VkHandleKind.commandPool, VkHandleKind.sampler,
+                    VkHandleKind.descriptorSetLayout, VkHandleKind.descriptorPool,
                 ])
                     assert(liveVkHandles(kind) == 0,
                         "a Vulkan object of kind " ~ kind.to!string ~ " outlived the device");
