@@ -831,11 +831,11 @@ Before each slice, read the matching reference named in
   Cells bound the distance step, each cell's `BoxBvh` answers the frustum and a
   ray, and `demo_godot --pick` reports what a ray hits, so neither a view nor a
   pick walks every part.
-  - [ ] GPU culling: keep the instance list in a storage buffer, cull in a
-        compute shader and draw with `vkCmdDrawIndexedIndirectCount`, so the CPU
-        uploads only the camera and the cell list.
   - [ ] Keep the CPU path as the fallback and as the reference for the GPU
-        results; judge it on 10k, 100k and 1M instances.
+        results; judge it on 10k, 100k and 1M instances. The GPU pass keeps a
+        mesh's instances in a storage buffer, culls them in a compute kernel and
+        draws them with `vkCmdDrawIndexedIndirectCount`; `--no-gpu-cull` keeps
+        the CPU path.
 
 - **LOD and HLOD**
   - [ ] Mesh LOD from authored levels first, then generated ones; pick the level
