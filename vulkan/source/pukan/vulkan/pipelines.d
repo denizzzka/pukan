@@ -21,47 +21,25 @@ debug
 
 package mixin template Pipelines()
 {
-    private VkPipeline[] pipelines;
-    private VkPipelineLayout[] pipelineLayouts;
-
-    /// Registers a pipeline layout to be destroyed after all pipelines
-    void registerPipelineLayout(VkPipelineLayout layout)
-    {
-        synchronized(this)
-            pipelineLayouts ~= layout;
-    }
-
-    private void pipelinesDtor()
-    {
-        foreach(ref p; pipelines)
-            vkDestroyPipeline(this.device, p, this.alloc);
-
-        foreach(layout; pipelineLayouts)
-            vkDestroyPipelineLayout(this.device, layout, this.alloc);
-    }
-
     VkPipeline[] createGraphicsPipelines(
         VkGraphicsPipelineCreateInfo[] infos,
         VkPipelineCache pipelineCache = null,
     )
     out(r; r.length == infos.length)
     {
-        synchronized(this)
-        {
-            size_t prevLen = pipelines.length;
-            pipelines.length += infos.length;
+        VkPipeline[] created;
+        created.length = infos.length;
 
-            vkCreateGraphicsPipelines(
-                this.device,
-                pipelineCache,
-                cast(uint) infos.length,
-                infos.ptr,
-                this.alloc,
-                &pipelines[prevLen]
-            ).vkCheck;
+        vkCreateGraphicsPipelines(
+            this.device,
+            pipelineCache,
+            cast(uint) infos.length,
+            infos.ptr,
+            this.alloc,
+            created.ptr,
+        ).vkCheck;
 
-            return pipelines[prevLen .. $];
-        }
+        return created;
     }
 
     VkPipeline[] createComputePipelines(
@@ -70,22 +48,19 @@ package mixin template Pipelines()
     )
     out(r; r.length == infos.length)
     {
-        synchronized(this)
-        {
-            size_t prevLen = pipelines.length;
-            pipelines.length += infos.length;
+        VkPipeline[] created;
+        created.length = infos.length;
 
-            vkCreateComputePipelines(
-                this.device,
-                pipelineCache,
-                cast(uint) infos.length,
-                infos.ptr,
-                this.alloc,
-                &pipelines[prevLen]
-            ).vkCheck;
+        vkCreateComputePipelines(
+            this.device,
+            pipelineCache,
+            cast(uint) infos.length,
+            infos.ptr,
+            this.alloc,
+            created.ptr,
+        ).vkCheck;
 
-            return pipelines[prevLen .. $];
-        }
+        return created;
     }
 
     /// Creates a driver cache, seeded with a stored blob when one is given
@@ -1036,8 +1011,16 @@ final class PipelineFactory
             if(entry.setLayout == setLayout && entry.pushConstants == pushConstants)
                 return entry.layout;
 
-        auto layout = createPipelineLayout(device, [setLayout, frameSetLayout.layout.vk], pushConstants);
-        device.registerPipelineLayout(layout);
+        auto layoutObj = VkObj!VkPipelineLayout(device.releaseQueue,
+            VkPipelineLayoutCreateInfo(
+                setLayoutCount: 2,
+                pSetLayouts: [setLayout, frameSetLayout.layout.vk].ptr,
+                pushConstantRangeCount: cast(uint) pushConstants.length,
+                pPushConstantRanges: pushConstants.ptr,
+            ));
+
+        auto layout = layoutObj.vk;
+        owner.accept(layoutObj);
 
         pipelineLayoutEntries ~= PipelineLayoutEntry(setLayout, pushConstants.dup, layout);
 
@@ -1053,8 +1036,16 @@ final class PipelineFactory
             if(entry.setLayout == setLayout && entry.pushConstants == pushConstants)
                 return entry.layout;
 
-        auto layout = createPipelineLayout(device, [setLayout], pushConstants);
-        device.registerPipelineLayout(layout);
+        auto layoutObj = VkObj!VkPipelineLayout(device.releaseQueue,
+            VkPipelineLayoutCreateInfo(
+                setLayoutCount: 1,
+                pSetLayouts: &setLayout,
+                pushConstantRangeCount: cast(uint) pushConstants.length,
+                pPushConstantRanges: pushConstants.ptr,
+            ));
+
+        auto layout = layoutObj.vk;
+        owner.accept(layoutObj);
 
         computeLayoutEntries ~= ComputeLayoutEntry(setLayout, pushConstants.dup, layout);
 
@@ -1195,6 +1186,9 @@ final class PipelineFactory
 
         auto pipeline = device.createGraphicsPipelines([pipelineCreateInfo], pipelineCache)[0];
 
+        auto slot = VkObj!VkPipeline(pipeline, device.releaseQueue);
+        owner.accept(slot);
+
         storePipelineCache(identity, pipelineCache);
 
         debug
@@ -1249,6 +1243,9 @@ final class PipelineFactory
         scope(exit) device.destroyPipelineCache(pipelineCache);
 
         auto pipeline = device.createComputePipelines([pipelineCreateInfo], pipelineCache)[0];
+
+        auto slot = VkObj!VkPipeline(pipeline, device.releaseQueue);
+        owner.accept(slot);
 
         storePipelineCache(identity, pipelineCache);
 

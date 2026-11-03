@@ -30,6 +30,8 @@ enum VkHandleKind: uint
     memory,
     descriptorSetLayout,
     descriptorPool,
+    pipeline,
+    pipelineLayout,
 
     count,
 }
@@ -141,6 +143,21 @@ template VkHandleInfo(Handle)
         enum destroyParent = VkParentKind.device;
         enum kind = VkHandleKind.descriptorSetLayout;
     }
+    else static if(is(Handle == VkPipeline))
+    {
+        enum hasCreate = false;
+        enum createParent = VkParentKind.none;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.pipeline;
+    }
+    else static if(is(Handle == VkPipelineLayout))
+    {
+        alias CreateInfo = VkPipelineLayoutCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.pipelineLayout;
+    }
     else static if(is(Handle == VkDescriptorPool))
     {
         alias CreateInfo = VkDescriptorPoolCreateInfo;
@@ -157,11 +174,12 @@ template VkHandleInfo(Handle)
         mixin("alias create = " ~ VkInfoNames!(CreateInfo.stringof).create ~ ";");
         mixin("alias destroy = " ~ VkInfoNames!(CreateInfo.stringof).destroy ~ ";");
     }
-    else
-    {
-        static assert(is(Handle == VkSurfaceKHR));
+    else static if(is(Handle == VkSurfaceKHR))
         alias destroy = vkDestroySurfaceKHR;
-    }
+    else static if(is(Handle == VkPipeline))
+        alias destroy = vkDestroyPipeline;
+    else
+        static assert(false, "no destroy function for " ~ name);
 }
 
 /// Owning RAII wrapper for a single Vulkan handle
