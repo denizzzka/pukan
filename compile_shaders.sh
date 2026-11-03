@@ -71,6 +71,7 @@ glslc ${TGT} -fshader-stage=vertex source/pukan/shaders/checkerboard.vert -o com
 glslc ${TGT} -fshader-stage=frag source/pukan/shaders/checkerboard.frag -o compiled_shaders/checkerboard_frag.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/gemm.comp -o compiled_shaders/gemm.spv
 glslc ${TGT} -fshader-stage=compute source/pukan/shaders/skin_matrices.comp -o compiled_shaders/skin_matrices.spv
+glslc ${TGT} -fshader-stage=compute source/pukan/shaders/instance_cull.comp -o compiled_shaders/instance_cull.spv
 
 # MurmurHash3 x64_128 of every SPIR-V module, little endian, next to the module.
 # The pipeline identity uses these sums instead of the full SPIR-V bytes.

@@ -1,0 +1,70 @@
+#version 460
+
+// Keeps the instances a frustum sees and packs their matrices for an indirect draw
+
+layout(local_size_x = 64) in;
+
+struct Instance
+{
+    mat4 mvp;
+    // Bounds in the part's space; the w of the min marks a part without any
+    vec4 boundsMin;
+    vec4 boundsMax;
+};
+
+layout(binding = 0) readonly buffer Instances
+{
+    Instance instances[];
+};
+
+layout(binding = 1) writeonly buffer Visible
+{
+    mat4 visible[];
+};
+
+// The draw command followed by the number of instances the kernel kept
+layout(binding = 2) buffer DrawArgs
+{
+    uint args[];
+};
+
+layout(push_constant) uniform Push
+{
+    uint instanceOffset;
+    uint visibleOffset;
+    uint argsIndex;
+    uint instanceCount;
+} pc;
+
+// Same test as pukan.graphics.common.misc.isVisible
+bool insideFrustum(in Instance instance)
+{
+    const vec4 center = (instance.boundsMin + instance.boundsMax) * 0.5;
+    const vec3 extent = (instance.boundsMax - instance.boundsMin).xyz * 0.5;
+
+    const vec4 c = instance.mvp * vec4(center.xyz, 1.0);
+    const vec4 e = abs(instance.mvp * vec4(extent, 0.0));
+
+    for(int axis = 0; axis < 3; ++axis)
+        if(c[axis] + c.w + e[axis] + e.w < 0.0 ||
+           c.w - c[axis] + e.w + e[axis] < 0.0)
+            return false;
+
+    return true;
+}
+
+void main()
+{
+    const uint i = gl_GlobalInvocationID.x;
+
+    if(i >= pc.instanceCount)
+        return;
+
+    const Instance instance = instances[pc.instanceOffset + i];
+
+    if(instance.boundsMin.w < 0.5 && !insideFrustum(instance))
+        return;
+
+    const uint slot = atomicAdd(args[pc.argsIndex + 5], 1u);
+    visible[pc.visibleOffset + slot] = instance.mvp;
+}
