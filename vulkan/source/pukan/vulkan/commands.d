@@ -3,6 +3,7 @@ module pukan.vulkan.commands;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers: vkCheck;
 import pukan.vulkan.logical_device: LogicalDevice;
+import pukan.vulkan.resources.release: ReleaseQueue;
 import pukan.vulkan.resources.vkobj: VkObj;
 
 /**
@@ -62,6 +63,8 @@ class CommandPool
         return ret;
     }
 
+
+
     void freeBuffers(VkCommandBuffer[] buffs)
     {
         vkFreeCommandBuffers(device, commandPool.vk, cast(uint) buffs.length, &buffs[0]);
@@ -92,6 +95,32 @@ class CommandPool
         vkResetFences(device, 1, fence.fence.vkPtr).vkCheck;
         device.submitQueue(submitInfo, fence.fence.vk);
         vkWaitForFences(device.device, 1, fence.fence.vkPtr, VK_TRUE, uint.max).vkCheck;
+    }
+}
+
+/// Command buffers of one frame, freed once the frames in flight pass
+final class CommandBuffers
+{
+    private ReleaseQueue queue;
+    private VkCommandPool pool;
+    private VkCommandBuffer[] buffers;
+
+    this(ReleaseQueue queue, VkCommandPool pool, VkCommandBuffer[] buffers)
+    {
+        this.queue = queue;
+        this.pool = pool;
+        this.buffers = buffers;
+    }
+
+    ref VkCommandBuffer opIndex(size_t i) => buffers[i];
+    size_t length() const => buffers.length;
+
+    ~this()
+    {
+        if(queue is null || queue.isClosed || buffers.length == 0)
+            return;
+
+        vkFreeCommandBuffers(queue.device, pool, cast(uint) buffers.length, buffers.ptr);
     }
 }
 

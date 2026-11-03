@@ -78,11 +78,8 @@ auto createFakeTexture1x1(LogicalDevice device)
 {
     auto commandPool = device.createCommandPool();
     auto commandBufs = commandPool.allocateBuffers(1);
-    scope(exit)
-    {
-        commandPool.freeBuffers(commandBufs);
-        destroy(commandPool);
-    }
+    // The pool frees its buffers with it
+    scope(exit) destroy(commandPool);
 
     auto img = createFakeImage1x1(device, commandPool, commandBufs[0]);
 

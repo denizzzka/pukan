@@ -1,6 +1,6 @@
 module pukan.vulkan.frame_builder;
 
-import pukan.vulkan.commands: CommandPool;
+import pukan.vulkan.commands: CommandBuffers, CommandPool;
 import pukan.vulkan.frame_bindings: FrameBindings;
 import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.image: ImageMemory, identityComponentMapping;
@@ -14,7 +14,7 @@ import pukan.vulkan.textures: Texture;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
 import pukan.vulkan.queue;
-import pukan.vulkan.resources.vkobj: OwnedHandles, VkObj;
+import pukan.vulkan.resources.vkobj: VkObj;
 import std.meta: AliasSeq;
 
 // This class should gradually become shared thread-safe
@@ -156,7 +156,7 @@ class Frame
     @property ref VkFramebuffer frameBuffer() => frameBufferObj.vk;
     FrameSet[2] frameSets;
     package SyncFramesInFlight syncPrimitives;
-    private OwnedHandles!VkCommandBuffer _commandBuffer;
+    private CommandBuffers _commandBuffer;
 
     ref VkCommandBuffer commandBuffer() => _commandBuffer[0];
 
@@ -172,9 +172,10 @@ class Frame
         this.fb = fb;
         this.image = image;
         syncPrimitives = new SyncFramesInFlight(fb);
-        _commandBuffer = OwnedHandles!VkCommandBuffer(
+        _commandBuffer = new CommandBuffers(
+            fb.device.releaseQueue,
+            fb.commandPool.commandPool.vk,
             fb.commandPool.allocateBuffers(1),
-            (VkCommandBuffer[] bufs) { fb.commandPool.freeBuffers(bufs); },
         );
 
         imageViewObj = createImageView(fb.device, imageFormat, image);
@@ -231,6 +232,10 @@ class Frame
 
         if(multisampledColor)
             destroy(multisampledColor);
+
+        // The pool outlives the commands that read them, so the queue frees them
+        if(_commandBuffer)
+            fb.device.releaseQueue.retireHolder(_commandBuffer);
     }
 }
 
