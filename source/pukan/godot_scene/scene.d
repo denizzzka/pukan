@@ -1,16 +1,18 @@
 module pukan.godot_scene.scene;
 
-import dlib.math: Matrix4x4f, Vector3f, Vector4f;
+import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
 import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergePartAabb;
-import pukan.graphics.g3d.cell_index: Bounded, CulledParts, Part, PartDrawable, wholePart;
+import pukan.graphics.g3d.cell_index: Bounded, CellIndex, CulledParts, DrawItem, Part, PartDrawable, wholePart;
+import pukan.graphics.g3d.cells: CellCoord;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
-import pukan.graphics.g3d.mesh: mirrors;
-import pukan.graphics.g3d.pbr.accessor: BufferPieceOnGPU;
+import pukan.graphics.g3d.hlod: ProxyPiece, mergeGeometry, readGeometry;
+import pukan.graphics.g3d.mesh: MeshResources, mirrors;
+import pukan.graphics.g3d.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.graphics.g3d.pbr.culling: CullBatch, CullFrame, CullInstance, currentCullFrame;
-import pukan.graphics.g3d.pbr.lod: clipDepth, lodThresholds, pickLevel;
-import pukan.graphics.g3d.pbr.mesh: PbrMesh;
+import pukan.graphics.g3d.pbr.lod: clipDepth, generateLevels, lodThresholds, pickLevel;
+import pukan.graphics.g3d.pbr.mesh: IndicesDescr, MeshGeometry, MeshStreams, PbrMesh;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.physics.shapes: Collider, CollisionShape;
 import pukan.physics.world: CollisionWorld;
@@ -150,10 +152,34 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     private size_t[] allKeys;
     private bool partsRegistered;
 
+    /// What a proxy needs for the attributes a merged piece leaves out
+    private MeshResources resources;
+    /// Merged geometry per cell, built the first time the cell is far
+    private CellProxy[CellCoord] proxies;
+
     /// Counts the parts that hold each mesh; the last one drops its pieces
     private SharedResource!PbrMesh[PbrMesh] meshNodes;
     /// GPU pieces several meshes share; the last holder releases the copy
     private SharedResource!BufferPieceOnGPU[] pieceNodes;
+
+    /**
+        What a far cell draws: one merged mesh per material, over its own pieces.
+
+        TODO: the material descriptor sets come from the scene's allocator, which
+        only dies with the scene, so a released cell leaves them behind.
+    */
+    private final class CellProxy
+    {
+        PbrMesh[] meshes;
+        BufferPieceOnGPU[] pieces;
+
+        ~this()
+        {
+            foreach(ref piece; pieces)
+                if(piece && piece.buffer)
+                    destroy(piece.buffer);
+        }
+    }
 
     private struct PartRecord
     {
@@ -209,6 +235,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         LogicalDevice device,
         DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
+        MeshResources resources,
         GodotNode root,
         PbrMesh[] meshes,
         BufferPieceOnGPU[] gpuBuffs,
@@ -224,6 +251,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         this.device = device;
         this.allocator = allocator;
         this.materialBuffer = materialBuffer;
+        this.resources = resources;
         this.root = root;
         this.meshes = meshes;
         this.gpuBuffs = gpuBuffs;
@@ -237,6 +265,12 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
     ~this()
     {
+        foreach(ref proxy; proxies)
+            if(proxy)
+                destroy(proxy);
+
+        proxies = null;
+
         // The descriptor sets sample the textures and buffers below, so free them first
         if(allocator)
             destroy(allocator);
@@ -842,6 +876,301 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
         if((*node).userCount == 0)
             meshNodes.remove(mesh);
+    }
+
+    /**
+        Merges the static parts of `cell` into one mesh per material.
+
+        A proxy is built once, from what the cell already holds: the CPU side of
+        its pieces, so no decode happens twice. It is drawn instead of the cell's
+        parts, and its index lists carry a coarse level for a distant view.
+
+        Returns: true once the cell has a proxy; false while a mesh of the cell
+        is still waiting for its upload.
+    */
+    bool buildProxy(CellCoord cell, CellIndex!DrawItem index, VkCommandBuffer buf)
+    {
+        registerParts();
+
+        if(cell in proxies)
+            return true;
+
+        static struct Group
+        {
+            PbrMesh source;
+            ProxyPiece[] pieces;
+        }
+
+        Group[] groups;
+        MeshGeometry*[PbrMesh] decoded;
+        const(void[])[][GodotScene] buffersOf;
+        bool complete = true;
+
+        void addPiece(GodotScene owner, PbrMesh mesh, in Matrix4x4f world)
+        {
+            auto geometry = mesh in decoded;
+
+            if(geometry is null)
+            {
+                auto buffers = owner in buffersOf;
+
+                if(buffers is null)
+                {
+                    buffersOf[owner] = owner.cpuBufs();
+                    buffers = owner in buffersOf;
+                }
+
+                auto read = new MeshGeometry;
+                *read = readGeometry(mesh.geometry.vert, *buffers);
+                decoded[mesh] = read;
+                geometry = mesh in decoded;
+
+            }
+
+            size_t found = groups.length;
+
+            foreach(g, group; groups)
+                if(group.source.sameMaterial(mesh))
+                {
+                    found = g;
+                    break;
+                }
+
+            if(found == groups.length)
+                groups ~= Group(mesh);
+
+            groups[found].pieces ~= ProxyPiece(
+                *geometry, world, mesh.frontFace != groups[found].source.frontFace);
+        }
+
+        foreach(item; index.collect([cell]))
+        {
+            // A part the cell does not bound stays out: a proxy stands for a cell
+            if(item.part == wholePart || !hasBounds(item.bounds))
+            {
+                complete = false;
+                continue;
+            }
+
+            collectPieces(this, [item.part], item.world, &addPiece, complete);
+        }
+
+        // A cell with a part the proxy cannot take keeps its parts
+        if(!complete || groups.length == 0)
+            return false;
+
+        auto proxy = new CellProxy;
+        const cellBounds = index.grid.bounds(cell);
+
+        foreach(group; groups)
+        {
+            auto merged = new MeshGeometry;
+            *merged = mergeGeometry(group.pieces, cellBounds);
+
+            if(merged.positions.length == 0)
+                continue;
+
+
+            if(auto mesh = createProxyMesh(proxy, *merged, group.source, buf))
+                proxy.meshes ~= mesh;
+        }
+
+        if(proxy.meshes.length == 0)
+        {
+            destroy(proxy);
+            return false;
+        }
+
+        // The proxy meshes took new material slots, so the buffer carries them
+        materialBuffer.recordUpload(buf);
+
+        proxies[cell] = proxy;
+
+        return true;
+    }
+
+    /// CPU side of this scene's pieces, indexed like the buffers a mesh names
+    private const(void[])[] cpuBufs()
+    {
+        void[][] result;
+        result.length = gpuBuffs.length;
+
+        foreach(i, piece; gpuBuffs)
+            if(piece !is null && piece.buffer !is null)
+                result[i] = piece.buffer.cpuBuf;
+
+        return result;
+    }
+
+    /// Visits the parts behind `keys`, descending into the drawables this scene wraps
+    private void collectPieces(
+        GodotScene owner,
+        scope const(size_t)[] keys,
+        in Matrix4x4f trans,
+        scope void delegate(GodotScene owner, PbrMesh mesh, in Matrix4x4f world) sink,
+        ref bool complete,
+    )
+    {
+        registerParts();
+
+        foreach(key; keys)
+        {
+            ref record = parts[key];
+
+            if(record.mesh !is null)
+            {
+                if(record.mesh.hasSkin || !record.mesh.geometryReady)
+                {
+                    complete = false;
+                    continue;
+                }
+
+                sink(owner, record.mesh, trans * record.world);
+                continue;
+            }
+
+            auto nested = cast(GodotScene) record.nested;
+
+            // A drawable this scene cannot look into keeps its parts
+            if(nested is null)
+            {
+                complete = false;
+                continue;
+            }
+
+            nested.collectPieces(nested, [record.nestedKey], trans * record.base, sink, complete);
+        }
+    }
+
+    /// Draws the cell's merged proxy; false when the cell has none
+    bool drawProxy(
+        VkCommandBuffer buf,
+        CellCoord cell,
+        in Matrix4x4f viewProj,
+        VkDescriptorSet frameSet,
+        DrawPhase phase,
+    )
+    {
+        auto found = cell in proxies;
+
+        if(found is null)
+            return false;
+
+        // The merged positions are in world space, so the view alone places them
+        Matrix4x4f placement = viewProj;
+
+        foreach(mesh; found.meshes)
+        {
+            if(!mesh.geometryReady || !matchesPhase(mesh, phase))
+                continue;
+
+            if(!isVisible(mesh.localAABB, viewProj))
+                continue;
+
+            const level = pickLevel(meshThresholds(mesh, placement), clipDepth(placement));
+
+            mesh.drawBatch(buf, selectPipeline(mesh, phase), [placement], frameSet, level);
+        }
+
+        return true;
+    }
+
+    /// Drops the cell's proxy, freeing the pieces it uploaded
+    void releaseProxy(CellCoord cell)
+    {
+        if((cell in proxies) is null)
+            return;
+
+        proxies.remove(cell);
+    }
+
+    /// Uploads the merged geometry and builds the mesh that draws it
+    private PbrMesh createProxyMesh(
+        ref CellProxy proxy,
+        MeshGeometry geometry,
+        PbrMesh source,
+        VkCommandBuffer buf,
+    )
+    {
+        MeshStreams streams;
+        streams.vertices = addProxyPiece(proxy, geometry.positions, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, buf);
+        streams.normals = addProxyPiece(proxy, geometry.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, buf);
+        streams.tangents = addProxyPiece(proxy, geometry.tangents, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, buf);
+        streams.texCoords = addProxyPiece(proxy, geometry.texCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, buf);
+        streams.colors = addProxyPiece(proxy, geometry.colors, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, buf);
+        streams.aabb = geometry.aabb;
+
+        if(geometry.indices.length)
+            streams.indices = IndicesDescr(
+                addProxyPiece(proxy, geometry.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, buf),
+                VK_INDEX_TYPE_UINT32,
+            );
+
+        auto mesh = new PbrMesh(
+            source.name,
+            streams,
+            allocator,
+            materialBuffer,
+            VkDescriptorImageInfo.init,
+            false,
+            resources.fallbackVertex.buf,
+            resources.identityJointsInfo,
+        );
+
+        // The proxy stands in for the source, so it takes its material as well
+        mesh.copyMaterialFrom(source);
+        mesh.updateDescriptorSetsAndUniformBuffers(device);
+
+        // The merged triangles keep the winding the source mesh draws with
+        mesh.frontFace = source.frontFace;
+
+
+        if(geometry.indices.length)
+        {
+            auto levels = generateLevels(
+                (size_t i) => geometry.positions[i],
+                cast(uint) geometry.positions.length,
+                geometry.indices,
+                geometry.aabb,
+            );
+
+            foreach(level; levels)
+                mesh.geometry.addIndexLevel(
+                    addProxyPiece(proxy, level.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, buf),
+                    VK_INDEX_TYPE_UINT32,
+                    level.error,
+                );
+        }
+
+        mesh.buildGeometry(proxy.pieces);
+        mesh.geometryReady = true;
+
+        return mesh;
+    }
+
+    /// Uploads `data` as one piece of the cell's proxy and returns its accessor
+    private BufAccess addProxyPiece(T)(
+        ref CellProxy proxy,
+        T[] data,
+        VkBufferUsageFlags usage,
+        VkCommandBuffer buf,
+    )
+    {
+        if(data.length == 0)
+            return BufAccess();
+
+        auto piece = new BufferPieceOnGPU;
+        piece.buffer = new TransferBuffer(device, T.sizeof * data.length, usage);
+        (cast(T[]) piece.buffer.cpuBuf)[] = data;
+        piece.recordUpload(buf);
+        proxy.pieces ~= piece;
+
+        return BufAccess(
+            cast(ptrdiff_t) (proxy.pieces.length - 1),
+            0,
+            cast(ubyte) T.sizeof,
+            cast(uint) data.length,
+        );
     }
 
     size_t uploadParts(VkCommandBuffer buf, size_t budget)

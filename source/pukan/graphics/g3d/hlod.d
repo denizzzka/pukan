@@ -1,7 +1,7 @@
 module pukan.graphics.g3d.hlod;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
-import pukan.graphics.common.misc: Boxf, expandAABB;
+import pukan.graphics.common.misc: Boxf, expandAABB, hasBounds;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor: AccessRange, BufAccess;
 import pukan.graphics.g3d.pbr.mesh: MeshGeometry, MeshStreams, Vector4us;
@@ -13,6 +13,8 @@ struct ProxyPiece
     /// Kept by the caller, which owns the pieces the cell loaded
     const(MeshGeometry)* geometry;
     Matrix4x4f transform;
+    /// Set when this piece winds the other way round than the proxy's mesh
+    bool reversed;
 }
 
 /// Reads one vertex stream back from the CPU side of the buffer it points at
@@ -81,12 +83,49 @@ private Vector3f direction(in Vector3f value, in Matrix4x4f transform)
     return Vector3f(moved.x, moved.y, moved.z);
 }
 
+/// Moves a direction and normalizes it; a zero direction stays zero, not NaN
+private Vector3f unitDirection(in Vector3f value, in Matrix4x4f transform)
+{
+    const moved = direction(value, transform);
+    const length = moved.length;
+
+    return length > 0 ? moved / length : moved;
+}
+
 /// Whether a piece can enter a proxy; a skinned one moves with its pose
 private bool mergeable(in MeshGeometry geometry)
 {
     return geometry.positions.length != 0
         && geometry.joints.length == 0
         && geometry.weights.length == 0;
+}
+
+/// Whether the triangle at `at` of `geometry` has its centre inside `clip`
+private bool triangleInside(
+    const(Vector3f)[] positions,
+    size_t vertexBase,
+    in MeshGeometry geometry,
+    bool indexed,
+    size_t at,
+    in Boxf clip,
+)
+{
+    Vector3f centre = Vector3f(0, 0, 0);
+
+    foreach(offset; 0 .. 3)
+    {
+        const index = indexed ? geometry.indices[at + offset] : cast(uint) (at + offset);
+        const local = vertexBase + index;
+
+        if(local >= positions.length)
+            return false;
+
+        centre += positions[local] / 3.0f;
+    }
+
+    return centre.x >= clip.min.x && centre.x <= clip.max.x
+        && centre.y >= clip.min.y && centre.y <= clip.max.y
+        && centre.z >= clip.min.z && centre.z <= clip.max.z;
 }
 
 /**
@@ -99,7 +138,7 @@ private bool mergeable(in MeshGeometry geometry)
     An attribute survives only when some piece carries it; pieces without it
     take a default, so the merged buffers keep one layout.
 */
-MeshGeometry mergeGeometry(scope const(ProxyPiece)[] pieces)
+MeshGeometry mergeGeometry(scope const(ProxyPiece)[] pieces, Boxf clip = Boxf.init)
 {
     MeshGeometry result;
 
@@ -186,7 +225,7 @@ MeshGeometry mergeGeometry(scope const(ProxyPiece)[] pieces)
 
             if(hasNormals)
                 result.normals[vertexBase + i] = i < geometry.normals.length
-                    ? direction(geometry.normals[i], transform).normalized
+                    ? unitDirection(geometry.normals[i], transform)
                     : Vector3f(0, 0, 0);
 
             if(hasTangents)
@@ -194,7 +233,7 @@ MeshGeometry mergeGeometry(scope const(ProxyPiece)[] pieces)
                 if(i < geometry.tangents.length)
                 {
                     const tangent = geometry.tangents[i];
-                    const axis = direction(Vector3f(tangent.x, tangent.y, tangent.z), transform).normalized;
+                    const axis = unitDirection(Vector3f(tangent.x, tangent.y, tangent.z), transform);
                     const sign = mirrored ? -tangent.w : tangent.w;
 
                     result.tangents[vertexBase + i] = Vector4f(axis.x, axis.y, axis.z, sign);
@@ -220,19 +259,29 @@ MeshGeometry mergeGeometry(scope const(ProxyPiece)[] pieces)
         }
 
         // A mirrored transform turns the triangles over, so their winding follows
-        const flip = mirrored && indexCount % 3 == 0;
+        const flip = (mirrored != piece.reversed) && indexCount % 3 == 0;
+        const clipped = hasBounds(clip);
 
-        foreach(i; 0 .. indexCount)
+        for(size_t i; i + 2 < indexCount; i += 3)
         {
-            const index = indexed ? geometry.indices[i] : cast(uint) i;
-            const local = i % 3;
+            // A proxy stands for one cell, so a triangle belongs to the cell its
+            // centre falls in; the neighbours take the rest
+            if(clipped && !triangleInside(result.positions, vertexBase, geometry, indexed, i, clip))
+                continue;
 
-            result.indices[indexBase + i] = cast(uint)(vertexBase + (flip ? index - local + 2 - local : index));
+            foreach(local; 0 .. 3)
+            {
+                const index = indexed ? geometry.indices[i + local] : cast(uint) (i + local);
+
+                result.indices[indexBase] = cast(uint)(vertexBase + (flip ? index - local + 2 - local : index));
+                ++indexBase;
+            }
         }
 
         vertexBase += count;
-        indexBase += indexCount;
     }
+
+    result.indices.length = indexBase;
 
     return result;
 }

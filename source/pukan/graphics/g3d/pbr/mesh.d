@@ -665,6 +665,38 @@ final class PbrMesh : Mesh
         writeMaterial();
     }
 
+    /// Takes the material and the textures of `source`, so both draw alike
+    package(pukan) void copyMaterialFrom(PbrMesh source)
+    {
+        material = source.material;
+        alphaMode = source.alphaMode;
+        doubleSided = source.doubleSided;
+        castShadow = source.castShadow;
+        shadowsOnly = source.shadowsOnly;
+
+        foreach(i; 0 .. materialTextures.length)
+            materialTextures[i] = source.materialTextures[i];
+
+        commitMaterial();
+    }
+
+    /// Whether both meshes draw with the same material and the same textures
+    package(pukan) bool sameMaterial(const PbrMesh other) const
+    {
+        if(other is null || material != other.material || alphaMode != other.alphaMode)
+            return false;
+
+        if(doubleSided != other.doubleSided || hasSkin != other.hasSkin)
+            return false;
+
+        foreach(i; 0 .. materialTextures.length)
+            if(materialTextures[i].imageView != other.materialTextures[i].imageView
+                || materialTextures[i].sampler != other.materialTextures[i].sampler)
+                return false;
+
+        return true;
+    }
+
     void updateDescriptorSetsAndUniformBuffers(LogicalDevice device)
     {
         auto uboInfo = materialInfo();

@@ -382,6 +382,7 @@ void main(string[] args)
     bool noGpuCull;
     float impostorDistance = 160.0f;
     float impostorRange = 256.0f;
+    float proxyDistance;
     string pickOrigin;
     string pickDirection;
 
@@ -409,6 +410,7 @@ void main(string[] args)
         "no-cells", "load every cell at start instead of streaming them", &noCells,
         "no-gpu-cull", "cull the parts of a cell on the CPU instead of the GPU", &noGpuCull,
         "impostor-distance", "draw cells beyond this distance as one captured card, 0 = off", &impostorDistance,
+        "proxy-distance", "merge the parts of cells beyond this distance into one proxy, 0 = off", &proxyDistance,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "pick", "report what a ray from this point hits, x,y,z", &pickOrigin,
         "pick-dir", "ray direction for --pick, x,y,z", &pickDirection,
@@ -1441,6 +1443,7 @@ void main(string[] args)
 
                 foreach(cell; residency.release(frameIndex))
                 {
+                    godotScene.releaseProxy(cell);
                     releaseCells(levelIndex, [cell]);
                     loadingCells = loadingCells.remove!(c => c == cell);
                 }
@@ -1462,6 +1465,7 @@ void main(string[] args)
             // A captured cell draws as one card; the rest keep their parts
             CellCoord[] nearCells;
             CellCoord[] farCells;
+            CellCoord[] proxyCells;
             bool[CellCoord] activeCellsLookup;
 
             foreach(cell; activeCells)
@@ -1470,10 +1474,12 @@ void main(string[] args)
 
                 const bounds = scene.cellGrid.bounds(cell);
                 const center = (bounds.min + bounds.max) * 0.5f;
+                const distance = (center - camera.position).length;
 
-                if(impostors !is null && (center - camera.position).length > impostorDistance
-                    && (cell in cellImpostors))
+                if(impostors !is null && distance > impostorDistance && (cell in cellImpostors))
                     farCells ~= cell;
+                else if(proxyDistance > 0 && distance > proxyDistance)
+                    proxyCells ~= cell;
                 else
                     nearCells ~= cell;
             }
@@ -1499,6 +1505,13 @@ void main(string[] args)
                         frame.frameSets[0].descriptorSet, phase,
                         phase == DrawPhase.blended ? CellCulling.cpu : cellCulling);
 
+                    // A cell beyond the proxy distance draws as one merged mesh
+                    foreach(cell; proxyCells)
+                        if(!godotScene.drawProxy(buf, cell, modelViewProj,
+                            frame.frameSets[0].descriptorSet, phase))
+                            drawCells(levelIndex, buf, modelViewProj, [cell],
+                                frame.frameSets[0].descriptorSet, phase, CellCulling.cpu);
+
                     if(phase == DrawPhase.surface)
                         foreach(cell; farCells)
                             if(auto impostor = cell in cellImpostors)
@@ -1517,11 +1530,21 @@ void main(string[] args)
                 (buf) {
                     drawCells(levelIndex, buf, shadowViewProj, nearCells,
                         frame.frameSets[0].descriptorSet, DrawPhase.shadow, cellCulling);
+
+                    foreach(cell; proxyCells)
+                        if(!godotScene.drawProxy(buf, cell, shadowViewProj,
+                            frame.frameSets[0].descriptorSet, DrawPhase.shadow))
+                            drawCells(levelIndex, buf, shadowViewProj, [cell],
+                                frame.frameSets[0].descriptorSet, DrawPhase.shadow, CellCulling.cpu);
                 },
                 (buf) {
                     capturePendingCells(buf, levelIndex, scene, impostors, cellImpostors,
                         pendingCaptures, camera.position, impostorRange,
                         frame.frameSets[0].descriptorSet);
+
+                    // A proxy is built once per cell, on the first frame it is far
+                    foreach(cell; proxyCells)
+                        godotScene.buildProxy(cell, levelIndex, buf);
 
                     if(cellCulling != CellCulling.gpu)
                         return;

@@ -417,6 +417,7 @@ private final class GodotLoader
             device,
             allocator,
             pbr.resources.materials,
+            pbr.resources,
             root,
             meshes,
             gpuBuffs,
