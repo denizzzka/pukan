@@ -312,7 +312,8 @@ void main(string[] args)
     float nearOption = cameraNear;
     float farOption = cameraFar;
     float speedOption = cameraSpeed;
-    float cellRange;
+    float cellRange = 256.0f;
+    bool noCells;
 
     auto getoptResult = getopt(
         args,
@@ -334,7 +335,8 @@ void main(string[] args)
         "walk", "hold forward, for headless movement tests", &walkForward,
         "fixed-step", "advance one physics tick per frame", &fixedStep,
         "noclip", "ignore collision in character mode", &noclip,
-        "cell-range", "stream cells within this distance in metres; 0 keeps every cell", &cellRange,
+        "cell-range", "stream cells within this distance in metres", &cellRange,
+        "no-cells", "load every cell at start instead of streaming them", &noCells,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
         "debug-capsule", "draw the character collision capsule", &debugCapsule,
         "model", "character model path; defaults to CesiumMan", &modelOption,
@@ -873,11 +875,11 @@ void main(string[] args)
             : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
-    // Cells stream around the camera when a range is given; otherwise they all exist
+    // Cells stream around the camera unless every cell is asked for at once
     auto residency = new Residency(scene.cellGrid);
     residency.framesInFlight = 2;
 
-    const bool streaming = cellRange > 0;
+    const bool streaming = !noCells;
 
     StreamingSource cameraSource(float range, CellState state)
     {

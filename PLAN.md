@@ -780,8 +780,9 @@ Before each slice, read the matching reference named in
   real extents while `cellBounds` adds the origins. `Residency` keeps cells alive
   around a list of `StreamingSource`s: each carries a range, a priority and a
   state, the angle to a cell stretches its distance, and the retire delay covers
-  the frames in flight. `demo_godot --cell-range` loads, draws and frees the
-  cells around the camera; without it every cell loads at start.
+  the frames in flight. `demo_godot` loads, draws and frees the cells around the
+  camera by default; `--cell-range` sets the distance and `--no-cells` loads
+  every cell at start.
 
   Still open:
 
