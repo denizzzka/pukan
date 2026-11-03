@@ -5,6 +5,18 @@ only a suggested grouping.
 
 - [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
       used independently of the rest of `pukan`. Keep module names unchanged.
+- [ ] Split the graphics code out of the flat `pukan.*` modules into
+      `pukan.graphics.g3d`, `pukan.graphics.g2d` and `pukan.graphics.common`,
+      moving the corresponding functions and updating imports, the demos and
+      the `pukan/package.d` re-exports. `pukan.vulkan` stays untouched, and the
+      new packages get no `package.d` files.
+  - [ ] `g3d`, a first pass: `axes`, `background`, `camera`, `camera_controls`,
+        `fly_camera`, `ibl`, `material`, `mesh`, `oit`, `scene`, `scene_tree`,
+        `shadow`, `stereo`, `pbr`, `primitives_tree`, `tree`. Content loaders
+        stay in `pukan.gltf` and `pukan.godot_scene`.
+  - [ ] `g2d`: create the package for the `## 2D` work; no drawing code moves
+        there yet.
+  - [ ] `common`: `misc`, `exceptions`, `screenshot`, `webp`, `zstd`.
 
 ## Open GitHub issues
 
