@@ -800,6 +800,7 @@ class SceneWith(Modules...)
         presentColor(frame);
 
         // Frees what no frame in flight can still reference
+        //TODO: the scene drives this; hang it on frame completion instead
         device.flushRetired(cast(uint) swapChain.frames.length);
     }
 

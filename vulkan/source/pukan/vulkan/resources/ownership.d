@@ -17,6 +17,9 @@ import std.traits: FieldNameTuple;
     An owner that knows a device hands its releases to that device's queue, so
     a group that unloads during a frame waits for the frames in flight.
 
+    TODO: a class field does not own its value, so a parent must call `destroy`
+    on this owner before it drops; make the tree close itself.
+
     `threaded` locks the owner for any thread. The other variant is for one
     thread only and pays for no lock; it checks that in debug.
 */
@@ -104,6 +107,7 @@ final class ResourceOwner(bool threaded = true): OwnerTag
         debug stampFields(holder);
     }
 
+    //TODO: one level deep, and a leak cannot name the owner that missed it
     /// Debug: marks the slots of `holder` with this owner, one level deep
     private void stampFields(T)(T holder)
     {

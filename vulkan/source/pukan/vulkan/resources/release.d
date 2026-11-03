@@ -64,6 +64,7 @@ final class ReleaseQueue
         }
 
         // The queue is full, so the handle goes now rather than never
+        //TODO: a burst can put a handle back in flight; grow instead of freeing
         release(vkDevice, handle, alloc);
     }
 
