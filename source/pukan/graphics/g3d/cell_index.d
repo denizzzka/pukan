@@ -50,11 +50,14 @@ interface PartDrawable
     /// Reports every part once; the keys stay valid for the drawable's life
     void eachPart(scope void delegate(in Part part) dg);
 
-    /// Uploads the parts; the caller holds them until `releaseParts`
-    void loadParts(VkCommandBuffer buf, scope const(size_t)[] keys);
+    /// Keeps the parts loaded; `releaseParts` drops the hold
+    void holdParts(scope const(size_t)[] keys);
 
     /// Drops the caller's hold; resources go when nothing else holds them
     void releaseParts(scope const(size_t)[] keys);
+
+    /// Uploads what the held parts miss, at most `budget` bytes; returns bytes used
+    size_t uploadParts(VkCommandBuffer buf, size_t budget);
 
     /**
         Records the given parts in one batch.
@@ -149,11 +152,11 @@ private void groupParts(
         dg(group.drawable, group.world, group.keys);
 }
 
-/// Uploads the parts of the cells; a drawable that records as a whole loads itself
-void loadCells(CellIndex!DrawItem index, VkCommandBuffer buf, scope const(CellCoord)[] cells)
+/// Keeps the parts of the cells loaded; `releaseCells` drops the hold
+void holdCells(CellIndex!DrawItem index, scope const(CellCoord)[] cells)
 {
     groupParts(index, cells, (drawable, world, keys) {
-        (cast(PartDrawable) drawable).loadParts(buf, keys);
+        (cast(PartDrawable) drawable).holdParts(keys);
     });
 }
 
@@ -163,6 +166,26 @@ void releaseCells(CellIndex!DrawItem index, scope const(CellCoord)[] cells)
     groupParts(index, cells, (drawable, world, keys) {
         (cast(PartDrawable) drawable).releaseParts(keys);
     });
+}
+
+/// Uploads what the held parts of the cells miss, at most `budget` bytes
+size_t uploadCells(
+    CellIndex!DrawItem index,
+    VkCommandBuffer buf,
+    scope const(CellCoord)[] cells,
+    size_t budget,
+)
+{
+    size_t used;
+
+    groupParts(index, cells, (drawable, world, keys) {
+        if(used >= budget)
+            return;
+
+        used += (cast(PartDrawable) drawable).uploadParts(buf, budget - used);
+    });
+
+    return used;
 }
 
 /**

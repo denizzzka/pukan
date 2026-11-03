@@ -545,7 +545,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                 group.drawable.drawingBufferFilling(buf, trans * group.base, frameSet, phase);
     }
 
-    void loadParts(VkCommandBuffer buf, scope const(size_t)[] keys)
+    void holdParts(scope const(size_t)[] keys)
     {
         registerParts();
 
@@ -555,53 +555,99 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
             size_t[] keys;
         }
 
-        PbrMesh[] loaded;
         NestedGroup[] groups;
 
         foreach(key; keys)
         {
             auto record = &parts[key];
 
-            if(record.mesh is null)
+            if(record.mesh !is null)
             {
-                size_t found = groups.length;
-
-                foreach(g, group; groups)
-                    if(group.drawable is record.nested)
-                    {
-                        found = g;
-                        break;
-                    }
-
-                if(found == groups.length)
-                    groups ~= NestedGroup(record.nested);
-
-                groups[found].keys ~= record.nestedKey;
-
+                ++meshRefs[record.mesh];
                 continue;
             }
 
-            if(meshRefs.get(record.mesh, 0) == 0)
-                loaded ~= record.mesh;
+            size_t found = groups.length;
 
-            ++meshRefs[record.mesh];
-        }
+            foreach(g, group; groups)
+                if(group.drawable is record.nested)
+                {
+                    found = g;
+                    break;
+                }
 
-        foreach(mesh; loaded)
-            foreach(piece; mesh.pieces)
-                if(pieceRefs[piece]++ == 0 && !gpuBuffs[piece].isUploaded)
-                    gpuBuffs[piece].recordUpload(buf);
+            if(found == groups.length)
+                groups ~= NestedGroup(record.nested);
 
-        // Handles bake the buffer of the piece, so an upload or a release re-resolves them
-        foreach(mesh; loaded)
-        {
-            mesh.buildGeometry(gpuBuffs);
-            meshReady[mesh] = true;
+            groups[found].keys ~= record.nestedKey;
         }
 
         foreach(group; groups)
             if(auto perPart = cast(PartDrawable) group.drawable)
-                perPart.loadParts(buf, group.keys);
+                perPart.holdParts(group.keys);
+    }
+
+    size_t uploadParts(VkCommandBuffer buf, size_t budget)
+    {
+        registerParts();
+
+        size_t used;
+
+        foreach(record; parts)
+        {
+            if(record.mesh is null || meshReady.get(record.mesh, false))
+                continue;
+
+            if(meshRefs.get(record.mesh, 0) == 0)
+                continue;
+
+            size_t need;
+
+            foreach(piece; record.mesh.pieces)
+                if(!gpuBuffs[piece].isUploaded)
+                    need += gpuBuffs[piece].buffer.length;
+
+            // A mesh larger than the whole budget still uploads alone, so nothing stalls
+            if(used > 0 && used + need > budget)
+                continue;
+
+            foreach(piece; record.mesh.pieces)
+                if(!gpuBuffs[piece].isUploaded)
+                    gpuBuffs[piece].recordUpload(buf);
+
+            record.mesh.buildGeometry(gpuBuffs);
+            meshReady[record.mesh] = true;
+            used += need;
+        }
+
+        DrawableByVulkan[] nested;
+
+        foreach(record; parts)
+            if(record.nested !is null)
+            {
+                bool seen;
+
+                foreach(drawable; nested)
+                    if(drawable is record.nested)
+                    {
+                        seen = true;
+                        break;
+                    }
+
+                if(!seen)
+                    nested ~= record.nested;
+            }
+
+        foreach(drawable; nested)
+        {
+            if(used >= budget)
+                break;
+
+            if(auto perPart = cast(PartDrawable) drawable)
+                used += perPart.uploadParts(buf, budget - used);
+        }
+
+        return used;
     }
 
     void releaseParts(scope const(size_t)[] keys)

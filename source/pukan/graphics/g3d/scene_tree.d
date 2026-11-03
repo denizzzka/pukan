@@ -16,7 +16,7 @@ unittest
 {
     import dlib.math: Matrix4x4f, translationMatrix, Vector3f;
     import pukan.graphics.common.misc: Boxf;
-    import pukan.graphics.g3d.cell_index: Bounded, DrawItem, Part, PartDrawable, loadCells, releaseCells;
+    import pukan.graphics.g3d.cell_index: Bounded, DrawItem, Part, PartDrawable, holdCells, releaseCells, uploadCells;
     import pukan.graphics.g3d.cells: CellCoord, CellGrid;
     import pukan.vulkan.bindings;
     import pukan.vulkan.commands: CommandPool;
@@ -74,7 +74,7 @@ unittest
             dg(Part(unit, Vector3f(100, 0, 0).translationMatrix, 1));
         }
 
-        void loadParts(VkCommandBuffer, scope const(size_t)[] keys)
+        void holdParts(scope const(size_t)[] keys)
         {
             loadedKeys ~= keys;
         }
@@ -83,6 +83,8 @@ unittest
         {
             releasedKeys ~= keys;
         }
+
+        size_t uploadParts(VkCommandBuffer, size_t budget) => 0;
 
         void drawParts(
             VkCommandBuffer,
@@ -174,7 +176,7 @@ unittest
     // Loading and releasing the cells group parts the same way
     const far = grid.of(Vector3f(150.5f, 0.5f, 0.5f));
 
-    loadCells(tree.cells, VkCommandBuffer.init, [far]);
+    holdCells(tree.cells, [far]);
     assert(split.loadedKeys == [1]);
 
     releaseCells(tree.cells, [far]);

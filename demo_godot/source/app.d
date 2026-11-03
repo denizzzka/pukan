@@ -20,7 +20,7 @@ import pukan.graphics.g3d.primitives_tree.lines: LineInstance, LineRenderer;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
-import std.algorithm: max, min;
+import std.algorithm: max, min, remove;
 import std.math: PI, abs, atan2, cos, sin, sqrt;
 import std.exception: enforce;
 import std.getopt: defaultGetoptPrinter, getopt;
@@ -898,15 +898,26 @@ void main(string[] args)
             cameraSource(cellRange * 1.5f, CellState.loaded),
         ], 0);
 
+        scope initialCells = residency.active() ~ residency.take(size_t.max);
+
+        holdCells(levelIndex, initialCells);
+
         scene.frameBuilder.commandPool.recordOneTimeAndSubmit(*initialBuffer, (buf) {
-            loadCells(levelIndex, buf, residency.active());
-            loadCells(levelIndex, buf, residency.take(size_t.max));
+            uploadCells(levelIndex, buf, initialCells, size_t.max);
         });
     }
     else
+    {
+        holdCells(levelIndex, levelCells);
+
         scene.frameBuilder.commandPool.recordOneTimeAndSubmit(*initialBuffer, (buf) {
-            loadCells(levelIndex, buf, levelCells);
+            uploadCells(levelIndex, buf, levelCells, size_t.max);
         });
+    }
+
+    // Taken cells upload a byte budget at a time, so a heavy cell never stalls a frame
+    enum cellUploadBudget = 1 << 20;
+    CellCoord[] loadingCells;
 
     uint frameIndex;
     import core.time: MonoTime;
@@ -1258,10 +1269,37 @@ void main(string[] args)
                 ], frameIndex);
 
                 foreach(cell; residency.take(4))
-                    loadCells(levelIndex, frame.commandBuffer(), [cell]);
+                {
+                    holdCells(levelIndex, [cell]);
+                    loadingCells ~= cell;
+                }
+
+                size_t budget = cellUploadBudget;
+                CellCoord[] stillLoading;
+
+                foreach(cell; loadingCells)
+                {
+                    if(budget == 0)
+                    {
+                        stillLoading ~= cell;
+                        continue;
+                    }
+
+                    const used = uploadCells(levelIndex, frame.commandBuffer(), [cell], budget);
+                    budget -= min(budget, used);
+
+                    // Zero bytes means the cell has everything it needs
+                    if(used > 0)
+                        stillLoading ~= cell;
+                }
+
+                loadingCells = stillLoading;
 
                 foreach(cell; residency.release(frameIndex))
+                {
                     releaseCells(levelIndex, [cell]);
+                    loadingCells = loadingCells.remove!(c => c == cell);
+                }
             }
 
             if(characterModel)

@@ -792,9 +792,6 @@ Before each slice, read the matching reference named in
   - [ ] Limits and slow streaming: a cap on cells loading at once and a policy
         for when loading falls behind (stall or keep the old cells), the way
         `MaxLoadingLevelStreamingCells` and `Block on Slow Streaming` do.
-  - [ ] The streaming budget counts bytes, not cells: one cell with a large
-        mesh or texture now takes a whole frame, so its upload has to spread
-        over frames.
   - [ ] Floating origin: keep the camera at the origin and shift cell
         transforms, so single-precision positions stay precise far from the
         start.
