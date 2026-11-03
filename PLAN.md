@@ -3,16 +3,6 @@
 Checkboxes track open work. Items can be done in any order; the order below is
 only a suggested grouping.
 
-## CI
-
-The workflow in `.github/workflows/ci.yml` fails on GitHub Actions: the run exits
-non-zero and the Vulkan library reports an error on the way out, so the job ends
-on the exit path rather than on a check it makes.
-
-- [ ] Reproduce the run under Xvfb and lavapipe and find what the Vulkan library
-      complains about at exit, then fix the exit or the teardown it reports.
-      Keep the job green only when nothing real is behind the message.
-
 ## Reported bugs
 
 Symptoms as reported, cause unknown; an item stays open until the fixed scene
@@ -712,34 +702,33 @@ cascades and no local-light shadows. Missing:
 
 ## Depth buffer
 
-The scene pass and the sun's shadow map share `DepthBuf.format`,
-`D24_UNORM_S8_UINT`. The stencil bits are unused: every attachment is created
-with `DONT_CARE` and the pipelines keep stencil testing off. Depth precision is
-what makes the truck town windows flicker at distance, and both steps below are
-long-term work.
+Z-fighting is visible: the truck town windows flicker at distance. Reverse Z is
+the industry standard and becomes the default, not an experiment. It also
+permits a far clip plane at infinity, which a projective matrix maps to depth
+zero, so the distance would cost no precision; the finite plane stays for now.
+The scene pass and the sun's shadow map share `DepthBuf.format`; the stencil
+bits are unused, since every attachment is created with `DONT_CARE` and the
+pipelines keep stencil testing off.
 
-- [ ] Switch the depth attachment to `D32_SFLOAT` on its own, keeping the
-      current Z convention. It costs the same 32 bits per sample as the 24-bit
-      format with stencil and drops a stencil the engine never uses. Alone it
-      buys little: float depth keeps its relative precision near 1.0 with a
-      normal projection, so this is groundwork for the next item rather than a
-      fix. Measure the change on the truck town window flicker before keeping
-      it.
-- [ ] Make reverse Z a compile-time choice of the swapchain, or of whichever
-      object owns the presented frame, rather than a project-wide switch: the
-      depth target and the projection rendered into it share one convention,
-      and every pass that reads that target follows it. Keep the current
-      convention as the default and as the fallback for hardware without
-      usable float depth. Flip the projection, the clear depth, every depth
-      compare, the OIT sorting and the `min`/`max` in the resolve, and retune
-      the shadow bias; decide separately whether the sun's shadow map follows
-      or stays conventional. Ship one build per convention rather than a
-      runtime switch, with no two conventions on one target. Check it on the
-      truck town house windows at distance and while the camera turns: the
-      wall and the window decals must stop flickering.
-- [ ] Test both builds on the fixed scene: the truck town windows must stop
-      flickering at distance, and the OIT, transmission and shadow results must
-      match the normal-Z build apart from precision.
+- [ ] `D32_SFLOAT` with reverse Z in the default build. The format costs the
+      same 32 bits per sample as the 24-bit one with stencil, which the engine
+      never uses, and it keeps that precision spread over the whole range
+      instead of piling it up near 1.0 the way normal Z does.
+- [ ] Flip the projection, the clear depth, every depth compare, the OIT sorting
+      and the `min`/`max` in the resolve, and retune the shadow bias. Both
+      targets follow the same convention: the scene pass and the sun's shadow
+      map.
+- [ ] Hold the convention in a compile-time choice of the swapchain, or of
+      whichever object owns the presented frame, rather than a project-wide
+      switch: the depth target and the projection rendered into it share one
+      convention, and every pass that reads that target follows it. Ship one
+      build per convention rather than a runtime switch, with no two
+      conventions on one target.
+- [ ] Keep normal Z as a build of its own through the same choice, for
+      comparison and for hardware without usable float depth.
+- [ ] Test on the fixed scene: the truck town windows must stop flickering at
+      distance and while the camera turns, and OIT, transmission and shadow
+      results must match the normal-Z build apart from precision.
 
 ## Deferred shading
 
