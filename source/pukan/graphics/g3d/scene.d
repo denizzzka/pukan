@@ -810,6 +810,9 @@ class SceneWith(Modules...)
 
         recordPendingScreenshot(frame);
         presentColor(frame);
+
+        // Frees what no frame in flight can still reference
+        device.flushRetired(cast(uint) swapChain.frames.length);
     }
 
     alias SceneDrawCallback = void delegate(ref VkCommandBuffer, DrawPhase phase);

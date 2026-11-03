@@ -32,6 +32,19 @@ class LogicalDevice
     private const(char)*[] enabledExtensions;
     private bool[ImageFormatRequest] supportedImageFormats;
     private Mutex queueMutex;
+
+    /// A handle release queued until no frame in flight can still reference it
+    private struct RetiredRelease
+    {
+        void function(LogicalDevice, void*, VkAllocationCallbacks*) release;
+        void* handle;
+        uint age;
+    }
+
+    /// Filled in place, because a destructor may retire during a collection
+    private RetiredRelease[] retired;
+    private size_t retiredCount;
+    private Mutex retiredMutex;
     /// Optional persistent caches shared by graphics pipelines and compute kernels
     PipelineCacheManager pipelineCacheManager;
 
@@ -41,6 +54,8 @@ class LogicalDevice
         physicalDevice = pd;
         selectedQueueFlags = requiredQueueFlags;
         queueMutex = new Mutex;
+        retiredMutex = new Mutex;
+        retired.length = 4096;
 
         const fqIdxs = pd.findSuitableQueueFamilies(requiredQueueFlags);
         enforce(fqIdxs.length > 0);
@@ -136,12 +151,57 @@ class LogicalDevice
         requireEnabled!Reqs(ctx, entity, file, line);
     }
 
+    /// Queues a release for the next flush that outlives every frame in flight
+    void retire(void function(LogicalDevice, void*, VkAllocationCallbacks*) release, void* handle)
+    {
+        synchronized(retiredMutex)
+        {
+            if(retiredCount < retired.length)
+            {
+                retired[retiredCount++] = RetiredRelease(release, handle);
+                return;
+            }
+        }
+
+        // The queue is full, so the handle goes now rather than never
+        release(this, handle, alloc);
+    }
+
+    /// Runs the queued releases no frame in flight can still reference
+    void flushRetired(uint framesInFlight)
+    {
+        synchronized(retiredMutex)
+        {
+            size_t released;
+
+            while(released < retiredCount)
+            {
+                if(++retired[released].age <= framesInFlight)
+                    break;
+
+                ++released;
+            }
+
+            foreach(i; 0 .. released)
+            {
+                auto entry = retired[i];
+                entry.release(this, entry.handle, alloc);
+            }
+
+            foreach(i; released .. retiredCount)
+                retired[i - released] = retired[i];
+
+            retiredCount -= released;
+        }
+    }
+
     ~this()
     {
         if(device)
         {
-            memoryDtor();
-            imagesDtor();
+            vkDeviceWaitIdle(device);
+            flushRetired(0);
+
             pipelinesDtor();
             shadersDtor();
 

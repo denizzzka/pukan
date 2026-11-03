@@ -4,22 +4,32 @@ import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.helpers: vkCheck;
 import pukan.vulkan.logical_device: LogicalDevice;
 
+private void releaseBuffer(LogicalDevice device, void* handle, VkAllocationCallbacks* alloc)
+{
+    vkDestroyBuffer(device, cast(VkBuffer) handle, alloc);
+}
+
+private void releaseMemory(LogicalDevice device, void* handle, VkAllocationCallbacks* alloc)
+{
+    vkFreeMemory(device, cast(VkDeviceMemory) handle, alloc);
+}
+
 package mixin template Memory()
 {
     import core.atomic: atomicLoad, atomicOp, atomicStore;
-    import lockfree.list: LockFreeList;
 
-    private LockFreeList!VkDeviceMemory deviceMemoryChunks;
     private shared ulong deviceLocalBytes;
     private shared ulong hostVisibleBytes;
     private shared size_t deviceMemoryAllocations;
     private shared ulong uploadedBytesCount;
 
-    auto allocateDeviceMemory(ref VkMemoryAllocateInfo allocInfo)
+    /// Allocates memory the caller frees
+    VkDeviceMemory allocateMemory(ref VkMemoryAllocateInfo allocInfo)
     {
-        return deviceMemoryChunks.insertOne((mem){
-            vkAllocateMemory(this.device, &allocInfo, this.alloc, &mem).vkCheck;
-        });
+        VkDeviceMemory memory;
+        vkAllocateMemory(this.device, &allocInfo, this.alloc, &memory).vkCheck;
+
+        return memory;
     }
 
     void addDeviceMemory(size_t bytes, VkMemoryPropertyFlags flags)
@@ -32,6 +42,16 @@ package mixin template Memory()
             atomicOp!"+="(hostVisibleBytes, cast(ulong) bytes);
     }
 
+    void removeDeviceMemory(size_t bytes, VkMemoryPropertyFlags flags)
+    {
+        atomicOp!"-="(deviceMemoryAllocations, 1);
+
+        if(flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+            atomicOp!"-="(deviceLocalBytes, cast(ulong) bytes);
+        if(flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+            atomicOp!"-="(hostVisibleBytes, cast(ulong) bytes);
+    }
+
     ulong deviceLocalMemoryBytes() const => atomicLoad(deviceLocalBytes);
     ulong hostVisibleMemoryBytes() const => atomicLoad(hostVisibleBytes);
     size_t deviceMemoryAllocationCount() const => atomicLoad(deviceMemoryAllocations);
@@ -40,62 +60,24 @@ package mixin template Memory()
     ulong uploadedBytes() const => atomicLoad(uploadedBytesCount);
     void resetUploadedBytes() { atomicStore(uploadedBytesCount, 0); }
 
-    private LockFreeList!VkBuffer buffers;
-
-    LockFreeList!(VkBuffer).Elem createBuffer(ref VkBufferCreateInfo createInfo)
+    /// Creates a buffer the caller frees
+    VkBuffer createBuffer(ref VkBufferCreateInfo createInfo)
     {
-        return buffers.insertOne((e){
-            vkCreateBuffer(this.device, &createInfo, this.alloc, &e).vkCheck;
-        });
-    }
+        VkBuffer buffer;
+        vkCreateBuffer(this.device, &createInfo, this.alloc, &buffer).vkCheck;
 
-    private LockFreeList!(VkBuffer[]) buffersArrays;
-
-    auto createBuffersArray(/*in*/ VkBufferCreateInfo createInfo, size_t num = 1)
-    {
-        return buffersArrays.insertOne((ref arr){
-            arr.length = num;
-
-            foreach(ref e; arr)
-                vkCreateBuffer(device, cast() &createInfo, alloc, &e).vkCheck;
-
-            scope(failure) destroyBuffers(arr);
-        });
-    }
-
-    private void destroyBuffers(T)(T arr)
-    {
-        foreach(ref e; arr)
-            vkDestroyBuffer(this.device, e, this.alloc);
-    }
-
-    private void memoryDtor()
-    {
-        foreach(arr; buffersArrays)
-            destroyBuffers(arr);
-
-        destroyBuffers(buffers);
-
-        foreach(e; deviceMemoryChunks)
-            vkFreeMemory(this.device, e, this.alloc);
+        return buffer;
     }
 }
 
-import lockfree.list: LockFreeList;
-
-alias MemChunk = LockFreeList!(VkDeviceMemory).Elem;
-alias BufChunk = LockFreeList!(VkBuffer).Elem;
 import pukan.vulkan.bindings;
 
 class MemoryBufferMappedToCPU : MemoryBuffer
 {
-    LogicalDevice device;
     void[] cpuBuf; /// CPU-mapped memory buffer
 
     this(LogicalDevice device, size_t size, VkBufferUsageFlags usageFlags)
     {
-        this.device = device;
-
         VkBufferCreateInfo createInfo = {
             sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             size: size,
@@ -121,7 +103,7 @@ class MemoryBufferMappedToCPU : MemoryBuffer
 //TODO: Incorporate into LogicalDevice by using mixin template?
 class MemoryBuffer : DeviceMemory
 {
-    BufChunk buf;
+    VkBuffer buf;
     alias this = buf;
 
     this(LogicalDevice device, ref VkBufferCreateInfo createInfo, in VkMemoryPropertyFlags propFlags)
@@ -134,6 +116,18 @@ class MemoryBuffer : DeviceMemory
         super(device, memRequirements, propFlags);
 
         vkBindBufferMemory(device, buf, deviceMemory, 0 /*memoryOffset*/).vkCheck;
+    }
+
+    ~this()
+    {
+        if(!buf)
+            return;
+
+        auto dev = device;
+        auto releasing = buf;
+        buf = null;
+
+        dev.retire(&releaseBuffer, cast(void*) releasing);
     }
 
     //TODO: static?
@@ -159,7 +153,10 @@ class MemoryBuffer : DeviceMemory
 
 class DeviceMemory
 {
-    MemChunk deviceMemory;
+    LogicalDevice device;
+    VkDeviceMemory deviceMemory;
+    private size_t allocationSize;
+    private VkMemoryPropertyFlags propFlags;
 
     this(LogicalDevice device, in VkMemoryRequirements memRequirements, in VkMemoryPropertyFlags propFlags)
     {
@@ -169,8 +166,27 @@ class DeviceMemory
             memoryTypeIndex: device.physicalDevice.findMemoryType(memRequirements.memoryTypeBits, propFlags),
         };
 
-        deviceMemory = device.allocateDeviceMemory(allocInfo);
+        this.device = device;
+        this.allocationSize = allocInfo.allocationSize;
+        this.propFlags = propFlags;
+
+        deviceMemory = device.allocateMemory(allocInfo);
         device.addDeviceMemory(allocInfo.allocationSize, propFlags);
+    }
+
+    ~this()
+    {
+        if(deviceMemory == VkDeviceMemory.init)
+            return;
+
+        auto dev = device;
+        auto releasing = deviceMemory;
+        auto bytes = allocationSize;
+        auto flags = propFlags;
+        deviceMemory = VkDeviceMemory.init;
+
+        dev.removeDeviceMemory(bytes, flags);
+        dev.retire(&releaseMemory, cast(void*) releasing);
     }
 }
 

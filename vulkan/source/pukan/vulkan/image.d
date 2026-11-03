@@ -5,21 +5,20 @@ import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: DeviceMemory, MemoryBufferMappedToCPU;
 import pukan.vulkan.requirements: ImageFormatRequest;
 
+private void releaseImage(LogicalDevice device, void* handle, VkAllocationCallbacks* alloc)
+{
+    vkDestroyImage(device, cast(VkImage) handle, alloc);
+}
+
 package mixin template Images()
 {
-    import lockfree.list: LockFreeList;
-
-    private LockFreeList!VkImage images;
-
-    auto createImage(ref VkImageCreateInfo createInfo)
+    /// Creates an image the caller frees
+    VkImage createImage(ref VkImageCreateInfo createInfo)
     {
-        return images.insertOne((e) => vkCall(this.device, &createInfo, this.alloc, &e));
-    }
+        VkImage image;
+        vkCall(this.device, &createInfo, this.alloc, &image);
 
-    private void imagesDtor()
-    {
-        foreach(e; images)
-            vkDestroyImage(this.device, e, this.alloc);
+        return image;
     }
 }
 
@@ -45,6 +44,7 @@ class ImageMemory : DeviceMemory
                 throw new PukanVulkanException(reason);
         }
 
+        this.device = device;
         image = device.createImage(createInfo);
 
         imageExtent = createInfo.extent;
@@ -57,6 +57,18 @@ class ImageMemory : DeviceMemory
         super(device, memRequirements, propFlags);
 
         vkBindImageMemory(device, image, super.deviceMemory, 0 /* memoryOffset */).vkCheck;
+    }
+
+    ~this()
+    {
+        if(!image)
+            return;
+
+        auto dev = device;
+        auto releasing = image;
+        image = null;
+
+        dev.retire(&releaseImage, cast(void*) releasing);
     }
 
     void addPipelineBarrier(
