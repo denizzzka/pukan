@@ -1,7 +1,7 @@
 module pukan.godot_scene.loader;
 
 import dlib.math: Matrix4x4f, Quaternionf, Vector2f, Vector3f, Vector4f, degtorad, scaleMatrix, translationMatrix;
-import material_bindings;
+import pukan.material_bindings;
 import pukan.compressed_texture: CompressedFamily, familySupported, formatSupported;
 import pukan.exceptions: PukanException;
 import pukan.gltf: GlTF;

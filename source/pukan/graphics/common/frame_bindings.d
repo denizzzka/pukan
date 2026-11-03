@@ -1,6 +1,6 @@
 module pukan.graphics.common.frame_bindings;
 
-import frame_bindings;
+import pukan.frame_bindings;
 import pukan.vulkan.bindings;
 import pukan.vulkan.frame_bindings: FrameBindings;
 

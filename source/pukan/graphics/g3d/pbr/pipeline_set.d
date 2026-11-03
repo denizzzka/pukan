@@ -1,7 +1,7 @@
 module pukan.graphics.g3d.pbr.pipeline_set;
 
 import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
-import material_bindings;
+import pukan.material_bindings;
 import pukan.graphics.g3d.pbr.mesh: staticInstanceBinding;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, PbrProfile, pbrGltfActive, pbrGodotActive;
 import pukan.vulkan.bindings;

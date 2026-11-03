@@ -1,7 +1,7 @@
 module pukan.graphics.g3d.pbr.mesh;
 
 import dlib.math;
-import material_bindings;
+import pukan.material_bindings;
 import pukan.graphics.common.misc: Boxf, expandAABB;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.graphics.g3d.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;

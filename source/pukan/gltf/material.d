@@ -1,7 +1,7 @@
 module pukan.gltf.material;
 
 import dlib.math: Vector3f, Vector4f;
-import material_bindings;
+import pukan.material_bindings;
 import pukan.gltf.loader: GltfLoadOptions;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.graphics.g3d.pbr.mesh: PbrMesh;

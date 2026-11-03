@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TGT="--target-env=vulkan1.3"
-INCLUDES="-I source/pukan/shaders"
+INCLUDES="-I source/pukan/shaders -I source/pukan"
 
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/mesh_vertices.glsl -o compiled_shaders/mesh_static_vert.spv
 glslc ${TGT} ${INCLUDES} -DSKINNED -fshader-stage=vertex source/pukan/shaders/mesh_vertices.glsl -o compiled_shaders/mesh_skinned_vert.spv
