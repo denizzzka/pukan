@@ -3,6 +3,28 @@
 Checkboxes track open work. Items can be done in any order; the order below is
 only a suggested grouping.
 
+## CI
+
+The workflow in `.github/workflows/ci.yml` fails on GitHub Actions: the run exits
+non-zero and the Vulkan library reports an error on the way out, so the job ends
+on the exit path rather than on a check it makes.
+
+- [ ] Reproduce the run under Xvfb and lavapipe and find what the Vulkan library
+      complains about at exit, then fix the exit or the teardown it reports.
+      Keep the job green only when nothing real is behind the message.
+
+## Reported bugs
+
+Symptoms as reported, cause unknown; an item stays open until the fixed scene
+shows it gone.
+
+- [ ] `platformer`: the character passes through some corners of vertical walls,
+      and through single wall columns, not only through their corners. It rests
+      on the narrowphase and sweep work in `#### Phase 1: collision world`.
+- [ ] `platformer`: white dots show in the seams of the brown vertical walls
+      while the camera turns. Decide which one it is: a crack between coplanar
+      triangles, depth precision, or a shading alias.
+
 ## Open GitHub issues
 
 - [ ] Resolve the tracker backlog. Discuss each item before starting work.
@@ -514,6 +536,15 @@ rig has to be predictable. glTF 2.0 carries whatever hierarchy the exporter prod
       report a root joint without a translation channel and a bind pose that is neither at
       ground level nor at the pelvis, so a bad export fails at load instead of yielding a
       database that matches nothing.
+
+### Rig mapping
+
+- [ ] glTF node names are not unique and a lookup takes the first match, so a
+      debug build must check that a name resolves to exactly one node and assert
+      otherwise. Write the check in idiomatic D.
+- [ ] Map the bones of a glTF model onto a motion matching rig automatically:
+      their names almost always carry the usual words, which is enough to pair
+      them. Throw an exception when a bone has no counterpart.
 
 ### Database
 
