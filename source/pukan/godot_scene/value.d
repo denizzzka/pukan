@@ -1,7 +1,7 @@
 module pukan.godot_scene.value;
 
 import dlib.math: Matrix4x4f, Quaternionf, Vector2f, Vector2i, Vector3f, Vector3i, Vector4f, Vector4i;
-import pukan.vulkan.exceptions: PukanException;
+import pukan.exceptions: PukanException;
 import pukan.misc: Boxf;
 import std.conv: to;
 import std.variant: Algebraic;

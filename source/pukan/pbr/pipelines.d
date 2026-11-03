@@ -1,6 +1,6 @@
 module pukan.pbr.pipelines;
 
-import pukan.vulkan.exceptions: PukanException;
+import pukan.exceptions: PukanException;
 import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, PipelineKey;
 import pukan.vulkan.renderpass: RenderPass;
 import std.algorithm: canFind;

@@ -1,7 +1,7 @@
 module pukan.screenshot;
 
 import dlib.image: ImageRGBA8, savePNG;
-import pukan.vulkan.exceptions: PukanException;
+import pukan.exceptions: PukanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.image: transitionImageLayout;

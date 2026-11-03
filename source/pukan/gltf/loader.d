@@ -6,7 +6,7 @@ import pukan.pbr.accessor;
 import pukan.gltf.animation;
 import pukan.pbr.pipelines: PbrPipelines;
 import pukan.material: MaterialBuffer;
-import pukan.vulkan.exceptions: PukanException;
+import pukan.exceptions: PukanException;
 import pukan.misc: linearFormat;
 import pukan.vulkan.bindings;
 import pukan.vulkan;

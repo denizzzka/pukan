@@ -1,6 +1,6 @@
 module pukan.vulkan.pipeline_cache;
 
-import pukan.vulkan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanVulkanException;
 import std.algorithm: canFind;
 import std.conv: to;
 import std.digest.sha: SHA256, toHexString;
@@ -162,7 +162,7 @@ align(1) struct PipelineCacheHeader
 }
 
 /// Thrown when a cache record does not match this device or layout
-class PipelineCacheLoadException: PukanException
+class PipelineCacheLoadException: PukanVulkanException
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null) pure @safe
     {

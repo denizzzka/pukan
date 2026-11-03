@@ -2,7 +2,7 @@ module pukan.vulkan.pipelines;
 
 import frame_bindings;
 
-import pukan.vulkan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanVulkanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
@@ -847,7 +847,7 @@ final class PipelineFactory
 
             try
                 cache[instance] = createPipeline(key, renderPass, subpass);
-            catch(PukanException e)
+            catch(PukanVulkanException e)
             {
                 e.msg = "technique " ~ techniqueName(key) ~ ": " ~ e.msg;
                 throw e;

@@ -2,28 +2,16 @@ module pukan.vulkan.exceptions;
 
 import std.conv: to;
 
-class PukanException: Exception
+/// Root of the Pukan exception hierarchy
+abstract class PukanBaseException: Exception
 {
-    this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null) pure @safe
+    protected this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null) pure @safe
     {
         super(msg, file, line, nextInChain);
     }
 }
 
-class PukanExceptionWithCode: PukanException
-{
-    import pukan.vulkan.bindings: VkResult;
-
-    VkResult code;
-
-    this(VkResult code, string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null) pure @safe
-    {
-        super(msg~": "~code.to!string, file, line, nextInChain);
-        this.code = code;
-    }
-}
-
-class PukanVulkanException: PukanException
+class PukanVulkanException: PukanBaseException
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null) pure @safe
     {

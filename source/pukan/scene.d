@@ -1046,7 +1046,7 @@ class SceneWith(Modules...)
 
     void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
     {
-        import pukan.vulkan.exceptions: PukanExceptionWithCode;
+        import pukan.exceptions: PukanExceptionWithCode;
 
         static if(pipelineWarmupEnabled)
         {

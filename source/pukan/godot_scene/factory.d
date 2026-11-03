@@ -1,6 +1,6 @@
 module pukan.godot_scene.factory;
 
-import pukan.vulkan.exceptions: PukanException;
+import pukan.exceptions: PukanException;
 import pukan.godot_scene.loader: GodotLoadOptions, loadGodotScene;
 import pukan.godot_scene.project: loadGodotProjectSettings;
 import pukan.godot_scene.source: PckSource;
