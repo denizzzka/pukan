@@ -312,7 +312,7 @@ void main(string[] args)
     float nearOption = cameraNear;
     float farOption = cameraFar;
     float speedOption = cameraSpeed;
-    float cellRange = 256.0f;
+    float cellRange = 128.0f;
     bool noCells;
 
     auto getoptResult = getopt(
@@ -877,7 +877,7 @@ void main(string[] args)
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     // Cells stream around the camera unless every cell is asked for at once
     auto residency = new Residency(scene.cellGrid);
-    residency.framesInFlight = 2;
+    residency.framesInFlight = cast(uint) scene.swapChain.frames.length;
 
     const bool streaming = !noCells;
 
