@@ -835,7 +835,8 @@ Before each slice, read the matching reference named in
         results; judge it on 10k, 100k and 1M instances. The GPU pass keeps a
         mesh's instances in a storage buffer, culls them in a compute kernel and
         draws them with `vkCmdDrawIndexedIndirectCount`; `--no-gpu-cull` keeps
-        the CPU path.
+        the CPU path. The dev machine falls back to llvmpipe, where the kernel
+        runs on the CPU, so the numbers wait for a working GPU driver.
 
 - **LOD and HLOD**
   - [ ] Mesh LOD from authored levels first, then generated ones; pick the level
