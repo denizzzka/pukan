@@ -450,6 +450,15 @@ Unreal lets an animation own movement for the duration of an action: a dash, a
 knockback hit or a scripted move. The movement step still resolves collision, but the
 animation delta replaces the usual input and physics velocity for that step.
 
+- [ ] `isRootMotion`: report whether a clip moves the character in world space,
+      using the node `MotionSampler` treats as the root (schema root bone, else
+      the first joint of the first skin, else the scene root). Compare the first
+      and last keyframes of its translation track; ignore tracks that return to
+      the start and net displacements below a small threshold, so body bob and
+      constant tracks do not count. Fixtures: `Fox/Walk` (loops back),
+      `CesiumMan`, `AnimatedCube` and `platformer/enemy` (constant `MASTER`
+      translation) stay in place, while `motion/UAL1_Standard_RM.glb` carries
+      both, `Crouch_Fwd_Loop` moves 1.5 m and `Crouch_Idle_Loop` does not.
 - [ ] Extract the root bone delta per animation step from glTF and Godot animation
       tracks; sample it on the CPU for movement while skinning stays on the GPU.
 - [ ] `RootMotionMode`: `ignore`, `additive` and `override`. `additive` adds the delta
