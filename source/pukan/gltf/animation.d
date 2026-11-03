@@ -134,7 +134,6 @@ package struct AnimationSupport
         foreach(const scope chan; currAnimation.channels)
         {
             const sampler = currAnimation.samplers[chan.samplerIdx];
-            assert(sampler.interpolation == InterpolationType.LINEAR, "TODO: support all interpolation types");
 
             float prevTime;
             float nextTime;
@@ -143,34 +142,53 @@ package struct AnimationSupport
             const prevIdx = sampler.getSampleByTime(content, currTime, prevTime, nextTime, loopTime);
             const nextIdx = prevIdx + 1;
 
-            const float interpRatio = (loopTime - prevTime) / (nextTime - prevTime);
+            const float span = nextTime - prevTime;
+            const float interpRatio = span > 0 ? (loopTime - prevTime) / span : 0;
             auto currTrans = &perNodeTranslations[chan.targetNode];
 
-            if (chan.targetPath == TRSType.translation)
+            if (chan.targetPath == TRSType.translation || chan.targetPath == TRSType.scale)
             {
                 const output = content.rangify!Vector3f(sampler.outputAcc);
-                const Vector3f prevTrans = output[prevIdx];
-                const Vector3f nextTrans = output[nextIdx];
-                currTrans.transl = lerp(prevTrans, nextTrans, interpRatio);
+
+                const Vector3f value = sampler.interpolation == InterpolationType.STEP
+                    ? output[prevIdx]
+                    : (sampler.interpolation == InterpolationType.CUBICSPLINE
+                        ? hermite(output[3 * prevIdx + 1], output[3 * nextIdx + 1],
+                            output[3 * prevIdx + 2], output[3 * nextIdx], interpRatio, span)
+                        : lerp(output[prevIdx], output[nextIdx], interpRatio));
+
+                if (chan.targetPath == TRSType.translation)
+                    currTrans.transl = value;
+                else
+                    currTrans.scale = value;
             }
             else if (chan.targetPath == TRSType.rotation)
             {
                 const output = content.rangify!Quaternionf(sampler.outputAcc);
-                const Quaternionf prevRot = output[prevIdx];
-                const Quaternionf nextRot = output[nextIdx];
-                // slerp: spherical linear interpolation:
-                currTrans.rot = slerp(prevRot, nextRot, interpRatio);
-            }
-            else if (chan.targetPath == TRSType.scale)
-            {
-                const output = content.rangify!Vector3f(sampler.outputAcc);
-                const Vector3f prevScale = output[prevIdx];
-                const Vector3f nextScale = output[nextIdx];
 
-                currTrans.scale = lerp(prevScale, nextScale, interpRatio);
+                const Quaternionf value = sampler.interpolation == InterpolationType.STEP
+                    ? output[prevIdx]
+                    : (sampler.interpolation == InterpolationType.CUBICSPLINE
+                        ? hermite(output[3 * prevIdx + 1], output[3 * nextIdx + 1],
+                            output[3 * prevIdx + 2], output[3 * nextIdx], interpRatio, span).normalized
+                        : slerp(output[prevIdx], output[nextIdx], interpRatio));
+
+                currTrans.rot = value;
             }
             else
                 assert(0);
         }
+    }
+
+    /// Cubic Hermite curve; `span` is the time between the two keys.
+    private static T hermite(T)(T fromValue, T toValue, T fromTangent, T toTangent, float t, float span)
+    {
+        const float t2 = t * t;
+        const float t3 = t2 * t;
+
+        return fromValue * (2 * t3 - 3 * t2 + 1)
+            + fromTangent * (span * (t3 - 2 * t2 + t))
+            + toValue * (-2 * t3 + 3 * t2)
+            + toTangent * (span * (t3 - t2));
     }
 }
