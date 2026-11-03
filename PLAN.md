@@ -758,11 +758,14 @@ one static BVH, lights are a single 16-entry frame list, and positions are
 single precision. A world that cannot be loaded at once needs all of these to
 change together, so the slices below share the cell grid as their unit.
 
-Order: coordinates and the cell partition first, because everything else
-addresses cells; then loading and unloading under a per-frame budget; then the
-spatial index and GPU-driven draws; then LOD, occlusion, shadows and collision
-streaming on top. Every slice is measured at cell borders, where its cost shows
-up. Before each slice, read the matching reference named in
+Order: the cell partition first, because everything else addresses cells; then
+the flat part list a drawable registers once, because both streaming and the
+draw list work on parts; then loading and unloading around the camera; then
+per-view culling and GPU-driven draws; then LOD, occlusion, shadows and
+collision streaming on top. Cells decide what exists, culling decides what is
+drawn, so a cell can never be unloaded while a recorded frame still holds one of
+its parts. Every slice is measured at cell borders, where its cost shows up.
+Before each slice, read the matching reference named in
 `## Look at the dependencies first`: `dagon.openworld` for the cell grid,
 `dagon.collision.bvh` for the index and `dagon.graphics.lod` for LOD.
 
@@ -779,6 +782,19 @@ up. Before each slice, read the matching reference named in
 
   Still open:
 
+  - [ ] Cells are axis-aligned boxes sized per axis, so the default grid can be
+        2D like Unreal's runtime hash: X and Z at 256 m, Y covering the level.
+        A 3D grid stays available for stacked levels.
+  - [ ] Streaming sources: positions with a loading radius, a priority and a
+        target state (loaded or active). The camera is one; a teleport adds a
+        temporary source at the destination. A cell takes the highest priority
+        and state among the sources that reach it.
+  - [ ] Cell importance is the distance to the source plus the angle between the
+        source's forward and the direction to the cell, so what lies ahead loads
+        first.
+  - [ ] Limits and slow streaming: a cap on cells loading at once and a policy
+        for when loading falls behind (stall or keep the old cells), the way
+        `MaxLoadingLevelStreamingCells` and `Block on Slow Streaming` do.
   - [ ] Content ownership per cell: a loader takes the cells `Residency.take`
         hands out, uploads them under the per-frame budget and frees a cell's
         resources when `Residency.release` returns it; the retire delay covers
@@ -791,6 +807,12 @@ up. Before each slice, read the matching reference named in
         scene.
 
 - **Spatial index and GPU-driven draws**
+  - [ ] Register the flat part list once: `Spatial` reports every part with its
+        key, transform and bounds, the drawable records from that list instead
+        of walking its nodes every frame, and cells own the parts. A view asks
+        for the parts of its resident cells.
+  - [ ] Cull by cost in Unreal's order: distance first, then frustum, then
+        occlusion. Cells bound the first step, the index the second.
   - [ ] One index over the loaded cells: a BVH or octree per cell with a flat
         top index over cell bounds, shared by frustum, shadow and picking
         queries.
@@ -804,7 +826,8 @@ up. Before each slice, read the matching reference named in
   - [ ] Mesh LOD from authored levels first, then generated ones; pick the level
         by screen-space error and keep skinned meshes posed at every level.
   - [ ] HLOD: merge distant groups into one proxy per cell, with an impostor for
-        the far ring. Build the merged geometry once per cell, not per frame.
+        the far ring. Build the merged geometry offline per cell, like Unreal's
+        HLOD builder, not per frame.
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
@@ -851,6 +874,9 @@ up. Before each slice, read the matching reference named in
         compile) landed on the main thread.
   - [ ] Prefetch seconds before the border, spread actor and collider creation
         over frames, and move mesh loading and physics builds to worker threads.
+  - [ ] Counters in the spirit of `stat initviews`: parts processed, culled by
+        cell, culled by frustum, drawn; cells loaded, pending and retired; the
+        time each step took.
 
 ## Data layout and throughput
 
