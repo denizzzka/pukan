@@ -302,9 +302,9 @@ only and never walks the scene tree.
 - [ ] A moved kinematic collider refits its leaf or rebuilds the tree.
 - [ ] `RayHit` and `ShapeCastHit` share time of impact, point, normal, penetration depth,
       collider and node.
-- [ ] Compare `pukan.physics.bvh` with `dagon.collision.bvh` (SAH, generic, with
-      box, sphere and ray traversal) before growing it further; keep ours only
-      where the Vulkan no-allocation and streaming rebuild demands differ.
+- [ ] Compare `pukan.bvh` with `dagon.collision.bvh` (SAH, generic, with box,
+      sphere and ray traversal) before growing it further; keep ours only where
+      the streaming rebuild and the per-cell trees demand differ.
 - [ ] Narrowphase: analytic plane and sphere, segment-triangle distance for a capsule
       against a mesh, GJK distance for separated convex pairs plus conservative
       advancement; `intrMPR` from `dlib.geometry` supplies the penetration normal when

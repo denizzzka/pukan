@@ -1,49 +1,41 @@
-/**
- * Static bounding volume hierarchy over primitive bounds: nested boxes let a
- * ray or a swept capsule skip most primitives. Built once after the level loads.
- */
 module pukan.physics.bvh;
 
 import dlib.math: Vector3f;
+import bvh = pukan.bvh;
 import pukan.physics.narrowphase: rayAabb;
 import pukan.physics.shapes: Aabb;
-import std.algorithm: sort;
 
-private struct BvhNode
+/// Boxes of the collision world, as the hierarchy build and its traversals read them
+private struct AabbOps
 {
-    Aabb bounds;
-    uint start;
-    uint count;
-    uint left;
-    uint right;
-}
-
-/// Static bounding volume hierarchy over primitive bounds
-final class Bvh
-{
-    private BvhNode[] nodes;
-    private uint[] order;
-    private Aabb[] bounds;
-
-    void build(Aabb[] primitiveBounds)
+    static void merge(ref Aabb into, in Aabb box)
     {
-        bounds = primitiveBounds;
-        order.length = primitiveBounds.length;
-
-        foreach(i; 0 .. order.length)
-            order[i] = cast(uint) i;
-
-        nodes = null;
-
-        if(order.length)
-            buildNode(0, cast(uint) order.length);
+        into = into.unionWith(box);
     }
 
-    /// Visits every primitive whose bounds overlap `box`
-    void query(in Aabb box, scope void delegate(uint primitive) visit) const
+    static Vector3f center(in Aabb box)
     {
-        if(nodes.length)
-            queryNode(0, box, visit);
+        return box.center;
+    }
+
+    static float rayT(in Aabb box, in Vector3f origin, in Vector3f direction, float maxT)
+    {
+        float t;
+
+        return rayAabb(box, origin, direction, maxT, t) ? t : float.nan;
+    }
+}
+
+/**
+    Static bounding volume hierarchy over primitive bounds: nested boxes let a
+    ray or a swept capsule skip most primitives. Built once after the level loads.
+*/
+final class Bvh : bvh.Bvh!(Aabb, AabbOps)
+{
+    /// Visits every primitive whose bounds overlap `box`
+    void query(in Aabb box, scope void delegate(size_t primitive) visit) const
+    {
+        super.query((in Aabb bounds) => bounds.overlaps(box), visit);
     }
 
     /// Visits every primitive whose bounds the ray enters within `maxT`
@@ -51,98 +43,10 @@ final class Bvh
         in Vector3f origin,
         in Vector3f direction,
         float maxT,
-        scope void delegate(uint primitive) visit,
+        scope void delegate(size_t primitive) visit,
     ) const
     {
-        if(nodes.length)
-            raycastNode(0, origin, direction, maxT, visit);
-    }
-
-    private uint buildNode(uint start, uint count)
-    {
-        const index = cast(uint) nodes.length;
-        nodes ~= BvhNode();
-
-        Aabb nodeBounds;
-        Aabb centroids;
-
-        foreach(i; start .. start + count)
-        {
-            const primitive = order[i];
-            nodeBounds = nodeBounds.unionWith(bounds[primitive]);
-            centroids = centroids.unionWithPoint(bounds[primitive].center);
-        }
-
-        nodes[index].bounds = nodeBounds;
-
-        if(count <= 4)
-        {
-            nodes[index].start = start;
-            nodes[index].count = count;
-            return index;
-        }
-
-        const extent = centroids.size;
-        const axis = extent.x > extent.y
-            ? (extent.x > extent.z ? 0 : 2)
-            : (extent.y > extent.z ? 1 : 2);
-
-        order[start .. start + count].sort!((a, b) =>
-            bounds[a].center[axis] < bounds[b].center[axis]);
-
-        const middle = start + count / 2;
-        const left = buildNode(start, middle - start);
-        const right = buildNode(middle, start + count - middle);
-
-        nodes[index].left = left;
-        nodes[index].right = right;
-
-        return index;
-    }
-
-    private void queryNode(uint index, in Aabb box, scope void delegate(uint) visit) const
-    {
-        const node = nodes[index];
-
-        if(!node.bounds.overlaps(box))
-            return;
-
-        if(node.count)
-        {
-            foreach(i; node.start .. node.start + node.count)
-                visit(order[i]);
-
-            return;
-        }
-
-        queryNode(node.left, box, visit);
-        queryNode(node.right, box, visit);
-    }
-
-    private void raycastNode(
-        uint index,
-        in Vector3f origin,
-        in Vector3f direction,
-        float maxT,
-        scope void delegate(uint) visit,
-    ) const
-    {
-        const node = nodes[index];
-        float t;
-
-        if(!rayAabb(node.bounds, origin, direction, maxT, t))
-            return;
-
-        if(node.count)
-        {
-            foreach(i; node.start .. node.start + node.count)
-                visit(order[i]);
-
-            return;
-        }
-
-        raycastNode(node.left, origin, direction, maxT, visit);
-        raycastNode(node.right, origin, direction, maxT, visit);
+        super.raycast(origin, direction, maxT, (primitive, distance) => visit(primitive));
     }
 }
 
@@ -161,7 +65,7 @@ unittest
 
     const queryBox = Aabb(Vector3f(-0.5f, -0.5f, -0.5f), Vector3f(4.5f, 0.5f, 0.5f));
 
-    uint[] found;
+    size_t[] found;
     bvh.query(queryBox, (primitive) {
         if(boxes[primitive].overlaps(queryBox))
             found ~= primitive;
