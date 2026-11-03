@@ -1104,22 +1104,52 @@ every blob in the binary is wrong when each is used once per process, and
       `VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT` in the
       preloader to tell a cache hit from a compile without paying for it.
 
-## Descriptor lifetime
+## Vk object ownership
 
-The device tracks every descriptor pool it hands out and destroys it with the
-device. A scene must free its sets before the textures and buffers they sample,
-so `DescriptorAllocator` destroys its own pools at scene teardown and creates
-them through `createDetachedDescriptorPool`, outside the device's tracking. Two
-ownership rules now live side by side: a pool is either owned by the device or
-by the allocator, and the allocator repeats the pool-size computation that
-`createDescriptorPool` already does.
+A Vulkan handle is a value: copying it transfers nothing. Ownership lives in
+the objects that hold handles, never in the handle. Two mechanisms cover every
+case, and the choice is a property of the slot, not of the resource type:
 
-- [ ] Give a pool one owner. Either drop the device tracking of pools and let
-      every creator free its own, or add a removal path to the device registry,
-      like `destroyPipeline` below, so an owner can hand a pool back before the
-      device goes away.
-- [ ] Keep one place that turns layout bindings into pool sizes, shared by the
-      tracked and the detached path, so the two cannot drift apart.
+- `VkObj!Handle` is a move-only struct for a slot that one object owns and
+  replaces in place. Its destructor releases the handle, `release()` frees it
+  early and keeps the slot, and a struct field is destroyed in reverse
+  declaration order, so a view declared after its image goes first.
+- `ResourceOwner` is a class for a group created and released together: a
+  scene, a frame set, a cell. It keeps its holders alive and calls `destroy` on
+  them newest first; `mark` and `releaseTo` unload a cell in one call.
+  `ResourceOwner!false` drops the lock and the thread check for a subtree that
+  one worker fills before handing it over.
+
+Rules, and the debug nets that hold them:
+
+- A stored handle is borrowed. Only the owning holder frees it, and a borrower
+  must live inside that holder's lifetime. `VkObj` zeroes the handle on release
+  and asserts on use, so a stale holder cannot pass a dead handle silently.
+- `own` means exclusive. A shared mesh or texture stays in the longer-lived
+  owner (asset, scene) and cells take counted references, as `meshRefs` and
+  `pieceRefs` do today.
+- Debug builds count live handles per kind. Every count must be zero at device
+  teardown; a non-zero count names a holder that nobody adopted.
+
+Where it stands: `pukan.vulkan.resources.ownership` and
+`pukan.vulkan.resources.vkobj` hold the two mechanisms and their unit tests.
+Nothing is migrated yet.
+
+- [ ] Move the descriptor pools and set layouts onto the owner of the technique
+      that declares them; delete the device's pool registry and the detached
+      pool path, and keep one place that turns layout bindings into pool sizes.
+- [ ] Move the scene, its frame sets, the OIT frames, the cull frames and the
+      impostor targets onto scene-local owners, then delete the per-type device
+      registries one type at a time.
+- [ ] Add the deferred release queue: at runtime `releaseTo` hands holders to
+      the frame that last used them and destroys them when its fence signals.
+      It replaces `retiredOitFrames` and `SwapChain.oldSwapchainFrames`.
+- [ ] Add `share` to the owning asset and move `meshRefs` and `pieceRefs` out of
+      `GodotScene`.
+- [ ] Assert the live handle counts are zero at device teardown.
+- [ ] Split the tree into threaded and per-thread owners once a real
+      multi-threaded loader lands. `mark` and `releaseTo` stay a pair on one
+      thread either way.
 
 ## Pipeline lifetime
 
@@ -1142,14 +1172,6 @@ an explicit unload at scene teardown may be enough.
       explicit scene unload. Pick a default only after measuring.
 - [ ] Make `LazyPipeline` hold a shared handle instead of a copied
       `GraphicsPipelineCfg`, so eviction can invalidate every copy at once.
-- [ ] Add `LogicalDevice.destroyPipeline(VkPipeline)` that removes the handle
-      from the device registry before destroying it; `pipelinesDtor` must not
-      see a stale handle.
-- [ ] Defer destruction until no recorded frame can still reference the
-      pipeline: wait for the frame fences or use a retire queue like
-      `SwapChain.oldSwapchainFrames`.
-- [ ] Keep the pipeline layout, set layout and descriptor pool until their last
-      pipeline goes, or decide that techniques are never removed.
 - [ ] Drop the `PipelineFactory` cache entry on eviction, so the next `acquire`
       reloads the variant from `PipelineCacheStore` instead of compiling cold.
 - [ ] Do not evict a variant that the current preload query still reports.
