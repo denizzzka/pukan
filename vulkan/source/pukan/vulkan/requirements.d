@@ -1065,7 +1065,7 @@ bool requirementsEnabled(Reqs...)(ref const InstanceContext ctx, out string reas
 /// Throws RequirementsNotMetException if any requirement is not enabled
 void requireEnabled(Reqs...)(ref const DeviceContext ctx, string entity, string file = __FILE__, size_t line = __LINE__)
 {
-    import pukan.exceptions: RequirementsNotMetException;
+    import pukan.vulkan.exceptions: RequirementsNotMetException;
 
     string[] missing;
     static foreach(R; NoDuplicates!Reqs)
@@ -1082,7 +1082,7 @@ void requireEnabled(Reqs...)(ref const DeviceContext ctx, string entity, string 
 /// Throws RequirementsNotMetException if any requirement is not enabled
 void requireEnabled(Reqs...)(ref const InstanceContext ctx, string entity, string file = __FILE__, size_t line = __LINE__)
 {
-    import pukan.exceptions: RequirementsNotMetException;
+    import pukan.vulkan.exceptions: RequirementsNotMetException;
 
     string[] missing;
     static foreach(R; NoDuplicates!Reqs)
@@ -1242,7 +1242,7 @@ unittest
 
     import std.exception: assertThrown;
     import core.exception: AssertError;
-    import pukan.exceptions: RequirementsNotMetException;
+    import pukan.vulkan.exceptions: RequirementsNotMetException;
 
     DeviceContext device;
     assert(!requirementsEnabled!(Requirement!(VkPhysicalDeviceFeatures.samplerAnisotropy))(device, reason));

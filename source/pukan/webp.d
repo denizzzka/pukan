@@ -1,6 +1,6 @@
 module pukan.webp;
 
-import pukan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanException;
 import std.conv: to;
 
 import pukan.webp_bindings;

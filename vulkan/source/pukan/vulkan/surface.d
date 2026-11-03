@@ -2,7 +2,6 @@ module pukan.vulkan.surface;
 
 import pukan.vulkan.bindings;
 import pukan.vulkan.requirements: Requirement, getOptionalRequirements;
-import pukan: toPrettyString;
 import std.meta: AliasSeq;
 
 /// Instance requirements for creating window surfaces

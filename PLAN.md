@@ -3,7 +3,7 @@
 Checkboxes track open work. Items can be done in any order; the order below is
 only a suggested grouping.
 
-- [ ] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
+- [x] Move `pukan/vulkan/` to a separate subpackage so `pukan.vulkan` can be
       used independently of the rest of `pukan`. Keep module names unchanged.
 - [ ] Split the graphics code out of the flat `pukan.*` modules into
       `pukan.graphics.g3d`, `pukan.graphics.g2d` and `pukan.graphics.common`,

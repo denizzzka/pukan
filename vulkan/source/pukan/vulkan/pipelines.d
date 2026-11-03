@@ -2,7 +2,7 @@ module pukan.vulkan.pipelines;
 
 import frame_bindings;
 
-import pukan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;

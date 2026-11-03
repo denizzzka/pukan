@@ -18,7 +18,7 @@ package mixin template Images()
     }
 }
 
-import pukan.exceptions: PukanVulkanException;
+import pukan.vulkan.exceptions: PukanVulkanException;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;

@@ -1,7 +1,7 @@
 module pukan.godot_scene.project;
 
 import dlib.math: Quaternionf, Vector2f, Vector2i, Vector3f, Vector3i, Vector4f, Vector4i;
-import pukan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanException;
 import pukan.godot_scene.source: GodotSource;
 import pukan.godot_scene.value: GodotAabb, GodotArray, GodotColor, GodotDictionary, GodotNil,
     GodotPlane, GodotRect2, GodotRect2i, GodotVariant;

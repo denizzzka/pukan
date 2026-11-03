@@ -1,6 +1,6 @@
 module pukan.godot_scene.pck;
 
-import pukan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanException;
 import pukan.godot_scene.paths: normalizeResourcePath;
 import std.conv: to;
 

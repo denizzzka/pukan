@@ -1,12 +1,11 @@
 module pukan.vulkan.physical_device;
 
-import pukan.exceptions;
+import pukan.vulkan.exceptions;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: Instance;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.helpers;
 import pukan.vulkan.requirements;
-import pukan: toPrettyString;
 import std.meta: AliasSeq;
 import swapchain = pukan.vulkan.swapchain;
 

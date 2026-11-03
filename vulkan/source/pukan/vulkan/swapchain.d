@@ -108,7 +108,7 @@ class SwapChain
         VkPresentModeKHR preferredPresentMode = VK_PRESENT_MODE_FIFO_KHR,
     )
     {
-        import pukan.exceptions: PukanVulkanException;
+        import pukan.vulkan.exceptions: PukanVulkanException;
         import std.algorithm: canFind;
         import std.conv: to;
 

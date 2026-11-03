@@ -2,7 +2,7 @@ module pukan.vulkan.shaders;
 
 package mixin template Shaders()
 {
-    import pukan.exceptions: PukanVulkanException;
+    import pukan.vulkan.exceptions: PukanVulkanException;
     import std.conv: to;
     import std.exception: enforce;
 

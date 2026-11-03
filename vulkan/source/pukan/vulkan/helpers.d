@@ -1,6 +1,6 @@
 module pukan.vulkan.helpers;
 
-import pukan.exceptions: PukanVulkanExceptionWithCode;
+import pukan.vulkan.exceptions: PukanVulkanExceptionWithCode;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 public import pukan.vulkan.stype_list: getCreateInfoStructureType;
@@ -132,4 +132,12 @@ mixin template ScopedLogicalDeviceTemplateMixin(alias M)
     }
 
      mixin M;
+}
+
+string toPrettyString(T)(in T val)
+{
+    import mir.ser.json: serializeJsonPretty;
+    import std.conv: to;
+
+    return val.serializeJsonPretty.to!string;
 }

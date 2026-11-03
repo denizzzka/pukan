@@ -1,6 +1,6 @@
 module pukan.vulkan.core;
 
-import pukan.exceptions;
+import pukan.vulkan.exceptions;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
@@ -9,7 +9,6 @@ import pukan.vulkan.physical_device: PhysicalDevice, SelectedDevice;
 import pukan.vulkan.api_version: loaderVersion, requiredApiVersionEncoded;
 import pukan.vulkan.requirements;
 import pukan.vulkan.bindings: VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-import pukan: toPrettyString;
 import std.exception: enforce;
 import std.meta: AliasSeq;
 import std.string: toStringz;

@@ -1,4 +1,4 @@
-module pukan.exceptions;
+module pukan.vulkan.exceptions;
 
 import std.conv: to;
 

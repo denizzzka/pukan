@@ -1,7 +1,7 @@
 module pukan.godot_scene.binary;
 
 import dlib.math: Quaternionf, Vector2f, Vector2i, Vector3f, Vector3i, Vector4f, Vector4i;
-import pukan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanException;
 import pukan.godot_scene.text: GodotTextDocument, GodotTextExternal, GodotTextResource, parseGodotText;
 import pukan.godot_scene.value;
 import std.conv: to;

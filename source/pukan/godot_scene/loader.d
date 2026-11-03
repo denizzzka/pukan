@@ -3,7 +3,7 @@ module pukan.godot_scene.loader;
 import dlib.math: Matrix4x4f, Quaternionf, Vector2f, Vector3f, Vector4f, degtorad, scaleMatrix, translationMatrix;
 import material_bindings;
 import pukan.compressed_texture: CompressedFamily, familySupported, formatSupported;
-import pukan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanException;
 import pukan.godot_scene.binary: parseGodotResourceData;
 import pukan.godot_scene.ctex: GodotCtexImage, isTwoChannelNormal, loadCtex;
 import pukan.godot_scene.environment: GodotEnvironment, readGodotEnvironment, readGodotSky;

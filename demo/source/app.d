@@ -379,7 +379,7 @@ void main(string[] args) {
         startupStats.uploadNs += gltf.loadStats.uploadNs;
     }
 
-    import pukan.exceptions;
+    import pukan.vulkan.exceptions;
 
     auto sw = StopWatch(AutoStart.yes);
 

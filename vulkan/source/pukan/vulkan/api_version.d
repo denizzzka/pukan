@@ -1,6 +1,6 @@
 module pukan.vulkan.api_version;
 
-import pukan.exceptions: PukanVulkanExceptionWithCode;
+import pukan.vulkan.exceptions: PukanVulkanExceptionWithCode;
 import pukan.vulkan.bindings;
 
 /// Vulkan API version, ordered by major, minor and patch

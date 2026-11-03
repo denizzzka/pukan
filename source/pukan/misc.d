@@ -1,7 +1,7 @@
 module pukan.misc;
 
 import gamut;
-import pukan.exceptions;
+import pukan.vulkan.exceptions;
 import pukan.vulkan.bindings: VkFormat;
 import pukan.webp: decodeWebp;
 import std.conv: to;

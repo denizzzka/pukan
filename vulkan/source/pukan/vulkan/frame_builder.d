@@ -2,7 +2,7 @@ module pukan.vulkan.frame_builder;
 
 import frame_bindings;
 
-//~ import pukan.exceptions;
+//~ import pukan.vulkan.exceptions;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;

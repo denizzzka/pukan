@@ -1,7 +1,7 @@
 module pukan.godot_scene.ctex;
 
 import pukan.compressed_texture.format: CompressedFormat, compressedFormat;
-import pukan.exceptions: PukanException;
+import pukan.vulkan.exceptions: PukanException;
 import pukan.vulkan.bindings: VkFormat, VK_FORMAT_R8_UNORM, VK_FORMAT_R8G8_UNORM,
     VK_FORMAT_R8G8B8_UNORM, VK_FORMAT_R8G8B8_SRGB, VK_FORMAT_R8G8B8A8_UNORM,
     VK_FORMAT_R8G8B8A8_SRGB;

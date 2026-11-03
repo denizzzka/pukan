@@ -1,6 +1,6 @@
 module pukan.vulkan.textures;
 
-import pukan.exceptions;
+import pukan.vulkan.exceptions;
 import pukan.vulkan;
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers;
