@@ -39,6 +39,22 @@ package mixin template DescriptorPools()
         uint maxSets,
     )
     {
+        auto pool = createDetachedDescriptorPool(descriptorSetLayoutBindings, maxSets);
+
+        return descriptorPools.insertOne((ref PoolAndLayoutInfo e) {
+            e = PoolAndLayoutInfo(
+                descriptorPool: pool,
+                descriptorSetLayout: layout,
+            );
+        });
+    }
+
+    /// Creates a pool the caller destroys; the device does not track it
+    VkDescriptorPool createDetachedDescriptorPool(
+        VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings,
+        uint maxSets,
+    )
+    {
         VkDescriptorPoolSize[] poolSizes;
 
         foreach(ref binding; descriptorSetLayoutBindings)
@@ -67,12 +83,7 @@ package mixin template DescriptorPools()
         VkDescriptorPool pool;
         vkCall(this.device, &descriptorPoolInfo, this.alloc, &pool);
 
-        return descriptorPools.insertOne((ref PoolAndLayoutInfo e) {
-            e = PoolAndLayoutInfo(
-                descriptorPool: pool,
-                descriptorSetLayout: layout,
-            );
-        });
+        return pool;
     }
 
     private void descriptorPoolsDtor()

@@ -252,6 +252,8 @@ final class DescriptorAllocator
     private VkDescriptorSetLayoutBinding[] bindings;
     private uint setsPerPool;
     private VkDescriptorPool[] pools;
+    /// Pool the next set comes from
+    private uint currentPool;
     private uint allocatedInCurrentPool;
 
     this(
@@ -268,14 +270,34 @@ final class DescriptorAllocator
         this.setsPerPool = setsPerPool;
     }
 
+    /// Frees every set allocated so far; the sets are invalid afterwards
+    void reset()
+    {
+        foreach(pool; pools)
+            vkResetDescriptorPool(device.device, pool, 0);
+
+        currentPool = 0;
+        allocatedInCurrentPool = 0;
+    }
+
     VkDescriptorSet allocate()
     {
-        if(pools.length == 0 || allocatedInCurrentPool == setsPerPool)
+        if(pools.length == 0)
             addPool();
+        else if(allocatedInCurrentPool == setsPerPool)
+        {
+            if(currentPool + 1 < pools.length)
+            {
+                ++currentPool;
+                allocatedInCurrentPool = 0;
+            }
+            else
+                addPool();
+        }
 
         VkDescriptorSetAllocateInfo info = {
             sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            descriptorPool: pools[$ - 1],
+            descriptorPool: pools[currentPool],
             descriptorSetCount: 1,
             pSetLayouts: &layout,
         };
@@ -295,7 +317,7 @@ final class DescriptorAllocator
                 result.vkCheck;
 
             addPool();
-            info.descriptorPool = pools[$ - 1];
+            info.descriptorPool = pools[currentPool];
         }
     }
 
@@ -310,8 +332,8 @@ final class DescriptorAllocator
 
     private void addPool()
     {
-        auto poolAndLayout = device.createDescriptorPool(layout, bindings, setsPerPool);
-        pools ~= poolAndLayout.descriptorPool;
+        pools ~= device.createDetachedDescriptorPool(bindings, setsPerPool);
+        currentPool = cast(uint)(pools.length - 1);
         allocatedInCurrentPool = 0;
     }
 }
