@@ -37,6 +37,7 @@ final class ResourceOwner(bool threaded = true): OwnerTag
     private Entry[] entries;
     /// Handles this owner still expects to release
     private size_t taggedHandles;
+
     private bool closed;
     /// Releases go through this queue; null frees at once
     private ReleaseQueue queue;

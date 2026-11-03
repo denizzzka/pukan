@@ -15,6 +15,7 @@ import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, LightingMode, PbrPipeline
 import pukan.physics.shapes: Collider, CollisionShape;
 import pukan.physics.world: CollisionWorld;
 import pukan.vulkan.bindings;
+import pukan.vulkan.resources.sharing: SharedResource;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: TransferBuffer;
@@ -151,7 +152,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
     /// Holders per mesh and per GPU piece, so a released cell frees what nothing holds
     private size_t[PbrMesh] meshRefs;
-    private size_t[] pieceRefs;
+    /// GPU pieces several meshes share; the last holder releases the copy
+    private SharedResource!BufferPieceOnGPU[] pieceNodes;
     /// Meshes whose GPU handles are resolved and whose pieces are uploaded
     private bool[PbrMesh] meshReady;
 
@@ -472,7 +474,12 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
         collect(Matrix4x4f.identity, root, false);
 
-        pieceRefs.length = gpuBuffs.length;
+        pieceNodes.length = gpuBuffs.length;
+        foreach(i, piece; gpuBuffs)
+            pieceNodes[i] = new SharedResource!BufferPieceOnGPU(
+                piece,
+                (BufferPieceOnGPU piece) { piece.releaseGPU(); },
+            );
 
         allKeys.length = parts.length;
         foreach(i; 0 .. parts.length)
@@ -830,7 +837,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 continue;
 
             foreach(piece; record.mesh.pieces)
-                if(pieceRefs[piece]++ == 0 && !gpuBuffs[piece].isUploaded)
+                if(pieceNodes[piece].acquire() && !gpuBuffs[piece].isUploaded)
                     gpuBuffs[piece].recordUpload(buf);
 
             record.mesh.buildGeometry(gpuBuffs);
@@ -920,12 +927,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
         foreach(mesh; released)
             foreach(piece; mesh.pieces)
-            {
-                assert(pieceRefs[piece] > 0, "releasing a piece nothing holds");
-
-                if(--pieceRefs[piece] == 0)
-                    gpuBuffs[piece].releaseGPU();
-            }
+                pieceNodes[piece].release();
 
         foreach(group; groups)
             if(auto perPart = cast(PartDrawable) group.drawable)
