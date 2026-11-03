@@ -7,9 +7,8 @@ public import pukan.gltf.loader: GltfAsset, LoadStats, createGltfInstance, loadG
 import pukan.gltf.loader;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.gltf.skin_matrices: SkinMatrices;
-import pukan.graphics.common.misc: Boxf, isVisible, mergeAabb, transformAabb;
+import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergeAabb, transformAabb;
 import pukan.graphics.g3d.cell_index: Bounded;
-import pukan.graphics.g3d.cells: hasBounds;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor;

@@ -1,8 +1,8 @@
 module pukan.graphics.g3d.cell_index;
 
 import dlib.math: Matrix4x4f, Vector3f;
-import pukan.graphics.common.misc: Boxf;
-import pukan.graphics.g3d.cells: CellCoord, CellGrid, hasBounds;
+import pukan.graphics.common.misc: Boxf, hasBounds;
+import pukan.graphics.g3d.cells: CellCoord, CellGrid;
 import pukan.vulkan.renderpass: DrawableByVulkan;
 
 /// A drawable that can report its bounds in its own space, so cells can place it

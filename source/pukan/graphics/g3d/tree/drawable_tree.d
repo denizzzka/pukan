@@ -2,9 +2,9 @@ module pukan.graphics.g3d.tree.drawable_tree;
 
 import dlib.math;
 import std.algorithm: sort;
-import pukan.graphics.common.misc: Boxf, transformAabb;
+import pukan.graphics.common.misc: Boxf, hasBounds, transformAabb;
 import pukan.graphics.g3d.cell_index: Bounded, CellIndex, DrawItem;
-import pukan.graphics.g3d.cells: CellGrid, hasBounds;
+import pukan.graphics.g3d.cells: CellGrid;
 import pukan.graphics.g3d.tree: BaseNode = Node;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;

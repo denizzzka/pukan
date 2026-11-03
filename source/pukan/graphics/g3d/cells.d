@@ -1,8 +1,8 @@
 module pukan.graphics.g3d.cells;
 
 import dlib.math: Vector3f;
-import pukan.graphics.common.misc: Boxf;
-import std.math: floor, isNaN;
+import pukan.graphics.common.misc: Boxf, hasBounds;
+import std.math: floor;
 
 /// Integer cell of a `CellGrid`; exact far from the level origin
 struct CellCoord
@@ -93,16 +93,6 @@ struct CellRange
 
         spent = true;
     }
-}
-
-/// A box that can be placed; `Boxf.init` has no bounds, and neither has a NaN corner
-bool hasBounds(in Boxf box) @safe nothrow pure
-{
-    foreach(axis; 0 .. 3)
-        if(box.min[axis].isNaN || box.max[axis].isNaN || box.min[axis] > box.max[axis])
-            return false;
-
-    return true;
 }
 
 unittest

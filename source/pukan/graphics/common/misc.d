@@ -124,14 +124,25 @@ struct Boxf
     Vector3f max;
 }
 
-/// Conservative clip-space test; a box without bounds is always visible
-bool isVisible(in Boxf box, in Matrix4x4f mvp) @safe nothrow pure
+/// A box with corners; `Boxf.init` has none
+bool hasBounds(in Boxf box) @safe nothrow pure
 {
-    import std.math: abs, isNaN;
+    import std.math: isNaN;
 
     foreach(axis; 0 .. 3)
         if(box.min[axis].isNaN || box.max[axis].isNaN)
-            return true;
+            return false;
+
+    return true;
+}
+
+/// Conservative clip-space test; a box without bounds is always visible
+bool isVisible(in Boxf box, in Matrix4x4f mvp) @safe nothrow pure
+{
+    import std.math: abs;
+
+    if(!hasBounds(box))
+        return true;
 
     const center = (box.min + box.max) * 0.5f;
     const extent = (box.max - box.min) * 0.5f;
@@ -280,13 +291,14 @@ void expandAABB(ref Boxf box, in Vector3f v)
 
 /// Merges `other` into `box`; a box without bounds takes the other one
 void mergeAabb(ref Boxf box, in Boxf other)
+in
 {
-    import std.math: isNaN;
-
-    if(other.min.x.isNaN)
-        return;
-
-    if(box.min.x.isNaN)
+    // A box without bounds cannot be merged; the caller decides how to place that part
+    assert(hasBounds(other), "mergeAabb takes a box with bounds");
+}
+do
+{
+    if(!hasBounds(box))
     {
         box = other;
         return;
@@ -300,6 +312,30 @@ void mergeAabb(ref Boxf box, in Boxf other)
     box.max.x = max(box.max.x, other.max.x);
     box.max.y = max(box.max.y, other.max.y);
     box.max.z = max(box.max.z, other.max.z);
+}
+
+unittest
+{
+    import core.exception: AssertError;
+
+    Boxf box;
+    mergeAabb(box, Boxf(Vector3f(0, 0, 0), Vector3f(1, 1, 1)));
+    assert(box == Boxf(Vector3f(0, 0, 0), Vector3f(1, 1, 1)));
+
+    mergeAabb(box, Boxf(Vector3f(-2, 0.5f, 0), Vector3f(-1, 2, 3)));
+    assert(box == Boxf(Vector3f(-2, 0, 0), Vector3f(1, 2, 3)));
+
+    version(assert)
+    {
+        bool rejected;
+
+        try
+            mergeAabb(box, Boxf.init);
+        catch(AssertError)
+            rejected = true;
+
+        assert(rejected, "a box without bounds is rejected by the contract");
+    }
 }
 
 /// Corners of an axis-aligned box transformed by an affine matrix

@@ -2,7 +2,7 @@ module pukan.graphics.g3d.pbr.mesh;
 
 import dlib.math;
 import pukan.material_bindings;
-import pukan.graphics.common.misc: Boxf, expandAABB;
+import pukan.graphics.common.misc: Boxf, expandAABB, hasBounds, mergeAabb;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.graphics.g3d.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
 import pukan.graphics.g3d.pbr.accessor;
@@ -295,9 +295,7 @@ final class PbrGeometry
 
     package(pukan) auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
     {
-        import std.math: isNaN;
-
-        if(!vert.aabb.min.x.isNaN)
+        if(hasBounds(vert.aabb))
         {
             debug assert(isSameAabb(vert.aabb, scannedAabb(gpuBuffs)),
                 "mesh bounds differ from the vertex data");
@@ -323,21 +321,6 @@ final class PbrGeometry
             expandAABB(box, e);
 
         return box;
-    }
-
-    private static void mergeAabb(ref Boxf box, in Boxf other)
-    {
-        import std.math: isNaN;
-
-        if(box.min.x.isNaN)
-        {
-            box.min = other.min;
-            box.max = other.max;
-            return;
-        }
-
-        expandAABB(box, other.min);
-        expandAABB(box, other.max);
     }
 
     private static bool isSameAabb(in Boxf a, in Boxf b)
