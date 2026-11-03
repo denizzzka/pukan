@@ -378,6 +378,10 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
 
     ~this()
     {
+        // The descriptor sets sample the textures and buffers below, so free them first
+        if(allocator)
+            destroy(allocator);
+
         foreach(ref buffer; jointMatricesBufs)
             if(buffer)
                 destroy(buffer);

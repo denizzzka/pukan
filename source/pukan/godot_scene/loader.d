@@ -414,6 +414,7 @@ private final class GodotLoader
         auto scene = new GodotScene(
             pipelines,
             device,
+            allocator,
             pbr.resources.materials,
             root,
             meshes,

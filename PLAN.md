@@ -849,9 +849,6 @@ Before each slice, read the matching reference named in
         residency bounded by the same cell policy.
   - [ ] Share one GPU resource between cells, so an asset placed in two cells
         loads and uploads once.
-  - [ ] Free a scene's descriptor sets before the textures and buffers they
-        sample, so a teardown after an exception cannot trip the validation
-        layer.
 
 - **Debug and budgets**
   - [ ] A streaming overlay: loaded and pending cells, bytes per cell, drawables

@@ -328,6 +328,14 @@ class SceneWith(Modules...)
         if(pendingScreenshot)
             destroy(pendingScreenshot);
 
+        // The frame sets sample the OIT images, the shadow map and the IBL textures
+        if(frameAllocator)
+            destroy(frameAllocator);
+
+        // The technique pools sample the material buffer and the fake texture
+        if(pipelineFactory)
+            destroy(pipelineFactory);
+
         if(gltfFactory)
             gltfFactory.destroyAssets();
 
@@ -386,9 +394,6 @@ class SceneWith(Modules...)
 
         if(meshResources)
             destroy(meshResources);
-
-        if(pipelineFactory)
-            destroy(pipelineFactory);
 
         if(pipelineCacheManager)
         {

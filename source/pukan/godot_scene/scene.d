@@ -16,7 +16,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: TransferBuffer;
-import pukan.vulkan.pipelines: GraphicsPipelineCfg;
+import pukan.vulkan.pipelines: DescriptorAllocator, GraphicsPipelineCfg;
 import pukan.vulkan.renderpass: Blended, DrawableByVulkan, DrawPhase, PipelineWarmup;
 import pukan.vulkan.textures: Texture;
 import std.algorithm: sort;
@@ -115,6 +115,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
 {
     private PbrPipelines pipelines;
     private LogicalDevice device;
+    /// Owns the material descriptor sets of this scene's meshes
+    private DescriptorAllocator allocator;
     private MaterialBuffer materialBuffer;
     private GodotNode root;
     private PbrMesh[] meshes;
@@ -166,6 +168,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
     package(pukan) this(
         PbrPipelines pipelines,
         LogicalDevice device,
+        DescriptorAllocator allocator,
         MaterialBuffer materialBuffer,
         GodotNode root,
         PbrMesh[] meshes,
@@ -180,6 +183,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
     {
         this.pipelines = pipelines;
         this.device = device;
+        this.allocator = allocator;
         this.materialBuffer = materialBuffer;
         this.root = root;
         this.meshes = meshes;
@@ -194,6 +198,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
 
     ~this()
     {
+        // The descriptor sets sample the textures and buffers below, so free them first
+        if(allocator)
+            destroy(allocator);
+
         foreach(ref piece; gpuBuffs)
             if(piece && piece.buffer)
                 destroy(piece.buffer);

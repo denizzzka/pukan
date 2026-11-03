@@ -299,6 +299,15 @@ final class DescriptorAllocator
         }
     }
 
+    ~this()
+    {
+        if(device is null)
+            return;
+
+        foreach(pool; pools)
+            vkDestroyDescriptorPool(device.device, pool, device.alloc);
+    }
+
     private void addPool()
     {
         auto poolAndLayout = device.createDescriptorPool(layout, bindings, setsPerPool);
@@ -622,6 +631,11 @@ final class PipelineFactory
 
             preloadThread.join();
         }
+
+        // Sets of the primitives live in these pools, so they go with them
+        foreach(ref technique; techniques)
+            if(technique.allocator)
+                destroy(technique.allocator);
 
         debug logCacheSummary();
     }
