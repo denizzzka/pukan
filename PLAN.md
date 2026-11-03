@@ -807,10 +807,6 @@ Before each slice, read the matching reference named in
         scene.
 
 - **Spatial index and GPU-driven draws**
-  - [ ] The frame loop draws from the cells: `demo_godot` asks
-        `SceneTree.drawCells` for the cells `Residency.resident` returns. glTF
-        becomes a `PartDrawable`, so an animated model is recorded per part with
-        its node transforms updated each frame, instead of as one whole.
   - [ ] Cull by cost in Unreal's order: distance first, then frustum, then
         occlusion. Cells bound the first step, the index the second.
   - [ ] One index over the loaded cells: a BVH or octree per cell with a flat

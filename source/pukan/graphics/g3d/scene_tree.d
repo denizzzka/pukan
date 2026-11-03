@@ -72,16 +72,19 @@ unittest
             dg(Part(unit, Vector3f(100, 0, 0).translationMatrix, 1));
         }
 
-        void drawPart(
+        void drawParts(
             VkCommandBuffer,
             in Matrix4x4f trans,
-            size_t key,
+            scope const(size_t)[] keys,
             VkDescriptorSet,
             DrawPhase,
         )
         {
-            drawnKeys ~= key;
-            drawnTrans ~= trans;
+            foreach(key; keys)
+            {
+                drawnKeys ~= key;
+                drawnTrans ~= trans;
+            }
         }
     }
 

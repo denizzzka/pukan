@@ -1,5 +1,6 @@
 module pukan.graphics.g3d.tree.drawable_tree;
 
+import cell_index = pukan.graphics.g3d.cell_index;
 import dlib.math;
 import std.algorithm: sort;
 import pukan.graphics.common.misc: Boxf, hasBounds, partAabb, transformAabb;
@@ -98,30 +99,7 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
         DrawPhase phase = DrawPhase.surface,
     )
     {
-        auto items = cellIndex.collect(cells);
-
-        foreach(i, item; items)
-        {
-            if(item.part != wholePart)
-            {
-                (cast(PartDrawable) item.drawable).drawPart(
-                    buf, viewProj * item.world, item.part, frameSet, phase);
-
-                continue;
-            }
-
-            bool seen;
-
-            foreach(j; 0 .. i)
-                if(items[j].drawable is item.drawable)
-                {
-                    seen = true;
-                    break;
-                }
-
-            if(!seen)
-                item.drawable.drawingBufferFilling(buf, viewProj * item.world, frameSet, phase);
-        }
+        cell_index.drawCells(cellIndex, buf, viewProj, cells, frameSet, phase);
     }
 
     ~this()

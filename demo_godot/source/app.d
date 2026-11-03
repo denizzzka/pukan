@@ -683,6 +683,11 @@ void main(string[] args)
     auto initialBuffer = &scene.swapChain.frames[0].commandBuffer();
     godotScene.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
 
+    // Nothing streams yet, so the level is one index and every cell exists
+    scope levelIndex = new CellIndex!DrawItem(scene.cellGrid);
+    placeDrawable(levelIndex, godotScene, Matrix4x4f.identity);
+    const levelCells = levelIndex.cells;
+
     if(characterModel)
     {
         characterModel.uploadToGPUImmediate(device, scene.frameBuilder.commandPool, *initialBuffer);
@@ -1220,7 +1225,8 @@ void main(string[] args)
             scene.recordCommandBuffer(
                 frame,
                 (buf, phase) {
-                    godotScene.drawingBufferFilling(buf, modelViewProj, frame.frameSets[0].descriptorSet, phase);
+                    drawCells(levelIndex, buf, modelViewProj, levelCells,
+                        frame.frameSets[0].descriptorSet, phase);
 
                     if(characterModel && thirdPerson && characterVisible)
                         characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
@@ -1233,7 +1239,8 @@ void main(string[] args)
                 },
                 null,
                 (buf) {
-                    godotScene.drawingBufferFilling(buf, scene.sunShadow.viewProj * wtb.model, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
+                    drawCells(levelIndex, buf, scene.sunShadow.viewProj * wtb.model, levelCells,
+                        frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                 },
             );
         });

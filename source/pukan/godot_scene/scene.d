@@ -140,9 +140,9 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
     private DrawableByVulkan[] instances;
     private GodotSkin[] skins;
 
-    /// Leaf parts and nested drawables, registered once so a frame walks no nodes
+    /// Leaf parts, registered once so a frame walks no nodes
     private PartRecord[] parts;
-    private NestedDraw[] nestedDraws;
+    private size_t[] allKeys;
     private bool partsRegistered;
 
     private struct PartRecord
@@ -150,14 +150,11 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
         PbrMesh mesh;
         DrawableByVulkan nested;
         size_t nestedKey;
+        /// Part transform inside this scene
         Matrix4x4f world;
+        /// Transform of the nested drawable itself
+        Matrix4x4f base;
         Boxf bounds;
-    }
-
-    private struct NestedDraw
-    {
-        DrawableByVulkan drawable;
-        Matrix4x4f world;
     }
 
     package(pukan) this(
@@ -384,19 +381,18 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
             {
                 debug assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
 
-                parts ~= PartRecord(mesh, null, wholePart, trans, mesh.localAABB);
+                parts ~= PartRecord(mesh, null, wholePart, trans, trans, mesh.localAABB);
             }
 
             if(node.instance !is null)
             {
-                nestedDraws ~= NestedDraw(node.instance, trans);
-
                 if(auto perPart = cast(PartDrawable) node.instance)
                     perPart.eachPart((in Part part) {
                         parts ~= PartRecord(
                             nested: node.instance,
                             nestedKey: part.key,
                             world: trans * part.local,
+                            base: trans,
                             bounds: part.bounds,
                         );
                     });
@@ -408,6 +404,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                         nested: node.instance,
                         nestedKey: wholePart,
                         world: trans,
+                        base: trans,
                         bounds: bounded is null ? Boxf.init : bounded.localBounds,
                     );
                 }
@@ -419,6 +416,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
 
         collect(Matrix4x4f.identity, root, false);
 
+        allKeys.length = parts.length;
+        foreach(i; 0 .. parts.length)
+            allKeys[i] = i;
+
         partsRegistered = true;
     }
 
@@ -427,6 +428,17 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
         Matrix4x4f trans,
         VkDescriptorSet frameSet,
         DrawPhase phase = DrawPhase.surface,
+    )
+    {
+        drawParts(buf, trans, allKeys, frameSet, phase);
+    }
+
+    void drawParts(
+        VkCommandBuffer buf,
+        in Matrix4x4f trans,
+        scope const(size_t)[] keys,
+        VkDescriptorSet frameSet,
+        DrawPhase phase,
     )
     {
         registerParts();
@@ -438,12 +450,38 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
             float depth;
         }
 
-        MeshDraw[] draws;
-
-        foreach(record; parts)
+        static struct NestedGroup
         {
+            DrawableByVulkan drawable;
+            Matrix4x4f base;
+            size_t[] keys;
+        }
+
+        MeshDraw[] draws;
+        NestedGroup[] groups;
+
+        foreach(key; keys)
+        {
+            auto record = &parts[key];
+
             if(record.mesh is null)
+            {
+                size_t found = groups.length;
+
+                foreach(g, group; groups)
+                    if(group.drawable is record.nested && group.base == record.base)
+                    {
+                        found = g;
+                        break;
+                    }
+
+                if(found == groups.length)
+                    groups ~= NestedGroup(record.nested, record.base);
+
+                groups[found].keys ~= record.nestedKey;
+
                 continue;
+            }
 
             const mvp = trans * record.world;
 
@@ -461,7 +499,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
         if(phase == DrawPhase.surface || phase == DrawPhase.shadow)
         {
             PbrMesh[] order;
-            Matrix4x4f[][PbrMesh] groups;
+            Matrix4x4f[][PbrMesh] batches;
 
             foreach(draw; draws)
             {
@@ -475,25 +513,28 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
                     continue;
                 }
 
-                if(auto group = draw.mesh in groups)
-                    *group ~= draw.trans;
+                if(auto batch = draw.mesh in batches)
+                    *batch ~= draw.trans;
                 else
                 {
                     order ~= draw.mesh;
-                    groups[draw.mesh] = [draw.trans];
+                    batches[draw.mesh] = [draw.trans];
                 }
             }
 
             foreach(mesh; order)
-                mesh.drawBatch(buf, selectPipeline(mesh, phase), groups[mesh], frameSet);
+                mesh.drawBatch(buf, selectPipeline(mesh, phase), batches[mesh], frameSet);
         }
         else
             foreach(draw; draws)
                 if(matchesPhase(draw.mesh, phase))
                     draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
 
-        foreach(nested; nestedDraws)
-            nested.drawable.drawingBufferFilling(buf, trans * nested.world, frameSet, phase);
+        foreach(group; groups)
+            if(auto perPart = cast(PartDrawable) group.drawable)
+                perPart.drawParts(buf, trans * group.base, group.keys, frameSet, phase);
+            else
+                group.drawable.drawingBufferFilling(buf, trans * group.base, frameSet, phase);
     }
 
     void eachPart(scope void delegate(in Part part) dg)
@@ -504,25 +545,6 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Pipel
             dg(Part(record.bounds, record.world, i));
     }
 
-    void drawPart(
-        VkCommandBuffer buf,
-        in Matrix4x4f trans,
-        size_t key,
-        VkDescriptorSet frameSet,
-        DrawPhase phase,
-    )
-    {
-        registerParts();
-
-        auto record = &parts[key];
-
-        if(record.mesh !is null)
-            record.mesh.draw(buf, selectPipeline(record.mesh, phase), trans, frameSet);
-        else if(record.nestedKey == wholePart)
-            record.nested.drawingBufferFilling(buf, trans, frameSet, phase);
-        else
-            (cast(PartDrawable) record.nested).drawPart(buf, trans, record.nestedKey, frameSet, phase);
-    }
 
     private static void destroyInstance(DrawableByVulkan instance)
     {
