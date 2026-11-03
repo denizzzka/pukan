@@ -204,6 +204,7 @@ class TransferBuffer
     LogicalDevice device;
     MemoryBufferMappedToCPU cpuBuffer;
     MemoryBuffer gpuBuffer;
+    private VkBufferUsageFlags usage;
 
     this(LogicalDevice device, size_t size, VkBufferUsageFlags mergeUsageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT)
     {
@@ -221,20 +222,14 @@ class TransferBuffer
 
         this.device = device;
         this.cpuBuffer = cpuBuffer;
+        this.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | mergeUsageFlags;
 
-        VkBufferCreateInfo dstBufInfo = {
-            sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            size: cpuBuffer.cpuBuf.length,
-            usage: VK_BUFFER_USAGE_TRANSFER_DST_BIT | mergeUsageFlags,
-            sharingMode: VK_SHARING_MODE_EXCLUSIVE,
-        };
-
-        gpuBuffer = device.create!MemoryBuffer(dstBufInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        prepareGPU();
     }
 
     ~this()
     {
-        destroy(gpuBuffer);
+        releaseGPU();
         destroy(cpuBuffer);
     }
 
@@ -242,8 +237,36 @@ class TransferBuffer
     auto cpuBuf() const => cpuBuffer.cpuBuf;
     uint length() const => cast(uint) cpuBuffer.cpuBuf.length;
 
+    /// Creates the GPU copy again after `releaseGPU`; the CPU data stays
+    void prepareGPU()
+    {
+        if(gpuBuffer !is null)
+            return;
+
+        VkBufferCreateInfo dstBufInfo = {
+            sType: VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            size: cpuBuffer.cpuBuf.length,
+            usage: usage,
+            sharingMode: VK_SHARING_MODE_EXCLUSIVE,
+        };
+
+        gpuBuffer = device.create!MemoryBuffer(dstBufInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    }
+
+    /// Drops the GPU copy; `prepareGPU` and an upload bring it back
+    void releaseGPU()
+    {
+        if(gpuBuffer is null)
+            return;
+
+        destroy(gpuBuffer);
+        gpuBuffer = null;
+    }
+
     void recordUpload(VkCommandBuffer buf)
     {
+        prepareGPU();
+
         gpuBuffer.recordCopyBuffer(buf, cpuBuffer.buf, gpuBuffer.buf, cpuBuf.length);
         device.addUploadedBytes(cpuBuf.length);
     }

@@ -94,6 +94,9 @@ final class PbrGeometry
     VkIndexType indexType;
     uint indexCount;
 
+    /// GPU pieces the geometry reads, so a cell can keep them while it lives
+    package(pukan) size_t[] pieces;
+
     private VkBuffer fallbackVertex;
     private VkBuffer[] buffers;
     private VkDeviceSize[] offsets;
@@ -112,12 +115,23 @@ final class PbrGeometry
     /// Resolves the accessors to GPU buffers once, before any instance draws
     package(pukan) void build(ref BufferPieceOnGPU[] gpuBuffs)
     {
+        void usePiece(size_t index)
+        {
+            foreach(piece; pieces)
+                if(piece == index)
+                    return;
+
+            pieces ~= index;
+        }
+
         VertexStream stream(BufAccess accessor)
         {
             assert(accessor.viewIdx >= 0);
 
             auto gpuBuf = gpuBuffs[accessor.viewIdx];
             assert(gpuBuf !is null);
+
+            usePiece(accessor.viewIdx);
 
             return VertexStream(
                 buffer: gpuBuf.buffer.gpuBuffer,
@@ -161,6 +175,8 @@ final class PbrGeometry
         {
             auto indicesBuffer = gpuBuffs[vert.indices.accessor.viewIdx];
             assert(indicesBuffer !is null);
+
+            usePiece(vert.indices.accessor.viewIdx);
 
             indexBuffer = indicesBuffer.buffer.gpuBuffer;
             indexOffset = vert.indices.accessor.offset;
@@ -396,6 +412,12 @@ final class PbrMesh : Mesh
     package(pukan) auto calcAABB(in BufferPieceOnGPU[] gpuBuffs, ref Boxf box) const
     {
         geometry.calcAABB(gpuBuffs, box);
+    }
+
+    /// GPU pieces the geometry reads
+    package(pukan) auto pieces() const
+    {
+        return geometry.pieces;
     }
 
     /// Mesh-space bounds; NaN when the source did not provide them

@@ -7,11 +7,23 @@ import std.exception: enforce;
 class BufferPieceOnGPU
 {
     TransferBuffer buffer;
+    private bool uploaded;
+
+    /// Whether the GPU copy holds the data
+    bool isUploaded() const => uploaded;
 
     //TODO: add flag if CPU buf is not needed after uploading
     void recordUpload(scope VkCommandBuffer commandBuffer)
     {
         buffer.recordUpload(commandBuffer);
+        uploaded = true;
+    }
+
+    /// Frees the GPU copy; the CPU data stays for a later upload
+    void releaseGPU()
+    {
+        buffer.releaseGPU();
+        uploaded = false;
     }
 }
 
