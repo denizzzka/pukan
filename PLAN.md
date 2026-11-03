@@ -774,14 +774,15 @@ up. Before each slice, read the matching reference named in
   report each mesh with its own transform, so a level lands in cells per object;
   a drawable that reports nothing stays visible from every cell, and a part
   without bounds contributes its origin. `calcAABB` keeps the real extents while
-  `cellBounds` adds the origins.
+  `cellBounds` adds the origins. `Residency` holds the resident radius, the
+  prefetch ring ordered by distance and the per-frame budget.
 
   Still open:
 
-  - [ ] The loaded set around the camera: a radius of resident cells plus a
-        prefetch ring ordered by distance, with one budget per frame for mesh
-        upload and pipeline warmup. A cell is released only when no recorded
-        frame still draws it.
+  - [ ] Content ownership per cell: a loader takes the cells `Residency.take`
+        hands out, uploads them under the per-frame budget and frees a cell's
+        resources when `Residency.release` returns it; the retire delay covers
+        the frames in flight.
   - [ ] Floating origin: keep the camera at the origin and shift cell
         transforms, so single-precision positions stay precise far from the
         start.
