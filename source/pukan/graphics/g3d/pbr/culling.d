@@ -3,10 +3,11 @@ module pukan.graphics.g3d.pbr.culling;
 import dlib.math: Matrix4x4f, Vector4f;
 import pukan.graphics.common.shaders: shaderStage;
 import pukan.vulkan.bindings;
-import pukan.vulkan.descriptors: PoolAndLayoutInfo, bufferWriteDescriptor;
+import pukan.vulkan.descriptors: bufferWriteDescriptor;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 import pukan.vulkan.pipelines: PipelineFactory, PipelineKey;
+import pukan.vulkan.resources.vkobj: VkObj;
 import pukan.vulkan.requirements: Requirement;
 import std.meta: AliasSeq;
 
@@ -62,7 +63,7 @@ final class CullFrame
     private PipelineKey key;
     private VkPipelineLayout layout;
     private VkDescriptorSet set;
-    private PoolAndLayoutInfo pool;
+    private VkObj!VkDescriptorPool pool;
     private VkPipeline pipeline;
 
     private MemoryBufferMappedToCPU instanceBuf;
@@ -94,8 +95,8 @@ final class CullFrame
 
         key = declared.key;
         layout = declared.pipelineLayout;
-        pool = device.createDescriptorPool(declared.setLayout, bindings, 1);
-        set = device.allocateDescriptorSet(pool);
+        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 1), device, device.alloc);
+        set = device.allocateDescriptorSet(pool.vk, declared.setLayout);
     }
 
     ~this()

@@ -1,16 +1,17 @@
 module pukan.vulkan.computation;
 
 import pukan.vulkan.bindings;
-import pukan.vulkan.descriptors: PoolAndLayoutInfo, bufferWriteDescriptor, imageWriteDescriptor;
+import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipelines: PipelineFactory, PipelineKey;
+import pukan.vulkan.resources.vkobj: VkObj;
 import pukan.vulkan.shaders: ShaderDecl;
 
 /// Base class for GPU compute kernels
 abstract class Compute
 {
     protected LogicalDevice device;
-    protected PoolAndLayoutInfo poolAndLayout;
+    protected VkObj!VkDescriptorPool pool;
     protected VkDescriptorSet descriptorSet;
 
     protected VkPipelineLayout pipelineLayout;
@@ -39,8 +40,8 @@ abstract class Compute
         pipelineLayout = layout.pipelineLayout;
         pushConstantSize = shader.pushConstantRange.size;
 
-        poolAndLayout = device.createDescriptorPool(layout.setLayout, shader.layoutBindings, 1);
-        descriptorSet = device.allocateDescriptorSet(poolAndLayout);
+        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(shader.layoutBindings, 1), device, device.alloc);
+        descriptorSet = device.allocateDescriptorSet(pool.vk, layout.setLayout);
 
         if(pipelines.eagerCompute)
             ensurePipeline();

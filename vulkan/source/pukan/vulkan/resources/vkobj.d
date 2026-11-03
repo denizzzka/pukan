@@ -21,6 +21,8 @@ enum VkHandleKind: uint
     semaphore,
     fence,
     commandPool,
+    descriptorSetLayout,
+    descriptorPool,
 
     count,
 }
@@ -75,6 +77,22 @@ template VkHandleInfo(Handle)
         enum createParent = VkParentKind.device;
         enum destroyParent = VkParentKind.device;
         enum kind = VkHandleKind.commandPool;
+    }
+    else static if(is(Handle == VkDescriptorSetLayout))
+    {
+        alias CreateInfo = VkDescriptorSetLayoutCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.descriptorSetLayout;
+    }
+    else static if(is(Handle == VkDescriptorPool))
+    {
+        alias CreateInfo = VkDescriptorPoolCreateInfo;
+        enum hasCreate = true;
+        enum createParent = VkParentKind.device;
+        enum destroyParent = VkParentKind.device;
+        enum kind = VkHandleKind.descriptorPool;
     }
     else
         static assert(false, "unsupported Vulkan handle: " ~ name);
@@ -303,4 +321,7 @@ unittest
     static assert(VkHandleInfo!VkSemaphore.kind == VkHandleKind.semaphore);
     static assert(VkHandleInfo!VkFence.kind == VkHandleKind.fence);
     static assert(VkHandleInfo!VkCommandPool.kind == VkHandleKind.commandPool);
+    static assert(is(VkHandleInfo!VkDescriptorPool.CreateInfo == VkDescriptorPoolCreateInfo));
+    static assert(VkHandleInfo!VkDescriptorPool.kind == VkHandleKind.descriptorPool);
+    static assert(VkHandleInfo!VkDescriptorSetLayout.kind == VkHandleKind.descriptorSetLayout);
 }

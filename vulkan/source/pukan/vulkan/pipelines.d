@@ -10,6 +10,7 @@ import pukan.vulkan.helpers;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.pipeline_cache: PipelineCacheLoadException, PipelineCacheStore, PipelineVariantKey, PipelineVariantKeyBuilder;
 import pukan.vulkan.renderpass: RenderPass;
+import pukan.vulkan.resources.ownership: ResourceOwner;
 import pukan.vulkan.shaders: ShaderDecl, ShaderVertexInput, createLayoutBinding;
 import std.conv: to;
 
@@ -332,7 +333,7 @@ final class DescriptorAllocator
 
     private void addPool()
     {
-        pools ~= device.createDetachedDescriptorPool(bindings, setsPerPool);
+        pools ~= device.createDescriptorPool(bindings, setsPerPool);
         currentPool = cast(uint)(pools.length - 1);
         allocatedInCurrentPool = 0;
     }
@@ -584,6 +585,9 @@ final class PipelineFactory
 
     /// Guards the variant cache, the target list and the preload queue
     private Mutex mutex;
+
+    /// Pools and set layouts of every technique, freed with the factory
+    private ResourceOwner!true owner;
     private Condition condition;
     private bool stopping;
     private Thread preloadThread;
@@ -610,12 +614,18 @@ final class PipelineFactory
         Duration pipelineCreationTime;
     }
 
+    /// One interned set layout; the owner frees it after the pools built from it
+    private final class SetLayoutHandle
+    {
+        VkObj!VkDescriptorSetLayout layout;
+    }
+
     private VkDescriptorSetLayout[] setLayouts;
     private VkDescriptorSetLayoutBinding[][] setLayoutBindings;
     private PipelineLayoutEntry[] pipelineLayoutEntries;
     private ComputeLayoutEntry[] computeLayoutEntries;
 
-    private VkDescriptorSetLayout frameSetLayout;
+    private SetLayoutHandle frameSetLayout;
     private VkDescriptorSetLayoutBinding[] frameBindings;
 
     this(
@@ -629,10 +639,14 @@ final class PipelineFactory
         this.cacheManager = cacheManager;
         this.frameBindings = frameBindings;
 
-        frameSetLayout = device.createDescriptorSetLayout(frameBindings);
-
         mutex = new Mutex;
         condition = new Condition(mutex);
+        owner = new ResourceOwner!true("pipeline factory");
+
+        // Taken first, so it goes after every pool built from it
+        frameSetLayout = new SetLayoutHandle;
+        frameSetLayout.layout = device.createDescriptorSetLayout(frameBindings);
+        owner.own(frameSetLayout);
 
         if(preload)
         {
@@ -654,10 +668,8 @@ final class PipelineFactory
             preloadThread.join();
         }
 
-        // Sets of the primitives live in these pools, so they go with them
-        foreach(ref technique; techniques)
-            if(technique.allocator)
-                destroy(technique.allocator);
+        if(owner)
+            destroy(owner);
 
         debug logCacheSummary();
     }
@@ -675,7 +687,7 @@ final class PipelineFactory
 
     DescriptorAllocator createFrameAllocator()
     {
-        return new DescriptorAllocator(device, frameSetLayout, frameBindings, 16);
+        return new DescriptorAllocator(device, frameSetLayout.layout.vk, frameBindings, 16);
     }
 
     private struct TechniqueIdentity
@@ -797,6 +809,7 @@ final class PipelineFactory
             entry.bindings = bindings;
             entry.setsPerPool = setsPerPool;
             entry.allocator = new DescriptorAllocator(device, setLayout, bindings, setsPerPool);
+            owner.own(entry.allocator);
 
             techniques ~= entry;
             techniqueByKey[key] = TechniqueId(cast(uint)(techniques.length - 1));
@@ -978,7 +991,10 @@ final class PipelineFactory
 
         ref technique = techniques[id.value];
 
-        return new DescriptorAllocator(device, technique.setLayout, technique.bindings, technique.setsPerPool);
+        auto allocator = new DescriptorAllocator(device, technique.setLayout, technique.bindings, technique.setsPerPool);
+        owner.own(allocator);
+
+        return allocator;
     }
 
     string techniqueName(PipelineKey key) const
@@ -1001,12 +1017,14 @@ final class PipelineFactory
             if(existing == bindings)
                 return setLayouts[i];
 
-        auto layout = device.createDescriptorSetLayout(bindings);
+        auto handle = new SetLayoutHandle;
+        handle.layout = device.createDescriptorSetLayout(bindings);
+        owner.own(handle);
 
-        setLayouts ~= layout;
+        setLayouts ~= handle.layout.vk;
         setLayoutBindings ~= bindings.dup;
 
-        return layout;
+        return handle.layout.vk;
     }
 
     private VkPipelineLayout internPipelineLayout(
@@ -1018,7 +1036,7 @@ final class PipelineFactory
             if(entry.setLayout == setLayout && entry.pushConstants == pushConstants)
                 return entry.layout;
 
-        auto layout = createPipelineLayout(device, [setLayout, frameSetLayout], pushConstants);
+        auto layout = createPipelineLayout(device, [setLayout, frameSetLayout.layout.vk], pushConstants);
         device.registerPipelineLayout(layout);
 
         pipelineLayoutEntries ~= PipelineLayoutEntry(setLayout, pushConstants.dup, layout);

@@ -2,77 +2,63 @@ module pukan.vulkan.descriptors;
 
 import pukan.vulkan.bindings;
 import pukan.vulkan.helpers: vkCall, vkCheck;
+import pukan.vulkan.resources.vkobj: VkObj;
+
+/// Descriptors of each type that `maxSets` sets of these bindings need
+VkDescriptorPoolSize[] descriptorPoolSizes(
+    scope const(VkDescriptorSetLayoutBinding)[] bindings,
+    uint maxSets,
+)
+{
+    VkDescriptorPoolSize[] poolSizes;
+
+    foreach(ref binding; bindings)
+    {
+        size_t existing = poolSizes.length;
+
+        foreach(i, ref poolSize; poolSizes)
+            if(poolSize.type == binding.descriptorType)
+            {
+                existing = i;
+                break;
+            }
+
+        if(existing == poolSizes.length)
+            poolSizes ~= VkDescriptorPoolSize(binding.descriptorType, binding.descriptorCount * maxSets);
+        else
+            poolSizes[existing].descriptorCount += binding.descriptorCount * maxSets;
+    }
+
+    return poolSizes;
+}
 
 package mixin template DescriptorPools()
 {
-    import lockfree.list: LockFreeList;
-    private VkDescriptorSetLayout[] descriptorLayouts;
-    /* private FIXME*/ LockFreeList!PoolAndLayoutInfo descriptorPools;
+    import pukan.vulkan.descriptors: descriptorPoolSizes;
 
-    VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
+    /// Creates a set layout the caller owns; it must outlive the pools built from it
+    VkObj!VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings)
     {
         synchronized(this)
         {
-            VkDescriptorSetLayoutCreateInfo descrLayoutCreateInfo = {
-                bindingCount: cast(uint) descriptorSetLayoutBindings.length,
-                pBindings: descriptorSetLayoutBindings.ptr,
-            };
-
-            VkDescriptorSetLayout layout;
-            vkCall(this.device, &descrLayoutCreateInfo, this.alloc, &layout);
-            descriptorLayouts ~= layout;
-
-            return layout;
-        }
-    }
-
-    LockFreeList!(PoolAndLayoutInfo).Elem createDescriptorPool(VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings, uint maxSets)
-    {
-        auto layout = createDescriptorSetLayout(descriptorSetLayoutBindings);
-
-        return createDescriptorPool(layout, descriptorSetLayoutBindings, maxSets);
-    }
-
-    LockFreeList!(PoolAndLayoutInfo).Elem createDescriptorPool(
-        VkDescriptorSetLayout layout,
-        VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings,
-        uint maxSets,
-    )
-    {
-        auto pool = createDetachedDescriptorPool(descriptorSetLayoutBindings, maxSets);
-
-        return descriptorPools.insertOne((ref PoolAndLayoutInfo e) {
-            e = PoolAndLayoutInfo(
-                descriptorPool: pool,
-                descriptorSetLayout: layout,
+            return VkObj!VkDescriptorSetLayout(
+                this.device,
+                this.alloc,
+                VkDescriptorSetLayoutCreateInfo(
+                    bindingCount: cast(uint) descriptorSetLayoutBindings.length,
+                    pBindings: descriptorSetLayoutBindings.ptr,
+                ),
             );
-        });
+        }
     }
 
-    /// Creates a pool the caller destroys; the device does not track it
-    VkDescriptorPool createDetachedDescriptorPool(
-        VkDescriptorSetLayoutBinding[] descriptorSetLayoutBindings,
+    /// Creates a pool the caller frees; its sets die with a reset or the pool
+    VkDescriptorPool createDescriptorPool(
+        scope const(VkDescriptorSetLayoutBinding)[] bindings,
         uint maxSets,
     )
     {
-        VkDescriptorPoolSize[] poolSizes;
-
-        foreach(ref binding; descriptorSetLayoutBindings)
-        {
-            size_t existing = poolSizes.length;
-
-            foreach(i, ref poolSize; poolSizes)
-                if(poolSize.type == binding.descriptorType)
-                {
-                    existing = i;
-                    break;
-                }
-
-            if(existing == poolSizes.length)
-                poolSizes ~= VkDescriptorPoolSize(binding.descriptorType, binding.descriptorCount * maxSets);
-            else
-                poolSizes[existing].descriptorCount += binding.descriptorCount * maxSets;
-        }
+        auto poolSizes = descriptorPoolSizes(bindings, maxSets);
 
         VkDescriptorPoolCreateInfo descriptorPoolInfo = {
             poolSizeCount: cast(uint) poolSizes.length,
@@ -86,23 +72,13 @@ package mixin template DescriptorPools()
         return pool;
     }
 
-    private void descriptorPoolsDtor()
-    {
-        foreach(ref e; descriptorPools)
-            if(e.descriptorPool)
-                vkDestroyDescriptorPool(this.device, e.descriptorPool, this.alloc);
-
-        foreach(layout; descriptorLayouts)
-            vkDestroyDescriptorSetLayout(this.device, layout, this.alloc);
-    }
-
-    VkDescriptorSet allocateDescriptorSet(ref PoolAndLayoutInfo layout)
+    VkDescriptorSet allocateDescriptorSet(VkDescriptorPool pool, VkDescriptorSetLayout layout)
     {
         VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
             sType: VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            descriptorPool: layout.descriptorPool,
+            descriptorPool: pool,
             descriptorSetCount: 1,
-            pSetLayouts: &layout.descriptorSetLayout,
+            pSetLayouts: &layout,
         };
 
         VkDescriptorSet ret;
@@ -115,12 +91,6 @@ package mixin template DescriptorPools()
     {
         vkUpdateDescriptorSets(device, cast(uint) writeDescriptorSets.length, writeDescriptorSets.ptr, 0, null);
     }
-}
-
-struct PoolAndLayoutInfo
-{
-    VkDescriptorPool descriptorPool;
-    VkDescriptorSetLayout descriptorSetLayout;
 }
 
 VkWriteDescriptorSet bufferWriteDescriptor(

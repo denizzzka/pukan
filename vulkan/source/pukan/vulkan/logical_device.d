@@ -4,7 +4,6 @@ import core.sync.mutex: Mutex;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.core: Instance;
-import pukan.vulkan.descriptors: PoolAndLayoutInfo;
 import pukan.vulkan.helpers: vkCall, vkCheck;
 import pukan.vulkan.memory: DeviceMemory, MemoryBufferMappedToCPU;
 import pukan.vulkan.physical_device: PhysicalDevice;
@@ -16,6 +15,7 @@ import pukan.vulkan.resources.vkobj: VkObj;
 
 import log = std.logger;
 import std.exception: enforce;
+import std.conv: to;
 import std.string: toStringz;
 
 class LogicalDevice
@@ -143,8 +143,22 @@ class LogicalDevice
             memoryDtor();
             imagesDtor();
             pipelinesDtor();
-            descriptorPoolsDtor();
             shadersDtor();
+
+            debug
+            {
+                import pukan.vulkan.resources.vkobj: VkHandleKind, liveVkHandles;
+
+                // The instance and its surface outlive their device
+                foreach(kind; [
+                    VkHandleKind.semaphore, VkHandleKind.fence,
+                    VkHandleKind.commandPool, VkHandleKind.descriptorSetLayout,
+                    VkHandleKind.descriptorPool,
+                ])
+                    assert(liveVkHandles(kind) == 0,
+                        "a Vulkan object of kind " ~ kind.to!string ~ " outlived the device");
+            }
+
             vkDestroyDevice(device, alloc);
         }
     }
