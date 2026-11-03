@@ -140,6 +140,17 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
     private DrawableByVulkan[] instances;
     private GodotSkin[] skins;
 
+    /// Every part of the scene, registered once so a frame does not walk the nodes
+    private Part[] parts;
+    private bool partsRegistered;
+
+    private struct Part
+    {
+        PbrMesh mesh;
+        DrawableByVulkan instance;
+        Matrix4x4f world;
+    }
+
     package(pukan) this(
         PbrPipelines pipelines,
         LogicalDevice device,
@@ -375,6 +386,40 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
             instance.refreshBuffers(buf);
     }
 
+    /// Registers every part once; a frame draws from this list instead of the nodes
+    private void registerParts()
+    {
+        if(partsRegistered)
+            return;
+
+        void collect(Matrix4x4f trans, GodotNode node, bool mirrored)
+        {
+            if(!node.visible)
+                return;
+
+            trans *= node.local;
+
+            debug mirrored = mirrored != node.local.mirrors;
+
+            foreach(mesh; node.meshes)
+            {
+                debug assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
+
+                parts ~= Part(mesh, null, trans);
+            }
+
+            if(node.instance !is null)
+                parts ~= Part(null, node.instance, trans);
+
+            foreach(child; node.children)
+                collect(trans, child, mirrored);
+        }
+
+        collect(Matrix4x4f.identity, root, false);
+
+        partsRegistered = true;
+    }
+
     void drawingBufferFilling(
         VkCommandBuffer buf,
         Matrix4x4f trans,
@@ -382,6 +427,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
         DrawPhase phase = DrawPhase.surface,
     )
     {
+        registerParts();
+
         static struct MeshDraw
         {
             PbrMesh mesh;
@@ -389,37 +436,32 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
             float depth;
         }
 
-        void collect(Matrix4x4f trans, GodotNode node, ref MeshDraw[] draws, bool mirrored)
+        static struct InstanceDraw
         {
-            if(!node.visible)
-                return;
-
-            trans *= node.local;
-
-            debug
-            {
-                mirrored = mirrored != node.local.mirrors;
-
-                foreach(mesh; node.meshes)
-                    assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
-            }
-
-            foreach(mesh; node.meshes)
-            {
-                //TODO: cull skinned meshes by their posed bounds
-                if(!mesh.hasSkin && !isVisible(mesh.localAABB, trans))
-                    continue;
-
-                const clip = Vector4f(0, 0, 0, 1) * trans;
-                draws ~= MeshDraw(mesh, trans, clip.w);
-            }
-
-            foreach(child; node.children)
-                collect(trans, child, draws, mirrored);
+            DrawableByVulkan instance;
+            Matrix4x4f trans;
         }
 
         MeshDraw[] draws;
-        collect(trans, root, draws, false);
+        InstanceDraw[] instancesToDraw;
+
+        foreach(part; parts)
+        {
+            if(part.mesh is null)
+            {
+                instancesToDraw ~= InstanceDraw(part.instance, trans * part.world);
+                continue;
+            }
+
+            const mvp = trans * part.world;
+
+            //TODO: cull skinned meshes by their posed bounds
+            if(!part.mesh.hasSkin && !isVisible(part.mesh.localAABB, mvp))
+                continue;
+
+            const clip = Vector4f(0, 0, 0, 1) * mvp;
+            draws ~= MeshDraw(part.mesh, mvp, clip.w);
+        }
 
         if(phase == DrawPhase.blended)
             draws.sort!((a, b) => a.depth > b.depth);
@@ -458,34 +500,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, Spatial, PipelineWa
                 if(matchesPhase(draw.mesh, phase))
                     draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
 
-        void drawInstances(GodotNode node, Matrix4x4f trans)
-        {
-            if(!node.visible)
-                return;
-
-            trans *= node.local;
-
-            if(node.instance !is null)
-            {
-                debug
-                {
-                    import std.stdio: writeln;
-                    static bool printed;
-                    if(!printed)
-                    {
-                        printed = true;
-                        writeln("GodotScene instance draw ", node.name, " phase ", phase);
-                    }
-                }
-
-                node.instance.drawingBufferFilling(buf, trans, frameSet, phase);
-            }
-
-            foreach(child; node.children)
-                drawInstances(child, trans);
-        }
-
-        drawInstances(root, trans);
+        foreach(draw; instancesToDraw)
+            draw.instance.drawingBufferFilling(buf, draw.trans, frameSet, phase);
     }
 
     private static void destroyInstance(DrawableByVulkan instance)

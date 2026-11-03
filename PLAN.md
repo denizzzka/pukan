@@ -807,10 +807,10 @@ Before each slice, read the matching reference named in
         scene.
 
 - **Spatial index and GPU-driven draws**
-  - [ ] Register the flat part list once: `Spatial` reports every part with its
-        key, transform and bounds, the drawable records from that list instead
-        of walking its nodes every frame, and cells own the parts. A view asks
-        for the parts of its resident cells.
+  - [ ] Cells own the parts of a drawable: `Spatial` reports each part with the
+        key that records it, so a cell can hold a part and a view can ask for
+        the parts of its resident cells. Static scenes register their parts once;
+        animated ones, such as glTF, still update transforms per frame.
   - [ ] Cull by cost in Unreal's order: distance first, then frustum, then
         occlusion. Cells bound the first step, the index the second.
   - [ ] One index over the loaded cells: a BVH or octree per cell with a flat
