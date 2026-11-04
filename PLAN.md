@@ -874,13 +874,13 @@ Before each slice, read the matching reference named in
 
 - **Occlusion**
 
-  A CPU raster of box occluders exists (`--occlusion`): the near cells' items are
-  drawn as six-faced boxes into a small depth grid, and `gatherParts` and
-  `drawParts` skip a part whose screen rectangle is fully behind it. It culls
-  6% of the field and nothing of the indoor sample, because a box covers more
-  screen than the surface it stands for.
-  - [ ] Depth pyramid from the previous frame's depth in the cull kernel, so an
-        instance is tested against real geometry instead of boxes.
+  A coarse grid exists (`--occlusion`), filled by a compute pass from the frame's
+  real depth one frame back; `gatherParts` and `drawParts` skip a part whose
+  screen rectangle is fully behind it. Its 192 by 144 cells and the full
+  rectangle rule leave 4 of the indoor sample's 998 parts hidden.
+  - [ ] Test each instance inside the cull kernel against a depth pyramid, so
+        the grid resolution stops bounding the win and the GPU keeps the
+        instances the CPU never learns about.
   - [ ] Portals and PVS for closed interiors: a room graph with portal frustums,
         so rooms behind walls never enter the list. Judge it against HiZ inside
         the truck town interiors.
