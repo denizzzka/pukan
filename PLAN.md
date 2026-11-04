@@ -848,12 +848,14 @@ Before each slice, read the matching reference named in
   Far cells are cheap by two steps. A cell beyond `--impostor-distance` is one
   card captured from the direction it arrived from. A cell beyond
   `--proxy-distance` merges its static parts into one mesh per material, clipped
-  to the cell and carrying generated index levels; the merge runs once, on the
-  first frame the cell is far, from the CPU side of the pieces the cell already
-  holds.
+  to the cell and carrying generated index levels; the merge runs as the cell
+  arrives, on a byte budget per frame, from the CPU side of the pieces the cell
+  already holds.
   - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
         Godot importer stores, instead of only from the generated ones.
-  - [ ] Numbers per ring on the fixed scene: triangles, draws and frame time.
+  - [ ] A ring test scene whose meshes belong to one cell: the samples merge
+        each material over the whole map, so a cell cannot cut what it draws and
+        the rings save nothing. `bench/hlod.md` holds the numbers.
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
