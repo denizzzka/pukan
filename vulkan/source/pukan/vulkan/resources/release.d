@@ -56,16 +56,12 @@ final class ReleaseQueue
 
         synchronized(mutex)
         {
-            if(count < entries.length)
-            {
-                entries[count++] = Entry(release, handle);
-                return;
-            }
-        }
+            // A retiring burst grows the queue instead of freeing into a frame
+            if(count == entries.length)
+                entries.length = entries.length * 2;
 
-        // The queue is full, so the handle goes now rather than never
-        //TODO: a burst can put a handle back in flight; grow instead of freeing
-        release(vkDevice, handle, alloc);
+            entries[count++] = Entry(release, handle);
+        }
     }
 
     /// Queues a holder, whose destructor releases what it owns
@@ -76,40 +72,45 @@ final class ReleaseQueue
 
         synchronized(mutex)
         {
-            if(count < entries.length)
-            {
-                entries[count++] = Entry(null, null, holder);
-                return;
-            }
-        }
+            if(count == entries.length)
+                entries.length = entries.length * 2;
 
-        destroy(holder);
+            entries[count++] = Entry(null, null, holder);
+        }
     }
 
     /// Runs the queued releases no frame in flight can still reference
     void flush(uint framesInFlight)
     {
+        Entry[] due;
+
         synchronized(mutex)
         {
-            foreach(i; 0 .. count)
-                ++entries[i].age;
+            foreach(ref entry; entries[0 .. count])
+                ++entry.age;
 
-            while(count && entries[0].age > framesInFlight)
-            {
-                auto entry = entries[0];
-                const rest = count - 1;
+            size_t taken;
 
-                foreach(i; 0 .. rest)
-                    entries[i] = entries[i + 1];
+            while(taken < count && entries[taken].age > framesInFlight)
+                ++taken;
 
-                count = rest;
+            if(taken == 0)
+                return;
 
-                if(entry.release !is null)
-                    entry.release(vkDevice, entry.handle, alloc);
-                else
-                    destroy(entry.holder);
-            }
+            due = entries[0 .. taken].dup;
+
+            foreach(i; 0 .. count - taken)
+                entries[i] = entries[i + taken];
+
+            count -= taken;
         }
+
+        // Outside the lock, because a holder's destructor may retire again
+        foreach(entry; due)
+            if(entry.release !is null)
+                entry.release(vkDevice, entry.handle, alloc);
+            else
+                destroy(entry.holder);
     }
 
     /// Whether a release still waits for the frames in flight

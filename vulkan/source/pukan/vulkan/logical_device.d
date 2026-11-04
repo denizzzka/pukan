@@ -320,7 +320,9 @@ class Fence
 
     void wait()
     {
-        vkWaitForFences(device, 1, fence.vkPtr, VK_TRUE, uint.max).vkCheck;
+        // The timeout is in nanoseconds; a heavy frame on a software driver can
+        // take longer than the four seconds a uint counts
+        vkWaitForFences(device, 1, fence.vkPtr, VK_TRUE, ulong.max).vkCheck;
     }
 
     void reset()

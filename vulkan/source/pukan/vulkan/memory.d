@@ -100,6 +100,7 @@ class MemoryBuffer : DeviceMemory
     {
         auto created = VkObj!VkBuffer(device.releaseQueue, createInfo);
 
+
         VkMemoryRequirements memRequirements;
         vkGetBufferMemoryRequirements(device.device, created.vk, &memRequirements);
 
@@ -222,7 +223,10 @@ class TransferBuffer
     ~this()
     {
         releaseGPU();
-        destroy(cpuBuffer);
+
+        // The copies that read it may still be in flight
+        if(cpuBuffer)
+            device.releaseQueue.retireHolder(cpuBuffer);
     }
 
     auto ref cpuBuf() => cpuBuffer.cpuBuf;
