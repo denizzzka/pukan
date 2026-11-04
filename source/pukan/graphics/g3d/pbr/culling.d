@@ -31,11 +31,9 @@ struct CullInstances
 /// What the kernel left for one level: its packed matrices and the draw command
 struct CullBatch
 {
-    VkBuffer visible;
     VkDeviceSize visibleOffset;
     /// Bytes the kept matrices may occupy, from the batch offset
     VkDeviceSize visibleSize;
-    VkBuffer args;
     VkDeviceSize argsOffset;
     /// Element offset of this batch in the instance list
     uint instanceOffset;
@@ -127,6 +125,10 @@ final class CullFrame
             destroy(buffer);
     }
 
+    /// Where the kernel puts the matrices and commands it keeps
+    VkBuffer visibleBuffer() => visibleBuf.buf;
+    VkBuffer argsBuffer() => argsBuf.buf;
+
     /// Forgets the batches of the previous frame and frees what they replaced
     void reset()
     {
@@ -187,10 +189,8 @@ final class CullFrame
         ];
 
         auto batch = CullBatch(
-            visible: visibleBuf.buf,
             visibleOffset: visibleUsed,
             visibleSize: visibleBytes,
-            args: argsBuf.buf,
             argsOffset: argsUsed,
             instanceOffset: instances.offset,
             instances: cast(uint) instances.count,
@@ -283,21 +283,26 @@ final class CullFrame
         if(buffer && buffer.cpuBuf.length >= needed)
             return buffer;
 
-        // The frame in flight may still read the old buffer, so it waits for
-        // the next reset instead of dying here
-        if(buffer)
-            retired ~= buffer;
-
         // Headroom, so a cell that arrives does not force a move every frame
         const grown = needed + needed / 2;
         const capacity = grown < 4096 ? 4096 : grown;
 
-        return device.create!MemoryBufferMappedToCPU(
+        auto replaced = device.create!MemoryBufferMappedToCPU(
             capacity,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
                 | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
                 | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         );
+
+        // Batches reserved before the move still read their offsets, so the
+        // bytes already written have to come along
+        if(buffer)
+        {
+            replaced.cpuBuf[0 .. buffer.cpuBuf.length] = buffer.cpuBuf;
+            retired ~= buffer;
+        }
+
+        return replaced;
     }
 
     /// Points the kernel at the three frame buffers

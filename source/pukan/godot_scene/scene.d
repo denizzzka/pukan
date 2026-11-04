@@ -750,10 +750,14 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             {
                 const maxDepth = level + 1 < levels ? thresholds[level + 1] : float.max;
 
+                // The depth of a part is its origin's, which a part that holds
+                // the camera can have behind it; the finest level takes those
+                const minDepth = level == 0 ? -float.max : thresholds[level];
+
                 gatheredMesh.batches[level] = currentCullFrame.reserveLevel(
                     instances, gatheredMesh.mesh.indexCount(level));
                 currentCullFrame.dispatch(buf, instances, gatheredMesh.batches[level],
-                    thresholds[level], maxDepth);
+                    minDepth, maxDepth);
             }
         }
     }

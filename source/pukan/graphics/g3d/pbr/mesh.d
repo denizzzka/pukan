@@ -6,7 +6,7 @@ import pukan.graphics.common.misc: Boxf, expandAABB, hasBounds, mergeAabb;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.graphics.g3d.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
 import pukan.graphics.g3d.pbr.accessor;
-import pukan.graphics.g3d.pbr.culling: CullBatch;
+import pukan.graphics.g3d.pbr.culling: CullBatch, currentCullFrame;
 import pukan.graphics.g3d.pbr.instancing: InstanceBatch, currentInstanceArena;
 import pukan.graphics.g3d.stats: countDraw, triangleCount;
 import pukan.vulkan.bindings;
@@ -376,14 +376,13 @@ final class PbrGeometry
         VkCommandBuffer buf,
         GraphicsPipelineCfg pipeline,
         in CullBatch batch,
+        VkBuffer visible,
+        VkBuffer args,
         VkFrontFace frontFace,
         VkDescriptorSet descriptorSet,
         size_t level = 0,
     )
     {
-        // The handles are taken by address, so the const of the argument goes
-        auto visible = cast(VkBuffer) batch.visible;
-        auto args = cast(VkBuffer) batch.args;
         auto argsOffset = batch.argsOffset;
 
         assert(buffers.length == staticInstanceBinding);
@@ -642,7 +641,11 @@ final class PbrMesh : Mesh
                 null,
             );
 
-        geometry.drawInstancedIndirect(buf, pipeline, batch, frontFace, descriptorSet, level);
+        geometry.drawInstancedIndirect(
+            buf, pipeline, batch,
+            currentCullFrame.visibleBuffer, currentCullFrame.argsBuffer,
+            frontFace, descriptorSet, level,
+        );
 
         const count = geometry.indexCountOf(level);
         countDraw(batch.instances, triangleCount(count ? count : geometry.vertexCount) * batch.instances);
