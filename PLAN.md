@@ -3,16 +3,6 @@
 Checkboxes track open work. Items can be done in any order; the order below is
 only a suggested grouping.
 
-## CI
-
-The workflow in `.github/workflows/ci.yml` fails on GitHub Actions: the run exits
-non-zero and the Vulkan library reports an error on the way out, so the job ends
-on the exit path rather than on a check it makes.
-
-- [ ] Reproduce the run under Xvfb and lavapipe and find what the Vulkan library
-      complains about at exit, then fix the exit or the teardown it reports.
-      Keep the job green only when nothing real is behind the message.
-
 ## Reported bugs
 
 Symptoms as reported, cause unknown; an item stays open until the fixed scene
@@ -83,6 +73,20 @@ graph, and dlib's containers predate ranges. The gain is the algorithm, its
 tests and the corner cases already paid for.
 
 ## Content formats
+
+### glTF
+
+The loader reads geometry, materials and animation; LOD extensions are not
+handled yet, so an asset that carries them must fail loudly rather than draw one
+level and look right.
+
+- [ ] `MSFT_lod`: check `extensionsUsed` on load and assert when it lists the
+      extension, with a message saying the engine does not support it yet, so
+      the first asset that needs it shows up instead of silently drawing a
+      single level.
+- [ ] Node-based LOD levels: a mesh split into sibling nodes for distance bands;
+      assert the same way, to learn how often assets carry them at all before
+      committing to support.
 
 ### Godot 4 scenes
 
@@ -203,6 +207,11 @@ Fixtures live in `demo_godot/godot_samples/`.
   - [ ] verify that each part renders, that shared geometry and glTF assets are
         counted once, and that the skipped counters aggregate;
   - [ ] README and fixture list.
+
+### Unreal Engine assets
+
+- [ ] Long-term: load cooked Unreal packages (`.uasset`, `.uexp`, `.ubulk`) as
+      another content source.
 
 ## Mover
 
@@ -383,7 +392,7 @@ the contract, not the binding.
       jump, crouch, attack, use, view angles and tick. The default character preset
       ships it as an example; games add their own fields.
 - [ ] Optional reference mapper with rebindable actions, dead zones and sensitivity,
-      shipped as a demo utility, not baked into the controller.
+      shipped in the game runtime subpackage, not baked into the controller.
 - [ ] Input commands are tick-stamped, fixed-step and serializable; the same struct feeds
       local play, replay and the network backend.
 - [ ] Support synthetic input for tests, AI and cutscenes without a window.
@@ -712,34 +721,33 @@ cascades and no local-light shadows. Missing:
 
 ## Depth buffer
 
-The scene pass and the sun's shadow map share `DepthBuf.format`,
-`D24_UNORM_S8_UINT`. The stencil bits are unused: every attachment is created
-with `DONT_CARE` and the pipelines keep stencil testing off. Depth precision is
-what makes the truck town windows flicker at distance, and both steps below are
-long-term work.
+Z-fighting is visible: the truck town windows flicker at distance. Reverse Z is
+the industry standard and becomes the default, not an experiment. It also
+permits a far clip plane at infinity, which a projective matrix maps to depth
+zero, so the distance would cost no precision; the finite plane stays for now.
+The scene pass and the sun's shadow map share `DepthBuf.format`; the stencil
+bits are unused, since every attachment is created with `DONT_CARE` and the
+pipelines keep stencil testing off.
 
-- [ ] Switch the depth attachment to `D32_SFLOAT` on its own, keeping the
-      current Z convention. It costs the same 32 bits per sample as the 24-bit
-      format with stencil and drops a stencil the engine never uses. Alone it
-      buys little: float depth keeps its relative precision near 1.0 with a
-      normal projection, so this is groundwork for the next item rather than a
-      fix. Measure the change on the truck town window flicker before keeping
-      it.
-- [ ] Make reverse Z a compile-time choice of the swapchain, or of whichever
-      object owns the presented frame, rather than a project-wide switch: the
-      depth target and the projection rendered into it share one convention,
-      and every pass that reads that target follows it. Keep the current
-      convention as the default and as the fallback for hardware without
-      usable float depth. Flip the projection, the clear depth, every depth
-      compare, the OIT sorting and the `min`/`max` in the resolve, and retune
-      the shadow bias; decide separately whether the sun's shadow map follows
-      or stays conventional. Ship one build per convention rather than a
-      runtime switch, with no two conventions on one target. Check it on the
-      truck town house windows at distance and while the camera turns: the
-      wall and the window decals must stop flickering.
-- [ ] Test both builds on the fixed scene: the truck town windows must stop
-      flickering at distance, and the OIT, transmission and shadow results must
-      match the normal-Z build apart from precision.
+- [ ] `D32_SFLOAT` with reverse Z in the default build. The format costs the
+      same 32 bits per sample as the 24-bit one with stencil, which the engine
+      never uses, and it keeps that precision spread over the whole range
+      instead of piling it up near 1.0 the way normal Z does.
+- [ ] Flip the projection, the clear depth, every depth compare, the OIT sorting
+      and the `min`/`max` in the resolve, and retune the shadow bias. Both
+      targets follow the same convention: the scene pass and the sun's shadow
+      map.
+- [ ] Hold the convention in a compile-time choice of the swapchain, or of
+      whichever object owns the presented frame, rather than a project-wide
+      switch: the depth target and the projection rendered into it share one
+      convention, and every pass that reads that target follows it. Ship one
+      build per convention rather than a runtime switch, with no two
+      conventions on one target.
+- [ ] Keep normal Z as a build of its own through the same choice, for
+      comparison and for hardware without usable float depth.
+- [ ] Test on the fixed scene: the truck town windows must stop flickering at
+      distance and while the camera turns, and OIT, transmission and shadow
+      results must match the normal-Z build apart from precision.
 
 ## Deferred shading
 
@@ -1266,6 +1274,26 @@ costs what importing the whole engine costs.
   helps. The library build compiles all sources either way, so the gain is on
   the application side: 3.2 s against 0.4 s and 5 MB against 0.6 MB for a
   trivial app.
+
+## Game runtime subpackage
+
+A game needs a window, device input and sound around the renderer, and none of
+that belongs in a library that also runs headless or inside another host. The
+working name is `pukan.game`; the final one is chosen when the package is
+created.
+
+- [ ] Move the window and the event loop out of `demo` and `demo_godot` into the
+      subpackage, together with the `glfw-d` dependency: instance extensions,
+      the surface, framebuffer size, the close flag and time. A build without
+      the subpackage links no GLFW and creates no window.
+- [ ] Device input reading: keyboard, mouse, cursor and gamepad, filling the
+      `usercmd` contract from `### Input`; the rebindable action mapper with
+      dead zones and sensitivity lives here instead of in a demo.
+- [ ] Sound extraction from the content formats: decode `AudioStreamWAV` and
+      `AudioStreamOggVorbis` from a Godot scene or pack into one mixer format,
+      and report the streams the loader cannot read instead of skipping them.
+- [ ] A mixer and a playback backend on top, so a level's sounds follow the
+      same scene graph that gives its meshes and transforms.
 
 ## Swapchain creation
 
