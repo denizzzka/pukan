@@ -107,20 +107,22 @@ thin cell layer, so a large range enumerates hundreds of empty vertical cells.
 
 ## Occlusion on the field and the town
 
-The coarse CPU depth grid (`--occlusion`) rasterizes the items of the near cells
-as boxes and drops a part when every sample of its screen rectangle lies behind
-a surface.
+The coarse CPU depth grid (`--occlusion`) holds one nearest depth per block of a
+192 by 144 grid, filled by a compute pass that samples the frame's multisampled
+depth. A part is dropped when every sample of its screen rectangle lies behind
+what the grid holds.
 
 | Scene | Parts drawn | With the grid | Frame mean |
 |---|---|---|---|
-| field, dense cells | 831.8 | 783.4 (50 dropped) | 71.46 ms -> 67.51 ms |
-| occlusion_culling | 994.4 | 994.4 (10 dropped) | 2182 ms -> 2205 ms |
-| truck_town | 2.0 | 2.0 (none dropped) | 38.88 ms -> 38.58 ms |
+| occlusion_culling | 998.0 | 995.7 (4 dropped) | 2090 ms -> 2129 ms |
+| truck_town | 2.0 | 2.0 (none dropped) | 39.12 ms -> 39.12 ms |
+| platformer, rings on | 0.0 | 0.0 (none dropped) | 30.73 ms -> 30.73 ms |
 
-A box is a poor occluder: its screen rectangle is larger than the surface it
-stands for, so the grid rarely covers a part completely. The field gains 6%,
-the indoor sample nothing measurable, and the town has too few near parts to
-matter.
+The test is conservative by construction: every sample of a part's screen
+rectangle has to lie behind a surface, and a coarse grid with box projections
+leaves the edges of that rectangle uncovered, so the win stays at a few parts.
+Climbing further needs the test per instance in the cull kernel, against a
+pyramid rather than a 192 by 144 grid.
 
 ## What the numbers say
 
