@@ -74,33 +74,36 @@ Loading it takes about 27 seconds with the validation build, most of it the
 ## Generated field
 
 `hlod_field/hlod_field.tscn`, 10 km square, 40 villages, 24,964 cells with
-`--no-cells`, camera at (120, 20, 160) looking at the origin.
+`--no-cells`, camera at (120, 20, 160) looking at the origin, 50 measured frames
+after 90 warm-up frames.
 
-| Rings | Ring | Draws | Instances | Triangles | Frame mean | p50 | p95 |
-|---|---|---|---|---|---|---|---|
-| off | near | 2,485.0 | 2,485.0 | 338,940 | 209.10 ms | 206 | 281 |
-| off | shadow | 149.1 | 149.1 | 20,336 | 209.10 ms | 206 | 281 |
-| proxy 300, cards 900 | near | 58.0 | 58.0 | 8,520 | 242.36 ms | 240 | 281 |
-| proxy 300, cards 900 | proxy | 745.7 | 745.7 | 803,195 | 242.36 ms | 240 | 281 |
-| proxy 300, cards 900 | shadow | 2,086.7 | 2,086.7 | 837,114 | 242.36 ms | 240 | 281 |
-| proxy 600, cards 1500 | proxy | 617.7 | 617.7 | 736,458 | 243.44 ms | 243 | 285 |
+| Rings | Ring | Draws | Triangles | Frame mean | p50 | p95 |
+|---|---|---|---|---|---|---|
+| off | near | 2,485.0 | 338,940 | 145.66 ms | 144 | 157 |
+| off | shadow | 149.1 | 20,336 | 145.66 ms | 144 | 157 |
+| proxy 300, cards 900, min 8 | near | 824.0 | 198,404 | 61.66 ms | 59 | 68 |
+| proxy 300, cards 900, min 8 | proxy | 11.0 | 68 | 61.66 ms | 59 | 68 |
+| proxy 300, cards 900, min 8 | shadow | 145.0 | 20,440 | 61.66 ms | 59 | 68 |
+| proxy 300, cards 900, min 24 | near | 2,349.0 | 327,404 | 140.00 ms | 137 | 160 |
 
-From inside the first village, camera at (40, 12, 40) looking at (80, 0, 80):
-parts 2,485 draws and 338,940 triangles at 262.33 ms; proxies 838 draws and
-994,375 triangles at 263.07 ms.
+With `--proxy-min-parts 8` the merge takes 162 of the 24,964 cells, the dense
+ones, and leaves 24,802 on the parts path. Those 162 cells are where the village
+geometry sits: merging them takes the frame from 145.7 ms to 61.7 ms, the draws
+from 2,485 to 835 and the submitted triangles from 338,940 to 198,472. At the
+old threshold of 24 only seven cells qualify and nothing changes.
 
-The field is the only scene here whose geometry belongs to its cells. On it the
-proxy ring trades draws for triangles: three times fewer draws, two to three
-times more triangles, and no gain in frame time. The parts path submits every
-part and lets the kernel drop the off-screen ones instance by instance, while a
-proxy is culled only as a whole cell, so a cell that is mostly empty still
-brings all its geometry. Cards never trigger: the field is a single flat layer
-and the camera sees across it.
+Two rules make that work. A cell below the threshold is decided once and never
+merged, so the parts path keeps its per-instance culling. A cell beyond the
+proxy distance without a proxy joins the near batch and draws through the cull
+kernel with the rest; routing it through a draw of its own, one cell at a time,
+was what made the earlier ring numbers look so bad.
 
-It also exposes two engine limits: a proxy per cell costs a descriptor set and
-a merge, which 24,964 cells make expensive, and the demo's streaming range is
-measured in metres against a thin cell layer, so a large range enumerates
-hundreds of empty vertical cells.
+Cards never trigger on the field: it is a single flat layer and the camera sees
+across it.
+
+The field also exposes two engine limits: a proxy costs a descriptor set and a
+merge per cell, and the demo's streaming range is measured in metres against a
+thin cell layer, so a large range enumerates hundreds of empty vertical cells.
 
 ## What the numbers say
 
