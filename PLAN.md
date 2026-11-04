@@ -878,9 +878,10 @@ Before each slice, read the matching reference named in
   real depth one frame back; `gatherParts` and `drawParts` skip a part whose
   screen rectangle is fully behind it. Its 192 by 144 cells and the full
   rectangle rule leave 4 of the indoor sample's 998 parts hidden.
-  - [ ] Test each instance inside the cull kernel against a depth pyramid, so
-        the grid resolution stops bounding the win and the GPU keeps the
-        instances the CPU never learns about.
+  - [ ] The kernel tests each instance against the previous frame's grid now,
+        for the camera's view only: applying it to the shadow pass would drop
+        casters the camera cannot see but the sun can. A shadow grid has to be
+        built from the sun's depth to cull there.
   - [ ] With glass on, sample the resolved depth instead of the multisampled
         one: the same compute, a `sampler2D` instead of a `sampler2DMS`, and
         the pass recorded after `resolveDepth`. That drops the extra read the
