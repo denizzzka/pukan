@@ -172,6 +172,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     {
         PbrMesh[] meshes;
         BufferPieceOnGPU[] pieces;
+        /// Bytes the pieces of this proxy uploaded
+        size_t bytes;
 
         ~this()
         {
@@ -885,15 +887,25 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         its pieces, so no decode happens twice. It is drawn instead of the cell's
         parts, and its index lists carry a coarse level for a distant view.
 
-        Returns: true once the cell has a proxy; false while a mesh of the cell
-        is still waiting for its upload.
+        Returns: bytes the proxy uploaded; zero when the cell already has one or
+        a mesh of it is still waiting for its upload.
     */
-    bool buildProxy(CellCoord cell, CellIndex!DrawItem index, VkCommandBuffer buf)
+    size_t buildProxy(CellCoord cell, CellIndex!DrawItem index, VkCommandBuffer buf)
     {
         registerParts();
 
         if(cell in proxies)
-            return true;
+            return 0;
+
+        // Decoding waits for every part, so a half loaded cell costs nothing
+        foreach(item; index.collect([cell]))
+        {
+            if(item.part == wholePart || !hasBounds(item.bounds))
+                return 0;
+
+            if(!partsReady([item.part]))
+                return 0;
+        }
 
         static struct Group
         {
@@ -957,7 +969,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
         // A cell with a part the proxy cannot take keeps its parts
         if(!complete || groups.length == 0)
-            return false;
+            return 0;
 
         auto proxy = new CellProxy;
         const cellBounds = index.grid.bounds(cell);
@@ -978,13 +990,39 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         if(proxy.meshes.length == 0)
         {
             destroy(proxy);
-            return false;
+            return 0;
         }
 
         // The proxy meshes took new material slots, so the buffer carries them
         materialBuffer.recordUpload(buf);
 
         proxies[cell] = proxy;
+
+        return proxy.bytes;
+    }
+
+    /// Whether every part behind `keys` is on the GPU, so a proxy can read it
+    private bool partsReady(scope const(size_t)[] keys)
+    {
+        registerParts();
+
+        foreach(key; keys)
+        {
+            ref record = parts[key];
+
+            if(record.mesh !is null)
+            {
+                if(record.mesh.hasSkin || !record.mesh.geometryReady)
+                    return false;
+
+                continue;
+            }
+
+            auto nested = cast(GodotScene) record.nested;
+
+            if(nested is null || !nested.partsReady([record.nestedKey]))
+                return false;
+        }
 
         return true;
     }
@@ -1164,6 +1202,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         (cast(T[]) piece.buffer.cpuBuf)[] = data;
         piece.recordUpload(buf);
         proxy.pieces ~= piece;
+        proxy.bytes += T.sizeof * data.length;
 
         return BufAccess(
             cast(ptrdiff_t) (proxy.pieces.length - 1),

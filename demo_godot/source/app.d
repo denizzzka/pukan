@@ -1018,6 +1018,8 @@ void main(string[] args)
 
     // Taken cells upload a byte budget at a time, so a heavy cell never stalls a frame
     enum cellUploadBudget = 1 << 20;
+    /// Bytes of merged geometry a frame may upload for new proxies
+    enum proxyBuildBudget = 1 << 20;
     enum maxLoadingCells = 16;
     CellCoord[] loadingCells;
 
@@ -1462,6 +1464,18 @@ void main(string[] args)
             const shadowViewProj = scene.sunShadow.viewProj * wtb.model;
             const activeCells = streaming ? residency.active() : levelCells;
 
+            // A proxy is built as soon as its cell is loaded, so crossing the
+            // proxy distance never shows the parts; a frame pays for a few
+            size_t proxyBytes;
+
+            foreach(cell; activeCells)
+            {
+                if(proxyBytes >= proxyBuildBudget)
+                    break;
+
+                proxyBytes += godotScene.buildProxy(cell, levelIndex, frame.commandBuffer);
+            }
+
             // A captured cell draws as one card; the rest keep their parts
             CellCoord[] nearCells;
             CellCoord[] farCells;
@@ -1541,10 +1555,6 @@ void main(string[] args)
                     capturePendingCells(buf, levelIndex, scene, impostors, cellImpostors,
                         pendingCaptures, camera.position, impostorRange,
                         frame.frameSets[0].descriptorSet);
-
-                    // A proxy is built once per cell, on the first frame it is far
-                    foreach(cell; proxyCells)
-                        godotScene.buildProxy(cell, levelIndex, buf);
 
                     if(cellCulling != CellCulling.gpu)
                         return;
