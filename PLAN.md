@@ -848,9 +848,10 @@ Before each slice, read the matching reference named in
   Far cells are cheap by two steps. A cell beyond `--impostor-distance` is one
   card captured from the direction it arrived from. A cell beyond
   `--proxy-distance` merges its static parts into one mesh per material, clipped
-  to the cell and carrying generated index levels; the merge runs as the cell
-  arrives, on a byte budget per frame, from the CPU side of the pieces the cell
-  already holds.
+  to the cell; the merge runs as the cell arrives, on a byte budget per frame,
+  from the CPU side of the pieces the cell already holds. A proxy draws the
+  merged list alone, because generated levels leave holes where every tile keeps
+  its own vertices.
   - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
         Godot importer stores, instead of only from the generated ones.
   - [ ] A ring test scene whose meshes belong to one cell: the samples merge
