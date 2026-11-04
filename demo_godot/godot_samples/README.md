@@ -1,6 +1,6 @@
 # Godot scene fixtures
 
-Three scenes come from the official Godot demo projects, one is generated
+Four scenes come from the official Godot demo projects, one is generated
 here, one is a small project exported as a PCK, and `cutout_shadow/` is written
 for this repository. They cover the text scene format, the binary RSRC format,
 ArrayMesh surfaces, primitive meshes, StandardMaterial3D, external glTF scenes,
@@ -18,6 +18,11 @@ Commit: `b761b4cd5718a7118f2c95eb55f181d0a5f004f1` (`master`).
   streams and screenshots are omitted, but `enemy.tscn` still declares them,
   so the loader must skip resource types it does not render. `stage/` is the
   ready-made GridMap landscape, with its cells and tile meshes.
+- `occlusion_culling/` is `3d/occlusion_culling_mesh_lod`: the scene, the room
+  and the door, without the scripts, the `.blend` source, the baked occluder,
+  the icon and the screenshots. A thousand rooms stand in a 64 by 64 grid, which
+  makes it the heavy indoor scene: no cells cut it down, so it is what the
+  occlusion work is judged on.
 - `truck_town/` is `3d/truck_town/town` with the project file and the
   `town_view.tscn` wrapper added here. The model, the trees, the lamps and the
   sky are kept as the `.scn` files Godot 4.7 imports; the raw `.gltf` sources,
