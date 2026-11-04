@@ -881,6 +881,10 @@ Before each slice, read the matching reference named in
   - [ ] Test each instance inside the cull kernel against a depth pyramid, so
         the grid resolution stops bounding the win and the GPU keeps the
         instances the CPU never learns about.
+  - [ ] With glass on, sample the resolved depth instead of the multisampled
+        one: the same compute, a `sampler2D` instead of a `sampler2DMS`, and
+        the pass recorded after `resolveDepth`. That drops the extra read the
+        two paths make today.
   - [ ] Portals and PVS for closed interiors: a room graph with portal frustums,
         so rooms behind walls never enter the list. Judge it against HiZ inside
         the truck town interiors.
