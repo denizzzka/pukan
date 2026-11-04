@@ -854,13 +854,10 @@ Before each slice, read the matching reference named in
   its own vertices.
   - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
         Godot importer stores, instead of only from the generated ones.
-  - [ ] The generated field's ground tiles do not appear through the cull
-        kernel, though `--no-gpu-cull` draws them and one such tile alone draws
-        through the kernel: find it before the ring numbers on the field mean
-        anything. `bench/hlod.md` has the counts.
-  - [ ] A proxy costs a descriptor set and a merge per cell, which the field's
-        24,964 cells make heavy: batch the proxies of a cell or share one
-        material set across them.
+  - [ ] A proxy costs a descriptor set and a merge per cell, and on the field it
+        trades three times fewer draws for twice the triangles with no gain in
+        frame time: cull inside a proxy, or merge only cells whose parts fill
+        them. `bench/hlod.md` has the counts.
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
