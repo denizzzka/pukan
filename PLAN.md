@@ -387,7 +387,7 @@ the contract, not the binding.
       jump, crouch, attack, use, view angles and tick. The default character preset
       ships it as an example; games add their own fields.
 - [ ] Optional reference mapper with rebindable actions, dead zones and sensitivity,
-      shipped as a demo utility, not baked into the controller.
+      shipped in the game runtime subpackage, not baked into the controller.
 - [ ] Input commands are tick-stamped, fixed-step and serializable; the same struct feeds
       local play, replay and the network backend.
 - [ ] Support synthetic input for tests, AI and cutscenes without a window.
@@ -1258,6 +1258,26 @@ costs what importing the whole engine costs.
   helps. The library build compiles all sources either way, so the gain is on
   the application side: 3.2 s against 0.4 s and 5 MB against 0.6 MB for a
   trivial app.
+
+## Game runtime subpackage
+
+A game needs a window, device input and sound around the renderer, and none of
+that belongs in a library that also runs headless or inside another host. The
+working name is `pukan.game`; the final one is chosen when the package is
+created.
+
+- [ ] Move the window and the event loop out of `demo` and `demo_godot` into the
+      subpackage, together with the `glfw-d` dependency: instance extensions,
+      the surface, framebuffer size, the close flag and time. A build without
+      the subpackage links no GLFW and creates no window.
+- [ ] Device input reading: keyboard, mouse, cursor and gamepad, filling the
+      `usercmd` contract from `### Input`; the rebindable action mapper with
+      dead zones and sensitivity lives here instead of in a demo.
+- [ ] Sound extraction from the content formats: decode `AudioStreamWAV` and
+      `AudioStreamOggVorbis` from a Godot scene or pack into one mixer format,
+      and report the streams the loader cannot read instead of skipping them.
+- [ ] A mixer and a playback backend on top, so a level's sounds follow the
+      same scene graph that gives its meshes and transforms.
 
 ## Swapchain creation
 
