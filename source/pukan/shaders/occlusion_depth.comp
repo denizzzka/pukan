@@ -1,0 +1,45 @@
+#version 460
+
+// Turns a frame's multisampled depth into the coarse grid the CPU tests against
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2DMS depthImage;
+layout(set = 0, binding = 1) writeonly buffer Depths
+{
+    float nearest[];
+};
+
+layout(push_constant) uniform Push
+{
+    uint gridWidth;
+    uint gridHeight;
+    uint texWidth;
+    uint texHeight;
+    uint samples;
+} pc;
+
+void main()
+{
+    const uvec2 cell = gl_GlobalInvocationID.xy;
+
+    if(cell.x >= pc.gridWidth || cell.y >= pc.gridHeight)
+        return;
+
+    const uint blockWidth = pc.texWidth / pc.gridWidth;
+    const uint blockHeight = pc.texHeight / pc.gridHeight;
+
+    // The scene compares depth with LESS, so the smallest value is the nearest
+    float depth = 1.0;
+
+    for(uint y = 0; y < blockHeight; ++y)
+        for(uint x = 0; x < blockWidth; ++x)
+        {
+            const ivec2 p = ivec2(cell.x * blockWidth + x, cell.y * blockHeight + y);
+
+            for(uint s = 0; s < pc.samples; ++s)
+                depth = min(depth, texelFetch(depthImage, p, int(s)).r);
+        }
+
+    nearest[cell.y * pc.gridWidth + cell.x] = depth;
+}

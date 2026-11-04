@@ -8,6 +8,7 @@ import pukan.graphics.common.screenshot: Screenshot;
 import pukan.graphics.g3d.axes: Axis;
 import pukan.graphics.g3d.ibl: createIblTextures, IblTextures;
 import pukan.graphics.g3d.mesh: MeshResources;
+import pukan.graphics.g3d.occlusion_depth: OcclusionDepth;
 import pukan.graphics.g3d.oit: DepthResolve, OitFrame, OitResolve;
 import pukan.graphics.g3d.pbr.culling: CullFrame, currentCullFrame;
 import pukan.graphics.g3d.pbr.instancing: InstanceArena, currentInstanceArena;
@@ -42,6 +43,8 @@ class SceneWith(Modules...)
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
     Background background;
+    /// Coarse depth of the last frame, when the occlusion grid is on
+    private OcclusionDepth occlusionDepth;
     VkPresentModeKHR presentMode;
 
     VkQueue graphicsQueue;
@@ -773,6 +776,15 @@ class SceneWith(Modules...)
             },
         );
 
+        if(occlusionDepth !is null)
+            occlusionDepth.record(
+                commandBuffer,
+                frame.depthBuf.depthImage.image,
+                frame.depthBuf.depthView,
+                swapChain.imageExtent,
+                cast(uint) renderPass.samples,
+            );
+
         if(oitEnabled)
             resolveOit(frame, false);
 
@@ -802,6 +814,19 @@ class SceneWith(Modules...)
         // Frees what no frame in flight can still reference
         //TODO: the scene drives this; hang it on frame completion instead
         device.flushRetired(cast(uint) swapChain.frames.length);
+    }
+
+    /// Starts feeding the coarse depth grid from this scene's frames
+    void enableOcclusionDepth(int columns, int rows)
+    {
+        if(occlusionDepth is null)
+            occlusionDepth = new OcclusionDepth(device, pipelineFactory, columns, rows);
+    }
+
+    /// Copies the last grid into `cells`; false while no frame has written one
+    bool readOcclusionDepths(float[] cells)
+    {
+        return occlusionDepth !is null && occlusionDepth.read(cells);
     }
 
     alias SceneDrawCallback = void delegate(ref VkCommandBuffer, DrawPhase phase);

@@ -6,23 +6,23 @@ import std.algorithm: max, min;
 import std.math: isNaN;
 
 /**
-    A coarse depth grid the CPU rasterizes box occluders into and tests boxes
-    against.
+    A coarse depth grid the CPU tests boxes against.
 
-    Each occluder box is drawn as its six faces, so a sample holds the depth of
-    a surface that really covers it: the near wall of a room, not the far side of
-    its volume. A sample no face covers stays NaN, and a box counts as hidden
-    only when every sample of its screen rectangle lies behind a surface.
+    The samples come from a real depth buffer, one nearest depth per screen
+    block, so a sample holds a surface that really covers it. A sample nothing
+    covers stays NaN, and a box counts as hidden only when every sample of its
+    screen rectangle lies behind a surface, which keeps the test conservative.
 */
 struct DepthRaster
 {
     private int width;
     private int height;
-    /// Nearest surface depth per sample; NaN marks a sample no occluder covers
+    /// Nearest surface depth per sample, in clip z over w; NaN marks a sample
+    /// nothing covers
     private float[] depths;
 
-    /// Depth a box has to beat to count as hidden, in world units
-    float bias = 0.5f;
+    /// Depth a box has to beat to count as hidden, in the same units
+    float bias = 0.00002f;
     /// Boxes the grid hid since the last reset
     size_t rejected;
 
@@ -59,40 +59,15 @@ struct DepthRaster
         return total;
     }
 
-    /// Rasterizes the box as six faces into the grid
-    void add(in Boxf box, in Matrix4x4f mvp)
+    /// The samples, to be filled from a real depth buffer
+    float[] samples() => depths;
+
+    /// Fills the grid from depths already measured, nearest first
+    void load(scope const(float)[] samples)
+    in(samples.length == depths.length)
     {
-        if(!hasBounds(box))
-            return;
-
-        Vector4f[8] clip;
-
-        foreach(i; 0 .. 8)
-        {
-            const corner = Vector3f(
-                (i & 1) ? box.max.x : box.min.x,
-                (i & 2) ? box.max.y : box.min.y,
-                (i & 4) ? box.max.z : box.min.z,
-            );
-            clip[i] = Vector4f(corner.x, corner.y, corner.z, 1) * mvp;
-
-            // A box that reaches behind the camera covers nothing it promises
-            if(!(clip[i].w > 0))
-                return;
-        }
-
-        // Six faces, each two triangles, as corner pairs of the box
-        static immutable ubyte[36] faces = [
-            0, 2, 6, 0, 6, 4,
-            1, 5, 7, 1, 7, 3,
-            0, 4, 5, 0, 5, 1,
-            2, 3, 7, 2, 7, 6,
-            0, 1, 3, 0, 3, 2,
-            4, 6, 7, 4, 7, 5,
-        ];
-
-        foreach(i; 0 .. faces.length / 3)
-            triangle(clip[faces[i * 3]], clip[faces[i * 3 + 1]], clip[faces[i * 3 + 2]]);
+        depths[] = samples[];
+        rejected = 0;
     }
 
     /// Whether the box sits behind what the grid already holds
@@ -117,7 +92,8 @@ struct DepthRaster
             if(!(clip[i].w > 0))
                 return false;
 
-            nearest = nearest > clip[i].w ? clip[i].w : nearest;
+            const depth = clip[i].z / clip[i].w;
+            nearest = nearest > depth ? depth : nearest;
         }
 
         const rect = screenRect(clip, width, height);
@@ -125,7 +101,7 @@ struct DepthRaster
         if(rect.empty)
             return false;
 
-        const limit = nearest + bias;
+        const limit = nearest - bias;
 
         foreach(y; rect.top .. rect.bottom + 1)
             foreach(x; rect.left .. rect.right + 1)
@@ -133,84 +109,13 @@ struct DepthRaster
                 const depth = depths[y * width + x];
 
                 // One sample without a surface leaves the box visible
-                if(depth.isNaN || depth > limit)
+                if(depth.isNaN || depth >= limit)
                     return false;
             }
 
         ++rejected;
 
         return true;
-    }
-
-    /// Draws one clip-space triangle, keeping the nearest depth per sample
-    private void triangle(in Vector4f start, in Vector4f middle, in Vector4f end)
-    {
-        Vector4f a = start;
-        Vector4f b = middle;
-        Vector4f c = end;
-
-        // Winding does not matter to a depth grid, so the corners are ordered
-        // until the signed area is positive
-        auto area = (screenX(b) - screenX(a)) * (screenY(c) - screenY(a))
-            - (screenY(b) - screenY(a)) * (screenX(c) - screenX(a));
-
-        if(area == 0)
-            return;
-
-        if(area < 0)
-        {
-            Vector4f swap = b;
-            b = c;
-            c = swap;
-            area = -area;
-        }
-
-        const ax = screenX(a), ay = screenY(a);
-        const bx = screenX(b), by = screenY(b);
-        const cx = screenX(c), cy = screenY(c);
-
-        const left = clampIndex(min(ax, min(bx, cx)), width);
-        const right = clampIndex(max(ax, max(bx, cx)), width);
-        const top = clampIndex(min(ay, min(by, cy)), height);
-        const bottom = clampIndex(max(ay, max(by, cy)), height);
-
-        if(left > right || top > bottom)
-            return;
-
-        foreach(y; top .. bottom + 1)
-            foreach(x; left .. right + 1)
-            {
-                const px = x + 0.5f;
-                const py = y + 0.5f;
-
-                const wa = ((bx - px) * (cy - py) - (by - py) * (cx - px)) / area;
-                const wb = ((cx - px) * (ay - py) - (cy - py) * (ax - px)) / area;
-                const wc = 1.0f - wa - wb;
-
-                if(wa < 0 || wb < 0 || wc < 0)
-                    continue;
-
-                // Perspective-correct depth from the corners' clip w
-                const depth = 1.0f / (wa / a.w + wb / b.w + wc / c.w);
-
-                ref sample = depths[y * width + x];
-
-                if(sample.isNaN || depth < sample)
-                    sample = depth;
-            }
-    }
-
-    private float screenX(in Vector4f clip) const => (clip.x / clip.w * 0.5f + 0.5f) * width;
-    private float screenY(in Vector4f clip) const => (0.5f - clip.y / clip.w * 0.5f) * height;
-
-    private static int clampIndex(float value, int limit)
-    {
-        const index = cast(int) value;
-
-        if(index < 0)
-            return 0;
-
-        return index >= limit ? limit - 1 : index;
     }
 
     /// Screen rectangle of a clip-space box, clipped to the grid
@@ -268,29 +173,35 @@ DepthRaster* currentOcclusion;
 
 unittest
 {
-    // A wall in front covers the rectangles behind it
+    // A wall at a fixed depth covers its rectangle; boxes behind it hide
     auto viewProj = Matrix4x4f.identity;
-    viewProj.a43 = 1;
 
     DepthRaster raster;
     raster.reset(32, 32);
 
-    const wall = Boxf(Vector3f(-4, -2, 2), Vector3f(4, 2, 2.2f));
-    const behind = Boxf(Vector3f(-0.5f, -0.5f, 6), Vector3f(0.5f, 0.5f, 7));
-    const inFront = Boxf(Vector3f(-0.5f, -0.5f, 0.5f), Vector3f(0.5f, 0.5f, 1));
+    // Every sample holds a surface at ndc 0.5, and the left column is open sky
+    float[] wall;
+    wall.length = 32 * 32;
+    wall[] = 0.5f;
 
-    raster.add(wall, viewProj);
+    foreach(y; 0 .. 32)
+        wall[y * 32] = float.nan;
 
-    assert(raster.covered() > 0);
-    assert(raster.hidden(behind, viewProj), "the box behind the wall is hidden");
+    raster.load(wall);
+
+    const behind = Boxf(Vector3f(-0.5f, -0.5f, 0.8f), Vector3f(0.5f, 0.5f, 0.9f));
+    const inFront = Boxf(Vector3f(-0.5f, -0.5f, 0.2f), Vector3f(0.5f, 0.5f, 0.3f));
+
+    assert(raster.covered() == 32 * 31);
+    assert(raster.hidden(behind, viewProj), "a box behind the wall is hidden");
     assert(raster.rejected == 1);
     assert(!raster.hidden(inFront, viewProj), "a box in front of the wall shows");
 
-    // A box beside the wall stays visible
-    const beside = Boxf(Vector3f(20, -0.5f, 6), Vector3f(21, 0.5f, 7));
+    // A box whose rectangle reaches the open column stays visible
+    const beside = Boxf(Vector3f(-20, -0.5f, 0.8f), Vector3f(20, 0.5f, 0.9f));
     assert(!raster.hidden(beside, viewProj));
 
     // A box that reaches behind the camera is left alone
-    const straddling = Boxf(Vector3f(-0.5f, -0.5f, -3), Vector3f(0.5f, 0.5f, 7));
+    const straddling = Boxf(Vector3f(-0.5f, -0.5f, -3), Vector3f(0.5f, 0.5f, 0.9f));
     assert(!raster.hidden(straddling, viewProj));
 }

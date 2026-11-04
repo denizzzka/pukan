@@ -24,7 +24,7 @@ import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
 import std.algorithm: max, min, remove, sort, sum;
-import std.math: PI, abs, atan2, cos, sin, sqrt;
+import std.math: PI, abs, atan2, cos, isNaN, sin, sqrt;
 import std.exception: enforce;
 import std.format: format;
 import std.getopt: defaultGetoptPrinter, getopt;
@@ -742,6 +742,9 @@ void main(string[] args)
         ", gltf assets ", scene.gltfFactory.cachedAssetCount);
 
     godotScene.proxyMinParts = proxyMinParts;
+
+    if(occlusion)
+        scene.enableOcclusionDepth(192, 144);
 
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
     printSkippedTypes("resources not rendered", godotScene.skippedResourceTypes);
@@ -1539,11 +1542,8 @@ void main(string[] args)
             {
                 raster.reset(192, 144);
 
-                // The items are the boxes the parts path tests against, so the
-                // grid holds what that path is about to draw
-                foreach(item; levelIndex.collect(nearCells))
-                    if(hasBounds(item.bounds))
-                        raster.add(item.bounds, modelViewProj);
+                // The depth of a frame that has finished, so no test tears
+                scene.readOcclusionDepths(raster.samples);
 
                 currentOcclusion = &raster;
             }
