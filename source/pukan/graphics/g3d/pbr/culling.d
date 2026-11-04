@@ -64,6 +64,7 @@ final class CullFrame
     private PipelineFactory pipelines;
     private PipelineKey key;
     private VkPipelineLayout layout;
+    private VkDescriptorSetLayout setLayout;
     private VkDescriptorSet set;
     private VkObj!VkDescriptorPool pool;
     private VkPipeline pipeline;
@@ -74,8 +75,10 @@ final class CullFrame
     private size_t instanceUsed;
     private size_t visibleUsed;
     private size_t argsUsed;
-    /// Set when a buffer moved, so the next dispatch rewrites the set
+    /// Set when a buffer moved, so the next dispatch takes a fresh set
     private bool setDirty;
+    /// Buffers a recorded frame may still read; freed at the next reset
+    private MemoryBufferMappedToCPU[] retired;
 
     this(LogicalDevice device, PipelineFactory pipelines)
     {
@@ -97,8 +100,19 @@ final class CullFrame
 
         key = declared.key;
         layout = declared.pipelineLayout;
-        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 1), device.releaseQueue);
+        setLayout = declared.setLayout;
+        // Room for a level of cells, so the buffers rarely move
+        instanceBuf = device.create!MemoryBufferMappedToCPU(4 << 20,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        visibleBuf = device.create!MemoryBufferMappedToCPU(4 << 20,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        argsBuf = device.create!MemoryBufferMappedToCPU(1 << 20,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+
+        // A moved buffer needs a set nobody has bound yet, so the pool keeps room
+        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 512), device.releaseQueue);
         set = device.allocateDescriptorSet(pool.vk, declared.setLayout);
+        writeSet();
     }
 
     ~this()
@@ -111,11 +125,18 @@ final class CullFrame
 
         if(argsBuf)
             destroy(argsBuf);
+
+        foreach(buffer; retired)
+            destroy(buffer);
     }
 
-    /// Forgets the batches of the previous frame; the memory stays
+    /// Forgets the batches of the previous frame and frees what they replaced
     void reset()
     {
+        foreach(buffer; retired)
+            destroy(buffer);
+
+        retired = null;
         instanceUsed = 0;
         visibleUsed = 0;
         argsUsed = 0;
@@ -196,6 +217,9 @@ final class CullFrame
 
         if(setDirty)
         {
+            // A set the recording buffer already holds cannot be updated, so
+            // the kernel gets one that nothing has bound
+            set = device.allocateDescriptorSet(pool.vk, setLayout);
             writeSet();
             setDirty = false;
         }
@@ -262,10 +286,14 @@ final class CullFrame
         if(buffer && buffer.cpuBuf.length >= needed)
             return buffer;
 
+        // The frame in flight may still read the old buffer, so it waits for
+        // the next reset instead of dying here
         if(buffer)
-            destroy(buffer);
+            retired ~= buffer;
 
-        const capacity = needed < 4096 ? 4096 : needed;
+        // Headroom, so a cell that arrives does not force a move every frame
+        const grown = needed + needed / 2;
+        const capacity = grown < 4096 ? 4096 : grown;
 
         return device.create!MemoryBufferMappedToCPU(
             capacity,
