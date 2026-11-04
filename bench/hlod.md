@@ -74,23 +74,33 @@ Loading it takes about 27 seconds with the validation build, most of it the
 ## Generated field
 
 `hlod_field/hlod_field.tscn`, 10 km square, 40 villages, 24,964 cells with
-`--no-cells`.
+`--no-cells`, camera at (120, 20, 160) looking at the origin.
 
-| Command | Cells | Parts submitted | Triangles submitted |
-|---|---|---|---|
-| `--no-cells` | 24,964 | 2,485 | 338,940 |
-| default streaming | 219 | 49 | 7,872 |
+| Rings | Ring | Draws | Instances | Triangles | Frame mean | p50 | p95 |
+|---|---|---|---|---|---|---|---|
+| off | near | 2,485.0 | 2,485.0 | 338,940 | 209.10 ms | 206 | 281 |
+| off | shadow | 149.1 | 149.1 | 20,336 | 209.10 ms | 206 | 281 |
+| proxy 300, cards 900 | near | 58.0 | 58.0 | 8,520 | 242.36 ms | 240 | 281 |
+| proxy 300, cards 900 | proxy | 745.7 | 745.7 | 803,195 | 242.36 ms | 240 | 281 |
+| proxy 300, cards 900 | shadow | 2,086.7 | 2,086.7 | 837,114 | 242.36 ms | 240 | 281 |
+| proxy 600, cards 1500 | proxy | 617.7 | 617.7 | 736,458 | 243.44 ms | 243 | 285 |
 
-The field is the only scene here whose geometry belongs to its cells, so it is
-the one the rings should be judged on. It is also the only one big enough to
-expose two engine limits: a proxy per cell costs a descriptor set and a merge,
-which 24,964 cells make expensive, and the demo's streaming range is measured
-in metres against a thin cell layer, so a large range enumerates hundreds of
-empty vertical cells.
+From inside the first village, camera at (40, 12, 40) looking at (80, 0, 80):
+parts 2,485 draws and 338,940 triangles at 262.33 ms; proxies 838 draws and
+994,375 triangles at 263.07 ms.
 
-It currently draws only with `--no-gpu-cull`: under the cull kernel the
-primitives render nothing, the same way `generated/primitives.tscn` and
-`generated/procedural.tscn` do.
+The field is the only scene here whose geometry belongs to its cells. On it the
+proxy ring trades draws for triangles: three times fewer draws, two to three
+times more triangles, and no gain in frame time. The parts path submits every
+part and lets the kernel drop the off-screen ones instance by instance, while a
+proxy is culled only as a whole cell, so a cell that is mostly empty still
+brings all its geometry. Cards never trigger: the field is a single flat layer
+and the camera sees across it.
+
+It also exposes two engine limits: a proxy per cell costs a descriptor set and
+a merge, which 24,964 cells make expensive, and the demo's streaming range is
+measured in metres against a thin cell layer, so a large range enumerates
+hundreds of empty vertical cells.
 
 ## What the numbers say
 
