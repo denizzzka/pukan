@@ -2,6 +2,7 @@ import dlib.math: Axis, Matrix4x4f, Vector3f, Vector4f, rotationMatrix;
 import pukan;
 import pukan.graphics.g3d.axes: axisVector;
 import pukan.graphics.g3d.impostor: CellImpostor, Impostors;
+import pukan.graphics.g3d.occlusion: DepthRaster, currentOcclusion;
 import pukan.graphics.common.misc: Boxf, hasBounds, trsMatrix;
 import pukan.gltf.motion_sampler: MotionSampler;
 import pukan.motion_matching.database: Clip, Database, invalidSample;
@@ -386,6 +387,7 @@ void main(string[] args)
     float impostorRange = 256.0f;
     float proxyDistance;
     size_t proxyMinParts = 8;
+    bool occlusion;
     bool stats;
     uint warmup;
     string pickOrigin;
@@ -417,6 +419,7 @@ void main(string[] args)
         "impostor-distance", "draw cells beyond this distance as one captured card, 0 = off", &impostorDistance,
         "proxy-distance", "merge the parts of cells beyond this distance into one proxy, 0 = off", &proxyDistance,
         "proxy-min-parts", "parts a cell needs before a proxy is worth its merge", &proxyMinParts,
+        "occlusion", "skip parts the near ones hide, tested against a coarse CPU depth grid", &occlusion,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "stats", "report draws, triangles and frame time per ring at the end", &stats,
         "warmup", "frames the stats leave out, for loading and merging", &warmup,
@@ -1059,6 +1062,8 @@ void main(string[] args)
     }
 
     uint frameIndex;
+    /// Parts the coarse occlusion grid left out
+    size_t occludedTotal;
     /// Per ring: near cells, proxies, cards
     DrawStats[3] ringTotals;
     DrawStats shadowTotal;
@@ -1527,6 +1532,22 @@ void main(string[] args)
                     farCells ~= cell;
                 }
 
+            DepthRaster raster;
+            scope(exit) currentOcclusion = null;
+
+            if(occlusion)
+            {
+                raster.reset(192, 144);
+
+                // The items are the boxes the parts path tests against, so the
+                // grid holds what that path is about to draw
+                foreach(item; levelIndex.collect(nearCells))
+                    if(hasBounds(item.bounds))
+                        raster.add(item.bounds, modelViewProj);
+
+                currentOcclusion = &raster;
+            }
+
             scene.recordCommandBuffer(
                 frame,
                 (buf, phase) {
@@ -1605,6 +1626,7 @@ void main(string[] args)
 
             if(frameIndex > warmup)
             {
+                occludedTotal += raster.rejected;
                 cellTotals[0] += nearCells.length;
                 cellTotals[1] += proxyCells.length;
                 cellTotals[2] += farCells.length;
@@ -1619,7 +1641,7 @@ void main(string[] args)
     }
 
     reportStats(stats, frameIndex - min(frameIndex, warmup), ringTotals, shadowTotal, cellTotals, frameTimes,
-        godotScene.proxyCount, godotScene.sparseCount);
+        godotScene.proxyCount, godotScene.sparseCount, occludedTotal);
 
     if(characterMode)
         writeln("character position ", mover.state.position,
@@ -1639,6 +1661,7 @@ private void reportStats(
     scope const(double)[] frameTimes,
     size_t proxies,
     size_t sparse,
+    size_t occluded,
 )
 {
     if(!enabled)
@@ -1650,7 +1673,7 @@ private void reportStats(
         "  cells near ", cells[0] / count,
         " proxy ", cells[1] / count,
         " far ", cells[2] / count,
-        "  merged ", proxies, " sparse ", sparse);
+        "  merged ", proxies, " sparse ", sparse, " occluded ", occluded / count);
 
     writeln(format("%-7s %8s %10s %12s", "ring", "draws", "instances", "triangles"));
 

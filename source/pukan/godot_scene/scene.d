@@ -8,6 +8,7 @@ import pukan.graphics.g3d.cell_index: Bounded, CellIndex, CulledParts, DrawItem,
 import pukan.graphics.g3d.cells: CellCoord;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.hlod: ProxyPiece, mergeGeometry, readGeometry;
+import pukan.graphics.g3d.occlusion: DepthRaster, currentOcclusion;
 import pukan.graphics.g3d.mesh: MeshResources, mirrors;
 import pukan.graphics.g3d.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.graphics.g3d.pbr.culling: CullBatch, CullFrame, CullInstance, currentCullFrame;
@@ -601,6 +602,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             if(!record.mesh.hasSkin && !isVisible(record.mesh.localAABB, mvp))
                 continue;
 
+            // A part the coarse depth grid already covers stays out of the draw
+            if(currentOcclusion !is null && currentOcclusion.hidden(record.bounds, mvp))
+                continue;
+
             const clip = Vector4f(0, 0, 0, 1) * mvp;
             draws ~= MeshDraw(record.mesh, mvp, clip.w);
         }
@@ -714,6 +719,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 continue;
 
             const mvp = trans * record.world;
+
+            // A part the coarse depth grid already covers stays out of the draw
+            if(currentOcclusion !is null && currentOcclusion.hidden(record.bounds, mvp))
+                continue;
 
             // A skinned mesh keeps the CPU path until its posed bounds are known
             if(record.mesh.hasSkin)
