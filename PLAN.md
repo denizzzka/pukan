@@ -74,6 +74,20 @@ tests and the corner cases already paid for.
 
 ## Content formats
 
+### glTF
+
+The loader reads geometry, materials and animation; LOD extensions are not
+handled yet, so an asset that carries them must fail loudly rather than draw one
+level and look right.
+
+- [ ] `MSFT_lod`: check `extensionsUsed` on load and assert when it lists the
+      extension, with a message saying the engine does not support it yet, so
+      the first asset that needs it shows up instead of silently drawing a
+      single level.
+- [ ] Node-based LOD levels: a mesh split into sibling nodes for distance bands;
+      assert the same way, to learn how often assets carry them at all before
+      committing to support.
+
 ### Godot 4 scenes
 
 Goal: load Godot 4 3D scenes from source projects and from packed production
