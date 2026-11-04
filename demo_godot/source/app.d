@@ -385,6 +385,7 @@ void main(string[] args)
     float impostorDistance = 160.0f;
     float impostorRange = 256.0f;
     float proxyDistance;
+    size_t proxyMinParts = 8;
     bool stats;
     uint warmup;
     string pickOrigin;
@@ -415,6 +416,7 @@ void main(string[] args)
         "no-gpu-cull", "cull the parts of a cell on the CPU instead of the GPU", &noGpuCull,
         "impostor-distance", "draw cells beyond this distance as one captured card, 0 = off", &impostorDistance,
         "proxy-distance", "merge the parts of cells beyond this distance into one proxy, 0 = off", &proxyDistance,
+        "proxy-min-parts", "parts a cell needs before a proxy is worth its merge", &proxyMinParts,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "stats", "report draws, triangles and frame time per ring at the end", &stats,
         "warmup", "frames the stats leave out, for loading and merging", &warmup,
@@ -735,6 +737,8 @@ void main(string[] args)
         ", lights ", godotScene.lights.length,
         ", instances ", godotScene.instanceCount,
         ", gltf assets ", scene.gltfFactory.cachedAssetCount);
+
+    godotScene.proxyMinParts = proxyMinParts;
 
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
     printSkippedTypes("resources not rendered", godotScene.skippedResourceTypes);
@@ -1504,7 +1508,7 @@ void main(string[] args)
 
                 if(impostors !is null && distance > impostorDistance && (cell in cellImpostors))
                     farCells ~= cell;
-                else if(proxyDistance > 0 && distance > proxyDistance)
+                else if(proxyDistance > 0 && distance > proxyDistance && godotScene.hasProxy(cell))
                     proxyCells ~= cell;
                 else
                     nearCells ~= cell;
@@ -1614,7 +1618,8 @@ void main(string[] args)
             writeln("screenshot saved to ", screenshotPath);
     }
 
-    reportStats(stats, frameIndex - min(frameIndex, warmup), ringTotals, shadowTotal, cellTotals, frameTimes);
+    reportStats(stats, frameIndex - min(frameIndex, warmup), ringTotals, shadowTotal, cellTotals, frameTimes,
+        godotScene.proxyCount, godotScene.sparseCount);
 
     if(characterMode)
         writeln("character position ", mover.state.position,
@@ -1632,6 +1637,8 @@ private void reportStats(
     in DrawStats shadow,
     scope const(size_t)[3] cells,
     scope const(double)[] frameTimes,
+    size_t proxies,
+    size_t sparse,
 )
 {
     if(!enabled)
@@ -1642,7 +1649,8 @@ private void reportStats(
     writeln("frames ", frames,
         "  cells near ", cells[0] / count,
         " proxy ", cells[1] / count,
-        " far ", cells[2] / count);
+        " far ", cells[2] / count,
+        "  merged ", proxies, " sparse ", sparse);
 
     writeln(format("%-7s %8s %10s %12s", "ring", "draws", "instances", "triangles"));
 

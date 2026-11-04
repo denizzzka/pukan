@@ -156,6 +156,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     private MeshResources resources;
     /// Merged geometry per cell, built the first time the cell is far
     private CellProxy[CellCoord] proxies;
+    /// Parts a cell needs before a merge pays for the meshes it builds
+    size_t proxyMinParts = 8;
+    /// Cells that stay on the parts path, decided once
+    private bool[CellCoord] sparseCells;
 
     /// Counts the parts that hold each mesh; the last one drops its pieces
     private SharedResource!PbrMesh[PbrMesh] meshNodes;
@@ -898,7 +902,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     {
         registerParts();
 
-        if(cell in proxies)
+        if(cell in proxies || cell in sparseCells)
             return 0;
 
         // Decoding waits for every part, so a half loaded cell costs nothing
@@ -909,6 +913,33 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
 
             if(!partsReady([item.part]))
                 return 0;
+        }
+
+        // A cell with a handful of parts keeps them: a merge costs a mesh and a
+        // descriptor set per material and saves one draw per part
+        size_t pieceCount;
+        bool countable = true;
+
+        void countPiece(GodotScene owner, PbrMesh mesh, in Matrix4x4f world)
+        {
+            ++pieceCount;
+        }
+
+        foreach(item; index.collect([cell]))
+        {
+            if(item.part == wholePart || !hasBounds(item.bounds))
+            {
+                countable = false;
+                break;
+            }
+
+            collectPieces(this, [item.part], item.world, &countPiece, countable);
+        }
+
+        if(!countable || pieceCount < proxyMinParts)
+        {
+            sparseCells[cell] = true;
+            return 0;
         }
 
         static struct Group
@@ -1115,9 +1146,19 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         return true;
     }
 
+    /// Whether the cell draws as a merged proxy
+    bool hasProxy(CellCoord cell) const => (cell in proxies) !is null;
+
+    /// Cells that a merge was worth
+    size_t proxyCount() const => proxies.length;
+    /// Cells that stay on the parts path because they hold too few parts
+    size_t sparseCount() const => sparseCells.length;
+
     /// Drops the cell's proxy, freeing the pieces it uploaded
     void releaseProxy(CellCoord cell)
     {
+        sparseCells.remove(cell);
+
         if((cell in proxies) is null)
             return;
 
