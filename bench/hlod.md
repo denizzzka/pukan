@@ -71,6 +71,27 @@ stay off for it.
 Loading it takes about 27 seconds with the validation build, most of it the
 1,024 instanced rooms.
 
+## Generated field
+
+`hlod_field/hlod_field.tscn`, 10 km square, 40 villages, 24,964 cells with
+`--no-cells`.
+
+| Command | Cells | Parts submitted | Triangles submitted |
+|---|---|---|---|
+| `--no-cells` | 24,964 | 2,485 | 338,940 |
+| default streaming | 219 | 49 | 7,872 |
+
+The field is the only scene here whose geometry belongs to its cells, so it is
+the one the rings should be judged on. It is also the only one big enough to
+expose two engine limits: a proxy per cell costs a descriptor set and a merge,
+which 24,964 cells make expensive, and the demo's streaming range is measured
+in metres against a thin cell layer, so a large range enumerates hundreds of
+empty vertical cells.
+
+It currently draws only with `--no-gpu-cull`: under the cull kernel the
+primitives render nothing, the same way `generated/primitives.tscn` and
+`generated/procedural.tscn` do.
+
 ## What the numbers say
 
 - Per-cell HLOD pays off only when a cell's geometry belongs to it. A scene

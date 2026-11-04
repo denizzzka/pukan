@@ -34,6 +34,24 @@ The demo projects are MIT licensed, see `LICENSE.godot-demo-projects.md`.
 are CC-BY 4.0 by Ricardo Sanchez and RitiWox; their `license.txt` files carry
 the attribution.
 
+## HLOD field
+
+`hlod_field/` is generated here, not upstream. `generate.gd` writes
+`hlod_field.tscn`: a 10 km square of ground in 500 m tiles, 40 villages of
+houses, towers, rocks and trees, five roads across the map, a few glass
+pavilions, and a sky with a sun. Props keep their own meshes, so a cell holds
+geometry that belongs to it, which is what the streaming and HLOD rings need to
+measure anything.
+
+To regenerate it, remove `hlod_field/.godot` after the run:
+
+```sh
+godot --headless --path hlod_field --script res://generate.gd
+```
+
+The scene is 10 km across, so the demo's default streaming range loads only the
+villages near the spawn; `--no-cells` loads the whole field.
+
 ## Cutout shadow
 
 `cutout_shadow/` is not upstream: a checkered alpha-scissor quad and an opaque
