@@ -853,10 +853,7 @@ Before each slice, read the matching reference named in
   holds.
   - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
         Godot importer stores, instead of only from the generated ones.
-  - [ ] Build a cell's proxy when the cell arrives, not on its first far frame,
-        so the approach never shows the parts.
-  - [ ] Numbers per ring on the fixed scene: triangles, draws and frame time,
-        and a proxy budget that caps what a cell may upload in one frame.
+  - [ ] Numbers per ring on the fixed scene: triangles, draws and frame time.
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
