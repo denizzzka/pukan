@@ -8,6 +8,7 @@ import pukan.graphics.g3d.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
 import pukan.graphics.g3d.pbr.accessor;
 import pukan.graphics.g3d.pbr.culling: CullBatch, cullCountOffset;
 import pukan.graphics.g3d.pbr.instancing: InstanceBatch, currentInstanceArena;
+import pukan.graphics.g3d.stats: countDraw, triangleCount;
 import pukan.vulkan.bindings;
 import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.logical_device: LogicalDevice;
@@ -614,6 +615,9 @@ final class PbrMesh : Mesh
         auto batch = currentInstanceArena.append(transforms);
 
         geometry.drawInstanced(buf, pipeline, batch, frontFace, descriptorSet, level);
+
+        const count = geometry.indexCountOf(level);
+        countDraw(transforms.length, triangleCount(count ? count : geometry.vertexCount) * transforms.length);
     }
 
     /// Draws the instances the cull kernel kept for this mesh in one indirect call
@@ -642,6 +646,9 @@ final class PbrMesh : Mesh
             );
 
         geometry.drawInstancedIndirect(buf, pipeline, batch, frontFace, descriptorSet, level);
+
+        const count = geometry.indexCountOf(level);
+        countDraw(batch.instances, triangleCount(count ? count : geometry.vertexCount) * batch.instances);
     }
 
     /// Index lists of the geometry, the authored one first

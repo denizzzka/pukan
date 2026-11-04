@@ -18,12 +18,14 @@ import pukan.graphics.g3d.pbr.pipelines: LightingMode, lightingMode, oitPass, pl
 import pukan.physics.simulation: Simulation;
 import pukan.physics.world: CollisionWorld, ShapeCastHit;
 import pukan.graphics.g3d.primitives_tree.lines: LineInstance, LineRenderer;
+import pukan.graphics.g3d.stats: DrawStats, drawStats;
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
-import std.algorithm: max, min, remove;
+import std.algorithm: max, min, remove, sort, sum;
 import std.math: PI, abs, atan2, cos, sin, sqrt;
 import std.exception: enforce;
+import std.format: format;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
 import std.stdio: writeln;
@@ -383,6 +385,8 @@ void main(string[] args)
     float impostorDistance = 160.0f;
     float impostorRange = 256.0f;
     float proxyDistance;
+    bool stats;
+    uint warmup;
     string pickOrigin;
     string pickDirection;
 
@@ -412,6 +416,8 @@ void main(string[] args)
         "impostor-distance", "draw cells beyond this distance as one captured card, 0 = off", &impostorDistance,
         "proxy-distance", "merge the parts of cells beyond this distance into one proxy, 0 = off", &proxyDistance,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
+        "stats", "report draws, triangles and frame time per ring at the end", &stats,
+        "warmup", "frames the stats leave out, for loading and merging", &warmup,
         "pick", "report what a ray from this point hits, x,y,z", &pickOrigin,
         "pick-dir", "ray direction for --pick, x,y,z", &pickDirection,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
@@ -1049,6 +1055,11 @@ void main(string[] args)
     }
 
     uint frameIndex;
+    /// Per ring: near cells, proxies, cards
+    DrawStats[3] ringTotals;
+    DrawStats shadowTotal;
+    size_t[3] cellTotals;
+    double[] frameTimes;
     import core.time: MonoTime;
     const start = MonoTime.currTime;
     double lastTime = offscreen ? 0.0 : glfwGetTime();
@@ -1070,6 +1081,7 @@ void main(string[] args)
     while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
         ++frameIndex;
+        const frameBegan = MonoTime.currTime;
         if(!offscreen)
             glfwPollEvents();
 
@@ -1514,10 +1526,20 @@ void main(string[] args)
             scene.recordCommandBuffer(
                 frame,
                 (buf, phase) {
+                    // The ring split is a surface matter; the other phases draw all
+                    const measure = phase == DrawPhase.surface && frameIndex > warmup;
+                    auto ringStart = drawStats();
+
                     // Blended draws keep the CPU path, which sorts them by depth
                     drawCells(levelIndex, buf, modelViewProj, nearCells,
                         frame.frameSets[0].descriptorSet, phase,
                         phase == DrawPhase.blended ? CellCulling.cpu : cellCulling);
+
+                    if(measure)
+                    {
+                        ringTotals[0] += drawStats() - ringStart;
+                        ringStart = drawStats();
+                    }
 
                     // A cell beyond the proxy distance draws as one merged mesh
                     foreach(cell; proxyCells)
@@ -1526,10 +1548,19 @@ void main(string[] args)
                             drawCells(levelIndex, buf, modelViewProj, [cell],
                                 frame.frameSets[0].descriptorSet, phase, CellCulling.cpu);
 
+                    if(measure)
+                    {
+                        ringTotals[1] += drawStats() - ringStart;
+                        ringStart = drawStats();
+                    }
+
                     if(phase == DrawPhase.surface)
                         foreach(cell; farCells)
                             if(auto impostor = cell in cellImpostors)
                                 impostors.draw(buf, *impostor, modelViewProj);
+
+                    if(measure)
+                        ringTotals[2] += drawStats() - ringStart;
 
                     if(characterModel && thirdPerson && characterVisible)
                         characterModel.drawingBufferFilling(buf, modelViewProj * characterTransform,
@@ -1542,6 +1573,8 @@ void main(string[] args)
                 },
                 null,
                 (buf) {
+                    auto shadowStart = drawStats();
+
                     drawCells(levelIndex, buf, shadowViewProj, nearCells,
                         frame.frameSets[0].descriptorSet, DrawPhase.shadow, cellCulling);
 
@@ -1550,6 +1583,8 @@ void main(string[] args)
                             frame.frameSets[0].descriptorSet, DrawPhase.shadow))
                             drawCells(levelIndex, buf, shadowViewProj, [cell],
                                 frame.frameSets[0].descriptorSet, DrawPhase.shadow, CellCulling.cpu);
+
+                    shadowTotal += drawStats() - shadowStart;
                 },
                 (buf) {
                     capturePendingCells(buf, levelIndex, scene, impostors, cellImpostors,
@@ -1564,11 +1599,22 @@ void main(string[] args)
                 },
             );
 
+            if(frameIndex > warmup)
+            {
+                cellTotals[0] += nearCells.length;
+                cellTotals[1] += proxyCells.length;
+                cellTotals[2] += farCells.length;
+            }
         });
+
+        if(frameIndex > warmup)
+            frameTimes ~= (MonoTime.currTime - frameBegan).total!"msecs";
 
         if(screenshotPath.length && frameIndex == captureFrame)
             writeln("screenshot saved to ", screenshotPath);
     }
+
+    reportStats(stats, frameIndex - min(frameIndex, warmup), ringTotals, shadowTotal, cellTotals, frameTimes);
 
     if(characterMode)
         writeln("character position ", mover.state.position,
@@ -1576,4 +1622,52 @@ void main(string[] args)
             " onGround ", mover.state.onGround);
 
     vkDeviceWaitIdle(device.device);
+}
+
+/// Prints what a frame submitted per ring, so the HLOD rings compare by number
+private void reportStats(
+    bool enabled,
+    uint frames,
+    scope const DrawStats[3] rings,
+    in DrawStats shadow,
+    scope const(size_t)[3] cells,
+    scope const(double)[] frameTimes,
+)
+{
+    if(!enabled)
+        return;
+
+    const count = max(frames, 1u);
+
+    writeln("frames ", frames,
+        "  cells near ", cells[0] / count,
+        " proxy ", cells[1] / count,
+        " far ", cells[2] / count);
+
+    writeln(format("%-7s %8s %10s %12s", "ring", "draws", "instances", "triangles"));
+
+    void row(string name, in DrawStats ring)
+    {
+        writeln(format("%-7s %8.1f %10.1f %12.0f", name,
+            cast(double) ring.draws / count,
+            cast(double) ring.instances / count,
+            cast(double) ring.triangles / count));
+    }
+
+    foreach(i, name; ["near", "proxy", "far"])
+        row(name, rings[i]);
+
+    row("shadow", shadow);
+
+    if(frameTimes.length == 0)
+        return;
+
+    auto sorted = frameTimes.dup.sort;
+
+    writeln(format("frame mean %.2f ms, p50 %.2f, p95 %.2f, min %.2f, max %.2f",
+        sorted.sum / sorted.length,
+        sorted[sorted.length / 2],
+        sorted[cast(size_t) (sorted.length * 95 / 100)],
+        sorted[0],
+        sorted[$ - 1]));
 }

@@ -39,6 +39,8 @@ struct CullBatch
     VkDeviceSize argsOffset;
     /// Element offset of this batch in the instance list
     uint instanceOffset;
+    /// Instances the kernel considers for this batch
+    uint instances;
 }
 
 /// Offset of the kept instance count inside the draw command region
@@ -173,6 +175,7 @@ final class CullFrame
             args: argsBuf.buf,
             argsOffset: argsUsed,
             instanceOffset: instances.offset,
+            instances: cast(uint) instances.count,
         );
 
         visibleUsed += visibleBytes;

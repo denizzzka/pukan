@@ -2,6 +2,7 @@ module pukan.graphics.g3d.mesh;
 
 import dlib.math: Matrix4x4f, Vector4f;
 import pukan.graphics.g3d.material: Material, MaterialBuffer;
+import pukan.graphics.g3d.stats: countDraw, triangleCount;
 import pukan.vulkan.bindings;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBufferMappedToCPU;
@@ -218,5 +219,7 @@ class Mesh
             vkCmdDrawIndexed(buf, indexCount, 1, 0, 0, 0);
         else
             vkCmdDraw(buf, vertexCount, 1, 0, 0);
+
+        countDraw(1, triangleCount(indexCount ? indexCount : vertexCount));
     }
 }

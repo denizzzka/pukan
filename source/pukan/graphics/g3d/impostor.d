@@ -1,5 +1,6 @@
 module pukan.graphics.g3d.impostor;
 
+import pukan.graphics.g3d.stats: countDraw;
 import dlib.math: Matrix4x4f, Vector3f, cross, dot;
 import pukan.graphics.common.misc: Boxf, hasBounds, mergeAabb, vulkanOrthographicMatrix;
 import pukan.graphics.common.shaders: shaderStage;
@@ -260,6 +261,9 @@ final class Impostors
         );
 
         vkCmdDraw(buf, 4, 1, 0, 0);
+
+        // The card is one quad, two triangles
+        countDraw(1, 2);
     }
 
     private void createSlot(ref Slot slot, in Vector3f center, in Vector3f right, in Vector3f up, float radius)

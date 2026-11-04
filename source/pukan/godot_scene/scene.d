@@ -1105,7 +1105,11 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             if(!isVisible(mesh.localAABB, viewProj))
                 continue;
 
-            const level = pickLevel(meshThresholds(mesh, placement), clipDepth(placement));
+            // The merged bounds are the mesh in world space, so their centre is
+            // the depth the level picks by
+            const centre = (mesh.localAABB.min + mesh.localAABB.max) * 0.5f;
+            const clip = Vector4f(centre.x, centre.y, centre.z, 1) * placement;
+            const level = pickLevel(meshThresholds(mesh, placement), clip.w);
 
             mesh.drawBatch(buf, selectPipeline(mesh, phase), [placement], frameSet, level);
         }
