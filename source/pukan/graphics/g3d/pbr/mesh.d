@@ -6,7 +6,7 @@ import pukan.graphics.common.misc: Boxf, expandAABB, hasBounds, mergeAabb;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialFlag, MaterialFlags, MaterialMode;
 import pukan.graphics.g3d.mesh: Mesh, VertexStream, fallbackVertexSize, mirrors;
 import pukan.graphics.g3d.pbr.accessor;
-import pukan.graphics.g3d.pbr.culling: CullBatch, cullCountOffset;
+import pukan.graphics.g3d.pbr.culling: CullBatch;
 import pukan.graphics.g3d.pbr.instancing: InstanceBatch, currentInstanceArena;
 import pukan.graphics.g3d.stats: countDraw, triangleCount;
 import pukan.vulkan.bindings;
@@ -432,23 +432,20 @@ final class PbrGeometry
 
         vkCmdSetFrontFace(buf, frontFace);
 
+        // The kernel wrote the kept instance count into the command itself
         if(levels.length)
-            vkCmdDrawIndexedIndirectCount(
+            vkCmdDrawIndexedIndirect(
                 buf,
                 args,
                 argsOffset,
-                args,
-                argsOffset + cullCountOffset,
                 1,
                 VkDrawIndexedIndirectCommand.sizeof,
             );
         else
-            vkCmdDrawIndirectCount(
+            vkCmdDrawIndirect(
                 buf,
                 args,
                 argsOffset,
-                args,
-                argsOffset + cullCountOffset,
                 1,
                 VkDrawIndirectCommand.sizeof,
             );

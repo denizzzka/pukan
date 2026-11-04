@@ -43,9 +43,6 @@ struct CullBatch
     uint instances;
 }
 
-/// Offset of the kept instance count inside the draw command region
-package(pukan) enum cullCountOffset = 5 * uint.sizeof;
-
 /// One frame's cull kernel, its memory and its descriptor set
 final class CullFrame
 {
@@ -186,7 +183,7 @@ final class CullFrame
             0, // firstIndex
             0, // vertexOffset
             0, // firstInstance
-            0, // instances the kernel keeps
+            0, // unused, keeps the command a whole number of cachelines
         ];
 
         auto batch = CullBatch(

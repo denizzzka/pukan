@@ -74,6 +74,7 @@ void main()
     if(instance.boundsMin.w < 0.5 && !insideFrustum(instance))
         return;
 
-    const uint slot = atomicAdd(args[pc.argsIndex + 5], 1u);
+    // The command is read at execution, so its instance count is the kept total
+    const uint slot = atomicAdd(args[pc.argsIndex + 1], 1u);
     visible[pc.visibleOffset + slot] = instance.mvp;
 }
