@@ -871,6 +871,9 @@ Before each slice, read the matching reference named in
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
+  - [ ] Cards abort the run once a cell retires: something the capture owns is
+        freed while a frame in flight still reads it, and the occlusion sample
+        only survives with `--impostor-distance 0`.
 
 - **Occlusion**
   - [ ] Depth-pyramid (HiZ) occlusion from the previous frame, or a software
