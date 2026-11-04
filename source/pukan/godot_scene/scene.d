@@ -775,7 +775,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 gatheredMesh.batches[level] = currentCullFrame.reserveLevel(
                     instances, gatheredMesh.mesh.indexCount(level));
                 currentCullFrame.dispatch(buf, instances, gatheredMesh.batches[level],
-                    minDepth, maxDepth);
+                    minDepth, maxDepth, phase == DrawPhase.surface);
             }
         }
     }

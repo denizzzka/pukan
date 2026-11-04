@@ -388,6 +388,7 @@ void main(string[] args)
     float proxyDistance;
     size_t proxyMinParts = 8;
     bool occlusion;
+    bool occlusionGpu;
     bool stats;
     uint warmup;
     string pickOrigin;
@@ -420,6 +421,7 @@ void main(string[] args)
         "proxy-distance", "merge the parts of cells beyond this distance into one proxy, 0 = off", &proxyDistance,
         "proxy-min-parts", "parts a cell needs before a proxy is worth its merge", &proxyMinParts,
         "occlusion", "skip parts the near ones hide, tested against a coarse CPU depth grid", &occlusion,
+        "occlusion-gpu", "let the cull kernel drop instances the last frame's depth covers", &occlusionGpu,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "stats", "report draws, triangles and frame time per ring at the end", &stats,
         "warmup", "frames the stats leave out, for loading and merging", &warmup,
@@ -743,7 +745,7 @@ void main(string[] args)
 
     godotScene.proxyMinParts = proxyMinParts;
 
-    if(occlusion)
+    if(occlusion || occlusionGpu)
         scene.enableOcclusionDepth(192, 144);
 
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
@@ -1067,6 +1069,8 @@ void main(string[] args)
     uint frameIndex;
     /// Parts the coarse occlusion grid left out
     size_t occludedTotal;
+    /// Instances the cull kernel's grid dropped
+    size_t kernelOccluded;
     /// Per ring: near cells, proxies, cards
     DrawStats[3] ringTotals;
     DrawStats shadowTotal;
@@ -1627,6 +1631,7 @@ void main(string[] args)
             if(frameIndex > warmup)
             {
                 occludedTotal += raster.rejected;
+                kernelOccluded += scene.occlusionRejections;
                 cellTotals[0] += nearCells.length;
                 cellTotals[1] += proxyCells.length;
                 cellTotals[2] += farCells.length;
@@ -1641,7 +1646,7 @@ void main(string[] args)
     }
 
     reportStats(stats, frameIndex - min(frameIndex, warmup), ringTotals, shadowTotal, cellTotals, frameTimes,
-        godotScene.proxyCount, godotScene.sparseCount, occludedTotal);
+        godotScene.proxyCount, godotScene.sparseCount, occludedTotal, kernelOccluded);
 
     if(characterMode)
         writeln("character position ", mover.state.position,
@@ -1662,6 +1667,7 @@ private void reportStats(
     size_t proxies,
     size_t sparse,
     size_t occluded,
+    size_t kernelOccluded,
 )
 {
     if(!enabled)
@@ -1673,7 +1679,8 @@ private void reportStats(
         "  cells near ", cells[0] / count,
         " proxy ", cells[1] / count,
         " far ", cells[2] / count,
-        "  merged ", proxies, " sparse ", sparse, " occluded ", occluded / count);
+        "  merged ", proxies, " sparse ", sparse, " occluded ", occluded / count,
+        " kernel ", kernelOccluded / count);
 
     writeln(format("%-7s %8s %10s %12s", "ring", "draws", "instances", "triangles"));
 

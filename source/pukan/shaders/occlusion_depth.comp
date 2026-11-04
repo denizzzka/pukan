@@ -12,6 +12,8 @@ layout(set = 0, binding = 1) writeonly buffer Depths
     float nearest[];
 };
 
+layout(set = 0, binding = 2, r32f) writeonly uniform image2D nearestImage;
+
 layout(push_constant) uniform Push
 {
     uint gridWidth;
@@ -44,4 +46,5 @@ void main()
         }
 
     nearest[cell.y * pc.gridWidth + cell.x] = depth;
+    imageStore(nearestImage, ivec2(cell), vec4(depth, 0.0, 0.0, 1.0));
 }

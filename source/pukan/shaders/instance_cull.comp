@@ -28,6 +28,9 @@ layout(binding = 2) buffer DrawArgs
     uint args[];
 };
 
+// The previous frame's nearest depth, one value per grid cell
+layout(binding = 3) uniform sampler2D occlusion;
+
 layout(push_constant) uniform Push
 {
     uint instanceOffset;
@@ -37,6 +40,10 @@ layout(push_constant) uniform Push
     // Clip depth range of this level; levels split the instances between them
     float minDepth;
     float maxDepth;
+    // Grid the occlusion test samples; zero width turns it off
+    uint occlusionWidth;
+    uint occlusionHeight;
+    float occlusionBias;
 } pc;
 
 // Same test as pukan.graphics.common.misc.isVisible
@@ -56,6 +63,59 @@ bool insideFrustum(in Instance instance)
     return true;
 }
 
+// Rejects a box the previous frame already covered in every corner it reaches
+bool occluded(in Instance instance)
+{
+    if(pc.occlusionWidth == 0)
+        return false;
+
+    vec2 low = vec2(1.0e30);
+    vec2 high = vec2(-1.0e30);
+    float nearest = 1.0e30;
+
+    // The eight corners, projected one by one, as the CPU test does it
+    for(int i = 0; i < 8; ++i)
+    {
+        const vec3 corner = vec3(
+            (i & 1) != 0 ? instance.boundsMax.x : instance.boundsMin.x,
+            (i & 2) != 0 ? instance.boundsMax.y : instance.boundsMin.y,
+            (i & 4) != 0 ? instance.boundsMax.z : instance.boundsMin.z
+        );
+        const vec4 clip = instance.mvp * vec4(corner, 1.0);
+
+        // A box that reaches the eye or behind it is left visible
+        if(clip.w <= 0.0)
+            return false;
+
+        const vec2 screen = clip.xy / clip.w * 0.5 + 0.5;
+        low = min(low, screen);
+        high = max(high, screen);
+        nearest = min(nearest, clip.z / clip.w);
+    }
+
+    // Nothing of the box lands on the grid
+    if(high.x < 0.0 || high.y < 0.0 || low.x > 1.0 || low.y > 1.0)
+        return false;
+
+    const ivec2 limit = ivec2(int(pc.occlusionWidth) - 1, int(pc.occlusionHeight) - 1);
+    low = clamp(low, vec2(0.0), vec2(1.0)) * vec2(float(pc.occlusionWidth), float(pc.occlusionHeight));
+    high = clamp(high, vec2(0.0), vec2(1.0)) * vec2(float(pc.occlusionWidth), float(pc.occlusionHeight));
+
+    // The farthest depth the grid holds over the rectangle decides
+    float covered = 0.0;
+
+    for(int y = 0; y < 3; ++y)
+        for(int x = 0; x < 3; ++x)
+        {
+            const vec2 at = mix(low, high, vec2(float(x) / 2.0, float(y) / 2.0));
+            const ivec2 cell = clamp(ivec2(at), ivec2(0), limit);
+
+            covered = max(covered, texelFetch(occlusion, cell, 0).r);
+        }
+
+    return covered < nearest - pc.occlusionBias;
+}
+
 void main()
 {
     const uint i = gl_GlobalInvocationID.x;
@@ -73,6 +133,13 @@ void main()
 
     if(instance.boundsMin.w < 0.5 && !insideFrustum(instance))
         return;
+
+    if(instance.boundsMin.w < 0.5 && occluded(instance))
+    {
+        // The sixth word is spare, so it counts what the grid dropped
+        atomicAdd(args[pc.argsIndex + 5], 1u);
+        return;
+    }
 
     // The command is read at execution, so its instance count is the kept total
     const uint slot = atomicAdd(args[pc.argsIndex + 1], 1u);

@@ -3,7 +3,9 @@ module pukan.graphics.g3d.pbr.culling;
 import dlib.math: Matrix4x4f, Vector4f;
 import pukan.graphics.common.shaders: shaderStage;
 import pukan.vulkan.bindings;
-import pukan.vulkan.descriptors: bufferWriteDescriptor;
+import pukan.vulkan.helpers: vkCheck;
+import pukan.vulkan.image: ImageMemory, transitionImageLayout;
+import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 import pukan.vulkan.pipelines: PipelineFactory, PipelineKey;
@@ -75,6 +77,19 @@ final class CullFrame
     /// Buffers a recorded frame may still read; freed at the next reset
     private MemoryBufferMappedToCPU[] retired;
 
+    /// Depth grid the kernel tests against; a 1x1 placeholder until a scene
+    /// installs one, so the binding always holds an image
+    private ImageMemory grid;
+    private VkObj!VkImageView gridViewObj;
+    private VkSampler gridSampler;
+    private VkImageView gridView;
+    private uint gridWidth;
+    private uint gridHeight;
+    /// Bias the occlusion test needs, in clip z over w
+    float occlusionBias = 0.00002f;
+    /// Instances the grid dropped in the frame that last used this one
+    private size_t rejected;
+
     this(LogicalDevice device, PipelineFactory pipelines)
     {
         device.ensureEnabled!requirements("CullFrame");
@@ -104,6 +119,63 @@ final class CullFrame
         argsBuf = device.create!MemoryBufferMappedToCPU(1 << 20,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 
+        // A 1x1 grid keeps the sampler binding valid while no scene feeds one
+        VkImageCreateInfo gridInfo = {
+            sType: VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            imageType: VK_IMAGE_TYPE_2D,
+            format: VK_FORMAT_R32_SFLOAT,
+            tiling: VK_IMAGE_TILING_OPTIMAL,
+            extent: VkExtent3D(1, 1, 1),
+            mipLevels: 1,
+            arrayLayers: 1,
+            samples: VK_SAMPLE_COUNT_1_BIT,
+            usage: VK_IMAGE_USAGE_SAMPLED_BIT,
+            sharingMode: VK_SHARING_MODE_EXCLUSIVE,
+        };
+        grid = device.create!ImageMemory(gridInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        VkImageViewCreateInfo gridViewInfo = {
+            sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            viewType: VK_IMAGE_VIEW_TYPE_2D,
+            format: VK_FORMAT_R32_SFLOAT,
+            subresourceRange: VkImageSubresourceRange(
+                aspectMask: VK_IMAGE_ASPECT_COLOR_BIT,
+                baseMipLevel: 0,
+                levelCount: 1,
+                baseArrayLayer: 0,
+                layerCount: 1,
+            ),
+            image: grid.image,
+        };
+        gridViewObj = VkObj!VkImageView(device.releaseQueue, gridViewInfo);
+        gridView = gridViewObj.vk;
+
+        // The binding promises a general layout, so the placeholder takes it too
+        auto gridPool = device.createCommandPool();
+        auto gridBuffers = gridPool.allocateBuffers(1);
+        gridPool.recordOneTimeAndSubmit(gridBuffers[0], (VkCommandBuffer buf) {
+            transitionImageLayout(buf, grid.image,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT,
+                0u, 1u, VK_IMAGE_ASPECT_COLOR_BIT);
+        });
+        destroy(gridPool);
+
+        VkSamplerCreateInfo gridSamplerInfo = {
+            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            magFilter: VK_FILTER_NEAREST,
+            minFilter: VK_FILTER_NEAREST,
+            mipmapMode: VK_SAMPLER_MIPMAP_MODE_NEAREST,
+            addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            borderColor: VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+            compareEnable: VK_FALSE,
+            compareOp: VK_COMPARE_OP_ALWAYS,
+        };
+        vkCreateSampler(device.device, &gridSamplerInfo, device.alloc, &gridSampler).vkCheck;
+
         // A moved buffer needs a set nobody has bound yet, so the pool keeps room
         pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 512), device.releaseQueue);
         set = device.allocateDescriptorSet(pool.vk, declared.setLayout);
@@ -123,16 +195,58 @@ final class CullFrame
 
         foreach(buffer; retired)
             destroy(buffer);
+
+        if(gridSampler)
+            vkDestroySampler(device.device, gridSampler, device.alloc);
+
+        if(grid)
+            destroy(grid);
     }
 
     /// Where the kernel puts the matrices and commands it keeps
     VkBuffer visibleBuffer() => visibleBuf.buf;
     VkBuffer argsBuffer() => argsBuf.buf;
 
+    /// Instances the last frame's grid dropped from the camera's own view
+    size_t occlusionRejections() const => rejected;
+
+    /// Installs the grid the kernel tests against, or the placeholder when null
+    void setOcclusion(VkImageView view, VkSampler sampler, uint width, uint height)
+    {
+        if(view is null)
+        {
+            view = gridView;
+            sampler = gridSampler;
+            width = 0;
+            height = 0;
+        }
+
+        if(view is gridView && width == gridWidth && height == gridHeight)
+            return;
+
+        gridView = view;
+        gridSampler = sampler;
+        gridWidth = width;
+        gridHeight = height;
+        setDirty = true;
+    }
+
     /// Forgets the batches of the previous frame; what it replaced waits for
     /// the frames still in flight
     void reset()
     {
+        // The frame that last used these commands has finished, so its counts
+        // are what the kernel wrote
+        rejected = 0;
+
+        if(argsBuf !is null)
+        {
+            const words = cast(const(uint)[]) argsBuf.cpuBuf;
+
+            for(size_t i = argsWords - 1; i < argsUsed / uint.sizeof; i += argsWords)
+                rejected += words[i];
+        }
+
         foreach(buffer; retired)
             device.releaseQueue.retireHolder(buffer);
 
@@ -203,8 +317,16 @@ final class CullFrame
         return batch;
     }
 
-    /// Runs the kernel over the instance list, keeping the ones in the depth range
-    void dispatch(VkCommandBuffer buf, CullInstances instances, CullBatch batch, float minDepth, float maxDepth)
+    /// Runs the kernel over the instance list, keeping the ones in the depth range;
+    /// the occlusion grid only makes sense for the camera's own view
+    void dispatch(
+        VkCommandBuffer buf,
+        CullInstances instances,
+        CullBatch batch,
+        float minDepth,
+        float maxDepth,
+        bool occlusion = true,
+    )
     {
         if(pipeline is null)
         {
@@ -257,6 +379,9 @@ final class CullFrame
             instanceCount: instances.count,
             minDepth: minDepth,
             maxDepth: maxDepth,
+            occlusionWidth: occlusion ? gridWidth : 0,
+            occlusionHeight: occlusion ? gridHeight : 0,
+            occlusionBias: occlusionBias,
         );
 
         vkCmdPushConstants(buf, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, push.sizeof, &push);
@@ -315,11 +440,18 @@ final class CullFrame
             VkDescriptorBufferInfo(argsBuf.buf, 0, VK_WHOLE_SIZE),
         ];
 
+        VkDescriptorImageInfo gridInfo = VkDescriptorImageInfo(
+            imageLayout: VK_IMAGE_LAYOUT_GENERAL,
+            imageView: gridView,
+            sampler: gridSampler,
+        );
+
         VkWriteDescriptorSet[] writes =
         [
             bufferWriteDescriptor(set, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, infos[0]),
             bufferWriteDescriptor(set, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, infos[1]),
             bufferWriteDescriptor(set, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, infos[2]),
+            imageWriteDescriptor(set, 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, gridInfo),
         ];
 
         device.updateDescriptorSets(writes);
@@ -334,7 +466,14 @@ final class CullFrame
             stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
         );
 
-        return [binding(0), binding(1), binding(2)];
+        auto image = VkDescriptorSetLayoutBinding(
+            binding: 3,
+            descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            descriptorCount: 1,
+            stageFlags: VK_SHADER_STAGE_COMPUTE_BIT,
+        );
+
+        return [binding(0), binding(1), binding(2), image];
     }
 
     private VkBufferMemoryBarrier hostToShaderBarrier(VkBuffer buffer)
@@ -387,6 +526,9 @@ final class CullFrame
         uint instanceCount;
         float minDepth;
         float maxDepth;
+        uint occlusionWidth;
+        uint occlusionHeight;
+        float occlusionBias;
     }
 }
 

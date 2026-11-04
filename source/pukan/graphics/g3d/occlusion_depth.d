@@ -4,7 +4,7 @@ import pukan.graphics.common.shaders: shaderStage;
 import pukan.vulkan.bindings;
 import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.helpers: vkCheck;
-import pukan.vulkan.image: transitionImageLayout;
+import pukan.vulkan.image: ImageMemory, transitionImageLayout;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBufferMappedToCPU;
 import pukan.vulkan.pipelines: PipelineFactory, PipelineKey;
@@ -29,6 +29,9 @@ final class OcclusionDepth
     private VkObj!VkDescriptorPool pool;
     private VkSampler sampler;
     private MemoryBufferMappedToCPU buffer;
+    /// The same grid as an image, for the cull kernel to sample
+    private ImageMemory grid;
+    private VkObj!VkImageView gridViewObj;
 
     /// Cells per row and column of the grid
     int columns;
@@ -71,6 +74,7 @@ final class OcclusionDepth
         auto bindings = [
             binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
             binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER),
+            binding(2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         ];
 
         auto declared = pipelines.declareCompute(shaderStage!"occlusion_depth.spv"(
@@ -106,12 +110,62 @@ final class OcclusionDepth
             cast(size_t) columns * rows * float.sizeof,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         );
+
+        VkImageCreateInfo gridInfo = {
+            sType: VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            imageType: VK_IMAGE_TYPE_2D,
+            format: VK_FORMAT_R32_SFLOAT,
+            tiling: VK_IMAGE_TILING_OPTIMAL,
+            extent: VkExtent3D(cast(uint) columns, cast(uint) rows, 1),
+            mipLevels: 1,
+            arrayLayers: 1,
+            samples: VK_SAMPLE_COUNT_1_BIT,
+            usage: VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            sharingMode: VK_SHARING_MODE_EXCLUSIVE,
+        };
+        grid = device.create!ImageMemory(gridInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        VkImageViewCreateInfo viewInfo = {
+            sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            viewType: VK_IMAGE_VIEW_TYPE_2D,
+            format: VK_FORMAT_R32_SFLOAT,
+            subresourceRange: VkImageSubresourceRange(
+                aspectMask: VK_IMAGE_ASPECT_COLOR_BIT,
+                baseMipLevel: 0,
+                levelCount: 1,
+                baseArrayLayer: 0,
+                layerCount: 1,
+            ),
+            image: grid.image,
+        };
+        gridViewObj = VkObj!VkImageView(device.releaseQueue, viewInfo);
+
+        // The kernel writes it and the cull kernel samples it, so it stays general
+        auto commandPool = device.createCommandPool();
+        auto buffers = commandPool.allocateBuffers(1);
+        commandPool.recordOneTimeAndSubmit(buffers[0], (VkCommandBuffer buf) {
+            transitionImageLayout(
+                buf, grid.image,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                0,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_WRITE_BIT,
+                0u, 1u,
+                VK_IMAGE_ASPECT_COLOR_BIT,
+            );
+        });
+        destroy(commandPool);
     }
 
     ~this()
     {
         if(buffer)
             destroy(buffer);
+
+        if(grid)
+            destroy(grid);
 
         if(sampler)
             vkDestroySampler(device, sampler, device.alloc);
@@ -151,10 +205,15 @@ final class OcclusionDepth
                 imageView: depth,
                 sampler: sampler,
             );
+            VkDescriptorImageInfo target = VkDescriptorImageInfo(
+                imageLayout: VK_IMAGE_LAYOUT_GENERAL,
+                imageView: gridViewObj.vk,
+            );
 
             scope VkWriteDescriptorSet[] writes = [
                 imageWriteDescriptor(created, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image),
                 bufferWriteDescriptor(created, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, info),
+                imageWriteDescriptor(created, 2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, target),
             ];
 
             device.updateDescriptorSets(writes);
@@ -234,6 +293,12 @@ final class OcclusionDepth
         extent = size;
         filled = true;
     }
+
+    /// The grid as an image, for a kernel that samples it
+    VkImageView view() => gridViewObj.vk;
+
+    /// Sampler that reads the grid without filtering
+    VkSampler readSampler() => sampler;
 
     /// Copies the last grid into `cells`; false when no frame has written one
     bool read(float[] cells) const

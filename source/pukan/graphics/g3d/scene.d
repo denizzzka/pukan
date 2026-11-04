@@ -754,6 +754,14 @@ class SceneWith(Modules...)
         {
             currentCullFrame = cullFrames[frameIndex(frame)];
             currentCullFrame.reset();
+
+            // The last frame's grid is what this frame's kernel tests against
+            currentCullFrame.setOcclusion(
+                occlusionDepth !is null ? occlusionDepth.view : null,
+                occlusionDepth !is null ? occlusionDepth.readSampler : VkSampler.init,
+                occlusionDepth !is null ? cast(uint) occlusionDepth.columns : 0,
+                occlusionDepth !is null ? cast(uint) occlusionDepth.rows : 0,
+            );
         }
 
         // Compute work, such as a cull kernel, has to finish before a pass begins
@@ -821,6 +829,12 @@ class SceneWith(Modules...)
     {
         if(occlusionDepth is null)
             occlusionDepth = new OcclusionDepth(device, pipelineFactory, columns, rows);
+    }
+
+    /// Instances the last frame's grid dropped from the camera's view
+    size_t occlusionRejections()
+    {
+        return currentCullFrame !is null ? currentCullFrame.occlusionRejections : 0;
     }
 
     /// Copies the last grid into `cells`; false while no frame has written one
