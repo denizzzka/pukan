@@ -849,15 +849,17 @@ Before each slice, read the matching reference named in
   card captured from the direction it arrived from. A cell beyond
   `--proxy-distance` merges its static parts into one mesh per material, clipped
   to the cell; the merge runs as the cell arrives, on a byte budget per frame,
-  from the CPU side of the pieces the cell already holds. A proxy draws the
+  from the CPU side of the pieces the cell already holds. A cell with fewer
+  pieces than `--proxy-min-parts` keeps them, since a merge costs a mesh and a
+  descriptor set per material and saves a draw per part. A proxy draws the
   merged list alone, because generated levels leave holes where every tile keeps
   its own vertices.
   - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
         Godot importer stores, instead of only from the generated ones.
-  - [ ] A proxy costs a descriptor set and a merge per cell, and on the field it
-        trades three times fewer draws for twice the triangles with no gain in
-        frame time: cull inside a proxy, or merge only cells whose parts fill
-        them. `bench/hlod.md` has the counts.
+  - [ ] A proxy is culled only as a whole cell, so it brings the geometry of
+        parts the near path would have dropped: split it into clusters with
+        their own bounds, and judge it on the field's dense cells against the
+        parts path. `bench/hlod.md` has the counts.
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
