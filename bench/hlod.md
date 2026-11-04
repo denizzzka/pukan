@@ -112,11 +112,21 @@ The coarse CPU depth grid (`--occlusion`) holds one nearest depth per block of a
 depth. A part is dropped when every sample of its screen rectangle lies behind
 what the grid holds.
 
-| Scene | Parts drawn | With the grid | Frame mean |
-|---|---|---|---|
-| occlusion_culling | 998.0 | 995.7 (4 dropped) | 2090 ms -> 2129 ms |
-| truck_town | 2.0 | 2.0 (none dropped) | 39.12 ms -> 39.12 ms |
-| platformer, rings on | 0.0 | 0.0 (none dropped) | 30.73 ms -> 30.73 ms |
+| Scene | Parts drawn | Grid | Frame mean | p50 |
+|---|---|---|---|---|
+| field, dense cells | 835.0 | none | 60.08 ms | 55 |
+| field, dense cells | 644.2 | CPU, 204 dropped | 55.92 ms | 51 |
+| field, dense cells | 835.0 | kernel, 170 dropped | 58.52 ms | 53 |
+| occlusion_culling | 998.0 | kernel, none dropped | 2112 ms | 1580 |
+| truck_town | 2.0 | none dropped | 39.1 ms | 38 |
+
+The kernel test drops 170 of the field's 835 instances and gains 1.6 ms. It
+cannot cut the submitted draws the way the CPU test does, so on this software
+raster the CPU path stays ahead; on a real GPU the kernel's saving is the one
+that lands in the frame.
+
+The indoor sample gains nothing from the kernel: its 998 draws come from nested
+scenes that draw themselves, so no instance reaches the cull kernel.
 
 The test is conservative by construction: every sample of a part's screen
 rectangle has to lie behind a surface, and a coarse grid with box projections
