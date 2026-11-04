@@ -105,6 +105,23 @@ The field also exposes two engine limits: a proxy costs a descriptor set and a
 merge per cell, and the demo's streaming range is measured in metres against a
 thin cell layer, so a large range enumerates hundreds of empty vertical cells.
 
+## Occlusion on the field and the town
+
+The coarse CPU depth grid (`--occlusion`) rasterizes the items of the near cells
+as boxes and drops a part when every sample of its screen rectangle lies behind
+a surface.
+
+| Scene | Parts drawn | With the grid | Frame mean |
+|---|---|---|---|
+| field, dense cells | 831.8 | 783.4 (50 dropped) | 71.46 ms -> 67.51 ms |
+| occlusion_culling | 994.4 | 994.4 (10 dropped) | 2182 ms -> 2205 ms |
+| truck_town | 2.0 | 2.0 (none dropped) | 38.88 ms -> 38.58 ms |
+
+A box is a poor occluder: its screen rectangle is larger than the surface it
+stands for, so the grid rarely covers a part completely. The field gains 6%,
+the indoor sample nothing measurable, and the town has too few near parts to
+matter.
+
 ## What the numbers say
 
 - Per-cell HLOD pays off only when a cell's geometry belongs to it. A scene
