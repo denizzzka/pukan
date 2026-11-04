@@ -854,9 +854,13 @@ Before each slice, read the matching reference named in
   its own vertices.
   - [ ] Authored levels: fill the list from glTF `MSFT_lod` and from what the
         Godot importer stores, instead of only from the generated ones.
-  - [ ] A ring test scene whose meshes belong to one cell: the samples merge
-        each material over the whole map, so a cell cannot cut what it draws and
-        the rings save nothing. `bench/hlod.md` holds the numbers.
+  - [ ] The generated field draws only with `--no-gpu-cull`: through the cull
+        kernel its primitives render nothing, as `generated/primitives.tscn` and
+        `generated/procedural.tscn` already did. Fix that before the ring
+        numbers mean anything; `bench/hlod.md` has the counts.
+  - [ ] A proxy costs a descriptor set and a merge per cell, which the field's
+        24,964 cells make heavy: batch the proxies of a cell or share one
+        material set across them.
   - [ ] Cluster LOD or virtual geometry (Nanite-style cluster grouping and
         software raster) as the long-term replacement, only after the merged
         HLOD has numbers.
