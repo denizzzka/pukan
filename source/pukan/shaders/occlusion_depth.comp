@@ -1,6 +1,8 @@
 #version 460
 
-// Turns a frame's multisampled depth into the coarse grid the CPU tests against
+// Turns a frame's multisampled depth into the coarse grid the CPU tests against.
+// The image cannot be copied - a copy wants one sample and a resolve takes colour
+// only - so it is sampled here, four samples per texel, nearest of the block.
 
 layout(local_size_x = 8, local_size_y = 8) in;
 

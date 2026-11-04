@@ -13,9 +13,10 @@ import pukan.vulkan.resources.vkobj: VkObj;
 /**
     Reads a frame's multisampled depth into a coarse grid of nearest depths.
 
-    A multisampled depth cannot be copied, so a compute pass samples it and
-    writes one value per grid cell. The CPU reads that buffer on the next frame,
-    which gives the occlusion test a frame of latency and keeps it safe.
+    A multisampled depth cannot be copied: `vkCmdCopyImageToBuffer` wants one
+    sample and `vkCmdResolveImage` takes colour only. A compute pass samples it
+    instead, one nearest depth per grid cell, and the CPU reads that buffer a
+    frame later.
 */
 final class OcclusionDepth
 {
