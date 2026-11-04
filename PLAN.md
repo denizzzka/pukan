@@ -208,6 +208,11 @@ Fixtures live in `demo_godot/godot_samples/`.
         counted once, and that the skipped counters aggregate;
   - [ ] README and fixture list.
 
+### Unreal Engine assets
+
+- [ ] Long-term: load cooked Unreal packages (`.uasset`, `.uexp`, `.ubulk`) as
+      another content source.
+
 ## Mover
 
 Goal: a modular movement system whose first motor is Quake-style, with the API
