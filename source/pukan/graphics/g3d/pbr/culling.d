@@ -129,11 +129,12 @@ final class CullFrame
     VkBuffer visibleBuffer() => visibleBuf.buf;
     VkBuffer argsBuffer() => argsBuf.buf;
 
-    /// Forgets the batches of the previous frame and frees what they replaced
+    /// Forgets the batches of the previous frame; what it replaced waits for
+    /// the frames still in flight
     void reset()
     {
         foreach(buffer; retired)
-            destroy(buffer);
+            device.releaseQueue.retireHolder(buffer);
 
         retired = null;
         instanceUsed = 0;

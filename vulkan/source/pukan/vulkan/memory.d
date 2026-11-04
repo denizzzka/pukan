@@ -251,7 +251,8 @@ class TransferBuffer
         if(gpuBuffer is null)
             return;
 
-        destroy(gpuBuffer);
+        // A frame in flight may still read the copy
+        device.releaseQueue.retireHolder(gpuBuffer);
         gpuBuffer = null;
     }
 

@@ -302,8 +302,14 @@ final class DescriptorAllocator
         if(device is null)
             return;
 
+        // A frame in flight may still hold sets from these pools
         foreach(pool; pools)
-            vkDestroyDescriptorPool(device.device, pool, device.alloc);
+            device.releaseQueue.retire(&releasePool, pool);
+    }
+
+    private static void releasePool(VkDevice device, void* handle, VkAllocationCallbacks* alloc)
+    {
+        vkDestroyDescriptorPool(device, cast(VkDescriptorPool) handle, alloc);
     }
 
     private void addPool()

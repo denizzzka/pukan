@@ -178,12 +178,17 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         BufferPieceOnGPU[] pieces;
         /// Bytes the pieces of this proxy uploaded
         size_t bytes;
+        /// Frames in flight may still read the pieces after the cell goes
+        LogicalDevice device;
 
         ~this()
         {
+            if(device is null)
+                return;
+
             foreach(ref piece; pieces)
                 if(piece && piece.buffer)
-                    destroy(piece.buffer);
+                    device.releaseQueue.retireHolder(piece.buffer);
         }
     }
 
@@ -1007,6 +1012,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             return 0;
 
         auto proxy = new CellProxy;
+        proxy.device = device;
         const cellBounds = index.grid.bounds(cell);
 
         foreach(group; groups)
