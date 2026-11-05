@@ -893,7 +893,9 @@ Before each slice, read the matching reference named in
         before it left; the widest path wins per room, an eye on a wall plane
         stands in both rooms, and the shadow pass keeps every cell so a hidden
         room still casts. The corridor keeps 27 of 63 rooms with a
-        pixel-identical picture. A PVS bake on top of that graph is what is left.
+        pixel-identical picture. A PVS bake exists (`--pvs`): sixteen directions per room, baked at load. It
+        keeps 55 rooms where the walk keeps 27 and costs 2.4 s to bake, so it
+        only pays with an offline bake, finer sectors and a much larger graph.
 
 - **Shadows and lights**
   - [ ] Cascaded shadow maps around the camera, each cascade with its own culled
