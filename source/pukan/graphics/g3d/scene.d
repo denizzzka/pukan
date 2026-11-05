@@ -306,9 +306,12 @@ class SceneWith(Modules...)
             : new SwapChain(device, frameBuilder, surface, renderPass, null, surfaceFormat.colorSpace, presentMode);
         createFrameSets();
 
-        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources, renderPass);
-        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources, renderPass);
-        litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources, renderPass);
+        coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources,
+            renderPass, sunShadow.pass);
+        texturedMeshFactory = PrimitivesFactory!TexturedMesh(device, pipelineFactory, meshResources,
+            renderPass, sunShadow.pass);
+        litMeshFactory = PrimitivesFactory!LitMesh(device, pipelineFactory, meshResources,
+            renderPass, sunShadow.pass);
         pbrPipelineSet = createPbrPipelineSet(pipelineFactory, renderPass, sunShadow.pass);
         pbrFactory = new PbrFactory(device, pipelineFactory, meshResources, pbrPipelineSet.materialLayout);
         static if(pipelineWarmupRequired)
@@ -339,8 +342,10 @@ class SceneWith(Modules...)
                 gltfFactory,
                 pbrPipelineSet.pipelinesFor(GodotFactory.pbrProfile),
             );
-        sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
-        cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass, meshResources.fakeTexture);
+        sphereRenderer = new SphereRenderer(device, pipelineFactory, renderPass,
+            meshResources.fakeTexture, sunShadow.pass);
+        cylinderRenderer = new CylinderRenderer(device, pipelineFactory, renderPass,
+            meshResources.fakeTexture, sunShadow.pass);
 
         // Registered in the reverse of the destruction order: newest goes first
         sceneOwner.own(renderPass);

@@ -9,10 +9,17 @@ import pukan.vulkan.renderpass: DrawableByVulkan;
 import std.variant: Algebraic;
 import dlib.math: Matrix4x4f;
 
+/// Pipeline a branch uses while a shadow map is the target
+struct ShadowPipelineCfg
+{
+    GraphicsPipelineCfg cfg;
+}
+
 alias Payload = Algebraic!(
     Bone,
     DrawableByVulkan,
     GraphicsPipelineCfg, // switches pipeline for DrawablePrimitive children nodes
+    ShadowPipelineCfg,   // switches the depth-only pipeline of the same nodes
     DrawablePrimitive,
 );
 
@@ -32,4 +39,7 @@ interface DrawablePrimitive
 {
     void uploadToGPUImmediate(LogicalDevice, CommandPool, scope VkCommandBuffer);
     void drawingBufferFilling(VkCommandBuffer, GraphicsPipelineCfg, Matrix4x4f, VkDescriptorSet); //const
+
+    /// Records the primitive into a shadow map, binding no material
+    void drawingShadow(VkCommandBuffer, GraphicsPipelineCfg, Matrix4x4f);
 }

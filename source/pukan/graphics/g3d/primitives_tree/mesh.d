@@ -180,6 +180,42 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
         }
     }
 
+    static ShaderDecl[] shadowShaderStages()
+    {
+        // Only position is read; the stride comes from the draw call
+        auto shadowInput = ShaderVertexInput(
+            [
+                VkVertexInputBindingDescription(
+                    binding: 0,
+                    stride: 0,
+                    inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+                ),
+            ],
+            [
+                VkVertexInputAttributeDescription(
+                    binding: 0,
+                    location: 0,
+                    format: VK_FORMAT_R32G32B32_SFLOAT,
+                    offset: 0,
+                ),
+            ],
+        );
+
+        return [
+            shaderStage!"primitive_shadow_vert.spv"(
+                VK_SHADER_STAGE_VERTEX_BIT,
+                null,
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+                shadowInput,
+            ),
+            shaderStage!"primitive_shadow_frag.spv"(VK_SHADER_STAGE_FRAGMENT_BIT, null),
+        ];
+    }
+
     void uploadToGPUImmediate(LogicalDevice device, CommandPool commandPool, scope VkCommandBuffer commandBuffer)
     {
         assert(vertices.length > 0);
@@ -217,6 +253,11 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans, VkDescriptorSet frameSet)
     {
         draw(buf, pipeline, trans, frameSet);
+    }
+
+    void drawingShadow(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    {
+        drawShadow(buf, pipeline, trans);
     }
 
     protected void updateDescriptorSets(LogicalDevice device, VkDescriptorImageInfo imageInfo)

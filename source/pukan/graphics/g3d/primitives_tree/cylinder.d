@@ -372,6 +372,7 @@ class CylinderRenderer : DrawablePrimitive
     private uint bucketCount;
 
     GraphicsPipelineCfg pipelineCfg;
+    GraphicsPipelineCfg shadowPipelineCfg;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
     private VkDescriptorImageInfo baseColorTexture;
@@ -400,6 +401,7 @@ class CylinderRenderer : DrawablePrimitive
         PipelineFactory pipelines,
         RenderPass renderPass,
         Texture fakeTexture,
+        RenderPass shadowPass,
         CylinderLod lod = CylinderLod(),
     )
     {
@@ -431,7 +433,80 @@ class CylinderRenderer : DrawablePrimitive
 
         pipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
+        const shadowTechnique = pipelines.declare(RenderTechnique(
+            name: "cylinders shadow",
+            stages: shadowShaderStages(),
+            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
+        ), 1);
+
+        shadowPipelineCfg = pipelines.acquire(shadowTechnique, shadowPass, 0);
+
         generator = new CylinderMeshGenerator(device, pipelines, lod.maxLevel);
+    }
+
+    private static ShaderDecl[] shadowShaderStages()
+    {
+        // The shadow shader skips the normal and keeps the instance basis
+        auto shadowInput = ShaderVertexInput(
+            [
+                VkVertexInputBindingDescription(
+                    binding: 0,
+                    stride: CylinderVertex.sizeof,
+                    inputRate: VK_VERTEX_INPUT_RATE_VERTEX,
+                ),
+                VkVertexInputBindingDescription(
+                    binding: 1,
+                    stride: 4 * Vector4f.sizeof,
+                    inputRate: VK_VERTEX_INPUT_RATE_INSTANCE,
+                ),
+            ],
+            [
+                VkVertexInputAttributeDescription(
+                    binding: 0,
+                    location: 0,
+                    format: VK_FORMAT_R32G32B32_SFLOAT,
+                    offset: 0,
+                ),
+                VkVertexInputAttributeDescription(
+                    binding: 1,
+                    location: 2,
+                    format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                    offset: 0,
+                ),
+                VkVertexInputAttributeDescription(
+                    binding: 1,
+                    location: 3,
+                    format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                    offset: 16,
+                ),
+                VkVertexInputAttributeDescription(
+                    binding: 1,
+                    location: 4,
+                    format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                    offset: 32,
+                ),
+                VkVertexInputAttributeDescription(
+                    binding: 1,
+                    location: 5,
+                    format: VK_FORMAT_R32G32B32A32_SFLOAT,
+                    offset: 48,
+                ),
+            ],
+        );
+
+        return [
+            shaderStage!"cylinder_shadow_vert.spv"(
+                VK_SHADER_STAGE_VERTEX_BIT,
+                null,
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+                shadowInput,
+            ),
+            shaderStage!"primitive_shadow_frag.spv"(VK_SHADER_STAGE_FRAGMENT_BIT, null),
+        ];
     }
 
     private static ShaderDecl[] shaderStages()
@@ -868,6 +943,38 @@ class CylinderRenderer : DrawablePrimitive
             0,
             null,
         );
+        vkCmdDrawIndexedIndirect(
+            buf,
+            commands.gpuBuffer.buf,
+            0,
+            bucketCount * partCount,
+            VkDrawIndexedIndirectCommand.sizeof,
+        );
+    }
+
+    override void drawingShadow(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        Matrix4x4f mvp,
+    )
+    {
+        if(instanceCount == 0 || !prepared)
+            return;
+
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+        vkCmdPushConstants(
+            buf,
+            pipeline.pipelineLayout,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0,
+            Matrix4x4f.sizeof,
+            &mvp,
+        );
+
+        VkBuffer[2] vertexBuffers = [generator.vertexBufferHandle(), bucketInstances.buf];
+        VkDeviceSize[2] offsets = [0, 0];
+        vkCmdBindVertexBuffers(buf, 0, 2, vertexBuffers.ptr, offsets.ptr);
+        vkCmdBindIndexBuffer(buf, generator.indexBufferHandle(), 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexedIndirect(
             buf,
             commands.gpuBuffer.buf,

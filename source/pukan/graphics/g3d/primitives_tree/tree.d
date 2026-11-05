@@ -1,6 +1,6 @@
 module pukan.graphics.g3d.primitives_tree.tree;
 
-import pukan.graphics.g3d.primitives_tree: Payload, DrawablePrimitive, Bone;
+import pukan.graphics.g3d.primitives_tree: Payload, DrawablePrimitive, Bone, ShadowPipelineCfg;
 import pukan.graphics.g3d.tree.drawable_tree: DrawableTreeBase = DrawableTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
@@ -28,15 +28,17 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
     )
     {
         // Primitives are opaque and never transmissive
-        if(phase != DrawPhase.surface)
+        if(phase != DrawPhase.surface && phase != DrawPhase.shadow)
             return;
 
-        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, trans, frameSet, root, phase);
+        drawingBufferFillingRecursive(buf, GraphicsPipelineCfg.init, GraphicsPipelineCfg.init,
+            trans, frameSet, root, phase);
     }
 
     private void drawingBufferFillingRecursive(
         VkCommandBuffer buf,
         GraphicsPipelineCfg pipelineCfg,
+        GraphicsPipelineCfg shadowCfg,
         Matrix4x4f trans,
         VkDescriptorSet frameSet,
         Node curr,
@@ -49,7 +51,13 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         {
             auto dr = curr.payload.peek!DrawablePrimitive;
 
-            dr.drawingBufferFilling(buf, pipelineCfg, trans, frameSet);
+            if(phase == DrawPhase.shadow)
+            {
+                if(shadowCfg.graphicsPipeline !is null)
+                    dr.drawingShadow(buf, shadowCfg, trans);
+            }
+            else
+                dr.drawingBufferFilling(buf, pipelineCfg, trans, frameSet);
         }
         if(curr.payload.type == typeid(DrawableByVulkan))
         {
@@ -65,9 +73,13 @@ class PrimitivesTree : DrawableTreeBase!Payload, DrawableByVulkan
         {
             pipelineCfg = *curr.payload.peek!GraphicsPipelineCfg;
         }
+        else if(curr.payload.type == typeid(ShadowPipelineCfg))
+        {
+            shadowCfg = curr.payload.peek!ShadowPipelineCfg.cfg;
+        }
 
         foreach(ref c; curr.children)
-            drawingBufferFillingRecursive(buf, pipelineCfg, trans, frameSet, cast(Node) c, phase);
+            drawingBufferFillingRecursive(buf, pipelineCfg, shadowCfg, trans, frameSet, cast(Node) c, phase);
     }
 
     private void forEachPrimitive(void delegate(DrawablePrimitive) dg)

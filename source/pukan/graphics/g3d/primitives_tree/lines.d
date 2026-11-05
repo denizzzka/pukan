@@ -201,4 +201,9 @@ class LineRenderer : DrawablePrimitive
         vkCmdBindVertexBuffers(buf, 0, 2, buffers.ptr, offsets.ptr);
         vkCmdDraw(buf, 4, lineCount, 0, 0);
     }
+
+    /// Lines are debug geometry and never cast a shadow
+    override void drawingShadow(VkCommandBuffer, GraphicsPipelineCfg, Matrix4x4f)
+    {
+    }
 }

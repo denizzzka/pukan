@@ -293,6 +293,7 @@ class SphereRenderer : DrawablePrimitive
     private uint bucketCount;
 
     GraphicsPipelineCfg pipelineCfg;
+    GraphicsPipelineCfg shadowPipelineCfg;
     private VkDescriptorSet graphicsSet;
     private MemoryBufferMappedToCPU paletteBuffer;
     private VkDescriptorImageInfo baseColorTexture;
@@ -322,6 +323,7 @@ class SphereRenderer : DrawablePrimitive
         PipelineFactory pipelines,
         RenderPass renderPass,
         Texture fakeTexture,
+        RenderPass shadowPass,
         SphereLod lod = SphereLod(),
     )
     {
@@ -351,7 +353,31 @@ class SphereRenderer : DrawablePrimitive
 
         pipelineCfg = pipelines.acquire(technique, renderPass, 1);
 
+        const shadowTechnique = pipelines.declare(RenderTechnique(
+            name: "spheres shadow",
+            stages: shadowShaderStages(),
+        ), 1);
+
+        shadowPipelineCfg = pipelines.acquire(shadowTechnique, shadowPass, 0);
+
         generator = new IcosphereGenerator(device, pipelines, lod.maxLevel);
+    }
+
+    private static ShaderDecl[] shadowShaderStages()
+    {
+        return [
+            shaderStage!"sphere_shadow_vert.spv"(
+                VK_SHADER_STAGE_VERTEX_BIT,
+                null,
+                VkPushConstantRange(
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                    offset: 0,
+                    size: Matrix4x4f.sizeof,
+                ),
+                vertexInput(),
+            ),
+            shaderStage!"primitive_shadow_frag.spv"(VK_SHADER_STAGE_FRAGMENT_BIT, null),
+        ];
     }
 
     private static ShaderDecl[] shaderStages()
@@ -777,6 +803,38 @@ class SphereRenderer : DrawablePrimitive
             0,
             null,
         );
+        vkCmdDrawIndexedIndirect(
+            buf,
+            commands.gpuBuffer.buf,
+            0,
+            bucketCount,
+            VkDrawIndexedIndirectCommand.sizeof,
+        );
+    }
+
+    override void drawingShadow(
+        VkCommandBuffer buf,
+        GraphicsPipelineCfg pipeline,
+        Matrix4x4f mvp,
+    )
+    {
+        if(instanceCount == 0 || !prepared)
+            return;
+
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+        vkCmdPushConstants(
+            buf,
+            pipeline.pipelineLayout,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0,
+            Matrix4x4f.sizeof,
+            &mvp,
+        );
+
+        VkBuffer[2] vertexBuffers = [generator.vertexBufferHandle(), bucketCenters.buf];
+        VkDeviceSize[2] offsets = [0, 0];
+        vkCmdBindVertexBuffers(buf, 0, 2, vertexBuffers.ptr, offsets.ptr);
+        vkCmdBindIndexBuffer(buf, generator.indexBufferHandle(), 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexedIndirect(
             buf,
             commands.gpuBuffer.buf,

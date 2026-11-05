@@ -19,8 +19,10 @@ struct PrimitivesFactory(T)
     private DescriptorAllocator allocator;
     private MeshResources resources;
     GraphicsPipelineCfg graphicsPipelineCfg;
+    GraphicsPipelineCfg shadowGraphicsPipelineCfg;
 
-    this(LogicalDevice device, PipelineFactory pipelines, MeshResources resources, RenderPass renderPass)
+    this(LogicalDevice device, PipelineFactory pipelines, MeshResources resources,
+        RenderPass renderPass, RenderPass shadowPass)
     {
         this.device = device;
         this.resources = resources;
@@ -33,6 +35,14 @@ struct PrimitivesFactory(T)
 
         allocator = pipelines.descriptorAllocator(technique);
         graphicsPipelineCfg = pipelines.acquire(technique, renderPass, 1);
+
+        const shadowTechnique = pipelines.declare(RenderTechnique(
+            name: T.techniqueName() ~ " shadow",
+            stages: T.shadowShaderStages(),
+            dynamicStates: [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE],
+        ), 1);
+
+        shadowGraphicsPipelineCfg = pipelines.acquire(shadowTechnique, shadowPass, 0);
     }
 
     auto create(CTOR_ARGS...)(FrameBuilder frameBuilder, CTOR_ARGS args)

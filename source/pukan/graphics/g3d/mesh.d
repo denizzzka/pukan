@@ -175,8 +175,21 @@ class Mesh
         drawGeometry(buf, pipeline, trans);
     }
 
+    /// Records a depth-only draw with a pipeline that binds no material
+    void drawShadow(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    {
+        vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+        drawGeometryImpl(buf, pipeline, trans, false);
+    }
+
     /// Draws assuming the pipeline is already bound
     void drawGeometry(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans)
+    {
+        drawGeometryImpl(buf, pipeline, trans, true);
+    }
+
+    private void drawGeometryImpl(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans,
+        bool bindMaterial)
     {
         vkCmdPushConstants(
             buf,
@@ -201,7 +214,7 @@ class Mesh
         if(indexCount)
             vkCmdBindIndexBuffer(buf, indexBuffer, indexOffset, indexType);
 
-        if(descriptorSet)
+        if(bindMaterial && descriptorSet)
             vkCmdBindDescriptorSets(
                 buf,
                 VK_PIPELINE_BIND_POINT_GRAPHICS,

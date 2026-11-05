@@ -1114,6 +1114,7 @@ auto createDemoTree(
     }
 
     auto coloredBranch = primitTree.addChild(scene.coloredMeshFactory.graphicsPipelineCfg);
+    coloredBranch.addChild(ShadowPipelineCfg(scene.coloredMeshFactory.shadowGraphicsPipelineCfg));
 
     {
         auto v = createCubeVertices;
@@ -1128,6 +1129,7 @@ auto createDemoTree(
     if(!benchMode)
     {
         auto litBranch = primitTree.addChild(scene.litMeshFactory.graphicsPipelineCfg);
+        litBranch.addChild(ShadowPipelineCfg(scene.litMeshFactory.shadowGraphicsPipelineCfg));
         auto v = createLitCubeVertices;
         auto cube = scene.litMeshFactory.create(scene.frameBuilder, v[0], v[1]);
 
@@ -1145,6 +1147,7 @@ auto createDemoTree(
     }
 
     auto textureBranch = primitTree.addChild(scene.texturedMeshFactory.graphicsPipelineCfg);
+    textureBranch.addChild(ShadowPipelineCfg(scene.texturedMeshFactory.shadowGraphicsPipelineCfg));
 
     {
         VkFormat format;
@@ -1175,6 +1178,7 @@ auto createDemoTree(
     }
 
     auto spheresBranch = primitTree.addChild(scene.sphereRenderer.pipelineCfg);
+    spheresBranch.addChild(ShadowPipelineCfg(scene.sphereRenderer.shadowPipelineCfg));
 
     {
         const specs = [
@@ -1212,6 +1216,7 @@ auto createDemoTree(
     tree.addChild(cylinderPrimitives);
 
     auto cylindersBranch = cylinderPrimitives.addChild(scene.cylinderRenderer.pipelineCfg);
+    cylindersBranch.addChild(ShadowPipelineCfg(scene.cylinderRenderer.shadowPipelineCfg));
 
     {
         import std.math: PI, cos, sin;

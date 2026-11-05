@@ -1,0 +1,23 @@
+#version 460
+
+layout(push_constant) uniform Push
+{
+    mat4 mvp;
+} pc;
+
+layout(location = 0) in vec3 position;
+layout(location = 2) in vec4 instanceP0;
+layout(location = 3) in vec4 instanceAxis;
+layout(location = 4) in vec4 instanceU;
+layout(location = 5) in vec4 instanceV;
+
+void main()
+{
+    const vec3 world =
+        instanceP0.xyz +
+        instanceAxis.xyz * position.y +
+        instanceU.xyz * position.x +
+        instanceV.xyz * position.z;
+
+    gl_Position = pc.mvp * vec4(world, 1.0);
+}
