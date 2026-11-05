@@ -239,6 +239,8 @@ void main()
         surface.metallic = metallicRoughness.x;
         surface.roughness = metallicRoughness.y;
         surface.ao = ao;
+        // A shadowmask reuses the baked occlusion where one is authored
+        surface.shadowmask = (flags & MATERIAL_FLAG_SHADOWMASK) != 0u ? ao : 1.0;
         surface.roughnessVariance = roughnessVariance;
 
 #ifndef CORE

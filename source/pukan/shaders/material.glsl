@@ -31,6 +31,7 @@ const uint MATERIAL_FLAG_BASE_COLOR_TEXTURE = 1u << 1;
 const uint MATERIAL_FLAG_METALLIC_ROUGHNESS_TEXTURE = 1u << 2;
 const uint MATERIAL_FLAG_NORMAL_TEXTURE = 1u << 3;
 const uint MATERIAL_FLAG_OCCLUSION_TEXTURE = 1u << 4;
+const uint MATERIAL_FLAG_SHADOWMASK = 1u << 23;
 const uint MATERIAL_FLAG_EMISSIVE_TEXTURE = 1u << 5;
 const uint MATERIAL_FLAG_DERIVED_NORMALS = 1u << 6;
 const uint MATERIAL_FLAG_VERTEX_TANGENT = 1u << 7;
@@ -151,6 +152,7 @@ struct Surface
     float metallic;
     float roughness;
     float ao;
+    float shadowmask;
     float clearcoat;
     float clearcoatRoughness;
     float sheenRoughness;
@@ -637,7 +639,7 @@ vec3 shadePbr(Surface s)
         float shadow = 1.0;
 
         if(type == LIGHT_DIRECTIONAL && i == 0u)
-            shadow = shadowFactor(s.position, N);
+            shadow = shadowFactor(s.position, N) * s.shadowmask;
         else if(type == LIGHT_SPOT && light.params.z >= 0.0 && attenuation > 0.0)
             shadow = localShadowFactor(light, s.position, N);
         else if(type == LIGHT_POINT && light.params.z >= 0.0 && attenuation > 0.0)
@@ -776,6 +778,7 @@ vec3 shadeMaterial(Material material, vec3 albedo, vec3 normal, vec3 worldPositi
         surface.metallic = material.metallicRoughness.x;
         surface.roughness = material.metallicRoughness.y;
         surface.ao = 1.0;
+        surface.shadowmask = 1.0;
         surface.clearcoat = material.clearcoat.x;
         surface.clearcoatRoughness = material.clearcoat.y;
         surface.sheenColor = material.sheen.rgb;

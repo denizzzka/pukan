@@ -143,6 +143,12 @@ GodotMaterialData readGodotMaterial(
         }
     }
 
+    if(auto value = "shadowmask" in properties)
+    {
+        if(asBool(*value, "shadowmask"))
+            result.material.flags = result.material.flags | MaterialFlag.shadowmask;
+    }
+
     if(auto value = "ao_enabled" in properties)
     {
         if(asBool(*value, "ao_enabled"))
