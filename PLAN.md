@@ -713,8 +713,9 @@ local-light shadows. Missing:
 - [x] Spot shadows on top of `SunShadow`: a 2x2 atlas of 512 tiles, the four
       spots nearest the camera, a matrix, tile and bias per light, and the
       atlas redrawn when the choice of lights changes.
-- [ ] Point-light shadows: a cubemap or six tiles per light, sharing the atlas
-      and its cache.
+- [x] Point-light shadows: six faces per point light in the shared atlas, the
+      face picked from the fragment direction, with the atlas redrawn when the
+      chosen lights change.
 - [ ] Caster coverage: the non-glTF primitives do not cast yet.
 - [x] A wider filter and cascade blending: four half-texel taps average a 3x3
       box, and the last tenth of each cascade fades into the next with both fits
