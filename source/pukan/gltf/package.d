@@ -8,7 +8,7 @@ import pukan.gltf.loader;
 import pukan.gltf.material: applyGltfMaterial;
 import pukan.gltf.skin_matrices: SkinMatrices;
 import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergePartAabb, pointsAabb;
-import pukan.graphics.g3d.cell_index: Bounded;
+import pukan.graphics.g3d.cell_index: Bounded, MeshParts;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode, runtimeMaterialOverride;
 import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor;
@@ -180,8 +180,44 @@ class Node : BaseNode
     }
 }
 
-class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
+class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
 {
+    /// Hands the static meshes to the parent, unless a skinned one needs the CPU
+    bool eachStaticMesh(scope void delegate(PbrMesh mesh, in Matrix4x4f world) sink)
+    {
+        bool skinned;
+
+        void check(Node node)
+        {
+            foreach(mesh; node.meshes)
+                if(mesh.hasSkin)
+                    skinned = true;
+
+            foreach(child; node.children)
+                check(cast(Node) child);
+        }
+
+        check(rootSceneNode);
+
+        if(skinned)
+            return false;
+
+        void walk(in Matrix4x4f parent, Node node)
+        {
+            const placed = parent * node.trans.calcMatrix;
+
+            foreach(mesh; node.meshes)
+                sink(mesh, placed);
+
+            foreach(child; node.children)
+                walk(placed, cast(Node) child);
+        }
+
+        walk(Matrix4x4f.identity, rootSceneNode);
+
+        return true;
+    }
+
     LoadStats loadStats;
 
     private bool uploaded;
@@ -925,6 +961,7 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup
             addGeneratedLevels(device, m, uplVert);
 
         m.buildGeometry(asset.gpuBuffs);
+        m.geometryReady = true;
         return m;
     }
 

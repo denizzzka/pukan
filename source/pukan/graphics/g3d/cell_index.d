@@ -4,6 +4,7 @@ import dlib.math: Matrix4x4f, Vector3f;
 import pukan.graphics.common.bvh: BoxBvh;
 import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, partAabb, transformAabb;
 import pukan.graphics.g3d.cells: CellCoord, CellGrid;
+import pukan.graphics.g3d.pbr.mesh: PbrMesh;
 import pukan.vulkan.bindings: VkCommandBuffer, VkDescriptorSet;
 import pukan.vulkan.renderpass: DrawableByVulkan, DrawPhase;
 
@@ -109,6 +110,18 @@ interface CulledParts
 
     /// Records the draws the kernel kept
     void drawGathered(VkCommandBuffer buf, VkDescriptorSet frameSet, DrawPhase phase);
+}
+
+/// A nested drawable that hands its static meshes to the parent's gather
+interface MeshParts
+{
+    /**
+        Visits every static mesh of the drawable with the transform that places
+        it inside the drawable. Returns false, and visits nothing, when some
+        mesh has to stay on the CPU path - a skinned one moves with its pose -
+        so the caller can draw the drawable whole instead.
+    */
+    bool eachStaticMesh(scope void delegate(PbrMesh mesh, in Matrix4x4f world) sink);
 }
 
 /// `DrawItem.part` of a drawable that records as a whole

@@ -4,7 +4,7 @@ import dlib.math: Matrix4x4f, Vector2f, Vector3f, Vector4f;
 import pukan.gltf: GlTF;
 import pukan.godot_scene.environment: GodotEnvironment;
 import pukan.graphics.common.misc: Boxf, hasBounds, isVisible, mergePartAabb;
-import pukan.graphics.g3d.cell_index: Bounded, CellIndex, CulledParts, DrawItem, Part, PartDrawable, wholePart;
+import pukan.graphics.g3d.cell_index: Bounded, CellIndex, CulledParts, DrawItem, MeshParts, Part, PartDrawable, wholePart;
 import pukan.graphics.g3d.cells: CellCoord;
 import pukan.graphics.g3d.material: AlphaMode, Material, MaterialBuffer, MaterialMode;
 import pukan.graphics.g3d.hlod: ProxyPiece, mergeGeometry, readGeometry;
@@ -689,12 +689,64 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     {
         auto gathered = &gatherPhases[cast(uint) phase];
 
+        void addInstance(PbrMesh mesh, in Boxf bounds, in Matrix4x4f placement, in Matrix4x4f mvp)
+        {
+            // A part whose pieces are not on the GPU yet has no buffer to bind
+            if(!mesh.geometryReady || !matchesPhase(mesh, phase))
+                return;
+
+            // A part the coarse depth grid already covers stays out of the draw
+            if(currentOcclusion !is null && currentOcclusion.hidden(bounds, mvp))
+                return;
+
+            // A skinned mesh keeps the CPU path until its posed bounds are known
+            if(mesh.hasSkin)
+            {
+                gathered.draws ~= GatheredDraw(mesh, mvp);
+                return;
+            }
+
+            size_t found = gathered.meshes.length;
+
+            foreach(g, batch; gathered.meshes)
+                if(batch.mesh is mesh)
+                {
+                    found = g;
+                    break;
+                }
+
+            if(found == gathered.meshes.length)
+                gathered.meshes ~= GatheredMesh(mesh, null, placement);
+
+            gathered.meshes[found].instances ~= cullInstance(bounds, mvp);
+        }
+
         foreach(key; keys)
         {
             auto record = &parts[key];
 
             if(record.mesh is null)
             {
+                // A nested drawable that hands out its static meshes joins the
+                // parent's lists, so one kernel pass covers the whole level
+                if(auto enumerated = cast(MeshParts) record.nested)
+                {
+                    const base = trans * record.base;
+
+                    // A whole instance outside the view never reaches its nodes
+                    if(hasBounds(record.bounds) && !isVisible(record.bounds, base))
+                        continue;
+
+                    bool added;
+
+                    if(enumerated.eachStaticMesh((PbrMesh mesh, in Matrix4x4f world) {
+                        added = true;
+                        addInstance(mesh, mesh.localAABB, base, base * world);
+
+                    }))
+                        continue;
+                }
+
                 size_t found = gathered.nested.length;
 
                 foreach(g, group; gathered.nested)
@@ -711,39 +763,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 continue;
             }
 
-            // A part whose pieces are not on the GPU yet has no buffer to bind
-            if(!record.mesh.geometryReady)
-                continue;
-
-            if(!matchesPhase(record.mesh, phase))
-                continue;
-
             const mvp = trans * record.world;
-
-            // A part the coarse depth grid already covers stays out of the draw
-            if(currentOcclusion !is null && currentOcclusion.hidden(record.bounds, mvp))
-                continue;
-
-            // A skinned mesh keeps the CPU path until its posed bounds are known
-            if(record.mesh.hasSkin)
-            {
-                gathered.draws ~= GatheredDraw(record.mesh, mvp);
-                continue;
-            }
-
-            size_t found = gathered.meshes.length;
-
-            foreach(g, batch; gathered.meshes)
-                if(batch.mesh is record.mesh)
-                {
-                    found = g;
-                    break;
-                }
-
-            if(found == gathered.meshes.length)
-                gathered.meshes ~= GatheredMesh(record.mesh, null, trans);
-
-            gathered.meshes[found].instances ~= cullInstance(record.bounds, mvp);
+            addInstance(record.mesh, record.bounds, trans, mvp);
         }
     }
 
