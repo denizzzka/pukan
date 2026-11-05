@@ -140,6 +140,20 @@ leaves the edges of that rectangle uncovered, so the win stays at a few parts.
 Climbing further needs the test per instance in the cull kernel, against a
 pyramid rather than a 192 by 144 grid.
 
+## Portals on the hall
+
+`portal_hall/portal_hall.tscn`, 6 by 6 rooms of 16 m, cells the size of a room,
+camera in the corner room looking down a corridor, 20 measured frames.
+
+| Portal walk | Cells | Draws | Triangles | Frame mean | p50 |
+|---|---|---|---|---|---|
+| off | 63 | 456 | 5,472 | 30.80 ms | 31 |
+| on | 27 | 156 | 1,872 | 17.00 ms | 17 |
+
+The pictures are pixel identical: the walk only drops rooms no doorway reaches.
+The regions are rectangles, so it over-opens compared to a polygon walk; the
+numbers are a floor, not a ceiling.
+
 ## What the numbers say
 
 - Per-cell HLOD pays off only when a cell's geometry belongs to it. A scene
