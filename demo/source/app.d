@@ -1392,12 +1392,12 @@ auto createCubeVertices()
     ];
 
     ushort[] indices = [
-        2, 1, 0, 1, 2, 3,   // 1
-        2, 4, 3, 3, 4, 5,   // 2
-        3, 5, 6, 1, 3, 6,   // 3
-        4, 7, 6, 4, 6, 5,   // 4
-        0, 1, 6, 0, 6 ,7,   // 5
-        0, 7, 2, 2, 7, 4,   // 6
+        0, 1, 2, 3, 2, 1,   // 1
+        2, 3, 4, 3, 5, 4,   // 2
+        3, 6, 5, 1, 6, 3,   // 3
+        4, 6, 7, 4, 5, 6,   // 4
+        0, 6, 1, 0, 7, 6,   // 5
+        0, 2, 7, 2, 4, 7,   // 6
     ];
 
     import std.typecons;
@@ -1444,7 +1444,8 @@ auto createLitCubeVertices()
         foreach(p; [a, b, c])
             vertices ~= LitVertex(p, normal, Vector3f(1, 1, 1), Vector2f(0, 0));
 
-        indices ~= [base, cast(ushort)(base + 1), cast(ushort)(base + 2)];
+        // The source triangles face outward; the draw order is the other way
+        indices ~= [base, cast(ushort)(base + 2), cast(ushort)(base + 1)];
     }
 
     return tuple(vertices, indices);
