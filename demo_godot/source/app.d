@@ -3,7 +3,7 @@ import pukan;
 import pukan.graphics.g3d.axes: axisVector;
 import pukan.graphics.g3d.impostor: CellImpostor, Impostors;
 import pukan.graphics.g3d.occlusion: DepthRaster, currentOcclusion;
-import pukan.graphics.g3d.portals: PortalGrid;
+import pukan.graphics.g3d.portals: PortalGrid, PortalSet, RoomPortal;
 import pukan.graphics.common.misc: Boxf, hasBounds, trsMatrix;
 import pukan.gltf.motion_sampler: MotionSampler;
 import pukan.motion_matching.database: Clip, Database, invalidSample;
@@ -31,7 +31,9 @@ import std.format: format;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
 import std.stdio: stderr, writeln;
-import std.string: toStringz;
+import std.algorithm: endsWith, startsWith;
+import std.conv: to;
+import std.string: split, toStringz;
 
 alias appRequirements = Requirements!(SwapChain, GodotFactory, FrameBuilder, CullFrame);
 debug alias DebugEntities = AliasSeq!(FlightRecorder, LayerSettings);
@@ -768,10 +770,56 @@ void main(string[] args)
         scene.enableOcclusionDepth(192, 144);
 
     PortalGrid portals;
+    PortalSet portalSet;
     const bool hasPortals = portalPath.length != 0;
 
     if(hasPortals)
+    {
         portals = PortalGrid.load(portalPath);
+
+        // A level that authors its own doorways names a node for each of them
+        godotScene.eachNode((string name, in Matrix4x4f world) {
+            if(!name.startsWith("Portal_"))
+                return;
+
+            const parts = name.split("_");
+
+            if(parts.length != 4)
+                return;
+
+            const x = parts[1].to!int;
+            const z = parts[2].to!int;
+            const side = parts[3].to!int;
+
+            long other;
+
+            final switch(side)
+            {
+                case 0: other = cast(long) x * portals.rooms + (z - 1); break;
+                case 1: other = cast(long) x * portals.rooms + (z + 1); break;
+                case 2: other = cast(long) (x - 1) * portals.rooms + z; break;
+                case 3: other = cast(long) (x + 1) * portals.rooms + z; break;
+            }
+
+            RoomPortal portal;
+            portal.a = cast(long) x * portals.rooms + z;
+            portal.b = other;
+
+            foreach(i; 0 .. 4)
+            {
+                const u = (i == 0 || i == 3) ? -0.5f : 0.5f;
+                const v = (i < 2) ? -0.5f : 0.5f;
+                const corner = Vector4f(u, v, 0, 1) * world;
+                portal.corners[i] = Vector3f(corner.x, corner.y, corner.z);
+            }
+
+            portalSet.portals ~= portal;
+        });
+
+        // A level without portal nodes falls back to what the grid implies
+        if(portalSet.portals.length == 0)
+            portalSet.portals = portals.portals();
+    }
 
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
     printSkippedTypes("resources not rendered", godotScene.skippedResourceTypes);
@@ -1541,7 +1589,8 @@ void main(string[] args)
 
             if(hasPortals)
             {
-                const seen = portals.visibleRooms(camera.position, modelViewProj);
+                const seen = portalSet.visibleRooms(
+                    PortalSet.startRooms(camera.position, portals.roomSize, portals.rooms), modelViewProj);
                 CellCoord[] reached;
 
                 foreach(cell; activeCells)

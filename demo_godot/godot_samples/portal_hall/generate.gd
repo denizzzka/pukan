@@ -92,6 +92,18 @@ func _init() -> void:
                     add_box(wall_node, root, "Wall", wall, Vector3(0, 0, 0))
                     continue
 
+                # The marker tells the engine which two rooms this doorway joins
+                var portal := Node3D.new()
+                portal.name = "Portal_%d_%d_%d" % [x, z, side]
+                # Scale in the doorway's own plane, then turn it into the wall
+                var scale := Basis.IDENTITY.scaled(Vector3(doorway_width, doorway_height, 1))
+                portal.transform = Transform3D(
+                    turn * scale,
+                    centres[side] + Vector3(0, doorway_height * 0.5 - wall_height * 0.5, 0),
+                )
+                room.add_child(portal)
+                portal.owner = root
+
                 # Two jambs and a lintel leave a doorway in the middle
                 add_box(wall_node, root, "Left", post, Vector3(-(doorway_width + post.size.x) * 0.5, 0, 0))
                 add_box(wall_node, root, "Right", post, Vector3((doorway_width + post.size.x) * 0.5, 0, 0))

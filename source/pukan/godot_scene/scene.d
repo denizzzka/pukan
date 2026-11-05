@@ -1111,6 +1111,21 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         return result;
     }
 
+    /// Visits every node with the transform that places it in the level
+    void eachNode(scope void delegate(string name, in Matrix4x4f world) sink)
+    {
+        void walk(in Matrix4x4f parent, GodotNode node)
+        {
+            const placed = parent * node.local;
+            sink(node.name, placed);
+
+            foreach(child; node.children)
+                walk(placed, child);
+        }
+
+        walk(Matrix4x4f.identity, root);
+    }
+
     /// Visits the parts behind `keys`, descending into the drawables this scene wraps
     private void collectPieces(
         GodotScene owner,

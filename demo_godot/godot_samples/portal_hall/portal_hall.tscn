@@ -24,1443 +24,1623 @@ size = Vector3(6.5, 4, 0.4)
 material = SubResource("StandardMaterial3D_l24cv")
 size = Vector3(3, 1.4, 0.4)
 
-[node name="PortalHall" type="Node3D" unique_id=13025617]
+[node name="PortalHall" type="Node3D" unique_id=1459787308]
 
-[node name="Room_0_0" type="Node3D" parent="." unique_id=436668544]
+[node name="Room_0_0" type="Node3D" parent="." unique_id=1799752330]
 
-[node name="Floor" type="MeshInstance3D" parent="Room_0_0" unique_id=1516178695]
+[node name="Floor" type="MeshInstance3D" parent="Room_0_0" unique_id=1555698880]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_0_0" unique_id=742768016]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_0_0" unique_id=2079028742]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_0_0" unique_id=676578024]
+[node name="Side_0" type="Node3D" parent="Room_0_0" unique_id=1493631762]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_0/Side_0" unique_id=1702640497]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_0/Side_0" unique_id=1000155390]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_0_0" unique_id=1852904060]
+[node name="Side_2" type="Node3D" parent="Room_0_0" unique_id=645926746]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_0/Side_2" unique_id=1280233084]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_0/Side_2" unique_id=1012862794]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_0_1" type="Node3D" parent="." unique_id=2038755058]
+[node name="Room_0_1" type="Node3D" parent="." unique_id=267035458]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 16)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_0_1" unique_id=1303069037]
+[node name="Floor" type="MeshInstance3D" parent="Room_0_1" unique_id=102737021]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_0_1" unique_id=1947167295]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_0_1" unique_id=2110033537]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_0_1" unique_id=1631984360]
+[node name="Side_0" type="Node3D" parent="Room_0_1" unique_id=1043163]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_0_1/Side_0" unique_id=1687117464]
+[node name="Left" type="MeshInstance3D" parent="Room_0_1/Side_0" unique_id=1102205984]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_0_1/Side_0" unique_id=955147572]
+[node name="Right" type="MeshInstance3D" parent="Room_0_1/Side_0" unique_id=1368945837]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_0_1/Side_0" unique_id=1183535402]
+[node name="Lintel" type="MeshInstance3D" parent="Room_0_1/Side_0" unique_id=729266325]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_0_1" unique_id=392867764]
+[node name="Portal_0_1_0" type="Node3D" parent="Room_0_1" unique_id=76248627]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_0_1" unique_id=2100092456]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_1/Side_2" unique_id=1948483550]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_1/Side_2" unique_id=885666910]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_0_2" type="Node3D" parent="." unique_id=1024698252]
+[node name="Room_0_2" type="Node3D" parent="." unique_id=1542639944]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 32)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_0_2" unique_id=302663942]
+[node name="Floor" type="MeshInstance3D" parent="Room_0_2" unique_id=342976652]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_0_2" unique_id=603899875]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_0_2" unique_id=612439166]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_0_2" unique_id=701400002]
+[node name="Side_0" type="Node3D" parent="Room_0_2" unique_id=975201521]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_0_2/Side_0" unique_id=592822255]
+[node name="Left" type="MeshInstance3D" parent="Room_0_2/Side_0" unique_id=555348506]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_0_2/Side_0" unique_id=866324996]
+[node name="Right" type="MeshInstance3D" parent="Room_0_2/Side_0" unique_id=291217440]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_0_2/Side_0" unique_id=1637251616]
+[node name="Lintel" type="MeshInstance3D" parent="Room_0_2/Side_0" unique_id=411504403]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_0_2" unique_id=1998512470]
+[node name="Portal_0_2_0" type="Node3D" parent="Room_0_2" unique_id=1987846353]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_0_2" unique_id=1920169101]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_2/Side_2" unique_id=1008747195]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_2/Side_2" unique_id=643818725]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_0_3" type="Node3D" parent="." unique_id=290201707]
+[node name="Room_0_3" type="Node3D" parent="." unique_id=1477955311]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 48)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_0_3" unique_id=968306651]
+[node name="Floor" type="MeshInstance3D" parent="Room_0_3" unique_id=1847560797]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_0_3" unique_id=259388055]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_0_3" unique_id=1701771760]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_0_3" unique_id=1703755308]
+[node name="Side_0" type="Node3D" parent="Room_0_3" unique_id=863822365]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_0_3/Side_0" unique_id=888289405]
+[node name="Left" type="MeshInstance3D" parent="Room_0_3/Side_0" unique_id=361469226]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_0_3/Side_0" unique_id=1523409105]
+[node name="Right" type="MeshInstance3D" parent="Room_0_3/Side_0" unique_id=1847133493]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_0_3/Side_0" unique_id=1558008784]
+[node name="Lintel" type="MeshInstance3D" parent="Room_0_3/Side_0" unique_id=472442138]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_0_3" unique_id=739879946]
+[node name="Portal_0_3_0" type="Node3D" parent="Room_0_3" unique_id=1398906054]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_0_3" unique_id=1524663603]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_3/Side_2" unique_id=1428512116]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_3/Side_2" unique_id=1646537136]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_0_4" type="Node3D" parent="." unique_id=1695154171]
+[node name="Room_0_4" type="Node3D" parent="." unique_id=152817908]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 64)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_0_4" unique_id=118647683]
+[node name="Floor" type="MeshInstance3D" parent="Room_0_4" unique_id=170914163]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_0_4" unique_id=668389615]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_0_4" unique_id=568203190]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_0_4" unique_id=2005123691]
+[node name="Side_0" type="Node3D" parent="Room_0_4" unique_id=138722446]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_0_4/Side_0" unique_id=1147780497]
+[node name="Left" type="MeshInstance3D" parent="Room_0_4/Side_0" unique_id=1089944949]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_0_4/Side_0" unique_id=618397203]
+[node name="Right" type="MeshInstance3D" parent="Room_0_4/Side_0" unique_id=1294810460]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_0_4/Side_0" unique_id=1028648904]
+[node name="Lintel" type="MeshInstance3D" parent="Room_0_4/Side_0" unique_id=462484727]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_0_4" unique_id=1694295098]
+[node name="Portal_0_4_0" type="Node3D" parent="Room_0_4" unique_id=218562822]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_0_4" unique_id=639793017]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_4/Side_2" unique_id=2036407024]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_4/Side_2" unique_id=1860051363]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_0_5" type="Node3D" parent="." unique_id=213618441]
+[node name="Room_0_5" type="Node3D" parent="." unique_id=159111816]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 80)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_0_5" unique_id=193580707]
+[node name="Floor" type="MeshInstance3D" parent="Room_0_5" unique_id=702136847]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_0_5" unique_id=510979220]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_0_5" unique_id=2104613021]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_0_5" unique_id=1712144796]
+[node name="Side_0" type="Node3D" parent="Room_0_5" unique_id=1058188414]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_0_5/Side_0" unique_id=550473614]
+[node name="Left" type="MeshInstance3D" parent="Room_0_5/Side_0" unique_id=197004504]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_0_5/Side_0" unique_id=1637492016]
+[node name="Right" type="MeshInstance3D" parent="Room_0_5/Side_0" unique_id=2131852509]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_0_5/Side_0" unique_id=1778797018]
+[node name="Lintel" type="MeshInstance3D" parent="Room_0_5/Side_0" unique_id=1287965502]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_1" type="Node3D" parent="Room_0_5" unique_id=1830401929]
+[node name="Portal_0_5_0" type="Node3D" parent="Room_0_5" unique_id=548468529]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_1" type="Node3D" parent="Room_0_5" unique_id=1106699323]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 16)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_5/Side_1" unique_id=2043365944]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_5/Side_1" unique_id=392411589]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_0_5" unique_id=540444989]
+[node name="Side_2" type="Node3D" parent="Room_0_5" unique_id=511177215]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_0_5/Side_2" unique_id=579886260]
+[node name="Wall" type="MeshInstance3D" parent="Room_0_5/Side_2" unique_id=871472588]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_1_0" type="Node3D" parent="." unique_id=1884544118]
+[node name="Room_1_0" type="Node3D" parent="." unique_id=156244642]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 0)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_1_0" unique_id=1953558477]
+[node name="Floor" type="MeshInstance3D" parent="Room_1_0" unique_id=989095088]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_1_0" unique_id=7549354]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_1_0" unique_id=1979472018]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_1_0" unique_id=491670868]
+[node name="Side_0" type="Node3D" parent="Room_1_0" unique_id=835586393]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_1_0/Side_0" unique_id=2060824026]
+[node name="Wall" type="MeshInstance3D" parent="Room_1_0/Side_0" unique_id=1700961382]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_1_0" unique_id=1282120185]
+[node name="Side_2" type="Node3D" parent="Room_1_0" unique_id=983143896]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_0/Side_2" unique_id=185178530]
+[node name="Left" type="MeshInstance3D" parent="Room_1_0/Side_2" unique_id=564392543]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_0/Side_2" unique_id=1437795046]
+[node name="Right" type="MeshInstance3D" parent="Room_1_0/Side_2" unique_id=409678393]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_0/Side_2" unique_id=88677008]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_0/Side_2" unique_id=2017396500]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_1_1" type="Node3D" parent="." unique_id=532635453]
+[node name="Portal_1_0_2" type="Node3D" parent="Room_1_0" unique_id=391211551]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_1_1" type="Node3D" parent="." unique_id=1248347792]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 16)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_1_1" unique_id=1641379286]
+[node name="Floor" type="MeshInstance3D" parent="Room_1_1" unique_id=1392999487]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_1_1" unique_id=1748805670]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_1_1" unique_id=1272843526]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_1_1" unique_id=1775844812]
+[node name="Side_0" type="Node3D" parent="Room_1_1" unique_id=458346087]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_1/Side_0" unique_id=1961674299]
+[node name="Left" type="MeshInstance3D" parent="Room_1_1/Side_0" unique_id=217079219]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_1/Side_0" unique_id=838475167]
+[node name="Right" type="MeshInstance3D" parent="Room_1_1/Side_0" unique_id=1205968896]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_1/Side_0" unique_id=1494948799]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_1/Side_0" unique_id=2106273857]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_1_1" unique_id=615432279]
+[node name="Portal_1_1_0" type="Node3D" parent="Room_1_1" unique_id=470697226]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_1_1" unique_id=21708268]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_1/Side_2" unique_id=1458997678]
+[node name="Left" type="MeshInstance3D" parent="Room_1_1/Side_2" unique_id=979061651]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_1/Side_2" unique_id=209803119]
+[node name="Right" type="MeshInstance3D" parent="Room_1_1/Side_2" unique_id=890822095]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_1/Side_2" unique_id=1323285880]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_1/Side_2" unique_id=1498241222]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_1_2" type="Node3D" parent="." unique_id=588394577]
+[node name="Portal_1_1_2" type="Node3D" parent="Room_1_1" unique_id=2030013893]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_1_2" type="Node3D" parent="." unique_id=791565681]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 32)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_1_2" unique_id=1987741749]
+[node name="Floor" type="MeshInstance3D" parent="Room_1_2" unique_id=332485765]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_1_2" unique_id=1373803016]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_1_2" unique_id=722812595]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_1_2" unique_id=1310947527]
+[node name="Side_0" type="Node3D" parent="Room_1_2" unique_id=923160339]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_2/Side_0" unique_id=683980079]
+[node name="Left" type="MeshInstance3D" parent="Room_1_2/Side_0" unique_id=1492237460]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_2/Side_0" unique_id=922607550]
+[node name="Right" type="MeshInstance3D" parent="Room_1_2/Side_0" unique_id=2053202353]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_2/Side_0" unique_id=694634721]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_2/Side_0" unique_id=863332240]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_1_2" unique_id=443025605]
+[node name="Portal_1_2_0" type="Node3D" parent="Room_1_2" unique_id=1130865739]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_1_2" unique_id=1174773042]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_2/Side_2" unique_id=1127615334]
+[node name="Left" type="MeshInstance3D" parent="Room_1_2/Side_2" unique_id=433730414]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_2/Side_2" unique_id=968174990]
+[node name="Right" type="MeshInstance3D" parent="Room_1_2/Side_2" unique_id=1788113912]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_2/Side_2" unique_id=1008822576]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_2/Side_2" unique_id=580249135]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_1_3" type="Node3D" parent="." unique_id=640698437]
+[node name="Portal_1_2_2" type="Node3D" parent="Room_1_2" unique_id=1655725040]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_1_3" type="Node3D" parent="." unique_id=1807666894]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 48)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_1_3" unique_id=87088126]
+[node name="Floor" type="MeshInstance3D" parent="Room_1_3" unique_id=1317114446]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_1_3" unique_id=275452275]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_1_3" unique_id=1331209203]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_1_3" unique_id=426113848]
+[node name="Side_0" type="Node3D" parent="Room_1_3" unique_id=1379829513]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_3/Side_0" unique_id=1843750707]
+[node name="Left" type="MeshInstance3D" parent="Room_1_3/Side_0" unique_id=21888186]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_3/Side_0" unique_id=1901493397]
+[node name="Right" type="MeshInstance3D" parent="Room_1_3/Side_0" unique_id=1193001397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_3/Side_0" unique_id=362585798]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_3/Side_0" unique_id=1625148371]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_1_3" unique_id=2063049025]
+[node name="Portal_1_3_0" type="Node3D" parent="Room_1_3" unique_id=2100522469]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_1_3" unique_id=1982886219]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_3/Side_2" unique_id=1965934611]
+[node name="Left" type="MeshInstance3D" parent="Room_1_3/Side_2" unique_id=1781118452]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_3/Side_2" unique_id=1793812801]
+[node name="Right" type="MeshInstance3D" parent="Room_1_3/Side_2" unique_id=1657725543]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_3/Side_2" unique_id=1692763480]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_3/Side_2" unique_id=1043980703]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_1_4" type="Node3D" parent="." unique_id=276063555]
+[node name="Portal_1_3_2" type="Node3D" parent="Room_1_3" unique_id=1815010802]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_1_4" type="Node3D" parent="." unique_id=808421537]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 64)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_1_4" unique_id=947347911]
+[node name="Floor" type="MeshInstance3D" parent="Room_1_4" unique_id=1541437055]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_1_4" unique_id=2046412095]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_1_4" unique_id=1974614262]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_1_4" unique_id=1901282991]
+[node name="Side_0" type="Node3D" parent="Room_1_4" unique_id=2029037981]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_4/Side_0" unique_id=1537523468]
+[node name="Left" type="MeshInstance3D" parent="Room_1_4/Side_0" unique_id=2106613241]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_4/Side_0" unique_id=1612662860]
+[node name="Right" type="MeshInstance3D" parent="Room_1_4/Side_0" unique_id=1155366027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_4/Side_0" unique_id=135174596]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_4/Side_0" unique_id=734763059]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_1_4" unique_id=2111691831]
+[node name="Portal_1_4_0" type="Node3D" parent="Room_1_4" unique_id=1339568214]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_1_4" unique_id=1788386537]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_4/Side_2" unique_id=710033499]
+[node name="Left" type="MeshInstance3D" parent="Room_1_4/Side_2" unique_id=1031113703]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_4/Side_2" unique_id=1937210846]
+[node name="Right" type="MeshInstance3D" parent="Room_1_4/Side_2" unique_id=1446336285]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_4/Side_2" unique_id=1899040666]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_4/Side_2" unique_id=1740105388]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_1_5" type="Node3D" parent="." unique_id=1339214811]
+[node name="Portal_1_4_2" type="Node3D" parent="Room_1_4" unique_id=1366868683]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_1_5" type="Node3D" parent="." unique_id=2010313028]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 80)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_1_5" unique_id=1426103614]
+[node name="Floor" type="MeshInstance3D" parent="Room_1_5" unique_id=1193423317]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_1_5" unique_id=1997247545]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_1_5" unique_id=456863145]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_1_5" unique_id=894940006]
+[node name="Side_0" type="Node3D" parent="Room_1_5" unique_id=966436442]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_5/Side_0" unique_id=585886852]
+[node name="Left" type="MeshInstance3D" parent="Room_1_5/Side_0" unique_id=1065790091]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_5/Side_0" unique_id=867274615]
+[node name="Right" type="MeshInstance3D" parent="Room_1_5/Side_0" unique_id=822772298]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_5/Side_0" unique_id=1223084578]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_5/Side_0" unique_id=205579044]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_1" type="Node3D" parent="Room_1_5" unique_id=797154231]
+[node name="Portal_1_5_0" type="Node3D" parent="Room_1_5" unique_id=1951242483]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_1" type="Node3D" parent="Room_1_5" unique_id=521223744]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 16)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_1_5/Side_1" unique_id=1799465324]
+[node name="Wall" type="MeshInstance3D" parent="Room_1_5/Side_1" unique_id=1502521053]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_1_5" unique_id=276140776]
+[node name="Side_2" type="Node3D" parent="Room_1_5" unique_id=1477098641]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_1_5/Side_2" unique_id=800460609]
+[node name="Left" type="MeshInstance3D" parent="Room_1_5/Side_2" unique_id=1484271046]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_1_5/Side_2" unique_id=1618641061]
+[node name="Right" type="MeshInstance3D" parent="Room_1_5/Side_2" unique_id=1317087104]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_1_5/Side_2" unique_id=1230881697]
+[node name="Lintel" type="MeshInstance3D" parent="Room_1_5/Side_2" unique_id=7822121]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_2_0" type="Node3D" parent="." unique_id=1113341116]
+[node name="Portal_1_5_2" type="Node3D" parent="Room_1_5" unique_id=1509636867]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_2_0" type="Node3D" parent="." unique_id=837914547]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 0)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_2_0" unique_id=1402502509]
+[node name="Floor" type="MeshInstance3D" parent="Room_2_0" unique_id=1589691219]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_2_0" unique_id=1630205503]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_2_0" unique_id=293127253]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_2_0" unique_id=1364644180]
+[node name="Side_0" type="Node3D" parent="Room_2_0" unique_id=464274175]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_2_0/Side_0" unique_id=926927211]
+[node name="Wall" type="MeshInstance3D" parent="Room_2_0/Side_0" unique_id=1461129309]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_2_0" unique_id=1062052510]
+[node name="Side_2" type="Node3D" parent="Room_2_0" unique_id=235173477]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_0/Side_2" unique_id=2026061383]
+[node name="Left" type="MeshInstance3D" parent="Room_2_0/Side_2" unique_id=80958397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_0/Side_2" unique_id=1117379264]
+[node name="Right" type="MeshInstance3D" parent="Room_2_0/Side_2" unique_id=1801133315]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_0/Side_2" unique_id=2112855987]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_0/Side_2" unique_id=2071314627]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_2_1" type="Node3D" parent="." unique_id=1652535920]
+[node name="Portal_2_0_2" type="Node3D" parent="Room_2_0" unique_id=325635233]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_2_1" type="Node3D" parent="." unique_id=1908807505]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 16)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_2_1" unique_id=917325019]
+[node name="Floor" type="MeshInstance3D" parent="Room_2_1" unique_id=202678901]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_2_1" unique_id=581818974]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_2_1" unique_id=1676898484]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_2_1" unique_id=1910617717]
+[node name="Side_0" type="Node3D" parent="Room_2_1" unique_id=1761876751]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_1/Side_0" unique_id=1864628171]
+[node name="Left" type="MeshInstance3D" parent="Room_2_1/Side_0" unique_id=1005681325]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_1/Side_0" unique_id=948099954]
+[node name="Right" type="MeshInstance3D" parent="Room_2_1/Side_0" unique_id=1311502809]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_1/Side_0" unique_id=1537901161]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_1/Side_0" unique_id=1513097976]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_2_1" unique_id=487573536]
+[node name="Portal_2_1_0" type="Node3D" parent="Room_2_1" unique_id=1723358568]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_2_1" unique_id=1378637064]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_1/Side_2" unique_id=627255822]
+[node name="Left" type="MeshInstance3D" parent="Room_2_1/Side_2" unique_id=246112027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_1/Side_2" unique_id=1721315687]
+[node name="Right" type="MeshInstance3D" parent="Room_2_1/Side_2" unique_id=2133598139]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_1/Side_2" unique_id=1872399220]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_1/Side_2" unique_id=1781891762]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_2_2" type="Node3D" parent="." unique_id=1090447281]
+[node name="Portal_2_1_2" type="Node3D" parent="Room_2_1" unique_id=1420897955]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_2_2" type="Node3D" parent="." unique_id=705751038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 32)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_2_2" unique_id=476323274]
+[node name="Floor" type="MeshInstance3D" parent="Room_2_2" unique_id=342043140]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_2_2" unique_id=399046383]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_2_2" unique_id=1967556168]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_2_2" unique_id=1542393492]
+[node name="Side_0" type="Node3D" parent="Room_2_2" unique_id=1302265411]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_2/Side_0" unique_id=924113802]
+[node name="Left" type="MeshInstance3D" parent="Room_2_2/Side_0" unique_id=692740445]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_2/Side_0" unique_id=1577510208]
+[node name="Right" type="MeshInstance3D" parent="Room_2_2/Side_0" unique_id=402801183]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_2/Side_0" unique_id=390141398]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_2/Side_0" unique_id=1585433547]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_2_2" unique_id=293218174]
+[node name="Portal_2_2_0" type="Node3D" parent="Room_2_2" unique_id=513680062]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_2_2" unique_id=1441022434]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_2/Side_2" unique_id=980804293]
+[node name="Left" type="MeshInstance3D" parent="Room_2_2/Side_2" unique_id=113996809]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_2/Side_2" unique_id=232872131]
+[node name="Right" type="MeshInstance3D" parent="Room_2_2/Side_2" unique_id=1183124483]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_2/Side_2" unique_id=1084992587]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_2/Side_2" unique_id=915169296]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_2_3" type="Node3D" parent="." unique_id=2063934666]
+[node name="Portal_2_2_2" type="Node3D" parent="Room_2_2" unique_id=622419380]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_2_3" type="Node3D" parent="." unique_id=975481778]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 48)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_2_3" unique_id=2121395217]
+[node name="Floor" type="MeshInstance3D" parent="Room_2_3" unique_id=36684357]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_2_3" unique_id=1684731417]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_2_3" unique_id=2001925704]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_2_3" unique_id=1927370520]
+[node name="Side_0" type="Node3D" parent="Room_2_3" unique_id=37796506]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_3/Side_0" unique_id=1871177753]
+[node name="Left" type="MeshInstance3D" parent="Room_2_3/Side_0" unique_id=406092709]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_3/Side_0" unique_id=740475080]
+[node name="Right" type="MeshInstance3D" parent="Room_2_3/Side_0" unique_id=1200836683]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_3/Side_0" unique_id=1090295634]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_3/Side_0" unique_id=1626974773]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_2_3" unique_id=1080736301]
+[node name="Portal_2_3_0" type="Node3D" parent="Room_2_3" unique_id=1812544234]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_2_3" unique_id=924347804]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_3/Side_2" unique_id=167622044]
+[node name="Left" type="MeshInstance3D" parent="Room_2_3/Side_2" unique_id=643354081]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_3/Side_2" unique_id=1159502831]
+[node name="Right" type="MeshInstance3D" parent="Room_2_3/Side_2" unique_id=1576178641]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_3/Side_2" unique_id=1954773779]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_3/Side_2" unique_id=1973569849]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_2_4" type="Node3D" parent="." unique_id=1695387137]
+[node name="Portal_2_3_2" type="Node3D" parent="Room_2_3" unique_id=357068379]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_2_4" type="Node3D" parent="." unique_id=990986477]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 64)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_2_4" unique_id=2115640873]
+[node name="Floor" type="MeshInstance3D" parent="Room_2_4" unique_id=2032178948]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_2_4" unique_id=2058255345]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_2_4" unique_id=1115612201]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_2_4" unique_id=914921144]
+[node name="Side_0" type="Node3D" parent="Room_2_4" unique_id=1404853890]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_4/Side_0" unique_id=1795885473]
+[node name="Left" type="MeshInstance3D" parent="Room_2_4/Side_0" unique_id=1468576084]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_4/Side_0" unique_id=1484856427]
+[node name="Right" type="MeshInstance3D" parent="Room_2_4/Side_0" unique_id=598723132]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_4/Side_0" unique_id=913294485]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_4/Side_0" unique_id=706212554]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_2_4" unique_id=2061627401]
+[node name="Portal_2_4_0" type="Node3D" parent="Room_2_4" unique_id=1674683501]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_2_4" unique_id=227308618]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_4/Side_2" unique_id=956666302]
+[node name="Left" type="MeshInstance3D" parent="Room_2_4/Side_2" unique_id=1450753985]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_4/Side_2" unique_id=791354381]
+[node name="Right" type="MeshInstance3D" parent="Room_2_4/Side_2" unique_id=405359328]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_4/Side_2" unique_id=280695792]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_4/Side_2" unique_id=316653919]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_2_5" type="Node3D" parent="." unique_id=749500807]
+[node name="Portal_2_4_2" type="Node3D" parent="Room_2_4" unique_id=544196135]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_2_5" type="Node3D" parent="." unique_id=1160640543]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 80)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_2_5" unique_id=1812045211]
+[node name="Floor" type="MeshInstance3D" parent="Room_2_5" unique_id=2005191652]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_2_5" unique_id=1289946778]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_2_5" unique_id=1454724206]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_2_5" unique_id=2093768865]
+[node name="Side_0" type="Node3D" parent="Room_2_5" unique_id=718729591]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_5/Side_0" unique_id=1702710745]
+[node name="Left" type="MeshInstance3D" parent="Room_2_5/Side_0" unique_id=1575935020]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_5/Side_0" unique_id=1970443464]
+[node name="Right" type="MeshInstance3D" parent="Room_2_5/Side_0" unique_id=501592547]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_5/Side_0" unique_id=1409100058]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_5/Side_0" unique_id=2044599618]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_1" type="Node3D" parent="Room_2_5" unique_id=1102752331]
+[node name="Portal_2_5_0" type="Node3D" parent="Room_2_5" unique_id=1030886079]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_1" type="Node3D" parent="Room_2_5" unique_id=823777856]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 16)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_2_5/Side_1" unique_id=1529633129]
+[node name="Wall" type="MeshInstance3D" parent="Room_2_5/Side_1" unique_id=1668573025]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_2_5" unique_id=1301379940]
+[node name="Side_2" type="Node3D" parent="Room_2_5" unique_id=1881539920]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_2_5/Side_2" unique_id=1283713965]
+[node name="Left" type="MeshInstance3D" parent="Room_2_5/Side_2" unique_id=453764887]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_2_5/Side_2" unique_id=312348181]
+[node name="Right" type="MeshInstance3D" parent="Room_2_5/Side_2" unique_id=499459058]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_2_5/Side_2" unique_id=1818591989]
+[node name="Lintel" type="MeshInstance3D" parent="Room_2_5/Side_2" unique_id=301968079]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_3_0" type="Node3D" parent="." unique_id=1978648185]
+[node name="Portal_2_5_2" type="Node3D" parent="Room_2_5" unique_id=1224698103]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_3_0" type="Node3D" parent="." unique_id=1610046015]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 0)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_3_0" unique_id=575882109]
+[node name="Floor" type="MeshInstance3D" parent="Room_3_0" unique_id=1733552919]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_3_0" unique_id=2075524593]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_3_0" unique_id=1529266905]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_3_0" unique_id=927620722]
+[node name="Side_0" type="Node3D" parent="Room_3_0" unique_id=634438188]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_3_0/Side_0" unique_id=2053987353]
+[node name="Wall" type="MeshInstance3D" parent="Room_3_0/Side_0" unique_id=545802977]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_3_0" unique_id=1551545977]
+[node name="Side_2" type="Node3D" parent="Room_3_0" unique_id=1698274581]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_0/Side_2" unique_id=197160188]
+[node name="Left" type="MeshInstance3D" parent="Room_3_0/Side_2" unique_id=700394509]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_0/Side_2" unique_id=585579879]
+[node name="Right" type="MeshInstance3D" parent="Room_3_0/Side_2" unique_id=466500016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_0/Side_2" unique_id=189954055]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_0/Side_2" unique_id=1682264028]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_3_1" type="Node3D" parent="." unique_id=1394601940]
+[node name="Portal_3_0_2" type="Node3D" parent="Room_3_0" unique_id=796556210]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_3_1" type="Node3D" parent="." unique_id=2079454707]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 16)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_3_1" unique_id=1894927707]
+[node name="Floor" type="MeshInstance3D" parent="Room_3_1" unique_id=847436895]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_3_1" unique_id=1528999550]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_3_1" unique_id=146565519]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_3_1" unique_id=2103803803]
+[node name="Side_0" type="Node3D" parent="Room_3_1" unique_id=2055615356]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_1/Side_0" unique_id=688948846]
+[node name="Left" type="MeshInstance3D" parent="Room_3_1/Side_0" unique_id=1045260129]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_1/Side_0" unique_id=1020048435]
+[node name="Right" type="MeshInstance3D" parent="Room_3_1/Side_0" unique_id=1288364617]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_1/Side_0" unique_id=1850917299]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_1/Side_0" unique_id=914165971]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_3_1" unique_id=178573292]
+[node name="Portal_3_1_0" type="Node3D" parent="Room_3_1" unique_id=521075434]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_3_1" unique_id=1094072596]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_1/Side_2" unique_id=22757218]
+[node name="Left" type="MeshInstance3D" parent="Room_3_1/Side_2" unique_id=504047630]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_1/Side_2" unique_id=875395143]
+[node name="Right" type="MeshInstance3D" parent="Room_3_1/Side_2" unique_id=199826188]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_1/Side_2" unique_id=1132207256]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_1/Side_2" unique_id=1286385213]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_3_2" type="Node3D" parent="." unique_id=620345610]
+[node name="Portal_3_1_2" type="Node3D" parent="Room_3_1" unique_id=407601017]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_3_2" type="Node3D" parent="." unique_id=650831134]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 32)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_3_2" unique_id=505476585]
+[node name="Floor" type="MeshInstance3D" parent="Room_3_2" unique_id=1596453045]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_3_2" unique_id=1152523345]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_3_2" unique_id=209779389]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_3_2" unique_id=652596914]
+[node name="Side_0" type="Node3D" parent="Room_3_2" unique_id=243719033]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_2/Side_0" unique_id=880069346]
+[node name="Left" type="MeshInstance3D" parent="Room_3_2/Side_0" unique_id=1382802262]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_2/Side_0" unique_id=1886367536]
+[node name="Right" type="MeshInstance3D" parent="Room_3_2/Side_0" unique_id=1748380102]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_2/Side_0" unique_id=775644300]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_2/Side_0" unique_id=1032672324]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_3_2" unique_id=432163942]
+[node name="Portal_3_2_0" type="Node3D" parent="Room_3_2" unique_id=1821264109]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_3_2" unique_id=81981811]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_2/Side_2" unique_id=1465717639]
+[node name="Left" type="MeshInstance3D" parent="Room_3_2/Side_2" unique_id=551033559]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_2/Side_2" unique_id=31801393]
+[node name="Right" type="MeshInstance3D" parent="Room_3_2/Side_2" unique_id=392560088]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_2/Side_2" unique_id=1371164320]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_2/Side_2" unique_id=814098778]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_3_3" type="Node3D" parent="." unique_id=655206786]
+[node name="Portal_3_2_2" type="Node3D" parent="Room_3_2" unique_id=141124901]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_3_3" type="Node3D" parent="." unique_id=544753564]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 48)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_3_3" unique_id=690477529]
+[node name="Floor" type="MeshInstance3D" parent="Room_3_3" unique_id=1306707966]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_3_3" unique_id=1246694632]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_3_3" unique_id=2071403438]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_3_3" unique_id=1334180365]
+[node name="Side_0" type="Node3D" parent="Room_3_3" unique_id=1465208443]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_3/Side_0" unique_id=1085488956]
+[node name="Left" type="MeshInstance3D" parent="Room_3_3/Side_0" unique_id=919067287]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_3/Side_0" unique_id=1395169732]
+[node name="Right" type="MeshInstance3D" parent="Room_3_3/Side_0" unique_id=619379765]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_3/Side_0" unique_id=1418363717]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_3/Side_0" unique_id=1836716378]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_3_3" unique_id=1205428379]
+[node name="Portal_3_3_0" type="Node3D" parent="Room_3_3" unique_id=335642674]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_3_3" unique_id=1441673985]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_3/Side_2" unique_id=29768855]
+[node name="Left" type="MeshInstance3D" parent="Room_3_3/Side_2" unique_id=811903785]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_3/Side_2" unique_id=2058975041]
+[node name="Right" type="MeshInstance3D" parent="Room_3_3/Side_2" unique_id=1476402802]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_3/Side_2" unique_id=4798889]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_3/Side_2" unique_id=974782208]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_3_4" type="Node3D" parent="." unique_id=496037945]
+[node name="Portal_3_3_2" type="Node3D" parent="Room_3_3" unique_id=433092530]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_3_4" type="Node3D" parent="." unique_id=1441329101]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 64)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_3_4" unique_id=175447001]
+[node name="Floor" type="MeshInstance3D" parent="Room_3_4" unique_id=1270838989]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_3_4" unique_id=705848133]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_3_4" unique_id=1470057671]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_3_4" unique_id=1346193362]
+[node name="Side_0" type="Node3D" parent="Room_3_4" unique_id=861701359]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_4/Side_0" unique_id=1205384702]
+[node name="Left" type="MeshInstance3D" parent="Room_3_4/Side_0" unique_id=750581909]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_4/Side_0" unique_id=1357439740]
+[node name="Right" type="MeshInstance3D" parent="Room_3_4/Side_0" unique_id=465693835]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_4/Side_0" unique_id=279927172]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_4/Side_0" unique_id=1639955260]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_3_4" unique_id=1500053584]
+[node name="Portal_3_4_0" type="Node3D" parent="Room_3_4" unique_id=776877357]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_3_4" unique_id=1800383985]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_4/Side_2" unique_id=1040563175]
+[node name="Left" type="MeshInstance3D" parent="Room_3_4/Side_2" unique_id=2008828896]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_4/Side_2" unique_id=515959813]
+[node name="Right" type="MeshInstance3D" parent="Room_3_4/Side_2" unique_id=424450031]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_4/Side_2" unique_id=22098833]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_4/Side_2" unique_id=98829798]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_3_5" type="Node3D" parent="." unique_id=847420130]
+[node name="Portal_3_4_2" type="Node3D" parent="Room_3_4" unique_id=1584229027]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_3_5" type="Node3D" parent="." unique_id=552423297]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 80)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_3_5" unique_id=1217356401]
+[node name="Floor" type="MeshInstance3D" parent="Room_3_5" unique_id=829407936]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_3_5" unique_id=1232666423]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_3_5" unique_id=1467618793]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_3_5" unique_id=1152947646]
+[node name="Side_0" type="Node3D" parent="Room_3_5" unique_id=1020261]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_5/Side_0" unique_id=1005044647]
+[node name="Left" type="MeshInstance3D" parent="Room_3_5/Side_0" unique_id=677084551]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_5/Side_0" unique_id=1185886544]
+[node name="Right" type="MeshInstance3D" parent="Room_3_5/Side_0" unique_id=1837653799]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_5/Side_0" unique_id=989828666]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_5/Side_0" unique_id=143922946]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_1" type="Node3D" parent="Room_3_5" unique_id=1956771120]
+[node name="Portal_3_5_0" type="Node3D" parent="Room_3_5" unique_id=1379208469]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_1" type="Node3D" parent="Room_3_5" unique_id=2056974149]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 16)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_3_5/Side_1" unique_id=224472763]
+[node name="Wall" type="MeshInstance3D" parent="Room_3_5/Side_1" unique_id=1542084151]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_3_5" unique_id=545695323]
+[node name="Side_2" type="Node3D" parent="Room_3_5" unique_id=1617813017]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_3_5/Side_2" unique_id=1199647569]
+[node name="Left" type="MeshInstance3D" parent="Room_3_5/Side_2" unique_id=289147612]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_3_5/Side_2" unique_id=544989345]
+[node name="Right" type="MeshInstance3D" parent="Room_3_5/Side_2" unique_id=272440677]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_3_5/Side_2" unique_id=1972069045]
+[node name="Lintel" type="MeshInstance3D" parent="Room_3_5/Side_2" unique_id=1568035172]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_4_0" type="Node3D" parent="." unique_id=387291095]
+[node name="Portal_3_5_2" type="Node3D" parent="Room_3_5" unique_id=833281622]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_4_0" type="Node3D" parent="." unique_id=601565545]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 0, 0)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_4_0" unique_id=1769364012]
+[node name="Floor" type="MeshInstance3D" parent="Room_4_0" unique_id=1027027763]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_4_0" unique_id=1617121936]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_4_0" unique_id=1159623563]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_4_0" unique_id=63867256]
+[node name="Side_0" type="Node3D" parent="Room_4_0" unique_id=406779558]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_4_0/Side_0" unique_id=143268349]
+[node name="Wall" type="MeshInstance3D" parent="Room_4_0/Side_0" unique_id=1440219438]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_4_0" unique_id=595739767]
+[node name="Side_2" type="Node3D" parent="Room_4_0" unique_id=766910716]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_0/Side_2" unique_id=1774402179]
+[node name="Left" type="MeshInstance3D" parent="Room_4_0/Side_2" unique_id=1007884125]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_0/Side_2" unique_id=1704362177]
+[node name="Right" type="MeshInstance3D" parent="Room_4_0/Side_2" unique_id=1054050285]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_0/Side_2" unique_id=525344638]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_0/Side_2" unique_id=1672590920]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_4_1" type="Node3D" parent="." unique_id=1822638374]
+[node name="Portal_4_0_2" type="Node3D" parent="Room_4_0" unique_id=1738227229]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_4_1" type="Node3D" parent="." unique_id=540524255]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 0, 16)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_4_1" unique_id=1833860931]
+[node name="Floor" type="MeshInstance3D" parent="Room_4_1" unique_id=134779551]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_4_1" unique_id=1644347039]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_4_1" unique_id=1671829722]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_4_1" unique_id=861456565]
+[node name="Side_0" type="Node3D" parent="Room_4_1" unique_id=513653276]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_1/Side_0" unique_id=1182366742]
+[node name="Left" type="MeshInstance3D" parent="Room_4_1/Side_0" unique_id=2041596219]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_1/Side_0" unique_id=2120300883]
+[node name="Right" type="MeshInstance3D" parent="Room_4_1/Side_0" unique_id=1464299843]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_1/Side_0" unique_id=1234107467]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_1/Side_0" unique_id=1473081843]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_4_1" unique_id=1158735102]
+[node name="Portal_4_1_0" type="Node3D" parent="Room_4_1" unique_id=8548107]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_4_1" unique_id=1408749149]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_1/Side_2" unique_id=189782501]
+[node name="Left" type="MeshInstance3D" parent="Room_4_1/Side_2" unique_id=1284604356]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_1/Side_2" unique_id=217715447]
+[node name="Right" type="MeshInstance3D" parent="Room_4_1/Side_2" unique_id=1175550487]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_1/Side_2" unique_id=1560740383]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_1/Side_2" unique_id=1696373671]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_4_2" type="Node3D" parent="." unique_id=1368493583]
+[node name="Portal_4_1_2" type="Node3D" parent="Room_4_1" unique_id=1749593632]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_4_2" type="Node3D" parent="." unique_id=1103734049]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 0, 32)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_4_2" unique_id=278657681]
+[node name="Floor" type="MeshInstance3D" parent="Room_4_2" unique_id=127680313]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_4_2" unique_id=1547508620]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_4_2" unique_id=1621616219]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_4_2" unique_id=1282548649]
+[node name="Side_0" type="Node3D" parent="Room_4_2" unique_id=1360157997]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_2/Side_0" unique_id=1865922844]
+[node name="Left" type="MeshInstance3D" parent="Room_4_2/Side_0" unique_id=759902514]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_2/Side_0" unique_id=395100894]
+[node name="Right" type="MeshInstance3D" parent="Room_4_2/Side_0" unique_id=1956013875]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_2/Side_0" unique_id=776626946]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_2/Side_0" unique_id=1641773523]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_4_2" unique_id=1616271566]
+[node name="Portal_4_2_0" type="Node3D" parent="Room_4_2" unique_id=817876403]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_4_2" unique_id=1789302843]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_2/Side_2" unique_id=1006818057]
+[node name="Left" type="MeshInstance3D" parent="Room_4_2/Side_2" unique_id=1936536038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_2/Side_2" unique_id=1566658877]
+[node name="Right" type="MeshInstance3D" parent="Room_4_2/Side_2" unique_id=2083454533]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_2/Side_2" unique_id=2096936518]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_2/Side_2" unique_id=1277291226]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_4_3" type="Node3D" parent="." unique_id=464728196]
+[node name="Portal_4_2_2" type="Node3D" parent="Room_4_2" unique_id=2015526933]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_4_3" type="Node3D" parent="." unique_id=877926035]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 0, 48)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_4_3" unique_id=964186680]
+[node name="Floor" type="MeshInstance3D" parent="Room_4_3" unique_id=992003091]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_4_3" unique_id=59018902]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_4_3" unique_id=709534332]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_4_3" unique_id=1589759838]
+[node name="Side_0" type="Node3D" parent="Room_4_3" unique_id=543741058]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_3/Side_0" unique_id=1230458895]
+[node name="Left" type="MeshInstance3D" parent="Room_4_3/Side_0" unique_id=1519443582]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_3/Side_0" unique_id=2069350332]
+[node name="Right" type="MeshInstance3D" parent="Room_4_3/Side_0" unique_id=1509850702]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_3/Side_0" unique_id=965294225]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_3/Side_0" unique_id=212712271]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_4_3" unique_id=42659408]
+[node name="Portal_4_3_0" type="Node3D" parent="Room_4_3" unique_id=1409235573]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_4_3" unique_id=1770268145]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_3/Side_2" unique_id=121879064]
+[node name="Left" type="MeshInstance3D" parent="Room_4_3/Side_2" unique_id=1813733551]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_3/Side_2" unique_id=330998246]
+[node name="Right" type="MeshInstance3D" parent="Room_4_3/Side_2" unique_id=1161722113]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_3/Side_2" unique_id=1023915375]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_3/Side_2" unique_id=716545985]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_4_4" type="Node3D" parent="." unique_id=1334098637]
+[node name="Portal_4_3_2" type="Node3D" parent="Room_4_3" unique_id=438742653]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_4_4" type="Node3D" parent="." unique_id=673395194]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 0, 64)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_4_4" unique_id=818502818]
+[node name="Floor" type="MeshInstance3D" parent="Room_4_4" unique_id=252011578]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_4_4" unique_id=2028541446]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_4_4" unique_id=1475353247]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_4_4" unique_id=1447704325]
+[node name="Side_0" type="Node3D" parent="Room_4_4" unique_id=1450988626]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_4/Side_0" unique_id=1428669816]
+[node name="Left" type="MeshInstance3D" parent="Room_4_4/Side_0" unique_id=1951618247]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_4/Side_0" unique_id=1222043093]
+[node name="Right" type="MeshInstance3D" parent="Room_4_4/Side_0" unique_id=2060229822]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_4/Side_0" unique_id=1873684478]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_4/Side_0" unique_id=1945727560]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_4_4" unique_id=1295509912]
+[node name="Portal_4_4_0" type="Node3D" parent="Room_4_4" unique_id=293285056]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_4_4" unique_id=1747964239]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_4/Side_2" unique_id=1608834641]
+[node name="Left" type="MeshInstance3D" parent="Room_4_4/Side_2" unique_id=1787892044]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_4/Side_2" unique_id=4236756]
+[node name="Right" type="MeshInstance3D" parent="Room_4_4/Side_2" unique_id=2094888578]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_4/Side_2" unique_id=1596367309]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_4/Side_2" unique_id=1160250882]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_4_5" type="Node3D" parent="." unique_id=262263705]
+[node name="Portal_4_4_2" type="Node3D" parent="Room_4_4" unique_id=334197037]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_4_5" type="Node3D" parent="." unique_id=87463939]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 0, 80)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_4_5" unique_id=652163390]
+[node name="Floor" type="MeshInstance3D" parent="Room_4_5" unique_id=90046232]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_4_5" unique_id=1758374452]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_4_5" unique_id=900367239]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_4_5" unique_id=1794297130]
+[node name="Side_0" type="Node3D" parent="Room_4_5" unique_id=1754779605]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_5/Side_0" unique_id=1763979994]
+[node name="Left" type="MeshInstance3D" parent="Room_4_5/Side_0" unique_id=1990609101]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_5/Side_0" unique_id=483429029]
+[node name="Right" type="MeshInstance3D" parent="Room_4_5/Side_0" unique_id=709386681]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_5/Side_0" unique_id=266663378]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_5/Side_0" unique_id=244906757]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_1" type="Node3D" parent="Room_4_5" unique_id=909513210]
+[node name="Portal_4_5_0" type="Node3D" parent="Room_4_5" unique_id=559497565]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_1" type="Node3D" parent="Room_4_5" unique_id=175825832]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 16)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_4_5/Side_1" unique_id=872631514]
+[node name="Wall" type="MeshInstance3D" parent="Room_4_5/Side_1" unique_id=1475644904]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_4_5" unique_id=1040291358]
+[node name="Side_2" type="Node3D" parent="Room_4_5" unique_id=2118800282]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_4_5/Side_2" unique_id=1627765607]
+[node name="Left" type="MeshInstance3D" parent="Room_4_5/Side_2" unique_id=1614643957]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_4_5/Side_2" unique_id=1989683962]
+[node name="Right" type="MeshInstance3D" parent="Room_4_5/Side_2" unique_id=1254365683]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_4_5/Side_2" unique_id=1679396671]
+[node name="Lintel" type="MeshInstance3D" parent="Room_4_5/Side_2" unique_id=38880130]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Room_5_0" type="Node3D" parent="." unique_id=150202735]
+[node name="Portal_4_5_2" type="Node3D" parent="Room_4_5" unique_id=1563477157]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Room_5_0" type="Node3D" parent="." unique_id=2141021355]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, 0)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_5_0" unique_id=47533663]
+[node name="Floor" type="MeshInstance3D" parent="Room_5_0" unique_id=1024746284]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_5_0" unique_id=240407433]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_5_0" unique_id=1354585314]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_5_0" unique_id=118132838]
+[node name="Side_0" type="Node3D" parent="Room_5_0" unique_id=1847447437]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_0/Side_0" unique_id=985299026]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_0/Side_0" unique_id=1759057093]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_5_0" unique_id=1523225562]
+[node name="Side_2" type="Node3D" parent="Room_5_0" unique_id=1738152864]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_0/Side_2" unique_id=1360053835]
+[node name="Left" type="MeshInstance3D" parent="Room_5_0/Side_2" unique_id=1839592429]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_0/Side_2" unique_id=127202147]
+[node name="Right" type="MeshInstance3D" parent="Room_5_0/Side_2" unique_id=947274669]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_0/Side_2" unique_id=1519840585]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_0/Side_2" unique_id=2063759324]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_3" type="Node3D" parent="Room_5_0" unique_id=1815682642]
+[node name="Portal_5_0_2" type="Node3D" parent="Room_5_0" unique_id=1849470475]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Side_3" type="Node3D" parent="Room_5_0" unique_id=1389673957]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 16, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_0/Side_3" unique_id=236582583]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_0/Side_3" unique_id=1122972559]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_5_1" type="Node3D" parent="." unique_id=1620180649]
+[node name="Room_5_1" type="Node3D" parent="." unique_id=1563790224]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, 16)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_5_1" unique_id=2001381414]
+[node name="Floor" type="MeshInstance3D" parent="Room_5_1" unique_id=466250913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_5_1" unique_id=1517526601]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_5_1" unique_id=1451374980]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_5_1" unique_id=552749223]
+[node name="Side_0" type="Node3D" parent="Room_5_1" unique_id=1625004444]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_1/Side_0" unique_id=610726433]
+[node name="Left" type="MeshInstance3D" parent="Room_5_1/Side_0" unique_id=910662335]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_1/Side_0" unique_id=1042934871]
+[node name="Right" type="MeshInstance3D" parent="Room_5_1/Side_0" unique_id=742429864]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_1/Side_0" unique_id=142224438]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_1/Side_0" unique_id=1891388884]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_5_1" unique_id=1445917902]
+[node name="Portal_5_1_0" type="Node3D" parent="Room_5_1" unique_id=913578295]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_5_1" unique_id=2022399966]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_1/Side_2" unique_id=1748958134]
+[node name="Left" type="MeshInstance3D" parent="Room_5_1/Side_2" unique_id=627987367]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_1/Side_2" unique_id=759770120]
+[node name="Right" type="MeshInstance3D" parent="Room_5_1/Side_2" unique_id=438012179]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_1/Side_2" unique_id=185507898]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_1/Side_2" unique_id=947857305]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_3" type="Node3D" parent="Room_5_1" unique_id=252593765]
+[node name="Portal_5_1_2" type="Node3D" parent="Room_5_1" unique_id=641868736]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Side_3" type="Node3D" parent="Room_5_1" unique_id=2018876215]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 16, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_1/Side_3" unique_id=1874968324]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_1/Side_3" unique_id=1719097653]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_5_2" type="Node3D" parent="." unique_id=923555796]
+[node name="Room_5_2" type="Node3D" parent="." unique_id=87317639]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, 32)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_5_2" unique_id=1815124843]
+[node name="Floor" type="MeshInstance3D" parent="Room_5_2" unique_id=1869431380]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_5_2" unique_id=415633780]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_5_2" unique_id=71610018]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_5_2" unique_id=646954899]
+[node name="Side_0" type="Node3D" parent="Room_5_2" unique_id=1961081702]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_2/Side_0" unique_id=354944651]
+[node name="Left" type="MeshInstance3D" parent="Room_5_2/Side_0" unique_id=778659542]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_2/Side_0" unique_id=1469372575]
+[node name="Right" type="MeshInstance3D" parent="Room_5_2/Side_0" unique_id=757592521]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_2/Side_0" unique_id=1859984535]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_2/Side_0" unique_id=1039214830]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_5_2" unique_id=1477092753]
+[node name="Portal_5_2_0" type="Node3D" parent="Room_5_2" unique_id=1491830962]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_5_2" unique_id=1902593883]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_2/Side_2" unique_id=614736065]
+[node name="Left" type="MeshInstance3D" parent="Room_5_2/Side_2" unique_id=1776705071]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_2/Side_2" unique_id=872448543]
+[node name="Right" type="MeshInstance3D" parent="Room_5_2/Side_2" unique_id=156530172]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_2/Side_2" unique_id=18671194]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_2/Side_2" unique_id=495411618]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_3" type="Node3D" parent="Room_5_2" unique_id=1232695908]
+[node name="Portal_5_2_2" type="Node3D" parent="Room_5_2" unique_id=773741449]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Side_3" type="Node3D" parent="Room_5_2" unique_id=921741407]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 16, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_2/Side_3" unique_id=2136981794]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_2/Side_3" unique_id=2033198592]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_5_3" type="Node3D" parent="." unique_id=272344659]
+[node name="Room_5_3" type="Node3D" parent="." unique_id=584125158]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, 48)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_5_3" unique_id=878524722]
+[node name="Floor" type="MeshInstance3D" parent="Room_5_3" unique_id=166045334]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_5_3" unique_id=2124204517]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_5_3" unique_id=2130524169]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_5_3" unique_id=925368945]
+[node name="Side_0" type="Node3D" parent="Room_5_3" unique_id=909523871]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_3/Side_0" unique_id=835212437]
+[node name="Left" type="MeshInstance3D" parent="Room_5_3/Side_0" unique_id=109811193]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_3/Side_0" unique_id=333262247]
+[node name="Right" type="MeshInstance3D" parent="Room_5_3/Side_0" unique_id=442615249]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_3/Side_0" unique_id=1929674171]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_3/Side_0" unique_id=2937306]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_5_3" unique_id=20745121]
+[node name="Portal_5_3_0" type="Node3D" parent="Room_5_3" unique_id=589887111]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_5_3" unique_id=1974876346]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_3/Side_2" unique_id=1095234051]
+[node name="Left" type="MeshInstance3D" parent="Room_5_3/Side_2" unique_id=43896185]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_3/Side_2" unique_id=1205357585]
+[node name="Right" type="MeshInstance3D" parent="Room_5_3/Side_2" unique_id=1639593968]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_3/Side_2" unique_id=1890219608]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_3/Side_2" unique_id=1521743959]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_3" type="Node3D" parent="Room_5_3" unique_id=450492575]
+[node name="Portal_5_3_2" type="Node3D" parent="Room_5_3" unique_id=1436737154]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Side_3" type="Node3D" parent="Room_5_3" unique_id=1234099760]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 16, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_3/Side_3" unique_id=1443072972]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_3/Side_3" unique_id=1541096675]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_5_4" type="Node3D" parent="." unique_id=533588297]
+[node name="Room_5_4" type="Node3D" parent="." unique_id=508624060]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, 64)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_5_4" unique_id=432247817]
+[node name="Floor" type="MeshInstance3D" parent="Room_5_4" unique_id=641893738]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_5_4" unique_id=488717086]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_5_4" unique_id=1821967598]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_5_4" unique_id=1884265823]
+[node name="Side_0" type="Node3D" parent="Room_5_4" unique_id=1019012022]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_4/Side_0" unique_id=1661300703]
+[node name="Left" type="MeshInstance3D" parent="Room_5_4/Side_0" unique_id=1384525636]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_4/Side_0" unique_id=238574452]
+[node name="Right" type="MeshInstance3D" parent="Room_5_4/Side_0" unique_id=1689297257]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_4/Side_0" unique_id=175792438]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_4/Side_0" unique_id=1695673636]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_2" type="Node3D" parent="Room_5_4" unique_id=553467109]
+[node name="Portal_5_4_0" type="Node3D" parent="Room_5_4" unique_id=858600671]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_2" type="Node3D" parent="Room_5_4" unique_id=1241298255]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_4/Side_2" unique_id=466294494]
+[node name="Left" type="MeshInstance3D" parent="Room_5_4/Side_2" unique_id=1139870238]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_4/Side_2" unique_id=2117653002]
+[node name="Right" type="MeshInstance3D" parent="Room_5_4/Side_2" unique_id=121415374]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_4/Side_2" unique_id=719430860]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_4/Side_2" unique_id=601006445]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_3" type="Node3D" parent="Room_5_4" unique_id=2082652431]
+[node name="Portal_5_4_2" type="Node3D" parent="Room_5_4" unique_id=290027201]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Side_3" type="Node3D" parent="Room_5_4" unique_id=1403963562]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 16, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_4/Side_3" unique_id=318187220]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_4/Side_3" unique_id=2032243098]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Room_5_5" type="Node3D" parent="." unique_id=475225614]
+[node name="Room_5_5" type="Node3D" parent="." unique_id=1189292814]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, 80)
 
-[node name="Floor" type="MeshInstance3D" parent="Room_5_5" unique_id=968777654]
+[node name="Floor" type="MeshInstance3D" parent="Room_5_5" unique_id=1379261167]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Ceiling" type="MeshInstance3D" parent="Room_5_5" unique_id=817280177]
+[node name="Ceiling" type="MeshInstance3D" parent="Room_5_5" unique_id=1811240888]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4.1, 8)
 mesh = SubResource("BoxMesh_grqvt")
 
-[node name="Side_0" type="Node3D" parent="Room_5_5" unique_id=62812235]
+[node name="Side_0" type="Node3D" parent="Room_5_5" unique_id=252133455]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_5/Side_0" unique_id=43699549]
+[node name="Left" type="MeshInstance3D" parent="Room_5_5/Side_0" unique_id=1292793193]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_5/Side_0" unique_id=1536374343]
+[node name="Right" type="MeshInstance3D" parent="Room_5_5/Side_0" unique_id=707126561]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_5/Side_0" unique_id=1073263663]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_5/Side_0" unique_id=1872864321]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_1" type="Node3D" parent="Room_5_5" unique_id=299685551]
+[node name="Portal_5_5_0" type="Node3D" parent="Room_5_5" unique_id=2096325647]
+transform = Transform3D(3, 0, 0, 0, 2.6, 0, 0, 0, 1, 8, 1.3, 0)
+
+[node name="Side_1" type="Node3D" parent="Room_5_5" unique_id=110865057]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 16)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_5/Side_1" unique_id=1113660589]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_5/Side_1" unique_id=1867901124]
 mesh = SubResource("BoxMesh_ewvhx")
 
-[node name="Side_2" type="Node3D" parent="Room_5_5" unique_id=698168104]
+[node name="Side_2" type="Node3D" parent="Room_5_5" unique_id=124011977]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 2, 8)
 
-[node name="Left" type="MeshInstance3D" parent="Room_5_5/Side_2" unique_id=1617462001]
+[node name="Left" type="MeshInstance3D" parent="Room_5_5/Side_2" unique_id=1546192154]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Right" type="MeshInstance3D" parent="Room_5_5/Side_2" unique_id=1180954014]
+[node name="Right" type="MeshInstance3D" parent="Room_5_5/Side_2" unique_id=1422633911]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.75, 0, 0)
 mesh = SubResource("BoxMesh_6pyur")
 
-[node name="Lintel" type="MeshInstance3D" parent="Room_5_5/Side_2" unique_id=148293740]
+[node name="Lintel" type="MeshInstance3D" parent="Room_5_5/Side_2" unique_id=301037504]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6, 0)
 mesh = SubResource("BoxMesh_s0hrg")
 
-[node name="Side_3" type="Node3D" parent="Room_5_5" unique_id=1030936667]
+[node name="Portal_5_5_2" type="Node3D" parent="Room_5_5" unique_id=1848071717]
+transform = Transform3D(-1.3113416e-07, 0, 1, 0, 2.6, 0, -3, 0, -4.371139e-08, 0, 1.3, 8)
+
+[node name="Side_3" type="Node3D" parent="Room_5_5" unique_id=1058354107]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 16, 2, 8)
 
-[node name="Wall" type="MeshInstance3D" parent="Room_5_5/Side_3" unique_id=551799214]
+[node name="Wall" type="MeshInstance3D" parent="Room_5_5/Side_3" unique_id=1785055867]
 mesh = SubResource("BoxMesh_ewvhx")
