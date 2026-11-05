@@ -145,19 +145,24 @@ pyramid rather than a 192 by 144 grid.
 `portal_hall/portal_hall.tscn`, 6 by 6 rooms of 16 m, cells the size of a room,
 camera in the corner room looking down a corridor, 20 measured frames.
 
-| Portal walk | Cells | Draws | Triangles | Frame mean | p50 |
-|---|---|---|---|---|---|
-| off | 63 | 276 | 3,312 | 20.15 ms | 20 |
-| on | 27 | 96 | 1,152 | 16.05 ms | 16 |
+| View | Portal walk | Cells | Draws | Triangles | Frame mean | p50 |
+|---|---|---|---|---|---|---|
+| down a corridor | off | 63 | 276 | 3,312 | 21.20 ms | 21 |
+| down a corridor | on | 27 | 96 | 1,152 | 16.35 ms | 16 |
+| diagonal | off | 63 | 276 | 3,312 | 20.50 ms | 20 |
+| diagonal | on | 36 | 194 | 2,328 | 18.55 ms | 18 |
 
-The pictures are pixel identical for a camera in a room centre: the walk only
-drops rooms no doorway reaches, and the shadow pass keeps every cell because a
-room behind a wall still casts into the rooms in view. A camera exactly on a
-wall plane still differs - the walk then starts inside the wall it should look
-through - which is a camera placement the game will not use.
+The pictures are pixel identical for every camera in a room centre, five of
+them tested, including two diagonals: the walk only drops rooms no doorway
+reaches. The shadow pass keeps every cell, because a room behind a wall still
+casts into the rooms in view. A camera exactly on a wall plane still differs -
+the walk then starts inside the wall it should look through - which is a camera
+placement the game will not use.
 
-The regions are rectangles, so the walk over-opens compared to a polygon walk;
-the numbers are a floor, not a ceiling.
+The region is the doorway's screen polygon now, not its box, so a doorway seen
+at an angle stops opening half the screen. That is why the diagonal view keeps
+36 rooms: the rectangle walk kept 28 by dropping rooms at their first arrival,
+not by geometry.
 
 ## What the numbers say
 
