@@ -201,29 +201,31 @@ corridor and edge cameras, and the stage differs from the single map by 11
 pixels. The corridor no longer shows sun through a wall: the light's near plane
 now reaches back past the casters above the slice.
 
-## Spot shadows
+## Local shadows
 
-Four 512 tiles share a 1024 depth atlas per frame in flight. The four spots
-nearest the camera take a tile; the choice is rebuilt each frame, and a change
-of choice invalidates the atlas. The sample is `spot_shadow/spot_shadow.tscn`:
-one downward spot, a cube on a floor.
+Sixteen 256 tiles share a 1024 depth atlas per frame in flight: a spot takes
+one, a point light six, one per cube face. The nearest lights get tiles first;
+a light whose tiles do not fit stays unshadowed. `spot_shadow` and `point_shadow`
+each put one cube under one light.
 
-| Camera | Spot shadows | Shadow cache | Frame mean | Atlas draws |
+| Sample | Local shadows | Shadow cache | Frame mean | Atlas draws |
 |---|---|---|---|---|
-| 0, 3, -6 | off | on | 8.30 ms | 0 |
-| 0, 3, -6 | on | on | 8.25 ms | cached |
-| 0, 3, -6 | off | off | 8.35 ms | 0 |
-| 0, 3, -6 | on | off | 9.00 ms | 3 / tile |
+| spot | off | on | 9.55 ms | 0 |
+| spot | on | on | 10.05 ms | cached |
+| spot | on | off | 10.40 ms | 3 / tile |
+| point | off | on | 10.15 ms | 0 |
+| point | on | on | 11.00 ms | cached |
+| point | on | off | 11.00 ms | 12 (6 tiles) |
 
-On the lights torture scene, four spot tiles cost 3.0 ms per frame while the
-atlas is redrawn (70.65 against 67.65 with the sun's shadows off), and nothing
-once cached. A fragment samples a spot tile only inside the cone where the spot
-contributes, so a scene where most pixels are outside all cones pays almost
-nothing for the atlas.
+The spot pays 0.50 ms for its tile sample and the point light 0.85 ms for six,
+with the atlas cached; redrawing adds 0.35 ms for the spot and is lost in the
+noise for the point light on this pair of boxes. On the lights torture scene,
+local shadows stay within noise cached (84.65 against 84.60), because most
+fragments sit outside the cones and a fragment samples a tile only inside one.
+`--no-local-shadows` and `--no-shadow-cache` isolate the effect and the pass.
 
-The cube's shadow covers 55,855 pixels at this camera; `--no-spot-shadows`
-lights the same floor through the cube, and `--no-sun-shadows` leaves the spot's
-shadow as the only one.
+The cube's shadow covers 9,689 pixels under the spot and 43,944 under the point
+light at the sample camera.
 
 ## What the numbers say
 
