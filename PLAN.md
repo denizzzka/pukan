@@ -876,8 +876,10 @@ Before each slice, read the matching reference named in
 
   A coarse grid exists (`--occlusion`), filled by a compute pass from the frame's
   real depth one frame back; `gatherParts` and `drawParts` skip a part whose
-  screen rectangle is fully behind it. Its 192 by 144 cells and the full
-  rectangle rule leave 4 of the indoor sample's 998 parts hidden.
+  screen rectangle is fully behind it, and the cull kernel tests instances
+  against the same grid for the camera's view (`--occlusion-gpu`). A nested glTF
+  scene hands its static meshes to the level's gather, so the kernel sees indoor
+  content too.
   - [ ] The kernel tests each instance against the previous frame's grid now,
         for the camera's view only: applying it to the shadow pass would drop
         casters the camera cannot see but the sun can. A shadow grid has to be
