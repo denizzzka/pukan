@@ -581,17 +581,9 @@ fields).
 
 ## 2D
 
-- [x] 2D overlay on top of 3D: a sprite batch of position, uv and colour quads
-      with alpha blending, drawn in its own one-sample pass after the OIT and
-      transmission resolves, before the screenshot and the present. Scissor
-      rectangles come from the draw commands.
-- [x] OSD: the frame carries a Dear ImGui layer, the pure-D `herringway_dimgui`
-      port of 1.89.7, drawn through the engine's sprite batch. `demo_godot`
-      opens a Debug window with frame time, light and shadow counts, exposure,
-      white point, IBL energy and the tonemap mode, including AgX.
-- [ ] Object labels once the OSD exists: project an object's origin to the screen
-      and draw its name there, glTF nodes and meshes first; overlapping,
-      off-screen and behind-the-camera labels need their own handling.
+- [ ] Object labels: project an object's origin to the screen and draw its name
+      there, glTF nodes and meshes first; overlapping, off-screen and
+      behind-the-camera labels need their own handling.
 - [ ] Menu: ImGui is in place, so build the menu on it; the port has no docking
       and no ImPlot.
 
@@ -714,31 +706,8 @@ lights, sixteen entries in total. The sun casts three 1024x1024 shadow maps, one
 per cascade: the camera frustum splits with a practical split, each slice is
 fitted to its own orthographic map and snapped to a world grid of whole texels,
 and the fragment shader picks a cascade by clip w and samples that binding. The
-last cascade stops at the level's bounds. Only the sun casts; there are no
-local-light shadows. Missing:
+last cascade stops at the level's bounds. Missing:
 
-- [x] Cascaded directional maps: three cascades fitted to the camera frustum,
-      clamped to the level's bounds, with a depth bias matched to each range.
-- [x] Spot shadows on top of `SunShadow`: a 2x2 atlas of 512 tiles, the four
-      spots nearest the camera, a matrix, tile and bias per light, and the
-      atlas redrawn when the choice of lights changes.
-- [x] Point-light shadows: six faces per point light in the shared atlas, the
-      face picked from the fragment direction, with the atlas redrawn when the
-      chosen lights change.
-- [x] Caster coverage: the primitive meshes, spheres and cylinders cast through
-      depth-only pipelines on the same shadow passes; debug lines stay out.
-- [x] A wider filter and cascade blending: four half-texel taps average a 3x3
-      box, and the last tenth of each cascade fades into the next with both fits
-      covering the band.
-- [x] Light culling by distance and screen size: a level keeps every light, and
-      each frame the sun plus the fifteen local lights that cover the most
-      pixels reach the shader; one under a pixel is dropped.
-- [x] AgX comes from Godot's own `tonemap.glsl` for `tonemap_mode = 4`, and the
-      background now takes the frame's exposure, mode and white through the same
-      curve instead of bypassing them.
-- [x] Shadowmasking: a material marked `shadowmask` uses its occlusion map as
-      baked directional occlusion, and the sun's real-time shadow multiplies it
-      so a baked dark surface stays dark; local lights ignore it.
 - [ ] Import the shadowmask from a Godot `LightmapGI` bake instead of a
       material's occlusion map, with the bake's UV2 and its per-light channels.
 
