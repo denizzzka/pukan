@@ -117,7 +117,8 @@ what the grid holds.
 | field, dense cells | 835.0 | none | 60.08 ms | 55 |
 | field, dense cells | 644.2 | CPU, 204 dropped | 55.92 ms | 51 |
 | field, dense cells | 835.0 | kernel, 170 dropped | 58.52 ms | 53 |
-| occlusion_culling | 998.0 | kernel, none dropped | 2112 ms | 1580 |
+| occlusion_culling, nested path | 997.2 | none | 2212 ms | 1727 |
+| occlusion_culling, kernel | 1,246.0 | 1,246 gathered | 2501 ms | 1972 |
 | truck_town | 2.0 | none dropped | 39.1 ms | 38 |
 
 The kernel test drops 170 of the field's 835 instances and gains 1.6 ms. It
@@ -125,8 +126,13 @@ cannot cut the submitted draws the way the CPU test does, so on this software
 raster the CPU path stays ahead; on a real GPU the kernel's saving is the one
 that lands in the frame.
 
-The indoor sample gains nothing from the kernel: its 998 draws come from nested
-scenes that draw themselves, so no instance reaches the cull kernel.
+The indoor sample's rooms are nested glTF scenes; they used to draw themselves,
+so no instance reached the kernel. They now hand their static meshes to the
+level's gather, and one instance out of view is dropped by its own bounds before
+its nodes are walked: 13,537 gathered instances become 1,246. The sample is
+bound by its shadow pass (3,386 draws against 1,246 instances on the surface),
+so the frame time barely moves - 1972 ms against 1727 ms for the nested path,
+which submits fewer surface triangles.
 
 The test is conservative by construction: every sample of a part's screen
 rectangle has to lie behind a surface, and a coarse grid with box projections
