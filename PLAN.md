@@ -601,8 +601,8 @@ Questions:
   renderer is not needed.
 - Text comes from ImGui's font atlas, its own stb_truetype port. `Ui.addFont`
   takes a TTF, a script list and the strings the UI shows, so Latin, Cyrillic
-  and CJK bake only the glyphs they use; a font without the glyphs still shows
-  placeholders.
+  and CJK bake only the glyphs they use; a second font merges into the first,
+  so the scripts can come from different files.
 
 ## Automatic composition: pipelines into render passes, passes into a frame
 
