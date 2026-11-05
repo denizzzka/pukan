@@ -897,9 +897,8 @@ Before each slice, read the matching reference named in
 
   `--stats` prints a stream line - cells, pending, drawables per cell, bytes per
   frame, the load and unload cost - and `--trace` prints a line at every cell
-  border with the frame time it landed in.
-  - [ ] Draw those counters on screen: the renderer has no text path yet, so the
-        overlay waits for one.
+  border with the frame time it landed in. The Debug window mirrors those
+  counters live, including the last border crossing.
   - [ ] Acceptance is the absence of hitches at cell borders, not an average
         frame rate: a steady 10 to 20 ms drop at a crossing means the budget is
         exceeded or a synchronous step (a physics scene build, a pipeline
@@ -1168,8 +1167,10 @@ cycling material and lighting modes, and the time to rebuild an evicted variant
 from the disk cache. If the fixed scene and its worst material set stay small,
 an explicit unload at scene teardown may be enough.
 
-- [ ] Track the live variant count and the last frame each variant was drawn.
-      Add both to the debug summary next to the compiled and cached counts.
+The factory stamps each `LazyPipeline` use with the frame, and reports the live
+count and the oldest use in the Debug window and the shutdown summary. Direct
+acquisitions are counted live but not stamped yet.
+
 - [ ] Decide the trigger: a variant cap, a memory cap, idle frames, or an
       explicit scene unload. Pick a default only after measuring.
 - [ ] Make `LazyPipeline` hold a shared handle instead of a copied
@@ -1286,13 +1287,8 @@ created.
 
 ## Swapchain creation
 
-`SwapChain` hardcodes `minImageCount: 3` and only checks that
-`cap.maxImageCount >= 3`, so a surface that requires more images fails
-validation and then `vkCreateSwapchainKHR`. Choose the count from the
-capabilities range, keeping three when the range allows it.
-
-- [ ] Choose `minImageCount` as `max(3, cap.minImageCount)`, capped by
-      `cap.maxImageCount` unless it is zero.
+`SwapChain` asks for `max(3, minImageCount)`, capped by `maxImageCount` when the
+surface bounds it, and cycles the frame index over the images it got back.
 
 ## Offscreen output
 
