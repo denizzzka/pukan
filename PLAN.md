@@ -581,19 +581,28 @@ fields).
 
 ## 2D
 
-- [ ] 2D overlay on top of 3D: sprite/quad batch, alpha blending, orthographic
-      projection, drawn after the 3D pass.
-- [ ] OSD: debug text and small overlays (FPS, counters, flags).
+- [x] 2D overlay on top of 3D: a sprite batch of position, uv and colour quads
+      with alpha blending, drawn in its own one-sample pass after the OIT and
+      transmission resolves, before the screenshot and the present. Scissor
+      rectangles come from the draw commands.
+- [x] OSD: the frame carries a Dear ImGui layer, the pure-D `herringway_dimgui`
+      port of 1.89.7, drawn through the engine's sprite batch. `demo_godot`
+      opens a Debug window with frame time, light and shadow counts, exposure,
+      white point, IBL energy and the tonemap mode, including AgX.
 - [ ] Object labels once the OSD exists: project an object's origin to the screen
       and draw its name there, glTF nodes and meshes first; overlapping,
       off-screen and behind-the-camera labels need their own handling.
-- [ ] Menu: prefer a ready-made solution (dimgui, bindbc-imgui, GTK, ...) and
-      evaluate how it integrates with the existing frame loop.
+- [ ] Menu: ImGui is in place, so build the menu on it; the port has no docking
+      and no ImPlot.
 
 Questions:
 
-- Overlay via an immediate-mode library or a custom sprite batch?
-- How is text rendered: font atlas, signed distance field, or the UI library?
+- The overlay is a sprite batch fed by ImGui's draw lists, so a separate 2D
+  renderer is not needed.
+- Text comes from ImGui's font atlas, its own stb_truetype port. `Ui.addFont`
+  takes a TTF, a script list and the strings the UI shows, so Latin, Cyrillic
+  and CJK bake only the glyphs they use; a font without the glyphs still shows
+  placeholders.
 
 ## Automatic composition: pipelines into render passes, passes into a frame
 
