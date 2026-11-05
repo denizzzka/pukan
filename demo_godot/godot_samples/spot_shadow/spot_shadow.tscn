@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="mat"]
+albedo_color = Color(0.62, 0.62, 0.62, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="floor"]
+material = SubResource("mat")
+size = Vector3(20, 0.2, 20)
+
+[sub_resource type="BoxMesh" id="cube"]
+material = SubResource("mat")
+size = Vector3(1, 1, 1)
+
+[node name="SpotShadow" type="Node3D"]
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("floor")
+
+[node name="Blocker" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("cube")
+
+[node name="Spot" type="SpotLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 2, 4, 2)
+light_color = Color(1, 1, 1, 1)
+light_energy = 3.0
+spot_range = 10.0
+spot_angle = 35.0

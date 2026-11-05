@@ -449,6 +449,9 @@ void main(string[] args)
     string eyeOption;
     string targetOption;
     bool noShadows;
+    bool noSpotShadows;
+    bool noSunShadows;
+    bool noShadowCache;
     bool plainMode;
     bool offscreen;
     bool characterMode = true;
@@ -498,6 +501,9 @@ void main(string[] args)
         "eye", "override the camera position, x,y,z", &eyeOption,
         "target", "override the camera target, x,y,z", &targetOption,
         "no-shadows", "do not cast shadows", &noShadows,
+        "no-spot-shadows", "let the sun cast, but not the spot lights", &noSpotShadows,
+        "no-sun-shadows", "let the spot lights cast, but not the sun", &noSunShadows,
+        "no-shadow-cache", "redraw the shadow maps every frame", &noShadowCache,
         "plain", "draw every surface in the plain lit mode", &plainMode,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
         "character", "walk a Quake-style capsule through the level, the default", &characterMode,
@@ -687,8 +693,10 @@ void main(string[] args)
 
     CellImpostor[CellCoord] cellImpostors;
 
-    scene.sunShadow.enabled = !noShadows;
-    scene.sunShadow.cache = true;
+    scene.sunShadow.enabled = !noShadows && !noSunShadows;
+    scene.sunShadow.cache = !noShadowCache;
+    scene.spotShadow.enabled = !noShadows && !noSpotShadows;
+    scene.spotShadow.cache = !noShadowCache;
     scene.godotFactory.preloadShadows = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
@@ -1849,6 +1857,23 @@ void main(string[] args)
                                 frame.frameSets[0].descriptorSet, DrawPhase.shadow, CellCulling.cpu);
 
                     shadowTotal += drawStats() - shadowStart;
+                },
+                (buf, tile) {
+                    auto spotStart = drawStats();
+                    const spotViewProj = scene.spotShadow.viewProj[tile] * wtb.model;
+
+                    // A spot sees only its cone; the cells behind a wall still cast
+                    drawCells(levelIndex, buf, spotViewProj, shadowCells,
+                        frame.frameSets[0].descriptorSet, DrawPhase.shadow, CellCulling.cpu);
+
+                    foreach(cell; proxyCells)
+                        if(!godotScene.drawProxy(buf, cell, spotViewProj,
+                            frame.frameSets[0].descriptorSet, DrawPhase.shadow))
+                            drawCells(levelIndex, buf, spotViewProj, [cell],
+                                frame.frameSets[0].descriptorSet, DrawPhase.shadow, CellCulling.cpu);
+
+                    shadowTotal += drawStats() - spotStart;
+
                 },
                 (buf) {
                     capturePendingCells(buf, levelIndex, scene, impostors, cellImpostors,

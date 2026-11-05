@@ -114,6 +114,65 @@ final class ShadowPass : RenderPass
 
         vkCmdEndRenderPass(buf);
     }
+
+    /// Records one depth pass into a grid of equal tiles, clearing the atlas once
+    void recordTiles(
+        VkCommandBuffer buf,
+        VkFramebuffer frameBuffer,
+        VkExtent2D extent,
+        uint tileSize,
+        size_t tiles,
+        void delegate(ref VkCommandBuffer, size_t tile) draw,
+    )
+    in(tiles > 0 && tileSize > 0)
+    in(extent.width % tileSize == 0 && extent.height % tileSize == 0)
+    {
+        VkRenderPassBeginInfo info = {
+            sType: VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+            renderPass: vkRenderPass,
+            framebuffer: frameBuffer,
+            renderArea: VkRect2D(
+                offset: VkOffset2D(0, 0),
+                extent: extent,
+            ),
+        };
+
+        VkClearValue clear = {
+            depthStencil: VkClearDepthStencilValue(1.0f, 0),
+        };
+        info.pClearValues = &clear;
+        info.clearValueCount = 1;
+
+        vkCmdBeginRenderPass(buf, &info, VK_SUBPASS_CONTENTS_INLINE);
+
+        const columns = extent.width / tileSize;
+
+        foreach(tile; 0 .. tiles)
+        {
+            const column = cast(uint) tile % columns;
+            const row = cast(uint) tile / columns;
+
+            VkViewport viewport = {
+                x: cast(float) (column * tileSize),
+                y: cast(float) (row * tileSize),
+                width: cast(float) tileSize,
+                height: cast(float) tileSize,
+                minDepth: 0.0f,
+                maxDepth: 1.0f,
+            };
+            VkRect2D scissor = {
+                offset: VkOffset2D(column * tileSize, row * tileSize),
+                extent: VkExtent2D(tileSize, tileSize),
+            };
+
+            vkCmdSetViewport(buf, 0, 1, &viewport);
+            vkCmdSetScissor(buf, 0, 1, &scissor);
+
+            draw(buf, tile);
+        }
+
+        vkCmdEndRenderPass(buf);
+    }
 }
 
 /// Depth image and framebuffer the shadow pass renders into, one per frame
@@ -610,6 +669,133 @@ final class SunShadow
         pass.record(buf, maps[slot].renderedFrameBuffer, maps[slot].renderExtent,
             (ref VkCommandBuffer b) { draw(b, cascade); });
         valid[slot] = true;
+
+        return true;
+    }
+}
+
+/// Side of one spot tile in the shadow atlas
+enum spotTileSize = 512;
+/// Tiles per axis; four spots cast at once
+enum spotTilesPerAxis = 2;
+/// Spot lights that can cast at once
+enum spotShadowCount = spotTilesPerAxis * spotTilesPerAxis;
+
+/// The spot lights' shadow atlas: one depth image per frame in flight
+final class SpotShadow
+{
+    private LogicalDevice device;
+    ShadowPass pass;
+    private ShadowMap[] maps;
+    private bool[] valid;
+    private VkSampler sampler;
+
+    /// Renders the atlas again only after `invalidate`
+    bool cache;
+    bool enabled = true;
+    /// Tiles the scene assigned in this frame
+    uint active;
+    /// Light view-projection of each tile
+    Matrix4x4f[spotShadowCount] viewProj;
+    /// NDC depth bias of each tile
+    float[spotShadowCount] depthBias;
+
+    this(LogicalDevice device)
+    {
+        this.device = device;
+        pass = new ShadowPass(device, DepthBuf.format);
+
+        foreach(ref matrix; viewProj)
+            matrix = Matrix4x4f.identity;
+
+        depthBias[] = 0.0025f;
+
+        VkSamplerCreateInfo info = {
+            sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            magFilter: VK_FILTER_LINEAR,
+            minFilter: VK_FILTER_LINEAR,
+            mipmapMode: VK_SAMPLER_MIPMAP_MODE_NEAREST,
+            addressModeU: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            compareEnable: VK_TRUE,
+            compareOp: VK_COMPARE_OP_LESS_OR_EQUAL,
+            borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+            unnormalizedCoordinates: VK_FALSE,
+        };
+        vkCall(device.device, &info, device.alloc, &sampler);
+    }
+
+    ~this()
+    {
+        foreach(ref map; maps)
+            if(map)
+                destroy(map);
+
+        if(sampler)
+            vkDestroySampler(device.device, sampler, device.alloc);
+
+        if(pass)
+            destroy(pass);
+    }
+
+    void invalidate()
+    {
+        valid[] = false;
+    }
+
+    void recreate(size_t frameCount)
+    {
+        if(maps.length == frameCount)
+            return;
+
+        foreach(ref map; maps)
+            if(map)
+                destroy(map);
+
+        maps.length = frameCount;
+        valid.length = frameCount * spotShadowCount;
+        valid[] = false;
+
+        foreach(i; 0 .. frameCount)
+            maps[i] = new ShadowMap(device, pass, spotTilesPerAxis * spotTileSize);
+    }
+
+    VkDescriptorImageInfo imageInfo(size_t frameIndex)
+    {
+        assert(frameIndex < maps.length);
+        return maps[frameIndex].imageInfo(sampler);
+    }
+
+    /// Whether `record` has a tile to draw in this frame
+    bool pending(size_t frameIndex) const
+    {
+        if(!enabled || active == 0)
+            return false;
+
+        foreach(tile; 0 .. active)
+            if(!(cache && valid[frameIndex * spotShadowCount + tile]))
+                return true;
+
+        return false;
+    }
+
+    /// Returns false when the atlas reused its cached tiles
+    bool record(size_t frameIndex, VkCommandBuffer buf, void delegate(ref VkCommandBuffer, size_t tile) draw)
+    {
+        assert(frameIndex * spotShadowCount < valid.length || active == 0);
+
+        if(!enabled || draw is null || active == 0)
+            return false;
+
+        if(cache && !pending(frameIndex))
+            return false;
+
+        pass.recordTiles(buf, maps[frameIndex].renderedFrameBuffer, maps[frameIndex].renderExtent,
+            spotTileSize, active, draw);
+
+        foreach(tile; 0 .. active)
+            valid[frameIndex * spotShadowCount + tile] = true;
 
         return true;
     }

@@ -18,4 +18,5 @@ struct FrameBindings
     uint shadowMap2 = uint.max;
     uint sceneDepth = uint.max;
     uint depthMS = uint.max;
+    uint spotShadows = uint.max;
 }

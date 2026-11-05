@@ -91,6 +91,7 @@ layout(set = 1, binding = FRAME_SCENE_COLOR) uniform sampler2D sceneColorMap;
 layout(set = 1, binding = FRAME_SHADOW_MAP) uniform sampler2DShadow shadowMap;
 layout(set = 1, binding = FRAME_SHADOW_MAP1) uniform sampler2DShadow shadowMap1;
 layout(set = 1, binding = FRAME_SHADOW_MAP2) uniform sampler2DShadow shadowMap2;
+layout(set = 1, binding = FRAME_SPOT_SHADOWS) uniform sampler2DShadow spotShadowMap;
 
 #ifdef SKY_ANALYTIC
 vec3 environment(vec3 direction)
@@ -394,6 +395,17 @@ vec3 transmissionSample(Surface s, vec3 N, vec3 V, float ior, float roughness)
     return textureLod(sceneColorMap, clamp(uv, vec2(0.0), vec2(1.0)), roughness * SCENE_COLOR_MAX_LOD).rgb;
 }
 
+/// Four half-texel taps: each bilinear comparison covers 2x2, together a 3x3 box
+float shadowPcf(sampler2DShadow map, vec2 uv, float ordinate, vec2 halfTexel)
+{
+    float total = texture(map, vec3(uv + vec2(-halfTexel.x, -halfTexel.y), ordinate));
+    total += texture(map, vec3(uv + vec2(halfTexel.x, -halfTexel.y), ordinate));
+    total += texture(map, vec3(uv + vec2(-halfTexel.x, halfTexel.y), ordinate));
+    total += texture(map, vec3(uv + vec2(halfTexel.x, halfTexel.y), ordinate));
+
+    return total * 0.25;
+}
+
 /// Fraction of the sun that reaches a point through one cascade's map
 float shadowFactorCascade(mat4 shadowViewProj, sampler2DShadow map, float bias, vec3 position, vec3 normal)
 {
@@ -409,13 +421,45 @@ float shadowFactorCascade(mat4 shadowViewProj, sampler2DShadow map, float bias, 
     if(any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
         return 1.0;
 
-    // Four half-texel taps: each bilinear comparison covers 2x2, together a 3x3 box
-    const float ordinate = ndc.z - bias;
     const vec2 halfTexel = 0.5 / vec2(textureSize(map, 0));
-    float total = texture(map, vec3(uv + vec2(-halfTexel.x, -halfTexel.y), ordinate));
-    total += texture(map, vec3(uv + vec2(halfTexel.x, -halfTexel.y), ordinate));
-    total += texture(map, vec3(uv + vec2(-halfTexel.x, halfTexel.y), ordinate));
-    total += texture(map, vec3(uv + vec2(halfTexel.x, halfTexel.y), ordinate));
+
+    return shadowPcf(map, uv, ndc.z - bias, halfTexel);
+}
+
+/// Fraction of a spot light that reaches a point through its atlas tile
+float spotShadowFactor(Light light, vec3 position, vec3 normal)
+{
+    const vec4 clip = light.shadowViewProj * vec4(position + normal * 0.02, 1.0);
+
+    if(clip.w <= 0.0)
+        return 1.0;
+
+    const vec3 ndc = clip.xyz / clip.w;
+
+    if(ndc.z <= 0.0 || ndc.z >= 1.0)
+        return 1.0;
+
+    const vec2 uv = ndc.xy * 0.5 + 0.5;
+
+    if(any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
+        return 1.0;
+
+    const float tiles = frameUbo.frame.spotShadowParams.y;
+    const float invTiles = frameUbo.frame.spotShadowParams.x;
+    const float tile = light.params.z;
+    const vec2 origin = vec2(mod(tile, tiles), floor(tile / tiles)) * invTiles;
+
+    // A tap at a tile edge would read the neighbour, so keep it inside its tile
+    const vec2 halfTexel = vec2(0.5 * frameUbo.frame.spotShadowParams.z);
+    const vec2 low = origin + halfTexel;
+    const vec2 high = origin + invTiles - halfTexel;
+    const vec2 atlasUv = origin + uv * invTiles;
+    const float ordinate = ndc.z - light.params.w;
+
+    float total = texture(spotShadowMap, vec3(clamp(atlasUv + vec2(-halfTexel.x, -halfTexel.y), low, high), ordinate));
+    total += texture(spotShadowMap, vec3(clamp(atlasUv + vec2(halfTexel.x, -halfTexel.y), low, high), ordinate));
+    total += texture(spotShadowMap, vec3(clamp(atlasUv + vec2(-halfTexel.x, halfTexel.y), low, high), ordinate));
+    total += texture(spotShadowMap, vec3(clamp(atlasUv + vec2(halfTexel.x, halfTexel.y), low, high), ordinate));
 
     return total * 0.25;
 }
@@ -613,10 +657,12 @@ vec3 shadePbr(Surface s)
         }
 #endif
 
-        // Only the sun casts a shadow for now
-        const float shadow = (type == LIGHT_DIRECTIONAL && i == 0u)
-            ? shadowFactor(s.position, N)
-            : 1.0;
+        float shadow = 1.0;
+
+        if(type == LIGHT_DIRECTIONAL && i == 0u)
+            shadow = shadowFactor(s.position, N);
+        else if(type == LIGHT_SPOT && light.params.z >= 0.0 && attenuation > 0.0)
+            shadow = spotShadowFactor(light, s.position, N);
 
         direct += brdf * light.colorIntensity.rgb * NdotL * attenuation * shadow;
 
