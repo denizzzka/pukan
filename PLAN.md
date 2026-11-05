@@ -714,7 +714,9 @@ local-light shadows. Missing:
       then point lights as a cubemap or six tiles, with per-light matrices,
       tile metadata in the frame data and per-tile cache validity.
 - [ ] Caster coverage: the non-glTF primitives do not cast yet.
-- [ ] A wider filter and cascade blending; the comparison is one bilinear tap today.
+- [x] A wider filter and cascade blending: four half-texel taps average a 3x3
+      box, and the last tenth of each cascade fades into the next with both fits
+      covering the band.
 - [ ] Light culling by distance and screen size.
 - [ ] Calibrate AgX against Godot; `Environment.tonemap_mode = 4` falls back to
       ACES today, and the background bypasses exposure and tonemap entirely.
