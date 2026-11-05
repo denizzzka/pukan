@@ -721,11 +721,17 @@ local-light shadows. Missing:
 - [x] A wider filter and cascade blending: four half-texel taps average a 3x3
       box, and the last tenth of each cascade fades into the next with both fits
       covering the band.
-- [ ] Light culling by distance and screen size.
-- [ ] Calibrate AgX against Godot; `Environment.tonemap_mode = 4` falls back to
-      ACES today, and the background bypasses exposure and tonemap entirely.
-- [ ] Shadowmasking: baked directional occlusion that dynamic lights sample, so
-      a lit surface can stay in a baked shadow.
+- [x] Light culling by distance and screen size: a level keeps every light, and
+      each frame the sun plus the fifteen local lights that cover the most
+      pixels reach the shader; one under a pixel is dropped.
+- [x] AgX comes from Godot's own `tonemap.glsl` for `tonemap_mode = 4`, and the
+      background now takes the frame's exposure, mode and white through the same
+      curve instead of bypassing them.
+- [x] Shadowmasking: a material marked `shadowmask` uses its occlusion map as
+      baked directional occlusion, and the sun's real-time shadow multiplies it
+      so a baked dark surface stays dark; local lights ignore it.
+- [ ] Import the shadowmask from a Godot `LightmapGI` bake instead of a
+      material's occlusion map, with the bake's UV2 and its per-light channels.
 
 ## Depth buffer
 
