@@ -710,9 +710,11 @@ local-light shadows. Missing:
 
 - [x] Cascaded directional maps: three cascades fitted to the camera frustum,
       clamped to the level's bounds, with a depth bias matched to each range.
-- [ ] Local-light shadows on top of `SunShadow`: an atlas of spot tiles first,
-      then point lights as a cubemap or six tiles, with per-light matrices,
-      tile metadata in the frame data and per-tile cache validity.
+- [x] Spot shadows on top of `SunShadow`: a 2x2 atlas of 512 tiles, the four
+      spots nearest the camera, a matrix, tile and bias per light, and the
+      atlas redrawn when the choice of lights changes.
+- [ ] Point-light shadows: a cubemap or six tiles per light, sharing the atlas
+      and its cache.
 - [ ] Caster coverage: the non-glTF primitives do not cast yet.
 - [x] A wider filter and cascade blending: four half-texel taps average a 3x3
       box, and the last tenth of each cascade fades into the next with both fits
