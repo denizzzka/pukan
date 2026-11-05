@@ -766,7 +766,7 @@ void main(string[] args)
     uint heightOption = height;
     bool uiOption;
     bool noUiOption;
-    string uiFontOption;
+    string[] uiFontOptions;
     float uiFontSize = 16.0f;
     string uiScriptsOption;
     bool uiDemoOption;
@@ -817,7 +817,7 @@ void main(string[] args)
         "height", "window or offscreen height in pixels, 600 by default", &heightOption,
         "ui", "draw the debug UI over the frame, on by default in a window", &uiOption,
         "no-ui", "run without the debug UI", &noUiOption,
-        "ui-font", "TrueType font for the debug UI; the built-in font covers ASCII only", &uiFontOption,
+        "ui-font", "TrueType font for the debug UI, repeatable so a second font covers other scripts; the built-in font covers ASCII only", &uiFontOptions,
         "ui-font-size", "font size in pixels, 16 by default", &uiFontSize,
         "ui-scripts", "glyph sets to bake with --ui-font: latin, cyrillic, greek, thai, vietnamese, japanese, korean, chinese, chinese-full", &uiScriptsOption,
         "ui-demo", "open the Dear ImGui demo window", &uiDemoOption,
@@ -1000,8 +1000,9 @@ void main(string[] args)
         auto ui = scene.enableUi();
         activeUi = ui;
 
-        if(uiFontOption.length)
-            ui.addFont(uiFontOption, uiFontSize, parseScripts(uiScriptsOption));
+        foreach(index, path; uiFontOptions)
+            ui.addFont(path, uiFontSize, parseScripts(uiScriptsOption), uiTextOption,
+                index != 0);
     }
 
     Impostors impostors;
