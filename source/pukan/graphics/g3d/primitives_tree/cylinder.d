@@ -2,6 +2,7 @@ module pukan.graphics.g3d.primitives_tree.cylinder;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.graphics.g3d.material: Material;
+import pukan.graphics.g3d.mesh: frontFaceFor;
 import pukan.graphics.g3d.primitives_tree: DrawablePrimitive;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
@@ -419,7 +420,8 @@ class CylinderRenderer : DrawablePrimitive
         const technique = pipelines.declare(RenderTechnique(
             name: "cylinders",
             stages: shaderStages(),
-            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
+            // The cylinder mesh is wound counter-clockwise outward
+            state: FixedState(frontFace: frontFaceFor(false, true)),
         ), 1);
 
         auto allocator = pipelines.descriptorAllocator(technique);
@@ -435,7 +437,8 @@ class CylinderRenderer : DrawablePrimitive
         const shadowTechnique = pipelines.declare(RenderTechnique(
             name: "cylinders shadow",
             stages: shadowShaderStages(),
-            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
+            // The cylinder mesh is wound counter-clockwise outward
+            state: FixedState(frontFace: frontFaceFor(false, true)),
         ), 1);
 
         shadowPipelineCfg = pipelines.acquire(shadowTechnique, shadowPass, 0);

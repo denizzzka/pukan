@@ -79,6 +79,15 @@ bool mirrors(Matrix4x4f m)
         + m.a13 * (m.a21 * m.a32 - m.a22 * m.a31) < 0;
 }
 
+/// Vulkan front face for triangles wound clockwise or counter-clockwise
+/// outward, mirrored or not
+VkFrontFace frontFaceFor(bool mirrored, bool counterClockwiseTriangles)
+{
+    return mirrored != counterClockwiseTriangles
+        ? VK_FRONT_FACE_COUNTER_CLOCKWISE
+        : VK_FRONT_FACE_CLOCKWISE;
+}
+
 /// Geometry and descriptor set shared by static and skinned meshes
 class Mesh
 {
@@ -103,9 +112,7 @@ class Mesh
     void applyFrontFace(bool mirrored, bool counterClockwiseTriangles)
     {
         this.mirrored = mirrored;
-        frontFace = mirrored != counterClockwiseTriangles
-            ? VK_FRONT_FACE_COUNTER_CLOCKWISE
-            : VK_FRONT_FACE_CLOCKWISE;
+        frontFace = frontFaceFor(mirrored, counterClockwiseTriangles);
     }
 
     protected MaterialBuffer materialBuffer;
@@ -235,4 +242,28 @@ class Mesh
 
         countDraw(1, triangleCount(indexCount ? indexCount : vertexCount));
     }
+}
+
+unittest
+{
+    import dlib.math: Vector3f, Vector4f;
+    import pukan.graphics.g3d.camera: vulkanPerspectiveMatrix;
+
+    // A counter-clockwise outward triangle in view space, as the primitives are
+    // wound. The Vulkan projection flips Y, so its signed area turns negative.
+    const projection = vulkanPerspectiveMatrix(60, 1, 0.1f, 100);
+
+    Vector4f project(Vector3f p)
+    {
+        const clip = Vector4f(p.x, p.y, p.z, 1) * projection;
+        return Vector4f(clip.x / clip.w, clip.y / clip.w, 0, 0);
+    }
+
+    const a = project(Vector3f(-1, -1, -1));
+    const b = project(Vector3f(1, -1, -1));
+    const c = project(Vector3f(0, 1, -1));
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+
+    assert(area < 0, "the projection no longer keeps counter-clockwise outward geometry front-facing");
+    assert(frontFaceFor(false, true) == VK_FRONT_FACE_COUNTER_CLOCKWISE);
 }
