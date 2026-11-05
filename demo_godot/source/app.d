@@ -589,6 +589,24 @@ struct StreamTotals
     size_t frames;
 }
 
+/// Last frame's streaming counters, for the debug window
+struct StreamScreen
+{
+    size_t active;
+    size_t pending;
+    size_t nearCells;
+    size_t proxyCells;
+    size_t farCells;
+    size_t placements;
+    size_t proxies;
+    size_t sparse;
+    size_t occluded;
+    size_t kernel;
+    size_t bytes;
+    double load = 0;
+    double unload = 0;
+}
+
 /// Reports what a screen pixel points at, so a fault can be named and found
 private void reportProbe(
     string scenePath,
@@ -1549,6 +1567,7 @@ void main(string[] args)
     /// Instances the cull kernel's grid dropped
     size_t kernelOccluded;
     StreamTotals streamCells;
+    StreamScreen streamScreen;
     bool[CellCoord] knownCells;
     size_t bytesTotal;
     size_t borderEntered;
@@ -1666,6 +1685,31 @@ void main(string[] args)
                             cast(int) frameStats.instances);
                         ImGui.Text("triangles %d", cast(int) frameStats.triangles);
                         ImGui.Checkbox("OIT", &scene.oitEnabled);
+                    }
+
+                    if(ImGui.CollapsingHeader("Streaming", ImGuiTreeNodeFlags.DefaultOpen))
+                    {
+                        ImGui.Text("cells %d   pending %d", cast(int) streamScreen.active,
+                            cast(int) streamScreen.pending);
+                        ImGui.Text("near %d   proxy %d   cards %d",
+                            cast(int) streamScreen.nearCells,
+                            cast(int) streamScreen.proxyCells,
+                            cast(int) streamScreen.farCells);
+                        ImGui.Text("drawables %d   proxies %d   sparse %d",
+                            cast(int) streamScreen.placements,
+                            cast(int) streamScreen.proxies,
+                            cast(int) streamScreen.sparse);
+                        ImGui.Text("bytes %d   load %.2f ms   unload %.2f ms",
+                            cast(int) streamScreen.bytes,
+                            streamScreen.load, streamScreen.unload);
+                        ImGui.Text("occluded %d   kernel %d",
+                            cast(int) streamScreen.occluded,
+                            cast(int) streamScreen.kernel);
+
+                        if(trace)
+                            ImGui.Text("border +%d -%d   %d active",
+                                cast(int) borderEntered, cast(int) borderLeft,
+                                cast(int) borderActive);
                     }
 
                     if(ImGui.CollapsingHeader("Camera"))
@@ -2068,6 +2112,7 @@ void main(string[] args)
 
             double loadMs = 0;
             double unloadMs = 0;
+            size_t frameBytes = 0;
 
             if(streaming)
             {
@@ -2103,6 +2148,7 @@ void main(string[] args)
                     const used = uploadCells(levelIndex, frame.commandBuffer(), [cell], budget);
                     budget -= min(budget, used);
                     bytesTotal += used;
+                    frameBytes += used;
 
                     // Zero bytes means the cell has everything it needs
                     if(used > 0)
@@ -2163,12 +2209,23 @@ void main(string[] args)
                 activeCells = reached;
             }
 
+            const placements = levelIndex.placementsIn(activeCells);
+
+            streamScreen.active = activeCells.length;
+            streamScreen.pending = residency.pending.length;
+            streamScreen.placements = placements;
+            streamScreen.proxies = godotScene.proxyCount;
+            streamScreen.sparse = godotScene.sparseCount;
+            streamScreen.bytes = frameBytes;
+            streamScreen.load = loadMs;
+            streamScreen.unload = unloadMs;
+
             if(frameIndex > warmup)
             {
                 streamCells.total += activeCells.length;
                 streamCells.pending += residency.pending.length;
                 streamCells.bytes += bytesTotal;
-                streamCells.placements += levelIndex.placementsIn(activeCells);
+                streamCells.placements += placements;
                 streamCells.load += loadMs;
                 streamCells.unload += unloadMs;
                 streamCells.frames += 1;
@@ -2246,6 +2303,10 @@ void main(string[] args)
 
                     farCells ~= cell;
                 }
+
+            streamScreen.nearCells = nearCells.length;
+            streamScreen.proxyCells = proxyCells.length;
+            streamScreen.farCells = farCells.length;
 
             if(probePending && (probeFromKeyboard || frameIndex == captureFrame))
             {
@@ -2389,6 +2450,9 @@ void main(string[] args)
                                 shadowCells, DrawPhase.shadow, cascade);
                 },
             );
+
+            streamScreen.occluded = raster.rejected;
+            streamScreen.kernel = scene.occlusionRejections;
 
             if(frameIndex > warmup)
             {
