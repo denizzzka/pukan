@@ -29,7 +29,7 @@ import std.exception: enforce;
 import std.format: format;
 import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
-import std.stdio: writeln;
+import std.stdio: stderr, writeln;
 import std.string: toStringz;
 
 alias appRequirements = Requirements!(SwapChain, GodotFactory, FrameBuilder, CullFrame);
@@ -349,6 +349,18 @@ LineInstance[] capsuleLines(
     return lines;
 }
 
+/// Cell streaming, as the trace and the summary report it
+struct StreamTotals
+{
+    size_t total;
+    size_t pending;
+    size_t bytes;
+    size_t placements;
+    double load = 0;
+    double unload = 0;
+    size_t frames;
+}
+
 void main(string[] args)
 {
     string scenePath;
@@ -389,6 +401,7 @@ void main(string[] args)
     size_t proxyMinParts = 8;
     bool occlusion;
     bool occlusionGpu;
+    bool trace;
     bool stats;
     uint warmup;
     string pickOrigin;
@@ -422,6 +435,7 @@ void main(string[] args)
         "proxy-min-parts", "parts a cell needs before a proxy is worth its merge", &proxyMinParts,
         "occlusion", "skip parts the near ones hide, tested against a coarse CPU depth grid", &occlusion,
         "occlusion-gpu", "let the cull kernel drop instances the last frame's depth covers", &occlusionGpu,
+        "trace", "print a line whenever cells enter or leave, with the frame cost", &trace,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "stats", "report draws, triangles and frame time per ring at the end", &stats,
         "warmup", "frames the stats leave out, for loading and merging", &warmup,
@@ -1071,6 +1085,15 @@ void main(string[] args)
     size_t occludedTotal;
     /// Instances the cull kernel's grid dropped
     size_t kernelOccluded;
+    StreamTotals streamCells;
+    bool[CellCoord] knownCells;
+    size_t bytesTotal;
+    size_t borderEntered;
+    size_t borderLeft;
+    size_t borderActive;
+    size_t borderPending;
+    double borderLoad = 0;
+    double borderUnload = 0;
     /// Per ring: near cells, proxies, cards
     DrawStats[3] ringTotals;
     DrawStats shadowTotal;
@@ -1430,8 +1453,13 @@ void main(string[] args)
             scene.updateFrameUniforms(frame, 0, wtb);
             godotScene.refreshBuffers(frame.commandBuffer);
 
+            double loadMs = 0;
+            double unloadMs = 0;
+
             if(streaming)
             {
+                const loadBegan = MonoTime.currTime;
+
                 residency.update([
                     cameraSource(cellRange, CellState.active),
                     cameraSource(cellRange * 1.5f, CellState.loaded),
@@ -1461,6 +1489,7 @@ void main(string[] args)
 
                     const used = uploadCells(levelIndex, frame.commandBuffer(), [cell], budget);
                     budget -= min(budget, used);
+                    bytesTotal += used;
 
                     // Zero bytes means the cell has everything it needs
                     if(used > 0)
@@ -1470,6 +1499,9 @@ void main(string[] args)
                 }
 
                 loadingCells = stillLoading;
+                loadMs = (MonoTime.currTime - loadBegan).total!"msecs";
+
+                const unloadBegan = MonoTime.currTime;
 
                 foreach(cell; residency.release(frameIndex))
                 {
@@ -1477,6 +1509,8 @@ void main(string[] args)
                     releaseCells(levelIndex, [cell]);
                     loadingCells = loadingCells.remove!(c => c == cell);
                 }
+
+                unloadMs = (MonoTime.currTime - unloadBegan).total!"msecs";
             }
 
             if(characterModel)
@@ -1491,6 +1525,43 @@ void main(string[] args)
             const cellCulling = noGpuCull ? CellCulling.cpu : CellCulling.gpu;
             const shadowViewProj = scene.sunShadow.viewProj * wtb.model;
             const activeCells = streaming ? residency.active() : levelCells;
+
+            if(frameIndex > warmup)
+            {
+                streamCells.total += activeCells.length;
+                streamCells.pending += residency.pending.length;
+                streamCells.bytes += bytesTotal;
+                streamCells.placements += levelIndex.placementsIn(activeCells);
+                streamCells.load += loadMs;
+                streamCells.unload += unloadMs;
+                streamCells.frames += 1;
+            }
+
+            if(trace)
+            {
+                bool[CellCoord] current;
+
+                foreach(cell; activeCells)
+                    current[cell] = true;
+
+                size_t entered;
+                size_t left;
+
+                foreach(cell; activeCells)
+                    entered += cell !in knownCells;
+
+                foreach(cell; knownCells.byKey)
+                    left += cell !in current;
+
+                knownCells = current;
+
+                borderEntered = entered;
+                borderLeft = left;
+                borderActive = activeCells.length;
+                borderPending = residency.pending.length;
+                borderLoad = loadMs;
+                borderUnload = unloadMs;
+            }
 
             // A proxy is built as soon as its cell is loaded, so crossing the
             // proxy distance never shows the parts; a frame pays for a few
@@ -1638,15 +1709,24 @@ void main(string[] args)
             }
         });
 
+        const frameMs = (MonoTime.currTime - frameBegan).total!"msecs";
+
         if(frameIndex > warmup)
-            frameTimes ~= (MonoTime.currTime - frameBegan).total!"msecs";
+            frameTimes ~= frameMs;
+
+        // A border crossing is where a hitch has to be attributed
+        if(trace && (borderEntered || borderLeft || frameIndex == 1))
+            stderr.writefln(
+                "f%5s active %4s pending %3s +%2s -%2s load %6.2f unload %5.2f frame %6.2f",
+                frameIndex, borderActive, borderPending, borderEntered, borderLeft,
+                borderLoad, borderUnload, frameMs);
 
         if(screenshotPath.length && frameIndex == captureFrame)
             writeln("screenshot saved to ", screenshotPath);
     }
 
     reportStats(stats, frameIndex - min(frameIndex, warmup), ringTotals, shadowTotal, cellTotals, frameTimes,
-        godotScene.proxyCount, godotScene.sparseCount, occludedTotal, kernelOccluded);
+        godotScene.proxyCount, godotScene.sparseCount, occludedTotal, kernelOccluded, streamCells);
 
     if(characterMode)
         writeln("character position ", mover.state.position,
@@ -1668,6 +1748,7 @@ private void reportStats(
     size_t sparse,
     size_t occluded,
     size_t kernelOccluded,
+    in StreamTotals streamCells,
 )
 {
     if(!enabled)
@@ -1681,6 +1762,16 @@ private void reportStats(
         " far ", cells[2] / count,
         "  merged ", proxies, " sparse ", sparse, " occluded ", occluded / count,
         " kernel ", kernelOccluded / count);
+
+    if(streamCells.frames)
+    {
+        const framesRun = cast(double) streamCells.frames;
+
+        writeln(format("stream  cells %6.1f  pending %5.1f  drawables/cell %5.1f  bytes/frame %8.0f  load %.2f ms  unload %.2f ms",
+            streamCells.total / framesRun, streamCells.pending / framesRun,
+            streamCells.placements / max(cast(double) streamCells.total, 1),
+            streamCells.bytes / framesRun, streamCells.load / framesRun, streamCells.unload / framesRun));
+    }
 
     writeln(format("%-7s %8s %10s %12s", "ring", "draws", "instances", "triangles"));
 
