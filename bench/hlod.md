@@ -147,14 +147,15 @@ camera in the corner room looking down a corridor, 20 measured frames.
 
 | View | Portal walk | Cells | Draws | Triangles | Frame mean | p50 |
 |---|---|---|---|---|---|---|
-| down a corridor | off | 63 | 276 | 3,312 | 21.20 ms | 21 |
-| down a corridor | on | 27 | 96 | 1,152 | 16.35 ms | 16 |
-| diagonal | off | 63 | 276 | 3,312 | 20.50 ms | 20 |
-| diagonal | on | 36 | 194 | 2,328 | 18.55 ms | 18 |
+| down a corridor | off | 63 | 276 | 3,312 | 20.35 ms | 20 |
+| down a corridor | on | 27 | 96 | 1,152 | 16.00 ms | 16 |
+| diagonal | off | 63 | 276 | 3,312 | 19.65 ms | 20 |
+| diagonal | on | 36 | 194 | 2,328 | 17.10 ms | 17 |
 
-The pictures are pixel identical for every camera in a room centre, five of
-them tested, including two diagonals: the walk only drops rooms no doorway
-reaches. The shadow pass keeps every cell, because a room behind a wall still
+The pictures are pixel identical for every camera tested, five of them,
+including two diagonals and one exactly on a wall plane: the walk only drops
+rooms no doorway reaches. The doorways come from the level's own
+`Portal_<x>_<z>_<side>` nodes, not from the grid. The shadow pass keeps every cell, because a room behind a wall still
 casts into the rooms in view. A camera exactly on a wall plane still differs -
 the walk then starts inside the wall it should look through - which is a camera
 placement the game will not use.
