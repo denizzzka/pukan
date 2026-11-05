@@ -716,7 +716,8 @@ local-light shadows. Missing:
 - [x] Point-light shadows: six faces per point light in the shared atlas, the
       face picked from the fragment direction, with the atlas redrawn when the
       chosen lights change.
-- [ ] Caster coverage: the non-glTF primitives do not cast yet.
+- [x] Caster coverage: the primitive meshes, spheres and cylinders cast through
+      depth-only pipelines on the same shadow passes; debug lines stay out.
 - [x] A wider filter and cascade blending: four half-texel taps average a 3x3
       box, and the last tenth of each cascade fades into the next with both fits
       covering the band.
