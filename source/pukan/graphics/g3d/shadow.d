@@ -2,7 +2,7 @@ module pukan.graphics.g3d.shadow;
 
 import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.graphics.common.misc: Boxf, vulkanOrthographicMatrix;
-import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
+import pukan.graphics.g3d.camera: cameraView;
 import pukan.vulkan.bindings;
 import pukan.vulkan.frame_builder: DepthBuf;
 import pukan.vulkan.helpers: vkCall, vkCheck;
@@ -234,7 +234,225 @@ final class ShadowMap
     }
 }
 
-/// The sun's shadow map: one depth image per frame in flight
+/// Cascades the sun's shadow splits the camera frustum into
+enum sunCascadeCount = 3;
+
+/// The camera frustum split into cascades, each fitted to the sun
+struct SunCascades
+{
+    /// Light view-projection per cascade, nearest first
+    Matrix4x4f[sunCascadeCount] viewProj;
+    /// NDC depth bias of each cascade, keeping the world-space offset constant
+    float[sunCascadeCount] depthBias;
+    /// View depth each cascade reaches to
+    float[sunCascadeCount] splitFar;
+    /// Side of each square map
+    uint mapSize;
+
+    /// Share the logarithmic split takes over the uniform one
+    private enum float splitLambda = 0.65f;
+    /// World-space depth offset the NDC bias stands for
+    private enum float biasWorld = 0.03f;
+
+    private Matrix4x4f[sunCascadeCount] lastViewProj;
+    private Boxf bounds;
+    private bool hasBounds;
+
+    this(uint mapSize)
+    in(mapSize > 0)
+    {
+        this.mapSize = mapSize;
+
+        foreach(ref matrix; viewProj)
+            matrix = Matrix4x4f.identity;
+
+        foreach(ref matrix; lastViewProj)
+            matrix = Matrix4x4f.identity;
+
+        depthBias[] = 0.0015f;
+        splitFar[] = float.max;
+    }
+
+    /// Bounds the level covers; the last cascade need not reach past it
+    void fit(in Boxf bounds)
+    {
+        import std.math: isNaN;
+
+        this.bounds = bounds;
+        hasBounds = !bounds.min.x.isNaN;
+    }
+
+    /// Rebuilds the cascades; returns true when the fit moved
+    bool update(Vector3f sunDirection, in Vector3f eye, in Matrix4x4f invViewProj)
+    {
+        import std.algorithm: max, min;
+        import std.math: abs, floor, pow;
+
+        const sun = sunDirection.normalized;
+        const up = abs(sun.y) > 0.99f ? Vector3f(0, 0, 1) : Vector3f(0, 1, 0);
+
+        Vector3f[8] corners;
+
+        foreach(i; 0 .. 8)
+        {
+            const ndc = Vector3f(
+                (i & 1) ? 1.0f : -1.0f,
+                (i & 2) ? 1.0f : -1.0f,
+                (i & 4) ? 1.0f : 0.0f,
+            );
+            const p = Vector4f(ndc.x, ndc.y, ndc.z, 1) * invViewProj;
+            corners[i] = Vector3f(p.x, p.y, p.z) / p.w;
+        }
+
+        const nearCenter = (corners[0] + corners[1] + corners[2] + corners[3]) * 0.25f;
+        const farCenter = (corners[4] + corners[5] + corners[6] + corners[7]) * 0.25f;
+        const near = max((nearCenter - eye).length, 0.01f);
+        const cameraFar = max((farCenter - eye).length, near * 1.01f);
+        float far = cameraFar;
+
+        // Cascades stop where the level does
+        if(hasBounds)
+        {
+            float reach = near;
+
+            foreach(i; 0 .. 8)
+            {
+                const corner = Vector3f(
+                    (i & 1) ? bounds.max.x : bounds.min.x,
+                    (i & 2) ? bounds.max.y : bounds.min.y,
+                    (i & 4) ? bounds.max.z : bounds.min.z,
+                );
+                reach = max(reach, (corner - eye).length);
+            }
+
+            far = min(far, reach);
+        }
+
+        far = max(far, near * 1.01f);
+
+        foreach(c; 0 .. sunCascadeCount)
+        {
+            const t = cast(float) (c + 1) / sunCascadeCount;
+            const logarithmic = near * pow(far / near, t);
+            const uniform = near + (far - near) * t;
+
+            splitFar[c] = splitLambda * logarithmic + (1 - splitLambda) * uniform;
+        }
+
+        foreach(c; 0 .. sunCascadeCount)
+        {
+            const t0 = c == 0 ? 0.0f : (splitFar[c - 1] - near) / (cameraFar - near);
+            const t1 = (splitFar[c] - near) / (cameraFar - near);
+
+            Vector3f[8] slice;
+
+            foreach(j; 0 .. 4)
+            {
+                const a = corners[j];
+                const b = corners[j + 4];
+
+                slice[j] = a + (b - a) * t0;
+                slice[j + 4] = a + (b - a) * t1;
+            }
+
+            Vector3f center = Vector3f(0, 0, 0);
+
+            foreach(corner; slice)
+                center += corner;
+
+            center *= 0.125f;
+
+            float radius = 1.0f;
+
+            foreach(corner; slice)
+                radius = max(radius, (corner - center).length);
+
+            // The light sits behind the slice, so all of it stays in front
+            const view = cameraView(center + sun * (radius * 2.0f + 1.0f), center, up);
+
+            float zMin = float.max;
+
+            foreach(corner; slice)
+                zMin = min(zMin, (Vector4f(corner.x, corner.y, corner.z, 1) * view).z);
+
+            const padding = radius * 0.02f + 0.5f;
+            const farPlane = -zMin + padding;
+
+            // Reaching back to the light keeps casters above the slice in the map
+            const nearPlane = 0.01f;
+
+            // The box is anchored to a world grid of whole texels, so the map
+            // slides a texel at a time instead of swimming under the camera
+            Matrix4x4f rotation = view;
+            rotation.a14 = 0;
+            rotation.a24 = 0;
+            rotation.a34 = 0;
+
+            const texel = 2.0f * radius / mapSize;
+            const worldCenter = Vector4f(center.x, center.y, center.z, 1) * rotation;
+            const x = floor(worldCenter.x / texel + 0.5f) * texel - worldCenter.x;
+            const y = floor(worldCenter.y / texel + 0.5f) * texel - worldCenter.y;
+
+            viewProj[c] = vulkanOrthographicMatrix(
+                x - radius, x + radius,
+                y - radius, y + radius,
+                nearPlane, farPlane,
+            ) * view;
+
+            depthBias[c] = biasWorld / (farPlane - nearPlane);
+        }
+
+        bool moved;
+
+        foreach(c; 0 .. sunCascadeCount)
+            if(!(viewProj[c] == lastViewProj[c]))
+                moved = true;
+
+        if(moved)
+            lastViewProj = viewProj;
+
+        return moved;
+    }
+}
+
+unittest
+{
+    import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
+
+    const eye = Vector3f(3, 4, 5);
+    const view = cameraView(eye, Vector3f(3, 4, -20), Vector3f(0, 1, 0));
+    const invViewProj = (vulkanPerspectiveMatrix(60.0f, 4.0f / 3.0f, 0.1f, 200.0f) * view).inverse;
+    const sun = Vector3f(0.3f, 1, 0.2f).normalized;
+
+    SunCascades cascades = SunCascades(1024);
+    cascades.update(sun, eye, invViewProj);
+
+    foreach(c; 1 .. sunCascadeCount)
+        assert(cascades.splitFar[c] > cascades.splitFar[c - 1], "each cascade reaches farther");
+
+    // The plane each cascade reaches to has to land inside its own map
+    const forward = Vector3f(0, 0, -1);
+
+    foreach(c; 0 .. sunCascadeCount)
+    {
+        const point = eye + forward * cascades.splitFar[c];
+        const clip = Vector4f(point.x, point.y, point.z, 1) * cascades.viewProj[c];
+        const ndc = Vector3f(clip.x, clip.y, clip.z) / clip.w;
+
+        assert(clip.w > 0);
+        assert(ndc.x >= -1 && ndc.x <= 1);
+        assert(ndc.y >= -1 && ndc.y <= 1);
+        assert(ndc.z >= 0 && ndc.z <= 1);
+    }
+
+    // The same camera gives the same fit, so the map does not swim
+    SunCascades again = SunCascades(1024);
+    again.update(sun, eye, invViewProj);
+
+    assert(again.viewProj == cascades.viewProj);
+}
+
+/// The sun's shadow maps: one depth image per cascade per frame in flight
 final class SunShadow
 {
     private LogicalDevice device;
@@ -243,26 +461,20 @@ final class SunShadow
     private bool[] valid;
     private VkSampler sampler;
 
-    /// Renders the map again only after `invalidate`
+    /// Renders a map again only after `invalidate`
     bool cache;
     bool enabled = true;
-    /// Side of the square map
+    /// Side of each square map
     uint mapSize = 1024;
-    /// Light view-projection the pass and the PBR shaders share
-    Matrix4x4f viewProj = Matrix4x4f.identity;
-    /// NDC depth bias that keeps the world-space offset constant
-    float depthBias = 0.0015f;
-
-    private Boxf bounds;
-    private bool hasBounds;
-    private enum fallbackFov = 24.0f;
-    private enum fallbackDistance = 10.0f;
+    /// Cascades the maps and the shaders share
+    SunCascades cascades;
 
     this(LogicalDevice device, uint mapSize = 1024)
     in(mapSize > 0)
     {
         this.device = device;
         this.mapSize = mapSize;
+        cascades = SunCascades(mapSize);
         pass = new ShadowPass(device, DepthBuf.format);
 
         VkSamplerCreateInfo info = {
@@ -294,13 +506,10 @@ final class SunShadow
             destroy(pass);
     }
 
-    /// Fits the map around `bounds`; a box without bounds restores the fallback
+    /// Bounds the level covers; the last cascade need not reach past it
     void fit(in Boxf bounds)
     {
-        import std.math: isNaN;
-
-        this.bounds = bounds;
-        hasBounds = !bounds.min.x.isNaN;
+        cascades.fit(bounds);
         invalidate();
     }
 
@@ -311,104 +520,69 @@ final class SunShadow
 
     void recreate(size_t frameCount)
     {
-        if(maps.length == frameCount)
+        if(maps.length == frameCount * sunCascadeCount)
             return;
 
         foreach(ref map; maps)
             if(map)
                 destroy(map);
 
-        maps.length = frameCount;
-        valid.length = frameCount;
+        maps.length = frameCount * sunCascadeCount;
+        valid.length = maps.length;
         valid[] = false;
 
-        foreach(i; 0 .. frameCount)
+        foreach(i; 0 .. maps.length)
             maps[i] = new ShadowMap(device, pass, mapSize);
     }
 
-    /// Rebuilds the light matrix; `sunDirection` points toward the sun
-    void update(Vector3f sunDirection)
+    /// Rebuilds the cascades; `sunDirection` points toward the sun
+    void update(Vector3f sunDirection, in Vector3f eye, in Matrix4x4f invViewProj)
     {
-        const sun = sunDirection.normalized;
-
-        if(!hasBounds)
-        {
-            const eye = sun * fallbackDistance;
-            const view = cameraView(eye, Vector3f(0, 0, 0), Vector3f(0, 1, 0));
-            const proj = vulkanPerspectiveMatrix(fallbackFov, 1.0f, 1.0f, fallbackDistance * 2.0f);
-            viewProj = proj * view;
-            depthBias = 0.0015f;
-            return;
-        }
-
-        const center = (bounds.min + bounds.max) * 0.5f;
-        const extent = (bounds.max - bounds.min) * 0.5f;
-        const radius = extent.length;
-        const eye = center + sun * (radius * 2.0f + 1.0f);
-        const view = cameraView(eye, center, Vector3f(0, 1, 0));
-
-        float xMin = float.max;
-        float xMax = -float.max;
-        float yMin = float.max;
-        float yMax = -float.max;
-        float zMin = float.max;
-        float zMax = -float.max;
-
-        foreach(i; 0 .. 8)
-        {
-            const corner = Vector3f(
-                (i & 1) ? bounds.max.x : bounds.min.x,
-                (i & 2) ? bounds.max.y : bounds.min.y,
-                (i & 4) ? bounds.max.z : bounds.min.z,
-            );
-            const p = Vector4f(corner.x, corner.y, corner.z, 1) * view;
-
-            if(p.x < xMin) xMin = p.x;
-            if(p.x > xMax) xMax = p.x;
-            if(p.y < yMin) yMin = p.y;
-            if(p.y > yMax) yMax = p.y;
-            if(p.z < zMin) zMin = p.z;
-            if(p.z > zMax) zMax = p.z;
-        }
-
-        auto padding = radius * 0.02f;
-        if(padding < 0.5f)
-            padding = 0.5f;
-
-        auto nearPlane = -zMax - padding;
-        if(nearPlane < 0.01f)
-            nearPlane = 0.01f;
-        const farPlane = -zMin + padding;
-
-        viewProj = vulkanOrthographicMatrix(
-            xMin - padding, xMax + padding,
-            yMin - padding, yMax + padding,
-            nearPlane, farPlane,
-        ) * view;
-
-        // A fixed depth offset in world units: the orthographic range is large
-        depthBias = 0.03f / (farPlane - nearPlane);
+        if(cascades.update(sunDirection, eye, invViewProj))
+            invalidate();
     }
 
-    VkDescriptorImageInfo imageInfo(size_t frameIndex)
+    VkDescriptorImageInfo imageInfo(size_t frameIndex, size_t cascade)
     {
-        assert(frameIndex < maps.length);
-        return maps[frameIndex].imageInfo(sampler);
+        const slot = frameIndex * sunCascadeCount + cascade;
+        assert(slot < maps.length);
+        return maps[slot].imageInfo(sampler);
     }
 
-    /// Returns false when the cached map is reused
-    bool record(size_t frameIndex, VkCommandBuffer buf, void delegate(ref VkCommandBuffer) draw)
+    /// Whether `record` still draws this cascade in the frame
+    bool pending(size_t frameIndex, size_t cascade) const
     {
-        assert(frameIndex < maps.length);
+        return enabled && !(cache && valid[frameIndex * sunCascadeCount + cascade]);
+    }
+
+    /// Returns false when every cascade reused its cached map
+    bool record(size_t frameIndex, VkCommandBuffer buf, void delegate(ref VkCommandBuffer, size_t cascade) draw)
+    {
+        assert(frameIndex * sunCascadeCount < maps.length);
 
         if(!enabled || draw is null)
             return false;
 
-        if(cache && valid[frameIndex])
+        bool recorded;
+
+        foreach(cascade; 0 .. sunCascadeCount)
+            if(recordCascade(frameIndex, cascade, buf, draw))
+                recorded = true;
+
+        return recorded;
+    }
+
+    private bool recordCascade(size_t frameIndex, size_t cascade, VkCommandBuffer buf,
+        void delegate(ref VkCommandBuffer, size_t) draw)
+    {
+        const slot = frameIndex * sunCascadeCount + cascade;
+
+        if(cache && valid[slot])
             return false;
 
-        pass.record(buf, maps[frameIndex].renderedFrameBuffer, maps[frameIndex].renderExtent, draw);
-        valid[frameIndex] = true;
+        pass.record(buf, maps[slot].renderedFrameBuffer, maps[slot].renderExtent,
+            (ref VkCommandBuffer b) { draw(b, cascade); });
+        valid[slot] = true;
 
         return true;
     }

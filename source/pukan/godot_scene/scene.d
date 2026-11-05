@@ -240,7 +240,9 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         GatheredNested[] nested;
     }
 
-    private GatherPhase[4] gatherPhases;
+    /// Cascades of one phase keep one list each
+    private enum gatherViews = 3;
+    private GatherPhase[gatherViews][4] gatherPhases;
 
     package(pukan) this(
         PbrPipelines pipelines,
@@ -602,8 +604,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             if(!record.mesh.hasSkin && !isVisible(record.mesh.localAABB, mvp))
                 continue;
 
-            // A part the coarse depth grid already covers stays out of the draw
-            if(currentOcclusion !is null && currentOcclusion.hidden(record.bounds, mvp))
+            // A part the coarse depth grid already covers stays out of the draw;
+            // the grid is the camera's, so it says nothing about a shadow view
+            if(phase == DrawPhase.surface && currentOcclusion !is null
+                && currentOcclusion.hidden(record.bounds, mvp))
                 continue;
 
             const clip = Vector4f(0, 0, 0, 1) * mvp;
@@ -678,16 +682,18 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 group.drawable.drawingBufferFilling(buf, trans * group.base, frameSet, phase);
     }
 
-    void beginGather(DrawPhase phase)
+    void beginGather(DrawPhase phase, size_t view = 0)
     {
+        assert(view < gatherViews, "a gather view that was never set up");
         registerParts();
 
-        gatherPhases[cast(uint) phase] = GatherPhase(started: true);
+        gatherPhases[cast(uint) phase][view] = GatherPhase(started: true);
     }
 
-    void gatherParts(VkCommandBuffer buf, in Matrix4x4f trans, scope const(size_t)[] keys, DrawPhase phase)
+    void gatherParts(VkCommandBuffer buf, in Matrix4x4f trans, scope const(size_t)[] keys,
+        DrawPhase phase, size_t view = 0)
     {
-        auto gathered = &gatherPhases[cast(uint) phase];
+        auto gathered = &gatherPhases[cast(uint) phase][view];
 
         void addInstance(PbrMesh mesh, in Boxf bounds, in Matrix4x4f placement, in Matrix4x4f mvp)
         {
@@ -695,8 +701,9 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             if(!mesh.geometryReady || !matchesPhase(mesh, phase))
                 return;
 
-            // A part the coarse depth grid already covers stays out of the draw
-            if(currentOcclusion !is null && currentOcclusion.hidden(bounds, mvp))
+            // The grid is the camera's, so it says nothing about a shadow view
+            if(phase == DrawPhase.surface && currentOcclusion !is null
+                && currentOcclusion.hidden(bounds, mvp))
                 return;
 
             // A skinned mesh keeps the CPU path until its posed bounds are known
@@ -768,9 +775,9 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         }
     }
 
-    void endGather(VkCommandBuffer buf, DrawPhase phase)
+    void endGather(VkCommandBuffer buf, DrawPhase phase, size_t view = 0)
     {
-        auto gathered = &gatherPhases[cast(uint) phase];
+        auto gathered = &gatherPhases[cast(uint) phase][view];
 
         assert(currentCullFrame !is null, "gathering outside Scene recording");
 
@@ -801,9 +808,9 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         }
     }
 
-    void drawGathered(VkCommandBuffer buf, VkDescriptorSet frameSet, DrawPhase phase)
+    void drawGathered(VkCommandBuffer buf, VkDescriptorSet frameSet, DrawPhase phase, size_t view = 0)
     {
-        auto gathered = &gatherPhases[cast(uint) phase];
+        auto gathered = &gatherPhases[cast(uint) phase][view];
 
         assert(gathered.started, "drawing a phase that was never gathered");
 

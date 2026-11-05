@@ -18,7 +18,7 @@ import pukan.graphics.g3d.pbr.pipelines: oitPass, transmissionPass, pipelineWarm
 import pukan.graphics.g3d.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActive;
 import pukan.graphics.g3d.primitives_tree.cylinder: CylinderRenderer;
 import pukan.graphics.g3d.primitives_tree.sphere: SphereRenderer;
-import pukan.graphics.g3d.shadow: SunShadow;
+import pukan.graphics.g3d.shadow: SunShadow, sunCascadeCount;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipeline_cache: FilePipelineCacheStore, PipelineCacheStore;
 import pukan.vulkan.resources.ownership: ResourceOwner;
@@ -445,7 +445,9 @@ class SceneWith(Modules...)
             lightBufs[i] = device.create!MemoryBufferMappedToCPU(maxLights * Light.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
             screenOwner.own(lightBufs[i]);
 
-            auto shadowInfo = sunShadow.imageInfo(i);
+            auto shadowInfo0 = sunShadow.imageInfo(i, 0);
+            auto shadowInfo1 = sunShadow.imageInfo(i, 1);
+            auto shadowInfo2 = sunShadow.imageInfo(i, 2);
             auto lightInfo = VkDescriptorBufferInfo(
                 buffer: lightBufs[i].buf,
                 offset: 0,
@@ -481,7 +483,9 @@ class SceneWith(Modules...)
                     oitFragments,
                     oitCounter,
                     lightInfo,
-                    shadowInfo,
+                    shadowInfo0,
+                    shadowInfo1,
+                    shadowInfo2,
                     sceneDepth,
                     depthMS,
                 );
@@ -707,7 +711,7 @@ class SceneWith(Modules...)
         data.viewProj = viewProj;
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
 
-        // The light matrix is only needed while the shadow pass runs
+        // The light matrices are only needed while the shadow pass runs
         if(sunShadow.enabled)
         {
             const sun = Vector3f(
@@ -715,11 +719,24 @@ class SceneWith(Modules...)
                 lights[0].positionRadius.y,
                 lights[0].positionRadius.z,
             );
-            sunShadow.update(sun);
-            data.shadowViewProj = sunShadow.viewProj;
+            sunShadow.update(sun, camera, data.invViewProj);
+
+            foreach(cascade; 0 .. sunCascadeCount)
+                data.shadowViewProj[cascade] = sunShadow.cascades.viewProj[cascade];
         }
 
-        data.shadowParams = Vector4f(sunShadow.enabled ? 1 : 0, sunShadow.depthBias, 0, 0);
+        data.shadowParams = Vector4f(
+            sunShadow.enabled ? 1 : 0,
+            sunShadow.cascades.depthBias[0],
+            sunShadow.cascades.depthBias[1],
+            sunShadow.cascades.depthBias[2],
+        );
+        data.shadowSplits = Vector4f(
+            sunShadow.cascades.splitFar[0],
+            sunShadow.cascades.splitFar[1],
+            sunShadow.cascades.splitFar[2],
+            0,
+        );
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
         data.exposureParams = Vector4f(
@@ -740,7 +757,7 @@ class SceneWith(Modules...)
         ref Frame frame,
         SceneDrawCallback drawScene,
         SceneDrawCallback drawTransmission = null,
-        void delegate(ref VkCommandBuffer) drawShadow = null,
+        ShadowDrawCallback drawShadow = null,
         void delegate(ref VkCommandBuffer) prepare = null,
     )
     {
@@ -845,6 +862,7 @@ class SceneWith(Modules...)
 
     alias SceneDrawCallback = void delegate(ref VkCommandBuffer, DrawPhase phase);
     alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent, DrawPhase phase);
+    alias ShadowDrawCallback = void delegate(ref VkCommandBuffer, size_t cascade);
 
     private void drawStereoEyes(VkCommandBuffer buf, StereoDrawCallback drawScene, bool transmission = false)
     {
@@ -890,7 +908,7 @@ class SceneWith(Modules...)
         ref Frame frame,
         StereoDrawCallback drawScene,
         StereoDrawCallback drawTransmission = null,
-        void delegate(ref VkCommandBuffer) drawShadow = null,
+        ShadowDrawCallback drawShadow = null,
     )
     {
         auto commandBuffer = frame.commandBuffer;
@@ -951,8 +969,14 @@ class SceneWith(Modules...)
         assert(false, "frame does not belong to the swapchain");
     }
 
+    /// Whether this frame still has to draw the cascade, so it can be culled first
+    bool shadowPending(ref Frame frame, size_t cascade)
+    {
+        return sunShadow.pending(frameIndex(frame), cascade);
+    }
+
     /// Renders the sun's view of the opaque scene before the main pass
-    private void recordShadow(ref Frame frame, void delegate(ref VkCommandBuffer) drawShadow)
+    private void recordShadow(ref Frame frame, ShadowDrawCallback drawShadow)
     {
         sunShadow.record(frameIndex(frame), frame.commandBuffer, drawShadow);
     }
@@ -1195,10 +1219,11 @@ struct FrameUniforms
 {
     Matrix4x4f invViewProj;
     Matrix4x4f viewProj;
-    Matrix4x4f shadowViewProj;
+    Matrix4x4f[sunCascadeCount] shadowViewProj;
     Vector4f cameraPosition;
     Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
-    Vector4f shadowParams;   // x = 1 while the sun's shadow map is used
+    Vector4f shadowParams;   // x = 1 while the sun's shadow map is used, yzw = depth bias per cascade
+    Vector4f shadowSplits;   // xyz = far view depth of each cascade
     Vector4f ambientParams;  // rgb = ambient tint, a = ambient energy
     Vector4f tonemapParams;  // x = mode, y = white
 }

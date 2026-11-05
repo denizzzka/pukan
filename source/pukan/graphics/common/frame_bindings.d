@@ -67,6 +67,18 @@ enum frameSetBindings = [
         stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
     ),
     VkDescriptorSetLayoutBinding(
+        binding: FRAME_SHADOW_MAP1,
+        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        descriptorCount: 1,
+        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+    ),
+    VkDescriptorSetLayoutBinding(
+        binding: FRAME_SHADOW_MAP2,
+        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        descriptorCount: 1,
+        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+    ),
+    VkDescriptorSetLayoutBinding(
         binding: FRAME_SCENE_DEPTH,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
@@ -92,6 +104,8 @@ enum frameBindings = FrameBindings(
     oitCounter: FRAME_OIT_COUNTER,
     lights: FRAME_LIGHTS,
     shadowMap: FRAME_SHADOW_MAP,
+    shadowMap1: FRAME_SHADOW_MAP1,
+    shadowMap2: FRAME_SHADOW_MAP2,
     sceneDepth: FRAME_SCENE_DEPTH,
     depthMS: FRAME_DEPTH_MS,
 );

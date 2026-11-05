@@ -591,8 +591,8 @@ void main(string[] args) {
                         scene.updateFrameUniforms(frame, view, stereoWtb[view]);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
                     },
-                    (buf) {
-                        tree.root.payload = Bone(scene.sunShadow.viewProj * wtb.model);
+                    (buf, cascade) {
+                        tree.root.payload = Bone(scene.sunShadow.cascades.viewProj[cascade] * wtb.model);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );
@@ -611,8 +611,8 @@ void main(string[] args) {
                         tree.root.payload = Bone(transl);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
-                    (buf) {
-                        tree.root.payload = Bone(scene.sunShadow.viewProj * wtb.model);
+                    (buf, cascade) {
+                        tree.root.payload = Bone(scene.sunShadow.cascades.viewProj[cascade] * wtb.model);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );

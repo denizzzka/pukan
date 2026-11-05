@@ -94,22 +94,22 @@ enum CellCulling
 
     `gatherCells` calls `beginGather` once per view, hands every placement to
     `gatherParts` and then lets `endGather` upload the instances and dispatch
-    the cull kernel. `drawCells` records what the kernel kept, so a phase is
-    gathered and drawn once per frame.
+    the cull kernel. `drawCells` records what the kernel kept, so a view is
+    gathered once per frame. Shadow cascades are the views beyond the first.
 */
 interface CulledParts
 {
-    /// Starts a new instance list for the phase
-    void beginGather(DrawPhase phase);
+    /// Starts a new instance list for the view of a phase
+    void beginGather(DrawPhase phase, size_t view = 0);
 
     /// Adds the parts of one placement to the list; `trans` maps it into clip space
-    void gatherParts(VkCommandBuffer buf, in Matrix4x4f trans, scope const(size_t)[] keys, DrawPhase phase);
+    void gatherParts(VkCommandBuffer buf, in Matrix4x4f trans, scope const(size_t)[] keys, DrawPhase phase, size_t view = 0);
 
     /// Uploads the gathered instances and dispatches the cull kernel
-    void endGather(VkCommandBuffer buf, DrawPhase phase);
+    void endGather(VkCommandBuffer buf, DrawPhase phase, size_t view = 0);
 
     /// Records the draws the kernel kept
-    void drawGathered(VkCommandBuffer buf, VkDescriptorSet frameSet, DrawPhase phase);
+    void drawGathered(VkCommandBuffer buf, VkDescriptorSet frameSet, DrawPhase phase, size_t view = 0);
 }
 
 /// A nested drawable that hands its static meshes to the parent's gather
@@ -261,6 +261,7 @@ void gatherCells(
     in Matrix4x4f viewProj,
     scope const(CellCoord)[] cells,
     DrawPhase phase,
+    size_t view = 0,
 )
 {
     auto items = index.collect(cells);
@@ -286,15 +287,15 @@ void gatherCells(
     }
 
     foreach(drawable; cullable)
-        (cast(CulledParts) drawable).beginGather(phase);
+        (cast(CulledParts) drawable).beginGather(phase, view);
 
     groupItems(items, (drawable, world, keys) {
         if(auto parts = cast(CulledParts) drawable)
-            parts.gatherParts(buf, viewProj * world, keys, phase);
+            parts.gatherParts(buf, viewProj * world, keys, phase, view);
     });
 
     foreach(drawable; cullable)
-        (cast(CulledParts) drawable).endGather(buf, phase);
+        (cast(CulledParts) drawable).endGather(buf, phase, view);
 }
 
 /// What one view took from the cells
@@ -325,6 +326,7 @@ DrawStats drawCells(
     VkDescriptorSet frameSet,
     DrawPhase phase = DrawPhase.surface,
     CellCulling culling = CellCulling.cpu,
+    size_t view = 0,
 )
 {
     DrawStats stats;
@@ -372,7 +374,7 @@ DrawStats drawCells(
                         return;
 
                 drawn ~= drawable;
-                parts.drawGathered(buf, frameSet, phase);
+                parts.drawGathered(buf, frameSet, phase, view);
                 return;
             }
 

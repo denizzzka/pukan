@@ -89,6 +89,8 @@ layout(set = 1, binding = FRAME_PREFILTERED) uniform sampler2D prefilteredMap;
 layout(set = 1, binding = FRAME_BRDF_LUT) uniform sampler2D brdfLut;
 layout(set = 1, binding = FRAME_SCENE_COLOR) uniform sampler2D sceneColorMap;
 layout(set = 1, binding = FRAME_SHADOW_MAP) uniform sampler2DShadow shadowMap;
+layout(set = 1, binding = FRAME_SHADOW_MAP1) uniform sampler2DShadow shadowMap1;
+layout(set = 1, binding = FRAME_SHADOW_MAP2) uniform sampler2DShadow shadowMap2;
 
 #ifdef SKY_ANALYTIC
 vec3 environment(vec3 direction)
@@ -392,14 +394,11 @@ vec3 transmissionSample(Surface s, vec3 N, vec3 V, float ior, float roughness)
     return textureLod(sceneColorMap, clamp(uv, vec2(0.0), vec2(1.0)), roughness * SCENE_COLOR_MAX_LOD).rgb;
 }
 
-/// Fraction of the sun that reaches a point, 3x3 PCF
-float shadowFactor(vec3 position, vec3 normal)
+/// Fraction of the sun that reaches a point through one cascade's map
+float shadowFactorCascade(mat4 shadowViewProj, sampler2DShadow map, float bias, vec3 position, vec3 normal)
 {
-    if(frameUbo.frame.shadowParams.x < 0.5)
-        return 1.0;
-
     // A small normal offset keeps a surface from shadowing itself
-    const vec4 clip = frameUbo.frame.shadowViewProj * vec4(position + normal * 0.015, 1.0);
+    const vec4 clip = shadowViewProj * vec4(position + normal * 0.015, 1.0);
 
     if(clip.w <= 0.0)
         return 1.0;
@@ -411,7 +410,28 @@ float shadowFactor(vec3 position, vec3 normal)
         return 1.0;
 
     // The sampler filters linearly, so one tap averages a 2x2 comparison
-    return texture(shadowMap, vec3(uv, ndc.z - frameUbo.frame.shadowParams.y));
+    return texture(map, vec3(uv, ndc.z - bias));
+}
+
+/// Fraction of the sun that reaches a point, from the cascade it falls in
+float shadowFactor(vec3 position, vec3 normal)
+{
+    if(frameUbo.frame.shadowParams.x < 0.5)
+        return 1.0;
+
+    // Clip w is the view depth the projection keeps, so the split needs no camera basis
+    const float depth = (frameUbo.frame.viewProj * vec4(position, 1.0)).w;
+
+    if(depth < frameUbo.frame.shadowSplits.x)
+        return shadowFactorCascade(frameUbo.frame.shadowViewProj[0], shadowMap,
+            frameUbo.frame.shadowParams.y, position, normal);
+
+    if(depth < frameUbo.frame.shadowSplits.y)
+        return shadowFactorCascade(frameUbo.frame.shadowViewProj[1], shadowMap1,
+            frameUbo.frame.shadowParams.z, position, normal);
+
+    return shadowFactorCascade(frameUbo.frame.shadowViewProj[2], shadowMap2,
+        frameUbo.frame.shadowParams.w, position, normal);
 }
 
 vec3 shadePbr(Surface s)

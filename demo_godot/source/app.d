@@ -6,6 +6,7 @@ import pukan.graphics.g3d.occlusion: DepthRaster, currentOcclusion;
 import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
 import pukan.graphics.g3d.fly_camera: FlyCamera;
 import pukan.graphics.g3d.portals: PortalGrid, PortalSet, RoomPortal;
+import pukan.graphics.g3d.shadow: sunCascadeCount;
 import pukan.graphics.common.misc: Boxf, hasBounds, trsMatrix;
 import pukan.gltf.motion_sampler: MotionSampler;
 import pukan.motion_matching.database: Clip, Database, invalidSample;
@@ -1660,7 +1661,6 @@ void main(string[] args)
                 scene.captureFrame(screenshotPath);
 
             const cellCulling = noGpuCull ? CellCulling.cpu : CellCulling.gpu;
-            const shadowViewProj = scene.sunShadow.viewProj * wtb.model;
             CellCoord[] activeCells = (streaming ? residency.active() : levelCells).dup;
             // A room behind a wall still casts a shadow into the rooms in view
             CellCoord[] shadowCells = activeCells;
@@ -1834,11 +1834,13 @@ void main(string[] args)
                             frame.frameSets[0].descriptorSet);
                 },
                 null,
-                (buf) {
+                (buf, cascade) {
                     auto shadowStart = drawStats();
+                    const shadowViewProj = scene.sunShadow.cascades.viewProj[cascade] * wtb.model;
 
+                    // Each cascade keeps only the casters its own frustum sees
                     drawCells(levelIndex, buf, shadowViewProj, shadowCells,
-                        frame.frameSets[0].descriptorSet, DrawPhase.shadow, cellCulling);
+                        frame.frameSets[0].descriptorSet, DrawPhase.shadow, cellCulling, cascade);
 
                     foreach(cell; proxyCells)
                         if(!godotScene.drawProxy(buf, cell, shadowViewProj,
@@ -1857,7 +1859,15 @@ void main(string[] args)
                         return;
 
                     gatherCells(levelIndex, buf, modelViewProj, nearCells, DrawPhase.surface);
-                    gatherCells(levelIndex, buf, shadowViewProj, shadowCells, DrawPhase.shadow);
+
+                    if(!scene.sunShadow.enabled)
+                        return;
+
+                    foreach(cascade; 0 .. sunCascadeCount)
+                        if(scene.shadowPending(frame, cascade))
+                            gatherCells(levelIndex, buf,
+                                scene.sunShadow.cascades.viewProj[cascade] * wtb.model,
+                                shadowCells, DrawPhase.shadow, cascade);
                 },
             );
 

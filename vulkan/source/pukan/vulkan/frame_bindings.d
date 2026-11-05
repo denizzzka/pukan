@@ -14,6 +14,8 @@ struct FrameBindings
     uint oitCounter = uint.max;
     uint lights = uint.max;
     uint shadowMap = uint.max;
+    uint shadowMap1 = uint.max;
+    uint shadowMap2 = uint.max;
     uint sceneDepth = uint.max;
     uint depthMS = uint.max;
 }

@@ -15,10 +15,11 @@ struct FrameData
 {
     mat4 invViewProj;
     mat4 viewProj;
-    mat4 shadowViewProj;
+    mat4 shadowViewProj[3];
     vec4 cameraPosition;
     vec4 exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
-    vec4 shadowParams;   // x = 1 while the sun's shadow map is used, y = depth bias
+    vec4 shadowParams;   // x = 1 while the sun's shadow map is used, yzw = depth bias per cascade
+    vec4 shadowSplits;   // xyz = far view depth of each cascade
     vec4 ambientParams;  // rgb = ambient tint, a = ambient energy
     vec4 tonemapParams;  // x = mode, y = white
 };

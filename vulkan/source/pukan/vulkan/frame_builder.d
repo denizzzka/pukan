@@ -101,6 +101,8 @@ final class FrameSet
         VkDescriptorBufferInfo oitCounter,
         VkDescriptorBufferInfo lights,
         VkDescriptorImageInfo shadowMap,
+        VkDescriptorImageInfo shadowMap1,
+        VkDescriptorImageInfo shadowMap2,
         VkDescriptorImageInfo sceneDepth,
         VkDescriptorImageInfo depthMS,
     )
@@ -120,6 +122,8 @@ final class FrameSet
             bufferWriteDescriptor(descriptorSet, bindings.oitCounter, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, oitCounter),
             bufferWriteDescriptor(descriptorSet, bindings.lights, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, lights),
             imageWriteDescriptor(descriptorSet, bindings.shadowMap, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shadowMap),
+            imageWriteDescriptor(descriptorSet, bindings.shadowMap1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shadowMap1),
+            imageWriteDescriptor(descriptorSet, bindings.shadowMap2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shadowMap2),
             imageWriteDescriptor(descriptorSet, bindings.sceneDepth, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneDepth),
             imageWriteDescriptor(descriptorSet, bindings.depthMS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, depthMS),
         ];
