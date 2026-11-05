@@ -1417,6 +1417,7 @@ class SceneWith(Modules...)
         }
 
         auto frame = swapChain.frames[imageIndex];
+        pipelineFactory.beginFrame(frameIndex(frame));
 
         frame.commandBuffer.beginOneTimeCommandBuffer;
         dg(frameBuilder, frame);

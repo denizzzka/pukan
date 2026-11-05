@@ -133,6 +133,7 @@ struct LazyPipeline
             }
         }
 
+        factory.touch(technique, pass, subpass);
         return cfg;
     }
 

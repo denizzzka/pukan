@@ -1684,6 +1684,15 @@ void main(string[] args)
                         ImGui.Text("draws %d   instances %d", cast(int) frameStats.draws,
                             cast(int) frameStats.instances);
                         ImGui.Text("triangles %d", cast(int) frameStats.triangles);
+
+                        const life = scene.pipelineFactory.lifetime();
+                        ImGui.Text("pipelines %d live, %d tracked",
+                            cast(int) life.live, cast(int) life.tracked);
+
+                        if(life.tracked)
+                            ImGui.Text("oldest used %d frames ago",
+                                cast(int) (life.currentFrame - life.oldestUse));
+
                         ImGui.Checkbox("OIT", &scene.oitEnabled);
                     }
 

@@ -189,6 +189,17 @@ struct PipelineInstance
     }
 }
 
+/// Live variants and the oldest tracked use of one
+struct PipelineLifetime
+{
+    size_t live;
+    /// Variants whose draw was stamped through `LazyPipeline`
+    size_t tracked;
+    ulong currentFrame;
+    /// Frame the oldest tracked variant was last used; 0 when none was
+    ulong oldestUse;
+}
+
 struct FixedState
 {
     VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -559,6 +570,8 @@ final class PipelineFactory
     private size_t[PipelineKey] computeByKey;
     private RenderTarget[] targets;
     private GraphicsPipelineCfg[PipelineInstance] cache;
+    private ulong frameNumber;
+    private ulong[PipelineInstance] lastUse;
     private PipelineCacheManager cacheManager;
 
     /// Compiles a compute kernel when it is declared, before its first dispatch
@@ -659,9 +672,15 @@ final class PipelineFactory
     {
         private void logCacheSummary()
         {
+            const life = lifetime();
+
             Instance.log_info(
                 "pipeline cache: " ~ compiledVariants.to!string ~ " compiled, " ~
                 cachedVariants.to!string ~ " cached, " ~
+                life.live.to!string ~ " live, " ~
+                (life.tracked
+                    ? "oldest use " ~ (life.currentFrame - life.oldestUse).to!string ~ " frames ago"
+                    : "none tracked") ~ ", " ~
                 pipelineCreationTime.total!"msecs".to!string ~ " ms in pipeline creation");
         }
     }
@@ -817,6 +836,49 @@ final class PipelineFactory
             }
 
             return cache[instance];
+        }
+    }
+
+    /// Sets the frame that `touch` stamps into the usage table
+    void beginFrame(ulong frame)
+    {
+        synchronized(mutex)
+            frameNumber = frame;
+    }
+
+    /// Marks the variant behind `key` as used on the current frame
+    void touch(PipelineKey key, RenderPass pass, uint subpass)
+    {
+        synchronized(mutex)
+        {
+            const instance = PipelineInstance(key, targetId(pass, subpass));
+            if(instance in cache)
+                lastUse[instance] = frameNumber;
+        }
+    }
+
+    /// Live variants and the oldest tracked use; direct acquires stay untracked
+    PipelineLifetime lifetime()
+    {
+        synchronized(mutex)
+        {
+            PipelineLifetime result;
+            result.live = cache.length;
+            result.currentFrame = frameNumber;
+            result.oldestUse = ulong.max;
+
+            foreach(instance, frame; lastUse)
+                if(instance in cache)
+                {
+                    ++result.tracked;
+                    if(frame < result.oldestUse)
+                        result.oldestUse = frame;
+                }
+
+            if(result.tracked == 0)
+                result.oldestUse = 0;
+
+            return result;
         }
     }
 
