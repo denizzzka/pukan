@@ -5,6 +5,7 @@ import pukan;
 import pukan.graphics.common.frame_bindings: frameBindings, frameSetBindings;
 import pukan.graphics.g3d.cells: CellGrid;
 import pukan.graphics.common.screenshot: Screenshot;
+import pukan.graphics.g2d.ui: Ui;
 import pukan.graphics.g3d.axes: Axis;
 import pukan.graphics.g3d.ibl: createIblTextures, IblTextures;
 import pukan.graphics.g3d.mesh: MeshResources;
@@ -57,6 +58,8 @@ class SceneWith(Modules...)
     PipelineCacheStore pipelineCacheStore;
     /// Shared by the factory and the compute kernels, null with no store
     PipelineCacheManager pipelineCacheManager;
+    /// Debug windows drawn over the frame, null until enabled
+    Ui ui;
     private DescriptorAllocator frameAllocator;
     MeshResources meshResources;
     PrimitivesFactory!ColoredMesh coloredMeshFactory;
@@ -391,6 +394,9 @@ class SceneWith(Modules...)
 
         if(pendingScreenshot)
             destroy(pendingScreenshot);
+
+        if(ui)
+            destroy(ui);
 
         // Asset sets live in the factory pools, so they go before them
         if(gltfFactory)
@@ -1070,6 +1076,9 @@ class SceneWith(Modules...)
             }
         }
 
+        if(ui !is null)
+            ui.record(commandBuffer, frame.imageView, cast(uint) frameIndex(frame), swapChain.imageExtent);
+
         recordPendingScreenshot(frame);
         presentColor(frame);
 
@@ -1195,6 +1204,9 @@ class SceneWith(Modules...)
             }
         }
 
+        if(ui !is null)
+            ui.record(commandBuffer, frame.imageView, cast(uint) frameIndex(frame), swapChain.imageExtent);
+
         recordPendingScreenshot(frame);
         presentColor(frame);
     }
@@ -1206,6 +1218,15 @@ class SceneWith(Modules...)
                 return i;
 
         assert(false, "frame does not belong to the swapchain");
+    }
+
+    /// Creates the debug UI; call it before the first frame
+    Ui enableUi()
+    {
+        if(ui is null)
+            ui = new Ui(device, pipelineFactory, surfaceFormat.format);
+
+        return ui;
     }
 
     /// Whether this frame still has to draw the cascade, so it can be culled first

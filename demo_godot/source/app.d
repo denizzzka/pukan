@@ -24,7 +24,10 @@ import pukan.physics.simulation: Simulation;
 import pukan.physics.world: CollisionWorld, ShapeCastHit;
 import pukan.graphics.g3d.primitives_tree.lines: LineInstance, LineRenderer;
 import pukan.graphics.g3d.stats: DrawStats, drawStats;
+import pukan.graphics.g2d.ui: Ui, UiScript;
 import pukan.vulkan.bindings;
+import ImGui = d_imgui;
+import d_imgui.imgui_h: ImGuiKey, ImVec2;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
 import std.algorithm: max, min, remove, sort, sum;
@@ -151,9 +154,21 @@ private CameraControls controls;
 private bool cursorCaptured;
 private double savedCursorX;
 private double savedCursorY;
+/// The UI that owns the keyboard and the pointer, null while it is off
+private Ui activeUi;
+/// Set while a UI window takes the pointer, so the camera leaves it alone
+private bool uiCapturing;
+/// Wheel notches the UI has not consumed yet
+private float pendingWheel;
 
 extern(C) void onCursorPos(GLFWwindow* window, double x, double y) nothrow @nogc
 {
+    if(uiCapturing)
+    {
+        controls.forgetCursor();
+        return;
+    }
+
     controls.cursorMoved(x, y,
         glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS,
         glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
@@ -161,7 +176,142 @@ extern(C) void onCursorPos(GLFWwindow* window, double x, double y) nothrow @nogc
 
 extern(C) void onScroll(GLFWwindow*, double, double yoffset) nothrow @nogc
 {
-    controls.scroll(cast(float) yoffset);
+    pendingWheel += cast(float) yoffset;
+
+    if(!uiCapturing)
+        controls.scroll(cast(float) yoffset);
+}
+
+extern(C) void onChar(GLFWwindow*, uint codepoint) nothrow @nogc
+{
+    if(activeUi is null || codepoint == 0 || codepoint > 0x10FFFF)
+        return;
+
+    char[4] utf8;
+    size_t length;
+
+    if(codepoint < 0x80)
+    {
+        utf8[0] = cast(char) codepoint;
+        length = 1;
+    }
+    else if(codepoint < 0x800)
+    {
+        utf8[0] = cast(char) (0xC0 | (codepoint >> 6));
+        utf8[1] = cast(char) (0x80 | (codepoint & 0x3F));
+        length = 2;
+    }
+    else if(codepoint < 0x10000)
+    {
+        utf8[0] = cast(char) (0xE0 | (codepoint >> 12));
+        utf8[1] = cast(char) (0x80 | ((codepoint >> 6) & 0x3F));
+        utf8[2] = cast(char) (0x80 | (codepoint & 0x3F));
+        length = 3;
+    }
+    else
+    {
+        utf8[0] = cast(char) (0xF0 | (codepoint >> 18));
+        utf8[1] = cast(char) (0x80 | ((codepoint >> 12) & 0x3F));
+        utf8[2] = cast(char) (0x80 | ((codepoint >> 6) & 0x3F));
+        utf8[3] = cast(char) (0x80 | (codepoint & 0x3F));
+        length = 4;
+    }
+
+    activeUi.addText(cast(string) utf8[0 .. length]);
+}
+
+/// Glyph sets named on the command line
+private UiScript[] parseScripts(string value)
+{
+    import std.array: split;
+    import std.exception: enforce;
+    import std.string: strip;
+
+    if(value.length == 0)
+        return [UiScript.latin, UiScript.cyrillic];
+
+    UiScript[] scripts;
+
+    foreach(name; value.split(","))
+    {
+        switch(strip(name))
+        {
+            case "latin": scripts ~= UiScript.latin; break;
+            case "cyrillic": scripts ~= UiScript.cyrillic; break;
+            case "greek": scripts ~= UiScript.greek; break;
+            case "thai": scripts ~= UiScript.thai; break;
+            case "vietnamese": scripts ~= UiScript.vietnamese; break;
+            case "japanese": scripts ~= UiScript.japanese; break;
+            case "korean": scripts ~= UiScript.korean; break;
+            case "chinese": scripts ~= UiScript.chineseSimplified; break;
+            case "chinese-full": scripts ~= UiScript.chineseFull; break;
+            default: enforce(false, "unknown --ui-scripts entry: " ~ name);
+        }
+    }
+
+    return scripts;
+}
+
+/// Queues the window state the UI needs for its next frame
+private void feedUi(Ui ui, GLFWwindow* window, VkExtent2D extent, float deltaSeconds)
+{
+    int frameWidth, frameHeight, windowWidth, windowHeight;
+    glfwGetFramebufferSize(window, &frameWidth, &frameHeight);
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);
+
+    double cursorX, cursorY;
+    glfwGetCursorPos(window, &cursorX, &cursorY);
+
+    const scaleX = frameWidth / cast(float) max(windowWidth, 1);
+    const scaleY = frameHeight / cast(float) max(windowHeight, 1);
+
+    ui.setMouse(
+        cast(float) cursorX * scaleX,
+        cast(float) cursorY * scaleY,
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS,
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS,
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS,
+        0,
+        pendingWheel,
+    );
+    pendingWheel = 0;
+
+    static immutable struct KeyBinding
+    {
+        int glfw;
+        ImGuiKey imgui;
+    }
+
+    static immutable KeyBinding[] bindings = [
+        KeyBinding(GLFW_KEY_TAB, ImGuiKey.Tab),
+        KeyBinding(GLFW_KEY_LEFT, ImGuiKey.LeftArrow),
+        KeyBinding(GLFW_KEY_RIGHT, ImGuiKey.RightArrow),
+        KeyBinding(GLFW_KEY_UP, ImGuiKey.UpArrow),
+        KeyBinding(GLFW_KEY_DOWN, ImGuiKey.DownArrow),
+        KeyBinding(GLFW_KEY_PAGE_UP, ImGuiKey.PageUp),
+        KeyBinding(GLFW_KEY_PAGE_DOWN, ImGuiKey.PageDown),
+        KeyBinding(GLFW_KEY_HOME, ImGuiKey.Home),
+        KeyBinding(GLFW_KEY_END, ImGuiKey.End),
+        KeyBinding(GLFW_KEY_INSERT, ImGuiKey.Insert),
+        KeyBinding(GLFW_KEY_DELETE, ImGuiKey.Delete),
+        KeyBinding(GLFW_KEY_BACKSPACE, ImGuiKey.Backspace),
+        KeyBinding(GLFW_KEY_SPACE, ImGuiKey.Space),
+        KeyBinding(GLFW_KEY_ENTER, ImGuiKey.Enter),
+        KeyBinding(GLFW_KEY_ESCAPE, ImGuiKey.Escape),
+        KeyBinding(GLFW_KEY_LEFT_CONTROL, ImGuiKey.LeftCtrl),
+        KeyBinding(GLFW_KEY_RIGHT_CONTROL, ImGuiKey.RightCtrl),
+        KeyBinding(GLFW_KEY_LEFT_SHIFT, ImGuiKey.LeftShift),
+        KeyBinding(GLFW_KEY_RIGHT_SHIFT, ImGuiKey.RightShift),
+        KeyBinding(GLFW_KEY_LEFT_ALT, ImGuiKey.LeftAlt),
+        KeyBinding(GLFW_KEY_RIGHT_ALT, ImGuiKey.RightAlt),
+        KeyBinding(GLFW_KEY_LEFT_SUPER, ImGuiKey.LeftSuper),
+        KeyBinding(GLFW_KEY_RIGHT_SUPER, ImGuiKey.RightSuper),
+    ];
+
+    foreach(binding; bindings)
+        ui.addKey(binding.imgui, glfwGetKey(window, binding.glfw) == GLFW_PRESS);
+
+    ui.beginFrame(deltaSeconds, extent);
 }
 
 void updateCamera(ref FlyCamera camera, GLFWwindow* window, float dt)
@@ -614,6 +764,13 @@ void main(string[] args)
     string probeOption;
     uint widthOption = width;
     uint heightOption = height;
+    bool uiOption;
+    bool noUiOption;
+    string uiFontOption;
+    float uiFontSize = 16.0f;
+    string uiScriptsOption;
+    bool uiDemoOption;
+    string uiTextOption;
 
     auto getoptResult = getopt(
         args,
@@ -658,6 +815,13 @@ void main(string[] args)
         "probe", "report what the scene shows at screen pixel x,y", &probeOption,
         "width", "window or offscreen width in pixels, 800 by default", &widthOption,
         "height", "window or offscreen height in pixels, 600 by default", &heightOption,
+        "ui", "draw the debug UI over the frame, on by default in a window", &uiOption,
+        "no-ui", "run without the debug UI", &noUiOption,
+        "ui-font", "TrueType font for the debug UI; the built-in font covers ASCII only", &uiFontOption,
+        "ui-font-size", "font size in pixels, 16 by default", &uiFontSize,
+        "ui-scripts", "glyph sets to bake with --ui-font: latin, cyrillic, greek, thai, vietnamese, japanese, korean, chinese, chinese-full", &uiScriptsOption,
+        "ui-demo", "open the Dear ImGui demo window", &uiDemoOption,
+        "ui-text", "draw this text in a corner window, to check the font and its glyph sets", &uiTextOption,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
         "debug-capsule", "draw the character collision capsule", &debugCapsule,
         "model", "character model path; defaults to CesiumMan", &modelOption,
@@ -726,6 +890,7 @@ void main(string[] args)
         enforce(window, "Cannot create a window");
         glfwSetCursorPosCallback(window, &onCursorPos);
         glfwSetScrollCallback(window, &onScroll);
+        glfwSetCharCallback(window, &onChar);
     }
     scope(exit)
     {
@@ -829,6 +994,15 @@ void main(string[] args)
     else
         scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat, "demo_godot");
     scope(exit) destroy(scene);
+
+    if((!offscreen || uiOption) && !noUiOption)
+    {
+        auto ui = scene.enableUi();
+        activeUi = ui;
+
+        if(uiFontOption.length)
+            ui.addFont(uiFontOption, uiFontSize, parseScripts(uiScriptsOption));
+    }
 
     Impostors impostors;
     scope(exit) if(impostors) destroy(impostors);
@@ -1404,6 +1578,8 @@ void main(string[] args)
     bool thirdPersonKeyWasDown;
     bool characterVisible = true;
     Vector3f characterRenderPosition;
+    bool uiDemoWindow = uiDemoOption;
+    bool uiKeyWasDown;
 
     while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
@@ -1419,9 +1595,38 @@ void main(string[] args)
             : measuredDt;
         lastTime = now;
 
-        if(characterMode)
+        if(scene.ui !is null)
         {
             if(!offscreen)
+            {
+                const bool uiKey = glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS;
+
+                if(uiKey && !uiKeyWasDown)
+                    uiDemoWindow = !uiDemoWindow;
+
+                uiKeyWasDown = uiKey;
+
+                feedUi(scene.ui, window, scene.swapChain.imageExtent, dt);
+                uiCapturing = scene.ui.capturesMouse();
+            }
+            else
+                scene.ui.beginFrame(dt, scene.swapChain.imageExtent);
+
+            if(uiDemoWindow)
+                ImGui.ShowDemoWindow(&uiDemoWindow);
+
+            if(uiTextOption.length)
+            {
+                ImGui.SetNextWindowPos(ImVec2(16, 16));
+                if(ImGui.Begin("Text"))
+                    ImGui.Text("%s", uiTextOption);
+                ImGui.End();
+            }
+        }
+
+        if(characterMode)
+        {
+            if(!offscreen && !uiCapturing)
             {
                 bool pressed(int key) nothrow @nogc
                 {
@@ -1701,10 +1906,10 @@ void main(string[] args)
             else
                 camera.position = eyePosition;
         }
-        else if(!offscreen)
+        else if(!offscreen && !uiCapturing)
             updateCamera(camera, window, dt);
 
-        if(!offscreen)
+        if(!offscreen && !uiCapturing)
         {
             const bool probeKey = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
 
