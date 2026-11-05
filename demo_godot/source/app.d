@@ -3,6 +3,8 @@ import pukan;
 import pukan.graphics.g3d.axes: axisVector;
 import pukan.graphics.g3d.impostor: CellImpostor, Impostors;
 import pukan.graphics.g3d.occlusion: DepthRaster, currentOcclusion;
+import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
+import pukan.graphics.g3d.fly_camera: FlyCamera;
 import pukan.graphics.g3d.portals: PortalGrid, PortalSet, RoomPortal;
 import pukan.graphics.common.misc: Boxf, hasBounds, trsMatrix;
 import pukan.gltf.motion_sampler: MotionSampler;
@@ -352,6 +354,77 @@ LineInstance[] capsuleLines(
     return lines;
 }
 
+/// Rooms visible from each room in `pvsSectors` directions, baked once at load
+bool[long][long][pvsSectors] pvsBake;
+
+/// Directions the bake samples; the runtime picks the nearest one
+enum pvsSectors = 16;
+
+private void bakePvs(ref PortalSet portals, in PortalGrid grid)
+{
+    import core.time: MonoTime;
+    import std.stdio: stderr;
+
+    const began = MonoTime.currTime;
+    bool[long][long][] baked;
+
+    foreach(sector; 0 .. pvsSectors)
+    {
+        bool[long][long] table;
+
+        foreach(x; 0 .. grid.rooms)
+            foreach(z; 0 .. grid.rooms)
+            {
+                const centre = Vector3f(
+                    (x + 0.5f) * grid.roomSize,
+                    grid.doorwayHeight * 0.65f,
+                    (z + 0.5f) * grid.roomSize,
+                );
+
+                const yaw = sector * 2.0f * PI / pvsSectors;
+                const target = centre + Vector3f(sin(yaw), 0, cos(yaw));
+                const viewProj = vulkanPerspectiveMatrix(80.0f, 1.333f, 0.05f, 500.0f)
+                    * cameraView(centre, target, Vector3f(0, 1, 0));
+
+                table[cast(long) x * grid.rooms + z] = portals.visibleRooms(
+                    [cast(long) x * grid.rooms + z], viewProj);
+            }
+
+        baked ~= table;
+    }
+
+    pvsBake = baked;
+
+    stderr.writefln("pvs baked in %.1f ms: %s rooms x %s directions",
+        (MonoTime.currTime - began).total!"msecs", grid.rooms * grid.rooms, pvsSectors);
+}
+
+/// Rooms the bake says a view in the camera's direction is in
+private bool[long] bakedRooms(
+    in PortalSet portals,
+    in PortalGrid grid,
+    scope const(long)[] starts,
+    in FlyCamera camera,
+)
+{
+    bool[long] seen;
+
+    const yaw = atan2(camera.forward.x, camera.forward.z);
+    const sector = cast(size_t) ((yaw + PI) / (2 * PI) * pvsSectors) % pvsSectors;
+
+    foreach(start; starts)
+    {
+        if(start >= pvsBake[sector].length)
+            continue;
+
+        foreach(room, visible; pvsBake[sector][start])
+            if(visible)
+                seen[room] = true;
+    }
+
+    return seen;
+}
+
 /// Cell streaming, as the trace and the summary report it
 struct StreamTotals
 {
@@ -407,6 +480,7 @@ void main(string[] args)
     bool trace;
     float cellSize = 64.0f;
     string portalPath;
+    bool pvs;
     bool stats;
     uint warmup;
     string pickOrigin;
@@ -443,6 +517,7 @@ void main(string[] args)
         "trace", "print a line whenever cells enter or leave, with the frame cost", &trace,
         "cell-size", "extent of a streaming cell in metres, 64 by default", &cellSize,
         "portals", "walk this room grid and draw only the rooms its doorways reach", &portalPath,
+        "pvs", "bake the room visibility per direction at load and skip the walk", &pvs,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "stats", "report draws, triangles and frame time per ring at the end", &stats,
         "warmup", "frames the stats leave out, for loading and merging", &warmup,
@@ -819,6 +894,9 @@ void main(string[] args)
         // A level without portal nodes falls back to what the grid implies
         if(portalSet.portals.length == 0)
             portalSet.portals = portals.portals();
+
+        if(pvs)
+            bakePvs(portalSet, portals);
     }
 
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
@@ -1589,8 +1667,10 @@ void main(string[] args)
 
             if(hasPortals)
             {
-                const seen = portalSet.visibleRooms(
-                    PortalSet.startRooms(camera.position, portals.roomSize, portals.rooms), modelViewProj);
+                const starts = PortalSet.startRooms(camera.position, portals.roomSize, portals.rooms);
+                const seen = pvs
+                    ? bakedRooms(portalSet, portals, starts, camera)
+                    : portalSet.visibleRooms(starts, modelViewProj);
                 CellCoord[] reached;
 
                 foreach(cell; activeCells)
