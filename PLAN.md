@@ -713,33 +713,11 @@ last cascade stops at the level's bounds. Missing:
 
 ## Depth buffer
 
-Z-fighting is visible: the truck town windows flicker at distance. Reverse Z is
-the industry standard and becomes the default, not an experiment. It also
-permits a far clip plane at infinity, which a projective matrix maps to depth
-zero, so the distance would cost no precision; the finite plane stays for now.
-The scene pass and the sun's shadow map share `DepthBuf.format`; the stencil
-bits are unused, since every attachment is created with `DONT_CARE` and the
-pipelines keep stencil testing off.
-
-- [ ] `D32_SFLOAT` with reverse Z in the default build. The format costs the
-      same 32 bits per sample as the 24-bit one with stencil, which the engine
-      never uses, and it keeps that precision spread over the whole range
-      instead of piling it up near 1.0 the way normal Z does.
-- [ ] Flip the projection, the clear depth, every depth compare, the OIT sorting
-      and the `min`/`max` in the resolve, and retune the shadow bias. Both
-      targets follow the same convention: the scene pass and the sun's shadow
-      map.
-- [ ] Hold the convention in a compile-time choice of the swapchain, or of
-      whichever object owns the presented frame, rather than a project-wide
-      switch: the depth target and the projection rendered into it share one
-      convention, and every pass that reads that target follows it. Ship one
-      build per convention rather than a runtime switch, with no two
-      conventions on one target.
-- [ ] Keep normal Z as a build of its own through the same choice, for
-      comparison and for hardware without usable float depth.
-- [ ] Test on the fixed scene: the truck town windows must stop flickering at
-      distance and while the camera turns, and OIT, transmission and shadow
-      results must match the normal-Z build apart from precision.
+The depth target is `D32_SFLOAT` with reverse Z: the perspective and orthographic
+projections map the near plane to 1 and the far plane to 0, and the clears, depth
+comparisons, OIT sorting and filtering, occlusion grid and shadow bias follow it.
+The scene pass and the sun's shadow map share `DepthBuf.format`, the stencil bits
+stay unused, and the far plane stays finite.
 
 ## Deferred shading
 
