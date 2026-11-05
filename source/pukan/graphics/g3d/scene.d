@@ -18,7 +18,7 @@ import pukan.graphics.g3d.pbr.pipelines: oitPass, transmissionPass, pipelineWarm
 import pukan.graphics.g3d.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActive;
 import pukan.graphics.g3d.primitives_tree.cylinder: CylinderRenderer;
 import pukan.graphics.g3d.primitives_tree.sphere: SphereRenderer;
-import pukan.graphics.g3d.shadow: SunShadow, sunCascadeCount;
+import pukan.graphics.g3d.shadow: SunCascades, SunShadow, sunCascadeCount;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipeline_cache: FilePipelineCacheStore, PipelineCacheStore;
 import pukan.vulkan.resources.ownership: ResourceOwner;
@@ -735,7 +735,7 @@ class SceneWith(Modules...)
             sunShadow.cascades.splitFar[0],
             sunShadow.cascades.splitFar[1],
             sunShadow.cascades.splitFar[2],
-            0,
+            SunCascades.blendBand,
         );
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);

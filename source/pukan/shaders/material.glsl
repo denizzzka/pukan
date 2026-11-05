@@ -409,8 +409,30 @@ float shadowFactorCascade(mat4 shadowViewProj, sampler2DShadow map, float bias, 
     if(any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
         return 1.0;
 
-    // The sampler filters linearly, so one tap averages a 2x2 comparison
-    return texture(map, vec3(uv, ndc.z - bias));
+    // Four half-texel taps: each bilinear comparison covers 2x2, together a 3x3 box
+    const float ordinate = ndc.z - bias;
+    const vec2 halfTexel = 0.5 / vec2(textureSize(map, 0));
+    float total = texture(map, vec3(uv + vec2(-halfTexel.x, -halfTexel.y), ordinate));
+    total += texture(map, vec3(uv + vec2(halfTexel.x, -halfTexel.y), ordinate));
+    total += texture(map, vec3(uv + vec2(-halfTexel.x, halfTexel.y), ordinate));
+    total += texture(map, vec3(uv + vec2(halfTexel.x, halfTexel.y), ordinate));
+
+    return total * 0.25;
+}
+
+/// Fraction of the sun one named cascade lets through
+float shadowFactorAt(uint cascade, vec3 position, vec3 normal)
+{
+    if(cascade == 0u)
+        return shadowFactorCascade(frameUbo.frame.shadowViewProj[0], shadowMap,
+            frameUbo.frame.shadowParams.y, position, normal);
+
+    if(cascade == 1u)
+        return shadowFactorCascade(frameUbo.frame.shadowViewProj[1], shadowMap1,
+            frameUbo.frame.shadowParams.z, position, normal);
+
+    return shadowFactorCascade(frameUbo.frame.shadowViewProj[2], shadowMap2,
+        frameUbo.frame.shadowParams.w, position, normal);
 }
 
 /// Fraction of the sun that reaches a point, from the cascade it falls in
@@ -420,18 +442,32 @@ float shadowFactor(vec3 position, vec3 normal)
         return 1.0;
 
     // Clip w is the view depth the projection keeps, so the split needs no camera basis
+    const vec4 splits = frameUbo.frame.shadowSplits;
     const float depth = (frameUbo.frame.viewProj * vec4(position, 1.0)).w;
 
-    if(depth < frameUbo.frame.shadowSplits.x)
-        return shadowFactorCascade(frameUbo.frame.shadowViewProj[0], shadowMap,
-            frameUbo.frame.shadowParams.y, position, normal);
+    if(depth < splits.x)
+    {
+        const float here = shadowFactorAt(0u, position, normal);
+        const float band = splits.x * splits.w;
 
-    if(depth < frameUbo.frame.shadowSplits.y)
-        return shadowFactorCascade(frameUbo.frame.shadowViewProj[1], shadowMap1,
-            frameUbo.frame.shadowParams.z, position, normal);
+        if(depth <= splits.x - band)
+            return here;
 
-    return shadowFactorCascade(frameUbo.frame.shadowViewProj[2], shadowMap2,
-        frameUbo.frame.shadowParams.w, position, normal);
+        return mix(here, shadowFactorAt(1u, position, normal), (depth - (splits.x - band)) / band);
+    }
+
+    if(depth < splits.y)
+    {
+        const float here = shadowFactorAt(1u, position, normal);
+        const float band = (splits.y - splits.x) * splits.w;
+
+        if(depth <= splits.y - band)
+            return here;
+
+        return mix(here, shadowFactorAt(2u, position, normal), (depth - (splits.y - band)) / band);
+    }
+
+    return shadowFactorAt(2u, position, normal);
 }
 
 vec3 shadePbr(Surface s)

@@ -249,6 +249,8 @@ struct SunCascades
     /// Side of each square map
     uint mapSize;
 
+    /// Share of a cascade's range that fades into the next one
+    enum float blendBand = 0.1f;
     /// Share the logarithmic split takes over the uniform one
     private enum float splitLambda = 0.65f;
     /// World-space depth offset the NDC bias stands for
@@ -271,6 +273,12 @@ struct SunCascades
 
         depthBias[] = 0.0015f;
         splitFar[] = float.max;
+    }
+
+    /// Depth this cascade fades into the next one over
+    float blend(int cascade) const
+    {
+        return (splitFar[cascade] - (cascade == 0 ? 0.0f : splitFar[cascade - 1])) * blendBand;
     }
 
     /// Bounds the level covers; the last cascade need not reach past it
@@ -341,7 +349,9 @@ struct SunCascades
 
         foreach(c; 0 .. sunCascadeCount)
         {
-            const t0 = c == 0 ? 0.0f : (splitFar[c - 1] - near) / (cameraFar - near);
+            // The next cascade starts a band earlier, so both cover the fade
+            const start = c == 0 ? near : max(splitFar[c - 1] - blend(c - 1), near);
+            const t0 = (start - near) / (cameraFar - near);
             const t1 = (splitFar[c] - near) / (cameraFar - near);
 
             Vector3f[8] slice;
@@ -443,6 +453,23 @@ unittest
         assert(ndc.x >= -1 && ndc.x <= 1);
         assert(ndc.y >= -1 && ndc.y <= 1);
         assert(ndc.z >= 0 && ndc.z <= 1);
+    }
+
+    // The fade band has to sit inside both maps it mixes
+    foreach(c; 1 .. sunCascadeCount)
+    {
+        const previous = cascades.splitFar[c - 1] - cascades.blend(c - 1) * 0.5f;
+        const point = eye + forward * previous;
+
+        foreach(k; [c - 1, c])
+        {
+            const clip = Vector4f(point.x, point.y, point.z, 1) * cascades.viewProj[k];
+            const ndc = Vector3f(clip.x, clip.y, clip.z) / clip.w;
+
+            assert(ndc.x >= -1 && ndc.x <= 1);
+            assert(ndc.y >= -1 && ndc.y <= 1);
+            assert(ndc.z >= 0 && ndc.z <= 1);
+        }
     }
 
     // The same camera gives the same fit, so the map does not swim
