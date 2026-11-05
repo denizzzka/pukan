@@ -919,10 +919,12 @@ Before each slice, read the matching reference named in
         loads and uploads once.
 
 - **Debug and budgets**
-  - [ ] A streaming overlay: loaded and pending cells, bytes per cell, drawables
-        per cell, and the frame cost of the load and unload step.
-  - [ ] Mark every cell border crossing with the frame time around it, so a
-        hitch is attributed to the load rather than to the next draw.
+
+  `--stats` prints a stream line - cells, pending, drawables per cell, bytes per
+  frame, the load and unload cost - and `--trace` prints a line at every cell
+  border with the frame time it landed in.
+  - [ ] Draw those counters on screen: the renderer has no text path yet, so the
+        overlay waits for one.
   - [ ] Acceptance is the absence of hitches at cell borders, not an average
         frame rate: a steady 10 to 20 ms drop at a crossing means the budget is
         exceeded or a synchronous step (a physics scene build, a pipeline
