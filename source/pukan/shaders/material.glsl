@@ -376,7 +376,7 @@ float shadowFactorCascade(mat4 shadowViewProj, sampler2DShadow map, float bias, 
 
     const vec2 halfTexel = 0.5 / vec2(textureSize(map, 0));
 
-    return shadowPcf(map, uv, ndc.z - bias, halfTexel);
+    return shadowPcf(map, uv, ndc.z + bias, halfTexel);
 }
 
 /// Fraction of one local tile that reaches a point
@@ -409,7 +409,7 @@ float tileShadowFactor(mat4 viewProj, float tile, float bias, vec3 position, vec
     const vec2 low = origin + halfTexel;
     const vec2 high = origin + invTiles - halfTexel;
     const vec2 atlasUv = origin + uv * invTiles;
-    const float ordinate = ndc.z - bias;
+    const float ordinate = ndc.z + bias;
 
     float total = texture(localShadowMap, vec3(clamp(atlasUv + vec2(-halfTexel.x, -halfTexel.y), low, high), ordinate));
     total += texture(localShadowMap, vec3(clamp(atlasUv + vec2(halfTexel.x, -halfTexel.y), low, high), ordinate));

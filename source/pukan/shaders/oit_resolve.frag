@@ -27,7 +27,7 @@ void main()
 
     const float reference = push.filterDepth != 0u
         ? texelFetch(sceneDepthMap, pixel, 0).r
-        : 1.0;
+        : 0.0;
 
     uint index = imageLoad(oitHeads, pixel).r;
 
@@ -39,12 +39,12 @@ void main()
             unpackHalf2x16(fragment.colorHi)
         );
 
-        if(count < OIT_MAX_LAYERS && fragment.depth <= reference + 1e-5)
+        if(count < OIT_MAX_LAYERS && fragment.depth >= reference - 1e-5)
         {
-            // Insertion sort, far to near
+            // Insertion sort, far to near; reverse Z makes far the smaller depth
             uint at = count;
 
-            while(at > 0u && depths[at - 1u] < fragment.depth)
+            while(at > 0u && depths[at - 1u] > fragment.depth)
             {
                 depths[at] = depths[at - 1u];
                 colors[at] = colors[at - 1u];

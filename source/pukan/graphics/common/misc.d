@@ -229,7 +229,7 @@ unittest
     assert(turned.a14 == 1 && turned.a24 == 2 && turned.a34 == 3);
 }
 
-/// Orthographic projection for Vulkan: Y points down and depth spans [0, 1]
+/// Orthographic projection for Vulkan: Y points down and depth is reverse Z
 Matrix4x4f vulkanOrthographicMatrix(
     float left,
     float right,
@@ -244,10 +244,10 @@ Matrix4x4f vulkanOrthographicMatrix(
     // A light view looks down -Z, so a positive depth is a negative view z
     result.a11 = 2.0f / (right - left);
     result.a22 = -2.0f / (top - bottom);
-    result.a33 = -1.0f / (farPlane - nearPlane);
+    result.a33 = 1.0f / (farPlane - nearPlane);
     result.a14 = -(right + left) / (right - left);
     result.a24 = (top + bottom) / (top - bottom);
-    result.a34 = -nearPlane / (farPlane - nearPlane);
+    result.a34 = farPlane / (farPlane - nearPlane);
 
     return result;
 }
@@ -264,10 +264,10 @@ unittest
     assert(center.z > 0 && center.z < 1);
 
     const near = Vector4f(0, 0, -2, 1) * projection;
-    assert(isClose(near.z, 0, 1e-5f, 1e-5f));
+    assert(isClose(near.z, 1, 1e-5f, 1e-5f));
 
     const far = Vector4f(0, 0, -12, 1) * projection;
-    assert(isClose(far.z, 1, 1e-5f, 1e-5f));
+    assert(isClose(far.z, 0, 1e-5f, 1e-5f));
 
     // Vulkan clip space points Y down
     const top = Vector4f(0, 1, -7, 1) * projection;

@@ -316,8 +316,9 @@ private struct PbrPipelineBuilder
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
             colorAttachmentCount: 0,
             depthBiasEnable: VK_TRUE,
-            depthBiasConstantFactor: 1.25f,
-            depthBiasSlopeFactor: 1.75f,
+            // Reverse Z: a negative bias moves the caster away from the light
+            depthBiasConstantFactor: -1.25f,
+            depthBiasSlopeFactor: -1.75f,
         );
         FixedState maskShadowState = shadowState;
         maskShadowState.cullMode = VK_CULL_MODE_NONE;

@@ -43,7 +43,31 @@ Matrix4x4f vulkanPerspectiveMatrix(float fovY, float aspectRatio, float nearPlan
 {
     auto result = perspectiveMatrix(fovY, aspectRatio, nearPlane, farPlane);
     result.a22 = -result.a22;
+
+    // Reverse Z maps the near plane to 1 and the far plane to 0
+    const depth = farPlane - nearPlane;
+    result.a33 = nearPlane / depth;
+    result.a34 = nearPlane * farPlane / depth;
+
     return result;
+}
+
+unittest
+{
+    import dlib.math: Vector4f;
+    import std.math: abs;
+
+    const projection = vulkanPerspectiveMatrix(60.0f, 1.0f, 0.1f, 100.0f);
+
+    float ndc(float viewDepth)
+    {
+        const clip = Vector4f(0, 0, -viewDepth, 1) * projection;
+        return clip.z / clip.w;
+    }
+
+    assert(abs(ndc(0.1f) - 1.0f) < 1e-5f, "the near plane is the far end of reverse Z");
+    assert(abs(ndc(100.0f)) < 1e-5f, "the far plane is zero under reverse Z");
+    assert(ndc(1.0f) > ndc(10.0f), "closer geometry has the larger depth");
 }
 
 unittest

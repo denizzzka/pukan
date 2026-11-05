@@ -11,10 +11,10 @@ void main()
     const ivec2 pixel = ivec2(gl_FragCoord.xy);
     const int samples = textureSamples(depthMS);
 
-    float nearest = 1.0;
+    float nearest = 0.0;
 
     for(int i = 0; i < samples; ++i)
-        nearest = min(nearest, texelFetch(depthMS, pixel, i).r);
+        nearest = max(nearest, texelFetch(depthMS, pixel, i).r);
 
     nearestDepth = nearest;
 }

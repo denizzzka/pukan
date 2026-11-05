@@ -21,9 +21,9 @@ import std.meta: AliasSeq;
 class FrameBuilder
 {
     private alias requirements = AliasSeq!(
-        ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+        ImageFormatRequirement!(VK_FORMAT_D32_SFLOAT, VK_IMAGE_TYPE_2D,
             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT),
-        ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+        ImageFormatRequirement!(VK_FORMAT_D32_SFLOAT, VK_IMAGE_TYPE_2D,
             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             0, VkExtent3D(1, 1, 1), 1, 1, VK_SAMPLE_COUNT_4_BIT),
         ImageFormatRequirement!(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TYPE_2D,
@@ -302,7 +302,7 @@ struct DepthBuf
 
     @property ref VkImageView depthView() => depthViewObj.vk;
     //TODO: autodetection need
-    enum format = VK_FORMAT_D24_UNORM_S8_UINT;
+    enum format = VK_FORMAT_D32_SFLOAT;
 
     this(LogicalDevice dev, VkExtent2D imageExtent, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT)
     {

@@ -88,7 +88,7 @@ final class ShadowPass : RenderPass
         };
 
         VkClearValue clear = {
-            depthStencil: VkClearDepthStencilValue(1.0f, 0),
+            depthStencil: VkClearDepthStencilValue(0.0f, 0),
         };
         info.pClearValues = &clear;
         info.clearValueCount = 1;
@@ -138,7 +138,7 @@ final class ShadowPass : RenderPass
         };
 
         VkClearValue clear = {
-            depthStencil: VkClearDepthStencilValue(1.0f, 0),
+            depthStencil: VkClearDepthStencilValue(0.0f, 0),
         };
         info.pClearValues = &clear;
         info.clearValueCount = 1;
@@ -249,7 +249,7 @@ final class ShadowMap
                     srcAccessMask: 0,
                     dstAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                     subresourceRange: VkImageSubresourceRange(
-                        aspectMask: VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                        aspectMask: VK_IMAGE_ASPECT_DEPTH_BIT,
                         baseMipLevel: 0,
                         levelCount: 1,
                         baseArrayLayer: 0,
@@ -365,7 +365,7 @@ struct SunCascades
             const ndc = Vector3f(
                 (i & 1) ? 1.0f : -1.0f,
                 (i & 2) ? 1.0f : -1.0f,
-                (i & 4) ? 1.0f : 0.0f,
+                (i & 4) ? 0.0f : 1.0f,
             );
             const p = Vector4f(ndc.x, ndc.y, ndc.z, 1) * invViewProj;
             corners[i] = Vector3f(p.x, p.y, p.z) / p.w;
@@ -572,8 +572,8 @@ final class SunShadow
             addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             compareEnable: VK_TRUE,
-            compareOp: VK_COMPARE_OP_LESS_OR_EQUAL,
-            borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+            compareOp: VK_COMPARE_OP_GREATER_OR_EQUAL,
+            borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
             unnormalizedCoordinates: VK_FALSE,
         };
         vkCall(device.device, &info, device.alloc, &sampler);
@@ -719,8 +719,8 @@ final class LocalShadow
             addressModeV: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             addressModeW: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             compareEnable: VK_TRUE,
-            compareOp: VK_COMPARE_OP_LESS_OR_EQUAL,
-            borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+            compareOp: VK_COMPARE_OP_GREATER_OR_EQUAL,
+            borderColor: VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
             unnormalizedCoordinates: VK_FALSE,
         };
         vkCall(device.device, &info, device.alloc, &sampler);

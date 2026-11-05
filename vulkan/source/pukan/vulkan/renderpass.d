@@ -262,7 +262,7 @@ class DefaultRenderPass : RenderPass
                 color: VkClearColorValue(float32: [0.0f, 0.0f, 0.0f, 1.0f]),
             ),
             VkClearValue(
-                depthStencil: VkClearDepthStencilValue(1, 0),
+                depthStencil: VkClearDepthStencilValue(0, 0),
             ),
         ];
 

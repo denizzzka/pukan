@@ -231,8 +231,7 @@ final class OcclusionDepth
         VkAccessFlags shaderRead = VK_ACCESS_SHADER_READ_BIT;
         VkAccessFlags depthReadWrite =
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        VkImageAspectFlags depthAndStencil =
-            VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        VkImageAspectFlags depthAspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 
         transitionImageLayout(
             buf, depthImage,
@@ -243,7 +242,7 @@ final class OcclusionDepth
             computeStage,
             shaderRead,
             0u, 1u,
-            depthAndStencil,
+            depthAspect,
         );
 
         vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
@@ -287,7 +286,7 @@ final class OcclusionDepth
             afterDepthWrites,
             depthReadWrite,
             0u, 1u,
-            depthAndStencil,
+            depthAspect,
         );
 
         extent = size;

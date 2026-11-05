@@ -360,7 +360,7 @@ final class Impostors
 
         auto clears = [
             VkClearValue(color: VkClearColorValue(float32: [0.0f, 0.0f, 0.0f, 0.0f])),
-            VkClearValue(depthStencil: VkClearDepthStencilValue(1.0f, 0)),
+            VkClearValue(depthStencil: VkClearDepthStencilValue(0.0f, 0)),
         ];
         info.pClearValues = clears.ptr;
         info.clearValueCount = cast(uint) clears.length;

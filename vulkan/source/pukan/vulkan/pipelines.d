@@ -196,7 +196,7 @@ struct FixedState
     VkFrontFace frontFace = VK_FRONT_FACE_CLOCKWISE;
     VkBool32 depthTestEnable = VK_TRUE;
     VkBool32 depthWriteEnable = VK_TRUE;
-    VkCompareOp depthCompareOp = VK_COMPARE_OP_LESS;
+    VkCompareOp depthCompareOp = VK_COMPARE_OP_GREATER;
     VkBool32 blendEnable = VK_FALSE;
     /// Turns the fragment alpha into sample coverage, needs a multisampled pass
     VkBool32 alphaToCoverage = VK_FALSE;

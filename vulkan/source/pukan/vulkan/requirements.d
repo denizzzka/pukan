@@ -1182,13 +1182,13 @@ unittest
     DeviceContext noQueue;
     assert(!requirementsSatisfied!graphicsQueue(noQueue, reason));
 
-    alias depth = FormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT,
+    alias depth = FormatRequirement!(VK_FORMAT_D32_SFLOAT,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     static assert(!depth.isExtension && !depth.isFeature && !depth.isChainFeature);
     static assert(RequirementsVersion!depth == VulkanVersion(1, 0));
     static assert(QueueFlagsFor!depth == 0);
 
-    alias depthImage = ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+    alias depthImage = ImageFormatRequirement!(VK_FORMAT_D32_SFLOAT, VK_IMAGE_TYPE_2D,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     static assert(!depthImage.isExtension && !depthImage.isFeature && !depthImage.isChainFeature);
     static assert(RequirementsVersion!depthImage == VulkanVersion(1, 0));

@@ -626,8 +626,8 @@ private void reportProbe(
         return Vector3f(p.x, p.y, p.z) / p.w;
     }
 
-    const origin = unproject(0);
-    const direction = (unproject(1) - origin).normalized;
+    const origin = unproject(1);
+    const direction = (unproject(0) - origin).normalized;
 
     string[] lines = [
         format("probe %s,%s of %sx%s", pixelX, pixelY, extent.width, extent.height),

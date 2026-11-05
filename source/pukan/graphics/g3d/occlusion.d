@@ -77,7 +77,7 @@ struct DepthRaster
             return false;
 
         Vector4f[8] clip;
-        float nearest = float.infinity;
+        float nearest = -float.infinity;
 
         foreach(i; 0 .. 8)
         {
@@ -93,7 +93,7 @@ struct DepthRaster
                 return false;
 
             const depth = clip[i].z / clip[i].w;
-            nearest = nearest > depth ? depth : nearest;
+            nearest = nearest < depth ? depth : nearest;
         }
 
         const rect = screenRect(clip, width, height);
@@ -101,7 +101,7 @@ struct DepthRaster
         if(rect.empty)
             return false;
 
-        const limit = nearest - bias;
+        const limit = nearest + bias;
 
         foreach(y; rect.top .. rect.bottom + 1)
             foreach(x; rect.left .. rect.right + 1)
@@ -109,7 +109,7 @@ struct DepthRaster
                 const depth = depths[y * width + x];
 
                 // One sample without a surface leaves the box visible
-                if(depth.isNaN || depth >= limit)
+                if(depth.isNaN || depth <= limit)
                     return false;
             }
 
@@ -179,6 +179,7 @@ unittest
     DepthRaster raster;
     raster.reset(32, 32);
 
+    // Reverse Z: a smaller depth is farther from the eye
     // Every sample holds a surface at ndc 0.5, and the left column is open sky
     float[] wall;
     wall.length = 32 * 32;
@@ -189,8 +190,8 @@ unittest
 
     raster.load(wall);
 
-    const behind = Boxf(Vector3f(-0.5f, -0.5f, 0.8f), Vector3f(0.5f, 0.5f, 0.9f));
-    const inFront = Boxf(Vector3f(-0.5f, -0.5f, 0.2f), Vector3f(0.5f, 0.5f, 0.3f));
+    const behind = Boxf(Vector3f(-0.5f, -0.5f, 0.2f), Vector3f(0.5f, 0.5f, 0.3f));
+    const inFront = Boxf(Vector3f(-0.5f, -0.5f, 0.8f), Vector3f(0.5f, 0.5f, 0.9f));
 
     assert(raster.covered() == 32 * 31);
     assert(raster.hidden(behind, viewProj), "a box behind the wall is hidden");
@@ -198,7 +199,7 @@ unittest
     assert(!raster.hidden(inFront, viewProj), "a box in front of the wall shows");
 
     // A box whose rectangle reaches the open column stays visible
-    const beside = Boxf(Vector3f(-20, -0.5f, 0.8f), Vector3f(20, 0.5f, 0.9f));
+    const beside = Boxf(Vector3f(-20, -0.5f, 0.2f), Vector3f(20, 0.5f, 0.3f));
     assert(!raster.hidden(beside, viewProj));
 
     // A box that reaches behind the camera is left alone
