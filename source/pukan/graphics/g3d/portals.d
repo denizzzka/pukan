@@ -64,13 +64,19 @@ struct PortalGrid
         bool[long] seen;
         float[long] widest;
 
-        int x, z;
-        roomOf(eye, x, z);
-
         // The whole screen, wound the way the clip expects
         Point[] screen = [Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)];
         normalize(screen);
-        walk(x, z, screen, 0, maxDepth, seen, widest, viewProj);
+
+        // An eye on a wall plane stands in every room the plane touches, and a
+        // game camera does reach one at the edge of a cell
+        int nearX, nearZ, farX, farZ;
+        roomOf(eye - Vector3f(standing, 0, standing), nearX, nearZ);
+        roomOf(eye + Vector3f(standing, 0, standing), farX, farZ);
+
+        foreach(x; nearX .. farX + 1)
+            foreach(z; nearZ .. farZ + 1)
+                walk(x, z, screen, 0, maxDepth, seen, widest, viewProj);
 
         return seen;
     }
@@ -196,6 +202,9 @@ struct PortalGrid
 
         return true;
     }
+
+    /// How far the eye may sit from a wall plane and still stand in both rooms
+    enum float standing = 0.05f;
 
     /// How much a doorway grows before the clip, so a grazing view keeps its room
     enum float grazing = 0.01f;
