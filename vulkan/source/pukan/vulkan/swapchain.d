@@ -113,14 +113,20 @@ class SwapChain
     )
     {
         import pukan.vulkan.exceptions: PukanVulkanException;
-        import std.algorithm: canFind;
+        import std.algorithm: canFind, max, min;
         import std.conv: to;
 
         auto cap = capabilities;
 
         enforce(cap.currentExtent.width != uint.max, "unsupported, see VkSurfaceCapabilitiesKHR(3) Manual Page");
         enforce(cap.minImageCount > 0);
-        enforce(cap.maxImageCount == 0 || cap.maxImageCount >= 3, "maxImageCount: "~cap.maxImageCount.to!string);
+
+        // Triple buffering when the surface allows it; a surface may demand more
+        const uint wantedImageCount = max(3u, cap.minImageCount);
+        const uint imageCount = cap.maxImageCount == 0
+            ? wantedImageCount
+            : min(wantedImageCount, cap.maxImageCount);
+        enforce(imageCount > 0);
 
         auto surface = device.physicalDevice.instance.surface.vk;
         string reason;
@@ -156,7 +162,7 @@ class SwapChain
             imageUsage: VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             imageSharingMode: VK_SHARING_MODE_EXCLUSIVE,
             presentMode: selectedPresentMode,
-            minImageCount: 3, // triple buffering will be used
+            minImageCount: imageCount,
             preTransform: capabilities.currentTransform,
             compositeAlpha: VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
             clipped: VK_TRUE,
@@ -187,8 +193,8 @@ class SwapChain
         vkCreateSwapchainKHR(d.device, &cinf, d.alloc, &swapchain).vkCheck;
         //TODO: need scope(failure) guard for swapchain?
 
-        images = getArrayFrom!(vkGetSwapchainImagesKHR, maxFramesInFlight)(device.device, swapchain);
-        assert(images.length == maxFramesInFlight);
+        images = getArrayFrom!(vkGetSwapchainImagesKHR)(device.device, swapchain);
+        assert(images.length >= cinf.minImageCount);
 
         frames.length = images.length;
 
@@ -267,7 +273,7 @@ class SwapChain
 
     void toNextFrame()
     {
-        currentFrameIdx = (currentFrameIdx + 1) % maxFramesInFlight;
+        currentFrameIdx = cast(int) ((currentFrameIdx + 1) % frames.length);
     }
 
     /// imageIndex result is "random" index value, not related to currentFrameIdx
