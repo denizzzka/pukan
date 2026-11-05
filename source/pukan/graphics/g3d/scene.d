@@ -19,7 +19,7 @@ import pukan.graphics.g3d.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActi
 import pukan.graphics.g3d.primitives_tree.cylinder: CylinderRenderer;
 import pukan.graphics.g3d.primitives_tree.sphere: SphereRenderer;
 import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
-import pukan.graphics.g3d.shadow: SpotShadow, SunCascades, SunShadow, spotShadowCount, spotTileSize, spotTilesPerAxis, sunCascadeCount;
+import pukan.graphics.g3d.shadow: LocalShadow, SunCascades, SunShadow, localShadowCount, localTileSize, localTilesPerAxis, sunCascadeCount;
 import pukan.vulkan.bindings;
 import pukan.vulkan.pipeline_cache: FilePipelineCacheStore, PipelineCacheStore;
 import pukan.vulkan.resources.ownership: ResourceOwner;
@@ -81,10 +81,10 @@ class SceneWith(Modules...)
     /// The sun's shadow map and its cache
     SunShadow sunShadow;
     /// The spot lights' shadow atlas and its cache
-    SpotShadow spotShadow;
+    LocalShadow localShadow;
     /// Spot lights the atlas held last frame, to notice a change of choice
-    private uint[spotShadowCount] spotAssignment;
-    private uint spotAssignmentCount;
+    private uint[localShadowCount] localAssignment;
+    private uint localAssignmentCount;
     private VkObj!VkSampler resolveSampler;
     private OitResolve oitResolve;
     private DepthResolve depthResolve;
@@ -174,8 +174,8 @@ class SceneWith(Modules...)
 
         lights[lightCount++] = light;
 
-        if(spotShadow)
-            spotShadow.invalidate();
+        if(localShadow)
+            localShadow.invalidate();
     }
 
     /// Whether transmissive meshes get a second pass after a copy of the frame.
@@ -283,7 +283,7 @@ class SceneWith(Modules...)
         depthResolve = new DepthResolve(device, pipelineFactory);
 
         sunShadow = new SunShadow(device);
-        spotShadow = new SpotShadow(device);
+        localShadow = new LocalShadow(device);
 
         {
             VkSamplerCreateInfo samplerInfo = {
@@ -367,7 +367,7 @@ class SceneWith(Modules...)
         sceneOwner.own(oitResolve);
         sceneOwner.own(depthResolve);
         sceneOwner.own(sunShadow);
-        sceneOwner.own(spotShadow);
+        sceneOwner.own(localShadow);
         sceneOwner.own(background);
         sceneOwner.own(pipelineFactory);
         sceneOwner.own(frameAllocator);
@@ -442,7 +442,7 @@ class SceneWith(Modules...)
         }
 
         sunShadow.recreate(swapChain.frames.length);
-        spotShadow.recreate(swapChain.frames.length);
+        localShadow.recreate(swapChain.frames.length);
 
         foreach(ref frame; swapChain.frames)
             frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
@@ -460,7 +460,7 @@ class SceneWith(Modules...)
             auto shadowInfo0 = sunShadow.imageInfo(i, 0);
             auto shadowInfo1 = sunShadow.imageInfo(i, 1);
             auto shadowInfo2 = sunShadow.imageInfo(i, 2);
-            auto spotInfo = spotShadow.imageInfo(i);
+            auto localInfo = localShadow.imageInfo(i);
             auto lightInfo = VkDescriptorBufferInfo(
                 buffer: lightBufs[i].buf,
                 offset: 0,
@@ -501,7 +501,7 @@ class SceneWith(Modules...)
                     shadowInfo2,
                     sceneDepth,
                     depthMS,
-                    spotInfo,
+                    localInfo,
                 );
         }
     }
@@ -760,7 +760,7 @@ class SceneWith(Modules...)
             cast(float) lightCount,
         );
 
-        assignSpotShadows(data, camera);
+        assignLocalShadows(data, camera);
 
         auto lightBuffer = lightBufs[frameIndex(frame)];
         const lightBytes = lightCount * Light.sizeof;
@@ -769,19 +769,23 @@ class SceneWith(Modules...)
         frame.frameSets[eye].update(data);
     }
 
-    /// Fits the shadowed spots into tiles, nearest to the camera first
-    private void assignSpotShadows(ref FrameUniforms data, in Vector3f camera)
+    /// Fits the shadowed local lights into tiles, nearest to the camera first
+    private void assignLocalShadows(ref FrameUniforms data, in Vector3f camera)
     {
         import std.algorithm: clamp, max, sort;
         import std.math: PI, abs, acos;
 
-        struct SpotCandidate
+        // A point light needs one tile per cube face
+        enum pointTiles = 6;
+
+        struct LocalCandidate
         {
             uint light;
+            uint tiles;
             float distance;
         }
 
-        SpotCandidate[] spots;
+        LocalCandidate[] candidates;
 
         foreach(i; 0 .. lightCount)
         {
@@ -789,66 +793,136 @@ class SceneWith(Modules...)
             light.params.z = -1;
             light.params.w = 0;
 
-            if(cast(uint) light.params.x != LightType.spot)
+            const kind = cast(uint) light.params.x;
+
+            if(kind != LightType.spot && kind != LightType.point)
                 continue;
 
             const position = Vector3f(light.positionRadius.x, light.positionRadius.y, light.positionRadius.z);
-            spots ~= SpotCandidate(cast(uint) i, (position - camera).length);
+            candidates ~= LocalCandidate(
+                cast(uint) i,
+                kind == LightType.point ? pointTiles : 1,
+                (position - camera).length,
+            );
         }
 
-        spots.sort!((a, b) => a.distance < b.distance)();
+        candidates.sort!((a, b) => a.distance < b.distance)();
 
-        const selected = spots.length < spotShadowCount ? spots.length : spotShadowCount;
-        bool changed = spotAssignmentCount != selected;
+        // Nearest first; a light whose tiles do not fit stays unshadowed
+        LocalCandidate[] chosen;
+        uint needed;
 
-        foreach(t; 0 .. selected)
-            if(spotAssignment[t] != spots[t].light)
+        foreach(candidate; candidates)
+            if(needed + candidate.tiles <= localShadowCount)
+            {
+                chosen ~= candidate;
+                needed += candidate.tiles;
+            }
+
+        uint[localShadowCount] next;
+        next[] = uint.max;
+
+        uint used;
+
+        foreach(candidate; chosen)
+            foreach(_; 0 .. candidate.tiles)
+                next[used++] = candidate.light;
+
+        bool changed = localAssignmentCount != needed;
+
+        foreach(tile; 0 .. localShadowCount)
+            if(localAssignment[tile] != next[tile])
                 changed = true;
 
         if(changed)
         {
-            spotShadow.invalidate();
-            spotAssignmentCount = cast(uint) selected;
-
-            foreach(t; 0 .. selected)
-                spotAssignment[t] = spots[t].light;
+            localShadow.invalidate();
+            localAssignment = next;
+            localAssignmentCount = needed;
         }
 
         uint tile;
 
-        foreach(candidate; spots[0 .. selected])
+        foreach(candidate; chosen)
         {
             ref light = lights[candidate.light];
             const position = Vector3f(light.positionRadius.x, light.positionRadius.y, light.positionRadius.z);
-            const direction = Vector3f(
-                light.directionOuterCos.x,
-                light.directionOuterCos.y,
-                light.directionOuterCos.z,
-            ).normalized;
             const radius = max(light.positionRadius.w, 0.1f);
-            const outer = acos(clamp(light.directionOuterCos.w, -1.0f, 1.0f));
-            const up = abs(direction.y) > 0.99f ? Vector3f(0, 0, 1) : Vector3f(0, 1, 0);
 
-            const view = cameraView(position, position + direction, up);
-            const fov = clamp(outer * 2.0f * 180.0f / PI, 0.01f, 179.0f);
-            const proj = vulkanPerspectiveMatrix(fov, 1.0f, 0.05f, radius);
+            if(cast(uint) light.params.x == LightType.spot)
+            {
+                const direction = Vector3f(
+                    light.directionOuterCos.x,
+                    light.directionOuterCos.y,
+                    light.directionOuterCos.z,
+                ).normalized;
+                const outer = acos(clamp(light.directionOuterCos.w, -1.0f, 1.0f));
+                const up = abs(direction.y) > 0.99f ? Vector3f(0, 0, 1) : Vector3f(0, 1, 0);
 
-            spotShadow.viewProj[tile] = proj * view;
-            spotShadow.depthBias[tile] = 0.03f / radius;
-            light.shadowViewProj = spotShadow.viewProj[tile];
+                const view = cameraView(position, position + direction, up);
+                const fov = clamp(outer * 2.0f * 180.0f / PI, 0.01f, 179.0f);
+                const proj = vulkanPerspectiveMatrix(fov, 1.0f, 0.05f, radius);
+
+                localShadow.viewProj[tile] = proj * view;
+                localShadow.depthBias[tile] = 0.03f / radius;
+                light.shadowViewProj[0] = localShadow.viewProj[tile];
+                light.params.z = cast(float) tile;
+                light.params.w = localShadow.depthBias[tile];
+
+                ++tile;
+                continue;
+            }
+
+            const proj = vulkanPerspectiveMatrix(90.0f, 1.0f, 0.05f, radius);
+            const bias = 0.03f / radius;
+
             light.params.z = cast(float) tile;
-            light.params.w = spotShadow.depthBias[tile];
+            light.params.w = bias;
 
-            ++tile;
+            foreach(face; 0 .. 6)
+            {
+                const view = cameraView(position, position + faceDirection(face), faceUp(face));
+                localShadow.viewProj[tile] = proj * view;
+                localShadow.depthBias[tile] = bias;
+                light.shadowViewProj[face] = localShadow.viewProj[tile];
+
+                ++tile;
+            }
         }
 
-        spotShadow.active = tile;
-        data.spotShadowParams = Vector4f(
-            1.0f / spotTilesPerAxis,
-            cast(float) spotTilesPerAxis,
-            1.0f / spotTileSize,
-            0,
+        localShadow.active = tile;
+
+
+        data.localShadowParams = Vector4f(
+            1.0f / localTilesPerAxis,
+            cast(float) localTilesPerAxis,
+            1.0f / localTileSize,
+            localShadow.enabled ? 1 : 0,
         );
+    }
+
+    /// Direction from a point light into one of its six shadow faces
+    private static Vector3f faceDirection(uint face)
+    {
+        static immutable Vector3f[6] directions = [
+            Vector3f(1, 0, 0), Vector3f(-1, 0, 0),
+            Vector3f(0, 1, 0), Vector3f(0, -1, 0),
+            Vector3f(0, 0, 1), Vector3f(0, 0, -1),
+        ];
+
+        return directions[face];
+    }
+
+    /// Up axis of one shadow face, so its map stays upright
+    private static Vector3f faceUp(uint face)
+    {
+        static immutable Vector3f[6] ups = [
+            Vector3f(0, 1, 0), Vector3f(0, 1, 0),
+            Vector3f(0, 0, 1), Vector3f(0, 0, 1),
+            Vector3f(0, 1, 0), Vector3f(0, 1, 0),
+        ];
+
+        return ups[face];
     }
 
     void recordCommandBuffer(
@@ -856,7 +930,7 @@ class SceneWith(Modules...)
         SceneDrawCallback drawScene,
         SceneDrawCallback drawTransmission = null,
         ShadowDrawCallback drawShadow = null,
-        SpotDrawCallback drawSpots = null,
+        LocalDrawCallback drawLocal = null,
         void delegate(ref VkCommandBuffer) prepare = null,
     )
     {
@@ -888,7 +962,7 @@ class SceneWith(Modules...)
         oitPass = oitEnabled;
 
         recordShadow(frame, drawShadow);
-        recordSpots(frame, drawSpots);
+        recordLocal(frame, drawLocal);
 
         clearOit(frame);
 
@@ -963,7 +1037,7 @@ class SceneWith(Modules...)
     alias SceneDrawCallback = void delegate(ref VkCommandBuffer, DrawPhase phase);
     alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent, DrawPhase phase);
     alias ShadowDrawCallback = void delegate(ref VkCommandBuffer, size_t cascade);
-    alias SpotDrawCallback = void delegate(ref VkCommandBuffer, size_t tile);
+    alias LocalDrawCallback = void delegate(ref VkCommandBuffer, size_t tile);
 
     private void drawStereoEyes(VkCommandBuffer buf, StereoDrawCallback drawScene, bool transmission = false)
     {
@@ -1010,7 +1084,7 @@ class SceneWith(Modules...)
         StereoDrawCallback drawScene,
         StereoDrawCallback drawTransmission = null,
         ShadowDrawCallback drawShadow = null,
-        SpotDrawCallback drawSpots = null,
+        LocalDrawCallback drawLocal = null,
     )
     {
         auto commandBuffer = frame.commandBuffer;
@@ -1078,9 +1152,9 @@ class SceneWith(Modules...)
     }
 
     /// Whether this frame still has to draw the spots' atlas
-    bool spotPending(ref Frame frame)
+    bool localPending(ref Frame frame)
     {
-        return spotShadow.pending(frameIndex(frame));
+        return localShadow.pending(frameIndex(frame));
     }
 
     /// Renders the sun's view of the opaque scene before the main pass
@@ -1090,9 +1164,9 @@ class SceneWith(Modules...)
     }
 
     /// Renders the shadowed spots into their atlas tiles before the main pass
-    private void recordSpots(ref Frame frame, SpotDrawCallback drawSpots)
+    private void recordLocal(ref Frame frame, LocalDrawCallback drawLocal)
     {
-        spotShadow.record(frameIndex(frame), frame.commandBuffer, drawSpots);
+        localShadow.record(frameIndex(frame), frame.commandBuffer, drawLocal);
     }
 
     /// Empties the per-pixel lists before the opaque and blended draws fill them
@@ -1325,10 +1399,10 @@ struct Light
     Vector4f directionOuterCos; // spot: xyz = beam direction, w = cosine of the outer angle
     Vector4f colorIntensity;    // rgb = colour, already scaled by intensity
     Vector4f params;            // x = type, y = cosine of the inner angle, z = shadow tile, w = bias
-    Matrix4x4f shadowViewProj;  // spot: world to the tile's clip space
+    Matrix4x4f[6] shadowViewProj; // spot: face 0; point: the six cube faces
 }
 
-static assert(Light.sizeof == 128);
+static assert(Light.sizeof == 448);
 
 struct FrameUniforms
 {
@@ -1339,7 +1413,7 @@ struct FrameUniforms
     Vector4f exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
     Vector4f shadowParams;   // x = 1 while the sun's shadow map is used, yzw = depth bias per cascade
     Vector4f shadowSplits;   // xyz = far view depth of each cascade
-    Vector4f spotShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
+    Vector4f localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     Vector4f ambientParams;  // rgb = ambient tint, a = ambient energy
     Vector4f tonemapParams;  // x = mode, y = white
 }

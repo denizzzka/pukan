@@ -91,7 +91,7 @@ layout(set = 1, binding = FRAME_SCENE_COLOR) uniform sampler2D sceneColorMap;
 layout(set = 1, binding = FRAME_SHADOW_MAP) uniform sampler2DShadow shadowMap;
 layout(set = 1, binding = FRAME_SHADOW_MAP1) uniform sampler2DShadow shadowMap1;
 layout(set = 1, binding = FRAME_SHADOW_MAP2) uniform sampler2DShadow shadowMap2;
-layout(set = 1, binding = FRAME_SPOT_SHADOWS) uniform sampler2DShadow spotShadowMap;
+layout(set = 1, binding = FRAME_LOCAL_SHADOWS) uniform sampler2DShadow localShadowMap;
 
 #ifdef SKY_ANALYTIC
 vec3 environment(vec3 direction)
@@ -426,10 +426,13 @@ float shadowFactorCascade(mat4 shadowViewProj, sampler2DShadow map, float bias, 
     return shadowPcf(map, uv, ndc.z - bias, halfTexel);
 }
 
-/// Fraction of a spot light that reaches a point through its atlas tile
-float spotShadowFactor(Light light, vec3 position, vec3 normal)
+/// Fraction of one local tile that reaches a point
+float tileShadowFactor(mat4 viewProj, float tile, float bias, vec3 position, vec3 normal)
 {
-    const vec4 clip = light.shadowViewProj * vec4(position + normal * 0.02, 1.0);
+    if(frameUbo.frame.localShadowParams.w < 0.5)
+        return 1.0;
+
+    const vec4 clip = viewProj * vec4(position + normal * 0.02, 1.0);
 
     if(clip.w <= 0.0)
         return 1.0;
@@ -444,24 +447,47 @@ float spotShadowFactor(Light light, vec3 position, vec3 normal)
     if(any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
         return 1.0;
 
-    const float tiles = frameUbo.frame.spotShadowParams.y;
-    const float invTiles = frameUbo.frame.spotShadowParams.x;
-    const float tile = light.params.z;
+    const float tiles = frameUbo.frame.localShadowParams.y;
+    const float invTiles = frameUbo.frame.localShadowParams.x;
     const vec2 origin = vec2(mod(tile, tiles), floor(tile / tiles)) * invTiles;
 
     // A tap at a tile edge would read the neighbour, so keep it inside its tile
-    const vec2 halfTexel = vec2(0.5 * frameUbo.frame.spotShadowParams.z);
+    const vec2 halfTexel = vec2(0.5 * frameUbo.frame.localShadowParams.z);
     const vec2 low = origin + halfTexel;
     const vec2 high = origin + invTiles - halfTexel;
     const vec2 atlasUv = origin + uv * invTiles;
-    const float ordinate = ndc.z - light.params.w;
+    const float ordinate = ndc.z - bias;
 
-    float total = texture(spotShadowMap, vec3(clamp(atlasUv + vec2(-halfTexel.x, -halfTexel.y), low, high), ordinate));
-    total += texture(spotShadowMap, vec3(clamp(atlasUv + vec2(halfTexel.x, -halfTexel.y), low, high), ordinate));
-    total += texture(spotShadowMap, vec3(clamp(atlasUv + vec2(-halfTexel.x, halfTexel.y), low, high), ordinate));
-    total += texture(spotShadowMap, vec3(clamp(atlasUv + vec2(halfTexel.x, halfTexel.y), low, high), ordinate));
+    float total = texture(localShadowMap, vec3(clamp(atlasUv + vec2(-halfTexel.x, -halfTexel.y), low, high), ordinate));
+    total += texture(localShadowMap, vec3(clamp(atlasUv + vec2(halfTexel.x, -halfTexel.y), low, high), ordinate));
+    total += texture(localShadowMap, vec3(clamp(atlasUv + vec2(-halfTexel.x, halfTexel.y), low, high), ordinate));
+    total += texture(localShadowMap, vec3(clamp(atlasUv + vec2(halfTexel.x, halfTexel.y), low, high), ordinate));
 
     return total * 0.25;
+}
+
+/// Fraction of a spot light that reaches a point
+float localShadowFactor(Light light, vec3 position, vec3 normal)
+{
+    return tileShadowFactor(light.shadowViewProj[0], light.params.z, light.params.w, position, normal);
+}
+
+/// Fraction of a point light that reaches a point, through the face its direction falls in
+float pointShadowFactor(Light light, vec3 position, vec3 normal)
+{
+    const vec3 away = position - light.positionRadius.xyz;
+    const vec3 magnitude = abs(away);
+    uint face;
+
+    if(magnitude.x >= magnitude.y && magnitude.x >= magnitude.z)
+        face = away.x >= 0.0 ? 0u : 1u;
+    else if(magnitude.y >= magnitude.z)
+        face = away.y >= 0.0 ? 2u : 3u;
+    else
+        face = away.z >= 0.0 ? 4u : 5u;
+
+    return tileShadowFactor(light.shadowViewProj[face], light.params.z + float(face),
+        light.params.w, position, normal);
 }
 
 /// Fraction of the sun one named cascade lets through
@@ -662,7 +688,9 @@ vec3 shadePbr(Surface s)
         if(type == LIGHT_DIRECTIONAL && i == 0u)
             shadow = shadowFactor(s.position, N);
         else if(type == LIGHT_SPOT && light.params.z >= 0.0 && attenuation > 0.0)
-            shadow = spotShadowFactor(light, s.position, N);
+            shadow = localShadowFactor(light, s.position, N);
+        else if(type == LIGHT_POINT && light.params.z >= 0.0 && attenuation > 0.0)
+            shadow = pointShadowFactor(light, s.position, N);
 
         direct += brdf * light.colorIntensity.rgb * NdotL * attenuation * shadow;
 

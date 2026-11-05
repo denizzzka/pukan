@@ -674,15 +674,15 @@ final class SunShadow
     }
 }
 
-/// Side of one spot tile in the shadow atlas
-enum spotTileSize = 512;
-/// Tiles per axis; four spots cast at once
-enum spotTilesPerAxis = 2;
-/// Spot lights that can cast at once
-enum spotShadowCount = spotTilesPerAxis * spotTilesPerAxis;
+/// Side of one local light's tile in the shadow atlas
+enum localTileSize = 256;
+/// Tiles per axis; a spot takes one, a point light six
+enum localTilesPerAxis = 4;
+/// Tiles the local lights share
+enum localShadowCount = localTilesPerAxis * localTilesPerAxis;
 
-/// The spot lights' shadow atlas: one depth image per frame in flight
-final class SpotShadow
+/// The local lights' shadow atlas: one depth image per frame in flight
+final class LocalShadow
 {
     private LogicalDevice device;
     ShadowPass pass;
@@ -696,9 +696,9 @@ final class SpotShadow
     /// Tiles the scene assigned in this frame
     uint active;
     /// Light view-projection of each tile
-    Matrix4x4f[spotShadowCount] viewProj;
+    Matrix4x4f[localShadowCount] viewProj;
     /// NDC depth bias of each tile
-    float[spotShadowCount] depthBias;
+    float[localShadowCount] depthBias;
 
     this(LogicalDevice device)
     {
@@ -754,11 +754,11 @@ final class SpotShadow
                 destroy(map);
 
         maps.length = frameCount;
-        valid.length = frameCount * spotShadowCount;
+        valid.length = frameCount * localShadowCount;
         valid[] = false;
 
         foreach(i; 0 .. frameCount)
-            maps[i] = new ShadowMap(device, pass, spotTilesPerAxis * spotTileSize);
+            maps[i] = new ShadowMap(device, pass, localTilesPerAxis * localTileSize);
     }
 
     VkDescriptorImageInfo imageInfo(size_t frameIndex)
@@ -774,7 +774,7 @@ final class SpotShadow
             return false;
 
         foreach(tile; 0 .. active)
-            if(!(cache && valid[frameIndex * spotShadowCount + tile]))
+            if(!(cache && valid[frameIndex * localShadowCount + tile]))
                 return true;
 
         return false;
@@ -783,7 +783,7 @@ final class SpotShadow
     /// Returns false when the atlas reused its cached tiles
     bool record(size_t frameIndex, VkCommandBuffer buf, void delegate(ref VkCommandBuffer, size_t tile) draw)
     {
-        assert(frameIndex * spotShadowCount < valid.length || active == 0);
+        assert(frameIndex * localShadowCount < valid.length || active == 0);
 
         if(!enabled || draw is null || active == 0)
             return false;
@@ -792,10 +792,10 @@ final class SpotShadow
             return false;
 
         pass.recordTiles(buf, maps[frameIndex].renderedFrameBuffer, maps[frameIndex].renderExtent,
-            spotTileSize, active, draw);
+            localTileSize, active, draw);
 
         foreach(tile; 0 .. active)
-            valid[frameIndex * spotShadowCount + tile] = true;
+            valid[frameIndex * localShadowCount + tile] = true;
 
         return true;
     }

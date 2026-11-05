@@ -449,7 +449,7 @@ void main(string[] args)
     string eyeOption;
     string targetOption;
     bool noShadows;
-    bool noSpotShadows;
+    bool noLocalShadows;
     bool noSunShadows;
     bool noShadowCache;
     bool plainMode;
@@ -501,7 +501,7 @@ void main(string[] args)
         "eye", "override the camera position, x,y,z", &eyeOption,
         "target", "override the camera target, x,y,z", &targetOption,
         "no-shadows", "do not cast shadows", &noShadows,
-        "no-spot-shadows", "let the sun cast, but not the spot lights", &noSpotShadows,
+        "no-local-shadows", "let the sun cast, but not the local lights", &noLocalShadows,
         "no-sun-shadows", "let the spot lights cast, but not the sun", &noSunShadows,
         "no-shadow-cache", "redraw the shadow maps every frame", &noShadowCache,
         "plain", "draw every surface in the plain lit mode", &plainMode,
@@ -695,8 +695,8 @@ void main(string[] args)
 
     scene.sunShadow.enabled = !noShadows && !noSunShadows;
     scene.sunShadow.cache = !noShadowCache;
-    scene.spotShadow.enabled = !noShadows && !noSpotShadows;
-    scene.spotShadow.cache = !noShadowCache;
+    scene.localShadow.enabled = !noShadows && !noLocalShadows;
+    scene.localShadow.cache = !noShadowCache;
     scene.godotFactory.preloadShadows = !noShadows;
 
     if(scenePath.length == 0 && packPath.length == 0)
@@ -1859,20 +1859,20 @@ void main(string[] args)
                     shadowTotal += drawStats() - shadowStart;
                 },
                 (buf, tile) {
-                    auto spotStart = drawStats();
-                    const spotViewProj = scene.spotShadow.viewProj[tile] * wtb.model;
+                    auto localStart = drawStats();
+                    const localViewProj = scene.localShadow.viewProj[tile] * wtb.model;
 
-                    // A spot sees only its cone; the cells behind a wall still cast
-                    drawCells(levelIndex, buf, spotViewProj, shadowCells,
+                    // A local light sees only its cone; cells behind a wall still cast
+                    drawCells(levelIndex, buf, localViewProj, shadowCells,
                         frame.frameSets[0].descriptorSet, DrawPhase.shadow, CellCulling.cpu);
 
                     foreach(cell; proxyCells)
-                        if(!godotScene.drawProxy(buf, cell, spotViewProj,
+                        if(!godotScene.drawProxy(buf, cell, localViewProj,
                             frame.frameSets[0].descriptorSet, DrawPhase.shadow))
-                            drawCells(levelIndex, buf, spotViewProj, [cell],
+                            drawCells(levelIndex, buf, localViewProj, [cell],
                                 frame.frameSets[0].descriptorSet, DrawPhase.shadow, CellCulling.cpu);
 
-                    shadowTotal += drawStats() - spotStart;
+                    shadowTotal += drawStats() - localStart;
 
                 },
                 (buf) {

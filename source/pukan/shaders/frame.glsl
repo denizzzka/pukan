@@ -9,7 +9,7 @@ struct Light
     vec4 directionOuterCos; // spot: xyz = beam direction, w = cosine of the outer angle
     vec4 colorIntensity;    // rgb = colour times intensity
     vec4 params;            // x = type, y = cosine of the inner angle, z = shadow tile, w = bias
-    mat4 shadowViewProj;
+    mat4 shadowViewProj[6]; // spot: face 0; point: the six cube faces
 };
 
 struct FrameData
@@ -21,7 +21,7 @@ struct FrameData
     vec4 exposureParams; // x = exposure, y = IBL intensity, z = scene colour, w = light count
     vec4 shadowParams;   // x = 1 while the sun's shadow map is used, yzw = depth bias per cascade
     vec4 shadowSplits;   // xyz = far view depth of each cascade
-    vec4 spotShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
+    vec4 localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     vec4 ambientParams;  // rgb = ambient tint, a = ambient energy
     vec4 tonemapParams;  // x = mode, y = white
 };
