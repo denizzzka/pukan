@@ -888,11 +888,12 @@ Before each slice, read the matching reference named in
         one: the same compute, a `sampler2D` instead of a `sampler2DMS`, and
         the pass recorded after `resolveDepth`. That drops the extra read the
         two paths make today.
-  - [ ] Portals walk a room grid (`--portals`): each doorway's screen polygon is
-        clipped to the region the doorways before it left, the widest path wins
-        per room, and the shadow pass keeps every cell so a hidden room still
-        casts. The corridor keeps 27 of 63 rooms with a pixel-identical picture;
-        reading portals from authored Godot rooms is what is left.
+  - [ ] Portals read their doorways from a level's `Portal_<x>_<z>_<side>`
+        nodes and clip each doorway's screen polygon to the region the ones
+        before it left; the widest path wins per room, an eye on a wall plane
+        stands in both rooms, and the shadow pass keeps every cell so a hidden
+        room still casts. The corridor keeps 27 of 63 rooms with a
+        pixel-identical picture. A PVS bake on top of that graph is what is left.
 
 - **Shadows and lights**
   - [ ] Cascaded shadow maps around the camera, each cascade with its own culled
