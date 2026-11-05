@@ -456,6 +456,10 @@ private void reportProbe(
     float farPlane,
     in CellGrid grid,
     CollisionWorld collisionWorld,
+    bool characterDrawn,
+    in Vector3f characterCenter,
+    float characterRadius,
+    string characterText,
     string shadowText,
     string path,
 )
@@ -537,6 +541,16 @@ private void reportProbe(
             lines ~= "surface none";
     }
 
+    if(characterDrawn)
+    {
+        const toCenter = characterCenter - origin;
+        const along = toCenter.x * direction.x + toCenter.y * direction.y + toCenter.z * direction.z;
+        const offAxis = toCenter - direction * along;
+
+        if(along > 0.0f && offAxis.length <= characterRadius)
+            lines ~= format("character %s distance=%s", characterText, along);
+    }
+
     lines ~= format("shadows %s", shadowText);
     lines ~= format("cells   %s drawn", cells.length);
 
@@ -598,6 +612,8 @@ void main(string[] args)
     string pickOrigin;
     string pickDirection;
     string probeOption;
+    uint widthOption = width;
+    uint heightOption = height;
 
     auto getoptResult = getopt(
         args,
@@ -640,6 +656,8 @@ void main(string[] args)
         "pick", "report what a ray from this point hits, x,y,z", &pickOrigin,
         "pick-dir", "ray direction for --pick, x,y,z", &pickDirection,
         "probe", "report what the scene shows at screen pixel x,y", &probeOption,
+        "width", "window or offscreen width in pixels, 800 by default", &widthOption,
+        "height", "window or offscreen height in pixels, 600 by default", &heightOption,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
         "debug-capsule", "draw the character collision capsule", &debugCapsule,
         "model", "character model path; defaults to CesiumMan", &modelOption,
@@ -703,7 +721,8 @@ void main(string[] args)
         enforce(glfwVulkanSupported());
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        window = glfwCreateWindow(width, height, "pukan Godot scene".toStringz, null, null);
+        window = glfwCreateWindow(cast(int) widthOption, cast(int) heightOption,
+            "pukan Godot scene".toStringz, null, null);
         enforce(window, "Cannot create a window");
         glfwSetCursorPosCallback(window, &onCursorPos);
         glfwSetScrollCallback(window, &onScroll);
@@ -805,7 +824,8 @@ void main(string[] args)
 
     Scene scene;
     if(offscreen)
-        scene = new Scene(device, VkExtent2D(width, height), VK_FORMAT_R8G8B8A8_SRGB, "demo_godot");
+        scene = new Scene(device, VkExtent2D(widthOption, heightOption),
+            VK_FORMAT_R8G8B8A8_SRGB, "demo_godot");
     else
         scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat, "demo_godot");
     scope(exit) destroy(scene);
@@ -1948,7 +1968,16 @@ void main(string[] args)
 
                 reportProbe(scenePath, levelIndex, activeCells, nearCells, proxyCells, farCells,
                     modelViewProj, scene.swapChain.imageExtent, probePixelX, probePixelY, camera,
-                    nearPlane, farPlane, scene.cellGrid, collisionWorld, shadowText, reportPath);
+                    nearPlane, farPlane, scene.cellGrid, collisionWorld,
+                    characterModel !is null && characterMode,
+                    (mover ? mover.state.position : characterRenderPosition)
+                        + scene.up.axisVector * (characterBody.height * 0.5f),
+                    max(characterBody.radius, characterBody.height * 0.5f),
+                    format("model=%s position=%s motion=%s",
+                        modelOption.length ? modelOption : "demo/assets/motion/UAL1_Standard_RM.glb",
+                        mover ? mover.state.position : characterRenderPosition,
+                        motionReady),
+                    shadowText, reportPath);
 
                 if(probeFromKeyboard)
                     scene.captureFrame(reportPath[0 .. $ - 4] ~ ".png");
