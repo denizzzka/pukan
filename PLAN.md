@@ -701,13 +701,15 @@ screen.
 ## Lighting
 
 The frame carries a light list in a storage buffer: the sun, then point and spot
-lights, sixteen entries in total. The sun casts a single 1024x1024 shadow map
-with a normal offset and one filtered comparison; it is fitted to the loaded
-scene when the app supplies its bounds. Only the sun casts; there are no
-cascades and no local-light shadows. Missing:
+lights, sixteen entries in total. The sun casts three 1024x1024 shadow maps, one
+per cascade: the camera frustum splits with a practical split, each slice is
+fitted to its own orthographic map and snapped to a world grid of whole texels,
+and the fragment shader picks a cascade by clip w and samples that binding. The
+last cascade stops at the level's bounds. Only the sun casts; there are no
+local-light shadows. Missing:
 
-- [ ] Cascaded directional maps; the sun keeps one fitted orthographic map until
-      then.
+- [x] Cascaded directional maps: three cascades fitted to the camera frustum,
+      clamped to the level's bounds, with a depth bias matched to each range.
 - [ ] Local-light shadows on top of `SunShadow`: an atlas of spot tiles first,
       then point lights as a cubemap or six tiles, with per-light matrices,
       tile metadata in the frame data and per-tile cache validity.
