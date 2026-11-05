@@ -1074,14 +1074,10 @@ void main(string[] args)
                 break;
 
             case GodotLightKind.point:
-                if(scene.activeLightCount >= maxLights)
-                    break;
                 scene.addPointLight(light.position, light.color * light.energy * 8.0f, light.range);
                 break;
 
             case GodotLightKind.spot:
-                if(scene.activeLightCount >= maxLights)
-                    break;
                 scene.addSpotLight(
                     light.position,
                     light.direction,
@@ -1962,9 +1958,9 @@ void main(string[] args)
             if(probePending && (probeFromKeyboard || frameIndex == captureFrame))
             {
                 const reportPath = format("probe-%s-%s-%s.txt", frameIndex, probePixelX, probePixelY);
-                const shadowText = format("sun=%s local=%s tiles=%s lights=%s",
+                const shadowText = format("sun=%s local=%s tiles=%s lights=%s/%s",
                     scene.sunShadow.enabled, scene.localShadow.enabled,
-                    scene.localShadow.active, scene.activeLightCount);
+                    scene.localShadow.active, scene.selectedLightCount, scene.activeLightCount);
 
                 reportProbe(scenePath, levelIndex, activeCells, nearCells, proxyCells, farCells,
                     modelViewProj, scene.swapChain.imageExtent, probePixelX, probePixelY, camera,

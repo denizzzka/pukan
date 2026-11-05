@@ -105,6 +105,8 @@ class SceneWith(Modules...)
     /// Partition of the world that cells and streaming work from
     CellGrid cellGrid;
 
+    /// Every light the level added, the sun first
+    private Light[] candidates;
     /// Uploaded with the frame; the first entry is the sun
     private Light[maxLights] lights;
     private uint lightCount;
@@ -153,7 +155,7 @@ class SceneWith(Modules...)
     {
         const dir = direction.normalized;
 
-        lights[0] = Light(
+        candidates[0] = Light(
             Vector4f(dir.x, dir.y, dir.z, 0),
             Vector4f(0, 0, 0, 0),
             Vector4f(color.x * intensity, color.y * intensity, color.z * intensity, 0),
@@ -163,16 +165,19 @@ class SceneWith(Modules...)
         sunShadow.invalidate();
     }
 
-    /// Number of lights already added, including the sun
-    uint activeLightCount() const => lightCount;
+    /// Lights the level added, including the sun
+    uint activeLightCount() const => cast(uint) candidates.length;
+
+    /// Lights the last frame uploaded, after culling
+    uint selectedLightCount() const => lightCount;
 
     private void addLight(Light light)
     {
         import std.exception: enforce;
 
-        enforce(lightCount < maxLights, "too many lights");
+        enforce(candidates.length < maxSceneLights, "too many lights");
 
-        lights[lightCount++] = light;
+        candidates ~= light;
 
         if(localShadow)
             localShadow.invalidate();
@@ -239,13 +244,12 @@ class SceneWith(Modules...)
         sceneOwner = new ResourceOwner!false("scene", device.rootOwner.releaseQueue);
 
         const sun = Vector3f(0.35f, 0.5f, -0.8f).normalized;
-        lights[0] = Light(
+        candidates ~= Light(
             Vector4f(sun.x, sun.y, sun.z, 0),
             Vector4f(0, 0, 0, 0),
             Vector4f(1, 1, 1, 1),
             Vector4f(cast(float) LightType.directional, 0, 0, 0),
         );
-        lightCount = 1;
 
         if(surface)
             device.physicalDevice.instance.useSurface(surface);
@@ -758,6 +762,9 @@ class SceneWith(Modules...)
         );
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
+        selectLights(camera, wtb.proj, swapChain.imageExtent.height);
+
+
         data.exposureParams = Vector4f(
             exposure,
             iblIntensity,
@@ -772,6 +779,54 @@ class SceneWith(Modules...)
         (cast(Light[]) lightBuffer.cpuBuf[0 .. lightBytes])[] = lights[0 .. lightCount];
 
         frame.frameSets[eye].update(data);
+    }
+
+    /// Fills the frame list with the sun and the local lights that cover the most pixels
+    private void selectLights(in Vector3f camera, in Matrix4x4f proj, uint viewportHeight)
+    {
+        import std.algorithm: max, min, sort;
+        import std.math: abs;
+
+        struct Candidate
+        {
+            size_t index;
+            float score;
+        }
+
+        Candidate[] locals;
+
+        // The sun always keeps the first slot
+        lights[0] = candidates[0];
+
+        // Pixels a one-unit sphere covers at distance one
+        const focal = abs(proj.a22) * viewportHeight * 0.5f;
+
+        foreach(i; 1 .. candidates.length)
+        {
+            const light = candidates[i];
+            const kind = cast(uint) light.params.x;
+
+            if(kind != LightType.point && kind != LightType.spot)
+                continue;
+
+            const position = Vector3f(light.positionRadius.x, light.positionRadius.y, light.positionRadius.z);
+            const range = max(light.positionRadius.w, 0.01f);
+            const distance = max((position - camera).length, 0.01f);
+            const pixels = range / distance * focal;
+
+            if(pixels < 1.0f)
+                continue;
+
+            locals ~= Candidate(i, pixels);
+        }
+
+        locals.sort!((a, b) => a.score > b.score)();
+
+        const take = min(locals.length, maxLights - 1);
+        lightCount = 1 + cast(uint) take;
+
+        foreach(i; 0 .. take)
+            lights[1 + i] = candidates[locals[i].index];
     }
 
     /// Fits the shadowed local lights into tiles, nearest to the camera first
@@ -1389,6 +1444,8 @@ struct WorldTransformation
 }
 
 enum maxLights = 16;
+/// Lights a level may add; the frame keeps the most visible ones
+enum maxSceneLights = 256;
 
 enum LightType : uint
 {
