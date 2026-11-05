@@ -419,7 +419,6 @@ class CylinderRenderer : DrawablePrimitive
         const technique = pipelines.declare(RenderTechnique(
             name: "cylinders",
             stages: shaderStages(),
-            // The instance basis is left-handed, so its winding is reversed.
             state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
         ), 1);
 

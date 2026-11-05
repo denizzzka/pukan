@@ -9,7 +9,7 @@ import pukan.vulkan.computation: Compute;
 import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.memory: MemoryBuffer, MemoryBufferMappedToCPU, TransferBuffer;
-import pukan.vulkan.pipelines: GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
+import pukan.vulkan.pipelines: FixedState, GraphicsPipelineCfg, PipelineFactory, RenderTechnique;
 import pukan.vulkan.renderpass: RenderPass;
 import pukan.vulkan.requirements: Requirement;
 import pukan.graphics.common.shaders: shaderStage;
@@ -341,6 +341,7 @@ class SphereRenderer : DrawablePrimitive
         const technique = pipelines.declare(RenderTechnique(
             name: "spheres",
             stages: shaderStages(),
+            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
         ), 1);
 
         auto allocator = pipelines.descriptorAllocator(technique);
@@ -356,6 +357,7 @@ class SphereRenderer : DrawablePrimitive
         const shadowTechnique = pipelines.declare(RenderTechnique(
             name: "spheres shadow",
             stages: shadowShaderStages(),
+            state: FixedState(frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE),
         ), 1);
 
         shadowPipelineCfg = pipelines.acquire(shadowTechnique, shadowPass, 0);
