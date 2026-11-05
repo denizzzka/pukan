@@ -67,8 +67,10 @@ struct PortalGrid
         int x, z;
         roomOf(eye, x, z);
 
-        const region = Rect(0, 0, 1, 1);
-        walk(x, z, region, 0, maxDepth, seen, widest, viewProj);
+        // The whole screen, wound the way the clip expects
+        Point[] screen = [Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)];
+        normalize(screen);
+        walk(x, z, screen, 0, maxDepth, seen, widest, viewProj);
 
         return seen;
     }
@@ -76,7 +78,7 @@ struct PortalGrid
     private void walk(
         int x,
         int z,
-        in Rect region,
+        scope const(Point)[] region,
         int depth,
         int maxDepth,
         ref bool[long] seen,
@@ -85,16 +87,17 @@ struct PortalGrid
     )
     {
         const key = cast(long) x * rooms + z;
+        const size = area(region);
 
         // A room reached again through a wider doorway can see further
         if(auto previous = key in widest)
-            if(region.area <= *previous)
+            if(size <= *previous)
                 return;
 
-        widest[key] = region.area;
+        widest[key] = size;
         seen[key] = true;
 
-        if(depth >= maxDepth)
+        if(depth >= maxDepth || region.length < 3)
             return;
 
         foreach(side; 0 .. 4)
@@ -105,104 +108,203 @@ struct PortalGrid
             if(!inside(nx, nz))
                 continue;
 
-            if((cast(long) nx * rooms + nz) in seen)
+            Point[4] doorway;
+            bool spans;
+
+            if(!projectDoorway(x, z, side, viewProj, doorway, spans))
                 continue;
 
-            Rect doorway;
+            // A doorway crossing the eye plane spans the whole region
+            const narrowed = spans
+                ? region.dup
+                : clip(doorway[], region);
 
-            if(!doorwayOf(x, z, side, viewProj, doorway))
+            if(narrowed.length < 3)
                 continue;
 
-            const overlap = region.intersect(doorway);
-
-            // The doorway has to overlap what the eye can see through the ones before
-            if(overlap.empty)
-                continue;
-
-            walk(nx, nz, overlap, depth + 1, maxDepth, seen, widest, viewProj);
+            walk(nx, nz, narrowed, depth + 1, maxDepth, seen, widest, viewProj);
         }
     }
 
-    /// Screen rectangle of the doorway on `side` of room (x, z); false when it
-    /// reaches behind the eye, where the walk gives up on rectangles
-    private bool doorwayOf(int x, int z, int side, in Matrix4x4f viewProj, out Rect rect)
+    /// Screen quad of the doorway on `side` of room (x, z)
+    private bool projectDoorway(
+        int x,
+        int z,
+        int side,
+        in Matrix4x4f viewProj,
+        out Point[4] corners,
+        out bool spans,
+    )
     {
         // The wall plane sits between the two rooms, the doorway in its middle
         const half = roomSize * 0.5f;
         const centre = Vector3f(x * roomSize + half, doorwayHeight * 0.5f, z * roomSize + half);
         const along = doorwayWidth * 0.5f;
 
-        Vector3f[4] corners;
+        spans = false;
 
         foreach(i; 0 .. 4)
         {
             const u = (i == 0 || i == 3) ? -along : along;
             const v = (i < 2) ? -doorwayHeight * 0.5f : doorwayHeight * 0.5f;
 
+            Vector3f corner;
+
             switch(side)
             {
-                case 0: corners[i] = centre + Vector3f(u, v, -half); break;
-                case 1: corners[i] = centre + Vector3f(u, v, half); break;
-                case 2: corners[i] = centre + Vector3f(-half, v, u); break;
-                default: corners[i] = centre + Vector3f(half, v, u); break;
+                case 0: corner = centre + Vector3f(u, v, -half); break;
+                case 1: corner = centre + Vector3f(u, v, half); break;
+                case 2: corner = centre + Vector3f(-half, v, u); break;
+                default: corner = centre + Vector3f(half, v, u); break;
             }
-        }
 
-        float left = float.infinity;
-        float right = -float.infinity;
-        float top = float.infinity;
-        float bottom = -float.infinity;
+            const clipPoint = Vector4f(corner.x, corner.y, corner.z, 1) * viewProj;
 
-        foreach(corner; corners)
-        {
-            const clip = Vector4f(corner.x, corner.y, corner.z, 1) * viewProj;
-
-            // A doorway crossing the eye plane spans whatever the region is
-            if(!(clip.w > 0))
+            if(!(clipPoint.w > 0))
             {
-                rect = Rect(0, 0, 1, 1);
+                spans = true;
                 return true;
             }
 
-            const sx = clip.x / clip.w * 0.5f + 0.5f;
-            const sy = 0.5f - clip.y / clip.w * 0.5f;
-
-            left = sx < left ? sx : left;
-            right = sx > right ? sx : right;
-            top = sy < top ? sy : top;
-            bottom = sy > bottom ? sy : bottom;
+            corners[i] = Point(
+                clipPoint.x / clipPoint.w * 0.5f + 0.5f,
+                0.5f - clipPoint.y / clipPoint.w * 0.5f,
+            );
         }
 
-        rect = Rect(left, top, right, bottom);
+        normalize(corners[]);
+
+        // A doorway grazing the region edge still lets a sliver through, and the
+        // clip would drop the room behind it
+        float cx = 0;
+        float cy = 0;
+
+        foreach(corner; corners)
+        {
+            cx += corner.x;
+            cy += corner.y;
+        }
+
+        cx /= 4;
+        cy /= 4;
+
+        foreach(ref corner; corners)
+        {
+            corner.x += (corner.x - cx) * grazing;
+            corner.y += (corner.y - cy) * grazing;
+        }
 
         return true;
     }
 
-    /// A rectangle in screen space, 0 to 1 on both axes
-    private struct Rect
+    /// How much a doorway grows before the clip, so a grazing view keeps its room
+    enum float grazing = 0.01f;
+
+    /// A point in screen space, 0 to 1 on both axes
+    private struct Point
     {
-        float left;
-        float top;
-        float right;
-        float bottom;
+        float x;
+        float y;
+    }
 
-        bool empty() const => right <= left || bottom <= top;
+    /// Screen area of a polygon, for the widest-path test
+    private static float area(scope const(Point)[] polygon)
+    {
+        float total;
 
-        float area() const => empty ? 0 : (right - left) * (bottom - top);
-
-        Rect intersect(in Rect other) const
+        foreach(i; 0 .. polygon.length)
         {
-            Rect result;
-            result.left = left > other.left ? left : other.left;
-            result.top = top > other.top ? top : other.top;
-            result.right = right < other.right ? right : other.right;
-            result.bottom = bottom < other.bottom ? bottom : other.bottom;
-
-            if(result.empty)
-                return Rect(0, 0, 0, 0);
-
-            return result;
+            const a = polygon[i];
+            const b = polygon[(i + 1) % polygon.length];
+            total += a.x * b.y - b.x * a.y;
         }
+
+        return total < 0 ? -total * 0.5f : total * 0.5f;
+    }
+
+    /// Turns a convex polygon the way the clip expects
+    private static void normalize(Point[] polygon)
+    {
+        float signed;
+
+        foreach(i; 0 .. polygon.length)
+        {
+            const a = polygon[i];
+            const b = polygon[(i + 1) % polygon.length];
+            signed += a.x * b.y - b.x * a.y;
+        }
+
+        if(signed >= 0)
+            return;
+
+        foreach(i; 0 .. polygon.length / 2)
+        {
+            const swap = polygon[i];
+            polygon[i] = polygon[polygon.length - 1 - i];
+            polygon[polygon.length - 1 - i] = swap;
+        }
+    }
+
+    /// The interior side of an edge, for the winding `normalize` leaves
+    private static bool insideEdge(in Point a, in Point b, in Point p)
+    {
+        return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) <= 0;
+    }
+
+    /// Sutherland-Hodgman: the part of `subject` inside the convex `region`
+    private static Point[] clip(in Point[] subject, scope const(Point)[] region)
+    {
+        Point[] output = subject.dup;
+
+        foreach(i; 0 .. region.length)
+        {
+            if(output.length == 0)
+                break;
+
+            const a = region[i];
+            const b = region[(i + 1) % region.length];
+
+            Point[] input = output;
+            output = null;
+
+            foreach(j; 0 .. input.length)
+            {
+                const current = input[j];
+                const previous = input[(j + input.length - 1) % input.length];
+
+                const currentIn = insideEdge(a, b, current);
+                const previousIn = insideEdge(a, b, previous);
+
+                if(currentIn != previousIn)
+                    output ~= crossing(previous, current, a, b);
+
+                if(currentIn)
+                    output ~= current;
+            }
+        }
+
+        if(output.length >= 3)
+            normalize(output);
+
+        return output;
+    }
+
+    /// Where the segment from `p` to `q` meets the line through `a` and `b`
+    private static Point crossing(in Point p, in Point q, in Point a, in Point b)
+    {
+        const dx = q.x - p.x;
+        const dy = q.y - p.y;
+        const ex = b.x - a.x;
+        const ey = b.y - a.y;
+
+        const denominator = dx * ey - dy * ex;
+
+        if(denominator == 0)
+            return q;
+
+        const t = ((a.x - p.x) * ey - (a.y - p.y) * ex) / denominator;
+
+        return Point(p.x + dx * t, p.y + dy * t);
     }
 }
 
