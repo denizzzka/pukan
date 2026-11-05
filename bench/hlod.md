@@ -147,30 +147,59 @@ camera in the corner room looking down a corridor, 20 measured frames.
 
 | View | Portal walk | Cells | Draws | Triangles | Frame mean | p50 |
 |---|---|---|---|---|---|---|
-| down a corridor | off | 63 | 276 | 3,312 | 20.35 ms | 20 |
-| down a corridor | walk | 27 | 96 | 1,152 | 17.20 ms | 17 |
-| down a corridor | baked PVS | 55 | 260 | 3,120 | 20.30 ms | 20 |
-| diagonal | off | 63 | 276 | 3,312 | 19.65 ms | 20 |
-| diagonal | walk | 36 | 194 | 2,328 | 17.10 ms | 17 |
+| down a corridor | off | 63 | 276 | 3,312 | 17.20 ms | 17 |
+| down a corridor | walk | 27 | 96 | 1,152 | 13.00 ms | 13 |
+| down a corridor | baked PVS | 55 | 260 | 3,120 | 17.10 ms | 17 |
+| diagonal | off | 63 | 276 | 3,312 | 18.25 ms | 17 |
+| diagonal | walk | 36 | 194 | 2,328 | 13.65 ms | 14 |
+| diagonal | baked PVS | 42 | 229 | 2,748 | 16.00 ms | 16 |
 
 The bake takes 2.4 s for 36 rooms and sixteen directions, and keeps 55 rooms
-where the walk keeps 27: a wedge of 22.5 degrees is far coarser than the view,
-and the bake eye sits at a room centre. The walk costs microseconds at sixty
-doorways, so PVS is all cost and no gain here; it needs hundreds of doorways,
-finer sectors, and an offline bake before it pays.
+where the walk keeps 27 down the corridor, and 42 where the walk keeps 36 on
+the diagonal: a wedge of 22.5 degrees is far coarser than the view, and the
+bake eye sits at a room centre. The walk costs microseconds at sixty doorways,
+so PVS is all cost and no gain here; it needs hundreds of doorways, finer
+sectors, and an offline bake before it pays.
 
 The pictures are pixel identical for every camera tested, five of them,
 including two diagonals and one exactly on a wall plane: the walk only drops
 rooms no doorway reaches. The doorways come from the level's own
-`Portal_<x>_<z>_<side>` nodes, not from the grid. The shadow pass keeps every cell, because a room behind a wall still
-casts into the rooms in view. A camera exactly on a wall plane still differs -
-the walk then starts inside the wall it should look through - which is a camera
-placement the game will not use.
+`Portal_<x>_<z>_<side>` nodes, not from the grid. The shadow pass keeps every
+cell, because a room behind a wall still casts into the rooms in view.
 
 The region is the doorway's screen polygon now, not its box, so a doorway seen
 at an angle stops opening half the screen. That is why the diagonal view keeps
 36 rooms: the rectangle walk kept 28 by dropping rooms at their first arrival,
 not by geometry.
+
+## Cascades on the town and the hall
+
+Three 1024 maps split the camera frustum with a practical split, each fitted to
+its slice and clamped to the level's reach. On the hall's corridor the splits
+fall at 11.9, 27.1 and 100 m, with 2.0, 4.0 and 15.2 cm texels; the single map
+over the level's bounds had 13 cm for everything.
+
+| Scene | Camera | Shadows | Frame mean | Shadow draws | Shadow triangles |
+|---|---|---|---|---|---|
+| hall corridor | still | off | 12.85 ms | 0 | 0 |
+| hall corridor | still | on | 13.95 ms | cached | cached |
+| town | still | off | 36.65 ms | 0 | 0 |
+| town | still | on | 59.20 ms | 329 | 197,105 |
+| town | walking | off | 36.17 ms | 0 | 0 |
+| town | walking | on | 56.60 ms | 328 | 195,359 |
+| platformer | walking | off | 29.33 ms | 0 | 0 |
+| platformer | walking | on | 33.80 ms | 50 | 2,832 |
+
+A still camera keeps its maps: the hall pays 1.1 ms for the three shadow
+samplings and nothing for the passes after the first frames. The town camera
+never settles from its spring, so every frame changes the fit and the three
+maps are drawn again; that costs 20 ms against the same scene without shadows.
+The platformer moves too but its level is small.
+
+The pictures are pixel identical with and without portals on the hall's
+corridor and edge cameras, and the stage differs from the single map by 11
+pixels. The corridor no longer shows sun through a wall: the light's near plane
+now reaches back past the casters above the slice.
 
 ## What the numbers say
 
