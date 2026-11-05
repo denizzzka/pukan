@@ -147,12 +147,12 @@ camera in the corner room looking down a corridor, 20 measured frames.
 
 | View | Portal walk | Cells | Draws | Triangles | Frame mean | p50 |
 |---|---|---|---|---|---|---|
-| down a corridor | off | 63 | 276 | 3,312 | 17.20 ms | 17 |
-| down a corridor | walk | 27 | 96 | 1,152 | 13.00 ms | 13 |
-| down a corridor | baked PVS | 55 | 260 | 3,120 | 17.10 ms | 17 |
-| diagonal | off | 63 | 276 | 3,312 | 18.25 ms | 17 |
-| diagonal | walk | 36 | 194 | 2,328 | 13.65 ms | 14 |
-| diagonal | baked PVS | 42 | 229 | 2,748 | 16.00 ms | 16 |
+| down a corridor | off | 63 | 276 | 3,312 | 17.90 ms | 18 |
+| down a corridor | walk | 27 | 96 | 1,152 | 13.75 ms | 14 |
+| down a corridor | baked PVS | 55 | 260 | 3,120 | 17.80 ms | 18 |
+| diagonal | off | 63 | 276 | 3,312 | 18.35 ms | 18 |
+| diagonal | walk | 36 | 194 | 2,328 | 14.15 ms | 14 |
+| diagonal | baked PVS | 42 | 229 | 2,748 | 18.00 ms | 18 |
 
 The bake takes 2.4 s for 36 rooms and sixteen directions, and keeps 55 rooms
 where the walk keeps 27 down the corridor, and 42 where the walk keeps 36 on
