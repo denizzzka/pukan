@@ -35,6 +35,7 @@ import std.getopt: defaultGetoptPrinter, getopt;
 import std.meta: AliasSeq;
 import std.stdio: stderr, writeln;
 import std.algorithm: endsWith, startsWith;
+import std.array: join;
 import std.conv: to;
 import std.string: split, toStringz;
 
@@ -438,6 +439,113 @@ struct StreamTotals
     size_t frames;
 }
 
+/// Reports what a screen pixel points at, so a fault can be named and found
+private void reportProbe(
+    string scenePath,
+    CellIndex!DrawItem levelIndex,
+    scope const(CellCoord)[] cells,
+    scope const(CellCoord)[] nearCells,
+    scope const(CellCoord)[] proxyCells,
+    scope const(CellCoord)[] farCells,
+    in Matrix4x4f viewProj,
+    VkExtent2D extent,
+    int pixelX,
+    int pixelY,
+    in FlyCamera camera,
+    float nearPlane,
+    float farPlane,
+    in CellGrid grid,
+    CollisionWorld collisionWorld,
+    string shadowText,
+    string path,
+)
+{
+    import std.file: write;
+
+    const inverse = viewProj.inverse;
+    const ndcX = 2.0f * (pixelX + 0.5f) / extent.width - 1.0f;
+    const ndcY = 2.0f * (pixelY + 0.5f) / extent.height - 1.0f;
+
+    Vector3f unproject(float z)
+    {
+        const p = Vector4f(ndcX, ndcY, z, 1) * inverse;
+        return Vector3f(p.x, p.y, p.z) / p.w;
+    }
+
+    const origin = unproject(0);
+    const direction = (unproject(1) - origin).normalized;
+
+    string[] lines = [
+        format("probe %s,%s of %sx%s", pixelX, pixelY, extent.width, extent.height),
+        format("scene   %s", scenePath),
+        format("camera  position=%s forward=%s fov=%s near=%s far=%s",
+            camera.position, camera.forward, camera.fov, nearPlane, farPlane),
+        format("ray     origin=%s direction=%s", origin, direction),
+    ];
+
+    DrawItem item;
+    float distance;
+
+    if(levelIndex.raycast(cells, origin, direction, float.max, item, distance))
+    {
+        string partName;
+
+        if(item.part != wholePart)
+            partName = (cast(PartDrawable) item.drawable).partName(item.part);
+        else if(auto level = cast(GodotScene) item.drawable)
+            partName = level.name;
+        else if(auto gltf = cast(GlTF) item.drawable)
+            partName = gltf.possibleName;
+
+        const point = origin + direction * distance;
+        const cell = grid.of(point);
+
+        string ring = "hidden";
+
+        foreach(ringCell; nearCells)
+            if(ringCell == cell)
+                ring = "near";
+
+        foreach(ringCell; proxyCells)
+            if(ringCell == cell)
+                ring = "proxy";
+
+        foreach(ringCell; farCells)
+            if(ringCell == cell)
+                ring = "far";
+
+        if(distance < 1e-3f)
+            lines ~= format("hit     \"%s\" ring=%s cell=(%s,%s,%s); camera inside its bounds",
+                partName, ring, cell.x, cell.y, cell.z);
+        else
+            lines ~= format("hit     \"%s\" ring=%s cell=(%s,%s,%s) distance=%s point=%s",
+                partName, ring, cell.x, cell.y, cell.z, distance, point);
+
+        lines ~= format("bounds  min=%s max=%s", item.bounds.min, item.bounds.max);
+    }
+    else
+        lines ~= "hit     nothing";
+
+    if(collisionWorld)
+    {
+        const surface = collisionWorld.raycast(origin, direction);
+
+        if(surface.hit)
+            lines ~= format("surface point=%s normal=%s collider=%s",
+                surface.point, surface.normal, surface.collider);
+        else
+            lines ~= "surface none";
+    }
+
+    lines ~= format("shadows %s", shadowText);
+    lines ~= format("cells   %s drawn", cells.length);
+
+    const text = lines.join("\n");
+    writeln(text);
+    write(path, text ~ "\n");
+    writeln("state written to ", path);
+}
+
 void main(string[] args)
 {
     string scenePath;
@@ -489,6 +597,7 @@ void main(string[] args)
     uint warmup;
     string pickOrigin;
     string pickDirection;
+    string probeOption;
 
     auto getoptResult = getopt(
         args,
@@ -530,6 +639,7 @@ void main(string[] args)
         "warmup", "frames the stats leave out, for loading and merging", &warmup,
         "pick", "report what a ray from this point hits, x,y,z", &pickOrigin,
         "pick-dir", "ray direction for --pick, x,y,z", &pickDirection,
+        "probe", "report what the scene shows at screen pixel x,y", &probeOption,
         "no-spring-arm", "keep the third-person camera at a fixed distance", &noSpringArm,
         "debug-capsule", "draw the character collision capsule", &debugCapsule,
         "model", "character model path; defaults to CesiumMan", &modelOption,
@@ -547,6 +657,22 @@ void main(string[] args)
     {
         defaultGetoptPrinter("pukan Godot scene demo", getoptResult.options);
         return;
+    }
+
+    int probePixelX;
+    int probePixelY;
+    bool probePending;
+    bool probeFromKeyboard;
+    bool probeKeyWasDown;
+
+    if(probeOption.length)
+    {
+        const pixel = probeOption.split(",");
+
+        enforce(pixel.length == 2, "--probe takes x,y");
+        probePixelX = pixel[0].to!int;
+        probePixelY = pixel[1].to!int;
+        probePending = true;
     }
 
     if(noCharacter)
@@ -1143,8 +1269,8 @@ void main(string[] args)
 
     if(!offscreen)
         writeln(characterMode
-            ? "character: WASD move, right mouse look, middle mouse orbit, Space jump, V third person"
-            : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
+            ? "character: WASD move, right mouse look, middle mouse orbit, Space jump, V third person, P probe"
+            : "camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal), P probe");
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
     // Cells stream around the camera unless every cell is asked for at once
@@ -1562,6 +1688,39 @@ void main(string[] args)
         else if(!offscreen)
             updateCamera(camera, window, dt);
 
+        if(!offscreen)
+        {
+            const bool probeKey = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
+
+            if(probeKey && !probeKeyWasDown)
+            {
+                int fbWidth, fbHeight;
+                int windowWidth, windowHeight;
+
+                glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+                glfwGetWindowSize(window, &windowWidth, &windowHeight);
+
+                double cursorX, cursorY;
+                glfwGetCursorPos(window, &cursorX, &cursorY);
+
+                // A held look button owns the cursor, so the crosshair probes then
+                const bool captured =
+                    glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS
+                    || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS;
+
+                probePixelX = captured
+                    ? fbWidth / 2
+                    : cast(int) (cursorX * fbWidth / max(windowWidth, 1));
+                probePixelY = captured
+                    ? fbHeight / 2
+                    : cast(int) (cursorY * fbHeight / max(windowHeight, 1));
+                probePending = true;
+                probeFromKeyboard = true;
+            }
+
+            probeKeyWasDown = probeKey;
+        }
+
         Matrix4x4f characterTransform = Matrix4x4f.identity();
 
         if(characterMode && characterModel)
@@ -1779,6 +1938,24 @@ void main(string[] args)
 
                     farCells ~= cell;
                 }
+
+            if(probePending && (probeFromKeyboard || frameIndex == captureFrame))
+            {
+                const reportPath = format("probe-%s-%s-%s.txt", frameIndex, probePixelX, probePixelY);
+                const shadowText = format("sun=%s local=%s tiles=%s lights=%s",
+                    scene.sunShadow.enabled, scene.localShadow.enabled,
+                    scene.localShadow.active, scene.activeLightCount);
+
+                reportProbe(scenePath, levelIndex, activeCells, nearCells, proxyCells, farCells,
+                    modelViewProj, scene.swapChain.imageExtent, probePixelX, probePixelY, camera,
+                    nearPlane, farPlane, scene.cellGrid, collisionWorld, shadowText, reportPath);
+
+                if(probeFromKeyboard)
+                    scene.captureFrame(reportPath[0 .. $ - 4] ~ ".png");
+
+                probePending = false;
+                probeFromKeyboard = false;
+            }
 
             DepthRaster raster;
             scope(exit) currentOcclusion = null;
