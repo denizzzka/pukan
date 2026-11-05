@@ -888,9 +888,11 @@ Before each slice, read the matching reference named in
         one: the same compute, a `sampler2D` instead of a `sampler2DMS`, and
         the pass recorded after `resolveDepth`. That drops the extra read the
         two paths make today.
-  - [ ] Portals and PVS for closed interiors: a room graph with portal frustums,
-        so rooms behind walls never enter the list. Judge it against HiZ inside
-        the truck town interiors.
+  - [ ] Portals walk a room grid already (`--portals`): each doorway is projected
+        and kept only where the doorways before it left room, so a room behind a
+        wall never enters the list; on the hall it halves the frame. The regions
+        are rectangles, so the walk over-opens - narrowing them to the portal
+        polygon is the next step.
 
 - **Shadows and lights**
   - [ ] Cascaded shadow maps around the camera, each cascade with its own culled
