@@ -52,6 +52,20 @@ godot --headless --path hlod_field --script res://generate.gd
 The scene is 10 km across, so the demo's default streaming range loads only the
 villages near the spawn; `--no-cells` loads the whole field.
 
+## Portal hall
+
+`portal_hall/` is generated here by `generate.gd`: a 6 by 6 grid of 16 m rooms
+with a doorway in every shared wall, and `portal_hall.json` telling the engine
+where the rooms and doorways are. It is the test bed for portal culling, which
+walks the room graph and draws only the rooms the doorways reach.
+
+```sh
+godot --headless --path portal_hall --script res://generate.gd
+```
+
+Run it with cells the size of a room: `--cell-size 16 --no-cells`, then
+`--portals portal_hall/portal_hall.json` turns the walk on.
+
 ## Cutout shadow
 
 `cutout_shadow/` is not upstream: a checkered alpha-scissor quad and an opaque

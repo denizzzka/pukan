@@ -3,6 +3,7 @@ import pukan;
 import pukan.graphics.g3d.axes: axisVector;
 import pukan.graphics.g3d.impostor: CellImpostor, Impostors;
 import pukan.graphics.g3d.occlusion: DepthRaster, currentOcclusion;
+import pukan.graphics.g3d.portals: PortalGrid;
 import pukan.graphics.common.misc: Boxf, hasBounds, trsMatrix;
 import pukan.gltf.motion_sampler: MotionSampler;
 import pukan.motion_matching.database: Clip, Database, invalidSample;
@@ -402,6 +403,8 @@ void main(string[] args)
     bool occlusion;
     bool occlusionGpu;
     bool trace;
+    float cellSize = 64.0f;
+    string portalPath;
     bool stats;
     uint warmup;
     string pickOrigin;
@@ -436,6 +439,8 @@ void main(string[] args)
         "occlusion", "skip parts the near ones hide, tested against a coarse CPU depth grid", &occlusion,
         "occlusion-gpu", "let the cull kernel drop instances the last frame's depth covers", &occlusionGpu,
         "trace", "print a line whenever cells enter or leave, with the frame cost", &trace,
+        "cell-size", "extent of a streaming cell in metres, 64 by default", &cellSize,
+        "portals", "walk this room grid and draw only the rooms its doorways reach", &portalPath,
         "impostor-range", "keep the card of a dropped cell until this distance", &impostorRange,
         "stats", "report draws, triangles and frame time per ring at the end", &stats,
         "warmup", "frames the stats leave out, for loading and merging", &warmup,
@@ -762,6 +767,12 @@ void main(string[] args)
     if(occlusion || occlusionGpu)
         scene.enableOcclusionDepth(192, 144);
 
+    PortalGrid portals;
+    const bool hasPortals = portalPath.length != 0;
+
+    if(hasPortals)
+        portals = PortalGrid.load(portalPath);
+
     printSkippedTypes("nodes not rendered", godotScene.skippedNodeTypes);
     printSkippedTypes("resources not rendered", godotScene.skippedResourceTypes);
 
@@ -810,7 +821,7 @@ void main(string[] args)
 
     if(hasBounds(levelBounds))
         scene.cellGrid = CellGrid(
-            Vector3f(64, levelBounds.max.y - levelBounds.min.y + 2, 64),
+            Vector3f(cellSize, levelBounds.max.y - levelBounds.min.y + 2, cellSize),
             Vector3f(0, levelBounds.min.y, 0),
         );
 
@@ -1524,7 +1535,27 @@ void main(string[] args)
 
             const cellCulling = noGpuCull ? CellCulling.cpu : CellCulling.gpu;
             const shadowViewProj = scene.sunShadow.viewProj * wtb.model;
-            const activeCells = streaming ? residency.active() : levelCells;
+            CellCoord[] activeCells = (streaming ? residency.active() : levelCells).dup;
+
+            if(hasPortals)
+            {
+                const seen = portals.visibleRooms(camera.position, modelViewProj);
+                CellCoord[] reached;
+
+                foreach(cell; activeCells)
+                {
+                    const bounds = scene.cellGrid.bounds(cell);
+                    const centre = (bounds.min + bounds.max) * 0.5f;
+
+                    int roomX, roomZ;
+                    portals.roomOf(centre, roomX, roomZ);
+
+                    if((cast(long) roomX * portals.rooms + roomZ) in seen)
+                        reached ~= cell;
+                }
+
+                activeCells = reached;
+            }
 
             if(frameIndex > warmup)
             {
