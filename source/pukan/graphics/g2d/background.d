@@ -25,6 +25,10 @@ class Background
     private Vector4f groundHorizon;
     private Vector4f groundBottom;
     private float energy = 1.0f;
+    /// Tonemapper the scene applies to the background too
+    uint tonemapMode;
+    float white = 1.0f;
+    float exposure = 1.0f;
 
     this(LogicalDevice device, PipelineFactory pipelines, DefaultRenderPass renderPass)
     {
@@ -80,6 +84,7 @@ class Background
             groundHorizon,
             groundBottom,
             Vector4f(cast(float) mode, cast(float) extent.height, energy, 0),
+            Vector4f(cast(float) tonemapMode, white, exposure, 0),
         );
 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
@@ -103,4 +108,5 @@ private struct BackgroundData
     Vector4f groundHorizon;
     Vector4f groundBottom;
     Vector4f params; // x = mode, y = height, z = energy
+    Vector4f tonemap; // x = mode, y = white, z = exposure
 }

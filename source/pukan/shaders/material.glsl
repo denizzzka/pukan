@@ -1,4 +1,5 @@
 #include "frame.glsl"
+#include "tonemap.glsl"
 
 struct Material
 {
@@ -132,56 +133,6 @@ vec3 environmentRadiance(vec3 direction, float roughness)
 #else
     return textureLod(prefilteredMap, equirectUv(direction), roughness * PREFILTERED_MAX_LOD).rgb;
 #endif
-}
-
-/// Narkowicz 2015 ACES fit
-vec3 toneMapAces(vec3 color)
-{
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-
-    return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
-}
-
-vec3 toneMapReinhard(vec3 color, float white)
-{
-    const float whiteSquared = white * white;
-    const vec3 whiteSquaredColor = whiteSquared * color;
-
-    return (whiteSquaredColor + color * color) / (whiteSquaredColor + whiteSquared);
-}
-
-vec3 toneMapFilmic(vec3 color, float white)
-{
-    const float exposureBias = 2.0;
-    const float A = 0.22 * exposureBias * exposureBias;
-    const float B = 0.30 * exposureBias;
-    const float C = 0.10;
-    const float D = 0.20;
-    const float E = 0.01;
-    const float F = 0.30;
-
-    const vec3 tonemapped = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
-    const float whiteTonemapped = ((white * (A * white + C * B) + D * E) / (white * (A * white + B) + D * F)) - E / F;
-
-    return tonemapped / whiteTonemapped;
-}
-
-vec3 toneMap(vec3 color, uint mode, float white)
-{
-    color = max(color, vec3(0.0));
-
-    switch(mode)
-    {
-        case 0u: return clamp(color, 0.0, 1.0);
-        case 1u: return clamp(toneMapReinhard(color, white), 0.0, 1.0);
-        case 2u: return clamp(toneMapFilmic(color, white), 0.0, 1.0);
-        // ACES also stands in for AgX until it is calibrated
-        default: return toneMapAces(color);
-    }
 }
 
 struct Surface

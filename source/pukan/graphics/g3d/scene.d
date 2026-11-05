@@ -763,6 +763,9 @@ class SceneWith(Modules...)
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
         selectLights(camera, wtb.proj, swapChain.imageExtent.height);
+        background.tonemapMode = tonemapMode;
+        background.white = tonemapWhite;
+        background.exposure = exposure;
 
 
         data.exposureParams = Vector4f(

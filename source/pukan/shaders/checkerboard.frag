@@ -1,5 +1,7 @@
 #version 460
 
+#include "tonemap.glsl"
+
 layout(push_constant) uniform BackgroundData
 {
     vec4 top;
@@ -7,6 +9,7 @@ layout(push_constant) uniform BackgroundData
     vec4 groundHorizon;
     vec4 groundBottom;
     vec4 params; // x = mode, y = height, z = energy
+    vec4 tonemap; // x = mode, y = white, z = exposure
 };
 
 layout(location = 0) out vec4 outColor;
@@ -39,5 +42,7 @@ void main()
         color *= params.z;
     }
 
+    color *= tonemap.z;
+    color = toneMap(color, uint(tonemap.x), tonemap.y);
     outColor = vec4(color, 1.0);
 }
