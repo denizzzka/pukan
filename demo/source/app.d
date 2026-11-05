@@ -1,4 +1,5 @@
 import arena: placeOnIcosahedron;
+import orientation: createOrientationCube, orientationAtlasPath;
 import pukan;
 import pukan.gltf.loader: GltfLoadOptions;
 import pukan.vulkan.renderpass: DrawPhase;
@@ -1175,6 +1176,38 @@ auto createDemoTree(
         auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, texturedVertices, texturedIndices, texture);
 
         textureBranch.addChild(cast(DrawablePrimitive) mesh);
+    }
+
+    {
+        VkFormat format;
+        auto extFormatImg = loadImageFromFile(orientationAtlasPath, format);
+
+        VkSamplerCreateInfo samplerInfo;
+        {
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            samplerInfo.unnormalizedCoordinates = VK_FALSE;
+            samplerInfo.compareEnable = VK_FALSE;
+            samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+            samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        }
+
+        Vertex[] vertices;
+        ushort[] indices;
+        createOrientationCube(vertices, indices, 0.16f);
+
+        auto img = loadImageToMemory(device, frameBuilder.commandPool, commandBuffer, extFormatImg, format);
+        auto texture = device.create!Texture(img, samplerInfo);
+        auto mesh = scene.texturedMeshFactory.create(scene.frameBuilder, vertices, indices, texture);
+
+        textureBranch
+            .addChild(Bone(mat: Vector3f(0.62f, 0.42f, 0).translationMatrix))
+            .addChild(cast(DrawablePrimitive) mesh);
     }
 
     auto spheresBranch = primitTree.addChild(scene.sphereRenderer.pipelineCfg);
