@@ -27,7 +27,7 @@ import pukan.graphics.g3d.stats: DrawStats, drawStats;
 import pukan.graphics.g2d.ui: Ui, UiScript;
 import pukan.vulkan.bindings;
 import ImGui = d_imgui;
-import d_imgui.imgui_h: ImGuiKey, ImVec2;
+import d_imgui.imgui_h: ImGuiCond, ImGuiKey, ImGuiTreeNodeFlags, ImVec2;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import glfw3.api;
 import std.algorithm: max, min, remove, sort, sum;
@@ -1580,6 +1580,8 @@ void main(string[] args)
     Vector3f characterRenderPosition;
     bool uiDemoWindow = uiDemoOption;
     bool uiKeyWasDown;
+    bool uiDebugOpen = true;
+    float smoothedDt = 0;
 
     while((offscreen ? frameIndex < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameIndex < frames))
     {
@@ -1594,6 +1596,9 @@ void main(string[] args)
             ? cast(float) (1.0 / physicsHz)
             : measuredDt;
         lastTime = now;
+
+        if(measuredDt > 0)
+            smoothedDt = smoothedDt <= 0 ? measuredDt : smoothedDt * 0.9f + measuredDt * 0.1f;
 
         if(scene.ui !is null)
         {
@@ -1611,6 +1616,87 @@ void main(string[] args)
             }
             else
                 scene.ui.beginFrame(dt, scene.swapChain.imageExtent);
+
+            if(uiDebugOpen)
+            {
+                ImGui.SetNextWindowPos(ImVec2(16, 16), ImGuiCond.FirstUseEver);
+                ImGui.SetNextWindowSize(ImVec2(330, 520), ImGuiCond.FirstUseEver);
+
+                if(ImGui.Begin("Debug", &uiDebugOpen))
+                {
+                    ImGui.Text("frame %d   %.1f fps   %.2f ms",
+                        cast(int) frameIndex,
+                        smoothedDt > 0 ? 1.0f / smoothedDt : 0.0f,
+                        smoothedDt * 1000.0f);
+
+                    if(ImGui.CollapsingHeader("Lights", ImGuiTreeNodeFlags.DefaultOpen))
+                    {
+                        ImGui.Text("selected %d of %d", cast(int) scene.selectedLightCount,
+                            cast(int) scene.activeLightCount);
+                        ImGui.Text("cascades %d   tiles %d", sunCascadeCount,
+                            cast(int) scene.localShadow.active);
+                        ImGui.Text("sun shadow %s   local shadow %s",
+                            scene.sunShadow.enabled ? "on" : "off",
+                            scene.localShadow.enabled ? "on" : "off");
+
+                        ImGui.Checkbox("Sun shadows", &scene.sunShadow.enabled);
+                        ImGui.Checkbox("Local shadows", &scene.localShadow.enabled);
+                        ImGui.Checkbox("Shadow cache", &scene.sunShadow.cache);
+                    }
+
+                    if(ImGui.CollapsingHeader("Tonemapping", ImGuiTreeNodeFlags.DefaultOpen))
+                    {
+                        int mode = cast(int) scene.tonemapMode;
+                        string[] modes = ["Linear", "Reinhard", "Filmic", "ACES", "AgX"];
+
+                        if(ImGui.Combo("Mode", &mode, modes, cast(int) modes.length))
+                            scene.tonemapMode = cast(uint) mode;
+
+                        ImGui.SliderFloat("Exposure", &scene.exposure, 0.1f, 4.0f);
+                        ImGui.SliderFloat("White", &scene.tonemapWhite, 0.5f, 4.0f);
+                        ImGui.SliderFloat("IBL", &scene.iblIntensity, 0.0f, 4.0f);
+                    }
+
+                    if(ImGui.CollapsingHeader("Renderer", ImGuiTreeNodeFlags.DefaultOpen))
+                    {
+                        const frameStats = drawStats();
+
+                        ImGui.Text("draws %d   instances %d", cast(int) frameStats.draws,
+                            cast(int) frameStats.instances);
+                        ImGui.Text("triangles %d", cast(int) frameStats.triangles);
+                        ImGui.Checkbox("OIT", &scene.oitEnabled);
+                    }
+
+                    if(ImGui.CollapsingHeader("Camera"))
+                    {
+                        ImGui.Text("position %.2f %.2f %.2f",
+                            camera.position.x, camera.position.y, camera.position.z);
+                        ImGui.Text("fov %.0f   near %.3f   far %.0f",
+                            fovOption, nearOption, farOption);
+                    }
+
+                    if(characterMode)
+                        ImGui.Text("character %.2f %.2f %.2f",
+                            characterRenderPosition.x, characterRenderPosition.y,
+                            characterRenderPosition.z);
+
+                    ImGui.Separator();
+
+                    if(ImGui.Button("Probe center"))
+                    {
+                        probePixelX = cast(int) scene.swapChain.imageExtent.width / 2;
+                        probePixelY = cast(int) scene.swapChain.imageExtent.height / 2;
+                        probePending = true;
+                    }
+
+                    ImGui.SameLine();
+
+                    if(ImGui.Button("Screenshot"))
+                        scene.captureFrame(format("ui-%s.png", frameIndex));
+                }
+
+                ImGui.End();
+            }
 
             if(uiDemoWindow)
                 ImGui.ShowDemoWindow(&uiDemoWindow);
