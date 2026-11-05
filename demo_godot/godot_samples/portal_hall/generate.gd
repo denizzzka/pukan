@@ -63,8 +63,12 @@ func _init() -> void:
             room.add_child(ceiling)
             ceiling.owner = root
 
-            # A wall on each side; only an outer wall has no doorway
+            # Each shared wall belongs to the room on its far side, so a wall
+            # is built once and no room culls its neighbour's only copy
             for side in 4:
+                if (side == 1 and z != rooms - 1) or (side == 3 and x != rooms - 1):
+                    continue
+
                 var outer := (side == 0 and z == 0) or (side == 1 and z == rooms - 1) \
                     or (side == 2 and x == 0) or (side == 3 and x == rooms - 1)
 

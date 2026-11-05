@@ -62,12 +62,13 @@ struct PortalGrid
     bool[long] visibleRooms(in Vector3f eye, in Matrix4x4f viewProj, int maxDepth = 8)
     {
         bool[long] seen;
+        float[long] widest;
 
         int x, z;
         roomOf(eye, x, z);
 
         const region = Rect(0, 0, 1, 1);
-        walk(x, z, region, 0, maxDepth, seen, viewProj);
+        walk(x, z, region, 0, maxDepth, seen, widest, viewProj);
 
         return seen;
     }
@@ -79,14 +80,18 @@ struct PortalGrid
         int depth,
         int maxDepth,
         ref bool[long] seen,
+        ref float[long] widest,
         in Matrix4x4f viewProj,
     )
     {
         const key = cast(long) x * rooms + z;
 
-        if(key in seen)
-            return;
+        // A room reached again through a wider doorway can see further
+        if(auto previous = key in widest)
+            if(region.area <= *previous)
+                return;
 
+        widest[key] = region.area;
         seen[key] = true;
 
         if(depth >= maxDepth)
@@ -114,7 +119,7 @@ struct PortalGrid
             if(overlap.empty)
                 continue;
 
-            walk(nx, nz, overlap, depth + 1, maxDepth, seen, viewProj);
+            walk(nx, nz, overlap, depth + 1, maxDepth, seen, widest, viewProj);
         }
     }
 
@@ -182,6 +187,8 @@ struct PortalGrid
         float bottom;
 
         bool empty() const => right <= left || bottom <= top;
+
+        float area() const => empty ? 0 : (right - left) * (bottom - top);
 
         Rect intersect(in Rect other) const
         {

@@ -1536,6 +1536,8 @@ void main(string[] args)
             const cellCulling = noGpuCull ? CellCulling.cpu : CellCulling.gpu;
             const shadowViewProj = scene.sunShadow.viewProj * wtb.model;
             CellCoord[] activeCells = (streaming ? residency.active() : levelCells).dup;
+            // A room behind a wall still casts a shadow into the rooms in view
+            CellCoord[] shadowCells = activeCells;
 
             if(hasPortals)
             {
@@ -1706,7 +1708,7 @@ void main(string[] args)
                 (buf) {
                     auto shadowStart = drawStats();
 
-                    drawCells(levelIndex, buf, shadowViewProj, nearCells,
+                    drawCells(levelIndex, buf, shadowViewProj, shadowCells,
                         frame.frameSets[0].descriptorSet, DrawPhase.shadow, cellCulling);
 
                     foreach(cell; proxyCells)
@@ -1726,7 +1728,7 @@ void main(string[] args)
                         return;
 
                     gatherCells(levelIndex, buf, modelViewProj, nearCells, DrawPhase.surface);
-                    gatherCells(levelIndex, buf, shadowViewProj, nearCells, DrawPhase.shadow);
+                    gatherCells(levelIndex, buf, shadowViewProj, shadowCells, DrawPhase.shadow);
                 },
             );
 
