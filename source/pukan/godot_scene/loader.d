@@ -1263,6 +1263,11 @@ private final class GodotLoader
                 else
                     createMeshInstance(libraryDocument, created.name, meshProperties, created, null);
 
+                // Cell pieces are shells; one-sided, a seam shows the neighbour's
+                // back face and the background leaks through the crack
+                foreach(mesh; created.meshes)
+                    mesh.doubleSided = true;
+
                 templates[cell.item] = created;
                 templateNode = cell.item in templates;
             }

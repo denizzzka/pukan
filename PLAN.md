@@ -11,9 +11,10 @@ shows it gone.
 - [x] `platformer`: the character passes through some corners of vertical walls,
       and through single wall columns, not only through their corners. It rests
       on the narrowphase and sweep work in `#### Phase 1: collision world`.
-- [ ] `platformer`: white dots show in the seams of the brown vertical walls
-      while the camera turns. Decide which one it is: a crack between coplanar
-      triangles, depth precision, or a shading alias.
+- [x] `platformer`: white dots showed in the seams of the brown vertical walls
+      while the camera turned. They were a crack between the grid pieces: a
+      one-sided cell shell exposed the neighbour's back face at a seam and the
+      background leaked through. Cell meshes now draw double-sided.
 
 ## Open GitHub issues
 
