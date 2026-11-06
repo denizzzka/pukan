@@ -11,10 +11,15 @@ shows it gone.
 - [x] `platformer`: the character passes through some corners of vertical walls,
       and through single wall columns, not only through their corners. It rests
       on the narrowphase and sweep work in `#### Phase 1: collision world`.
-- [x] `platformer`: white dots showed in the seams of the brown vertical walls
-      while the camera turned. They were a crack between the grid pieces: a
-      one-sided cell shell exposed the neighbour's back face at a seam and the
-      background leaked through. Cell meshes now draw double-sided.
+- [ ] `platformer`: white dots show in the seams of the brown vertical walls
+      while the camera turns. A magenta background tints the dots, so the
+      background leaks through a crack between the grid pieces; disabling
+      mipmaps or specular shading changes nothing. Double-sided cell meshes
+      remove every dot on those walls in a 260-frame turn at 0.5 degrees per
+      frame, but cost 37-42% on lavapipe in platformer views (town unchanged),
+      so that fix stays out. Next: snap GridMap mesh vertices within about 1e-4
+      of the cell bounds to the exact value at load, or align the wall piece
+      planes in the stage, and judge it with the same turn capture.
 
 ## Open GitHub issues
 
