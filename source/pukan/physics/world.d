@@ -8,6 +8,7 @@ import pukan.physics.narrowphase:
     rayTriangle,
     segmentAabbDistanceSquared,
     sweepCapsuleBox,
+    sweepCapsuleConvex,
     sweepCapsuleSphere,
     sweepCapsuleTriangle;
 import pukan.physics.shapes:
@@ -262,6 +263,13 @@ final class CollisionWorld
                             break;
                         }
 
+                        case ShapeKind.convex:
+                            hit = sweepCapsuleConvex(
+                                a, b, radius, motion,
+                                collider.transform, collider.shape.points,
+                                margin, fraction, point, normal);
+                            break;
+
                         default:
                             hit = false;
                             break;
@@ -359,6 +367,9 @@ final class CollisionWorld
             case ShapeKind.box:
                 return rayBox(collider, origin, direction, maxDistance, hit);
 
+            case ShapeKind.convex:
+                return rayConvex(collider, origin, direction, maxDistance, hit);
+
             case ShapeKind.plane:
                 return rayPlane(collider, origin, direction, maxDistance, hit);
 
@@ -410,6 +421,45 @@ final class CollisionWorld
             collider.id,
             collider.node,
         );
+
+        return true;
+    }
+
+    private static bool rayConvex(
+        in Collider collider,
+        in Vector3f origin,
+        in Vector3f direction,
+        float maxDistance,
+        out RayHit hit,
+    )
+    {
+        const directionLength = direction.length;
+
+        if(directionLength < 1e-8f)
+            return false;
+
+        // The sweep needs a finite motion that reaches past the whole shape
+        const bounds = collider.shape.bounds(collider.transform);
+        const travel = (bounds.center - origin).length + (bounds.max - bounds.min).length;
+
+        if(travel <= 0.0f)
+            return false;
+
+        const scale = travel / directionLength;
+        float fraction;
+        Vector3f point;
+        Vector3f normal;
+
+        if(!sweepCapsuleConvex(origin, origin, 0.0f, direction * scale,
+            collider.transform, collider.shape.points, 0.0f, fraction, point, normal))
+            return false;
+
+        const t = fraction * scale;
+
+        if(t > maxDistance)
+            return false;
+
+        hit = RayHit(true, t, point, normal, collider.id, collider.node);
 
         return true;
     }
@@ -553,4 +603,46 @@ unittest
         uint.max, 0.001f, overlap));
     assert(!world.overlapCapsule(Vector3f(0, 5, 0), Vector3f(0, 6, 0), 0.4f,
         uint.max, 0.001f, overlap));
+}
+
+unittest
+{
+    import pukan.physics.shapes: CollisionShape;
+
+    // The same wall as the box above, as a convex hull: a grid map writes
+    // its corner cells this way
+    Vector3f[8] corners = [
+        Vector3f(-1, -2, -20), Vector3f(1, -2, -20),
+        Vector3f(1, 2, -20), Vector3f(-1, 2, -20),
+        Vector3f(-1, -2, 20), Vector3f(1, -2, 20),
+        Vector3f(1, 2, 20), Vector3f(-1, 2, 20),
+    ];
+
+    auto convexWorld = new CollisionWorld;
+    convexWorld.add(Collider(
+        CollisionShape.box(Vector3f(20, 1, 20)),
+        Vector3f(0, -0.5f, 0).translationMatrix,
+    ));
+    convexWorld.add(Collider(
+        CollisionShape.convex(corners[]),
+        Vector3f(5, 2, 0).translationMatrix,
+    ));
+    convexWorld.build();
+
+    const wallRay = convexWorld.raycast(Vector3f(0, 1, 0), Vector3f(1, 0, 0));
+    assert(wallRay.hit);
+    assert(abs(wallRay.t - 4.0f) < 1e-3f);
+    assert(wallRay.normal.x < -0.9f);
+
+    const intoWall = convexWorld.sweepCapsule(
+        Vector3f(3, 0.5f, 0), Vector3f(3, 1.5f, 0), 0.4f,
+        Vector3f(2, 0, 0));
+
+    assert(intoWall.hit);
+    assert(abs(intoWall.fraction - 0.3f) < 0.02f);
+    assert(intoWall.normal.x < -0.9f);
+
+    ShapeCastHit touching;
+    assert(convexWorld.overlapCapsule(Vector3f(3.4f, 0.4f, 0), Vector3f(3.4f, 1.4f, 0),
+        0.4f, uint.max, 0.001f, touching));
 }

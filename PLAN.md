@@ -8,7 +8,7 @@ only a suggested grouping.
 Symptoms as reported, cause unknown; an item stays open until the fixed scene
 shows it gone.
 
-- [ ] `platformer`: the character passes through some corners of vertical walls,
+- [x] `platformer`: the character passes through some corners of vertical walls,
       and through single wall columns, not only through their corners. It rests
       on the narrowphase and sweep work in `#### Phase 1: collision world`.
 - [ ] `platformer`: white dots show in the seams of the brown vertical walls

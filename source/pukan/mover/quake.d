@@ -475,6 +475,43 @@ unittest
 
     assert(state.position.x < 2.2f);
 
+    // Grid map corner cells arrive as convex hulls, not boxes
+    Vector3f[8] wallCorners = [
+        Vector3f(-1, -2, -10), Vector3f(1, -2, -10),
+        Vector3f(1, 2, -10), Vector3f(-1, 2, -10),
+        Vector3f(-1, -2, 10), Vector3f(1, -2, 10),
+        Vector3f(1, 2, 10), Vector3f(-1, 2, 10),
+    ];
+
+    auto convexWallWorld = new CollisionWorld;
+    convexWallWorld.add(Collider(
+        CollisionShape.box(Vector3f(20, 1, 20)),
+        Vector3f(0, -0.5f, 0).translationMatrix,
+    ));
+    convexWallWorld.add(Collider(
+        CollisionShape.convex(wallCorners[]),
+        Vector3f(3, 2, 0).translationMatrix,
+    ));
+    convexWallWorld.build();
+
+    state.position = Vector3f(0, 0, 0);
+    state.velocity = Vector3f(0, 0, 0);
+    state.onGround = true;
+    walk.wishDir = Vector3f(1, 0, 0);
+    walk.wishSpeed = config.maxSpeed;
+
+    foreach(i; 0 .. 120)
+    {
+        const result = pmMove(convexWallWorld, state, walk, 1.0f / 60.0f, body, config);
+        state.position = result.position;
+        state.velocity = result.velocity;
+        state.onGround = result.onGround;
+        state.groundNormal = result.groundNormal;
+    }
+
+    assert(state.position.x < 2.2f);
+    assert(state.onGround);
+
     state.position = Vector3f(2.2f, 0, 0);
     state.velocity = Vector3f(0, 0, 0);
     state.onGround = false;

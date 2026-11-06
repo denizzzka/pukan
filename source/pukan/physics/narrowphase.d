@@ -138,12 +138,15 @@ Vector3f closestPointOnSegment(in Vector3f a, in Vector3f b, in Vector3f point)
     return a + ab * clamp(dot(point - a, ab) / lengthSquared, 0.0f, 1.0f);
 }
 
-/// Closest point on a triangle to a point
-Vector3f closestPointOnTriangle(
+/// Closest point on a triangle to a point, with its barycentric weights
+private Vector3f closestPointOnTriangleWeights(
     in Vector3f point,
     in Vector3f a,
     in Vector3f b,
     in Vector3f c,
+    out float weightA,
+    out float weightB,
+    out float weightC,
 )
 {
     const ab = b - a;
@@ -153,20 +156,33 @@ Vector3f closestPointOnTriangle(
     const d2 = dot(ac, ap);
 
     if(d1 <= 0.0f && d2 <= 0.0f)
+    {
+        weightA = 1.0f;
+        weightB = 0.0f;
+        weightC = 0.0f;
         return a;
+    }
 
     const bp = point - b;
     const d3 = dot(ab, bp);
     const d4 = dot(ac, bp);
 
     if(d3 >= 0.0f && d4 <= d3)
+    {
+        weightA = 0.0f;
+        weightB = 1.0f;
+        weightC = 0.0f;
         return b;
+    }
 
     const vc = d1 * d4 - d3 * d2;
 
     if(vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
     {
         const v = d1 / (d1 - d3);
+        weightA = 1.0f - v;
+        weightB = v;
+        weightC = 0.0f;
         return a + ab * v;
     }
 
@@ -175,13 +191,21 @@ Vector3f closestPointOnTriangle(
     const d6 = dot(ac, cp);
 
     if(d6 >= 0.0f && d5 <= d6)
+    {
+        weightA = 0.0f;
+        weightB = 0.0f;
+        weightC = 1.0f;
         return c;
+    }
 
     const vb = d5 * d2 - d1 * d6;
 
     if(vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
     {
         const w = d2 / (d2 - d6);
+        weightA = 1.0f - w;
+        weightB = 0.0f;
+        weightC = w;
         return a + ac * w;
     }
 
@@ -190,14 +214,35 @@ Vector3f closestPointOnTriangle(
     if(va <= 0.0f && d4 - d3 >= 0.0f && d5 - d6 >= 0.0f)
     {
         const w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        weightA = 0.0f;
+        weightB = 1.0f - w;
+        weightC = w;
         return b + (c - b) * w;
     }
 
     const denominator = 1.0f / (va + vb + vc);
     const v = vb * denominator;
     const w = vc * denominator;
+    weightA = 1.0f - v - w;
+    weightB = v;
+    weightC = w;
 
     return a + ab * v + ac * w;
+}
+
+/// Closest point on a triangle to a point
+Vector3f closestPointOnTriangle(
+    in Vector3f point,
+    in Vector3f a,
+    in Vector3f b,
+    in Vector3f c,
+)
+{
+    float weightA;
+    float weightB;
+    float weightC;
+
+    return closestPointOnTriangleWeights(point, a, b, c, weightA, weightB, weightC);
 }
 
 /// Squared distance from a point to a centered box `[-halfExtents, halfExtents]`
@@ -414,6 +459,305 @@ float segmentTriangleDistanceSquared(
     }
 
     return best;
+}
+
+/// A vertex of the Minkowski difference `segment - hull` used by GJK
+private struct GjkVertex
+{
+    Vector3f w;
+    Vector3f a;
+    Vector3f b;
+}
+
+private struct GjkProjection
+{
+    float distanceSquared = float.infinity;
+    Vector3f w;
+    size_t count;
+    GjkVertex[4] vertices;
+    float[4] weights;
+}
+
+/// Support point of `segment - hull` in `direction`
+private GjkVertex supportSegmentHull(
+    in Vector3f a,
+    in Vector3f b,
+    in Vector3f[] points,
+    in Vector3f direction,
+)
+{
+    const segmentPoint = dot(a, direction) >= dot(b, direction) ? a : b;
+
+    size_t index;
+    auto best = -dot(points[0], direction);
+
+    foreach(i; 1 .. points.length)
+    {
+        const projection = -dot(points[i], direction);
+
+        if(projection > best)
+        {
+            best = projection;
+            index = i;
+        }
+    }
+
+    const hullPoint = Vector3f(points[index].x, points[index].y, points[index].z);
+
+    return GjkVertex(segmentPoint - hullPoint, segmentPoint, hullPoint);
+}
+
+private bool originInsideTetra(in Vector3f[4] points)
+{
+    const volume = dot(cross(points[1] - points[0], points[2] - points[0]),
+        points[3] - points[0]);
+
+    // A coplanar tetra has no interior; its faces already give the distance
+    if(abs(volume) < 1e-9f)
+        return false;
+
+    bool sameSide(in Vector3f vertex, in Vector3f a, in Vector3f b, in Vector3f c)
+    {
+        const originSide = dot(cross(b - a, c - a), -a);
+        const vertexSide = dot(cross(b - a, c - a), vertex - a);
+
+        return originSide * vertexSide >= 0.0f;
+    }
+
+    return sameSide(points[3], points[0], points[1], points[2])
+        && sameSide(points[2], points[0], points[1], points[3])
+        && sameSide(points[1], points[0], points[2], points[3])
+        && sameSide(points[0], points[1], points[2], points[3]);
+}
+
+/// Closest point to the origin of the simplex, reduced to the feature holding it
+private GjkProjection projectSimplex(in GjkVertex[4] vertices, size_t count)
+{
+    GjkProjection best;
+
+    void keep(scope const(size_t)[] indices, scope const(float)[] weights, Vector3f w)
+    {
+        const distanceSquared = dot(w, w);
+
+        if(distanceSquared >= best.distanceSquared)
+            return;
+
+        best.distanceSquared = distanceSquared;
+        best.w = w;
+        best.count = indices.length;
+
+        foreach(i; 0 .. indices.length)
+        {
+            best.vertices[i] = vertices[indices[i]];
+            best.weights[i] = weights[i];
+        }
+    }
+
+    foreach(i; 0 .. count)
+    {
+        size_t[4] indices = [i, 0, 0, 0];
+        float[4] weights = [1.0f, 0.0f, 0.0f, 0.0f];
+
+        keep(indices[0 .. 1], weights[0 .. 1], vertices[i].w);
+    }
+
+    static immutable uint[2][6] pairs = [
+        [0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3],
+    ];
+
+    foreach(pair; pairs)
+    {
+        if(pair[0] >= count || pair[1] >= count)
+            continue;
+
+        const start = vertices[pair[0]].w;
+        const edge = vertices[pair[1]].w - start;
+        const lengthSquared = dot(edge, edge);
+        const t = lengthSquared > 1e-12f
+            ? clamp(-dot(start, edge) / lengthSquared, 0.0f, 1.0f)
+            : 0.0f;
+
+        size_t[4] indices;
+        float[4] weights;
+        size_t kept;
+
+        if(1.0f - t > 1e-6f)
+        {
+            indices[kept] = pair[0];
+            weights[kept] = 1.0f - t;
+            ++kept;
+        }
+
+        if(t > 1e-6f)
+        {
+            indices[kept] = pair[1];
+            weights[kept] = t;
+            ++kept;
+        }
+
+        if(kept == 0)
+        {
+            indices[0] = pair[0];
+            weights[0] = 1.0f;
+            kept = 1;
+        }
+
+        keep(indices[0 .. kept], weights[0 .. kept], start + edge * t);
+    }
+
+    static immutable uint[3][4] triples = [
+        [0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3],
+    ];
+
+    Vector3f[4] tetraPoints;
+
+    foreach(i; 0 .. 4)
+        tetraPoints[i] = vertices[i].w;
+
+    if(count == 4 && originInsideTetra(tetraPoints))
+    {
+        best.distanceSquared = 0.0f;
+        best.w = Vector3f(0, 0, 0);
+        best.count = 0;
+
+        return best;
+    }
+
+    foreach(triple; triples)
+    {
+        if(triple[0] >= count || triple[1] >= count || triple[2] >= count)
+            continue;
+
+        const area = cross(
+            vertices[triple[1]].w - vertices[triple[0]].w,
+            vertices[triple[2]].w - vertices[triple[0]].w,
+        );
+
+        if(area.lengthsqr < 1e-12f)
+            continue;
+
+        float weightA;
+        float weightB;
+        float weightC;
+        const point = closestPointOnTriangleWeights(
+            Vector3f(0, 0, 0),
+            vertices[triple[0]].w,
+            vertices[triple[1]].w,
+            vertices[triple[2]].w,
+            weightA,
+            weightB,
+            weightC,
+        );
+
+        const float[3] allWeights = [weightA, weightB, weightC];
+        size_t[4] indices;
+        float[4] weights;
+        size_t kept;
+
+        foreach(i; 0 .. 3)
+        {
+            if(allWeights[i] > 1e-6f)
+            {
+                indices[kept] = triple[i];
+                weights[kept] = allWeights[i];
+                ++kept;
+            }
+        }
+
+        if(kept == 0)
+        {
+            indices[0] = triple[0];
+            weights[0] = 1.0f;
+            kept = 1;
+        }
+
+        keep(indices[0 .. kept], weights[0 .. kept], point);
+    }
+
+    return best;
+}
+
+/**
+    Closest points between a segment and the convex hull of `points`, by GJK.
+    The points are the hull vertices in any order; their convex hull is the shape.
+*/
+float segmentConvexDistanceSquared(
+    in Vector3f a,
+    in Vector3f b,
+    in Vector3f[] points,
+    out Vector3f closestA,
+    out Vector3f closestB,
+)
+{
+    closestA = a;
+    closestB = a;
+
+    if(points.length == 0)
+        return 0.0f;
+
+    auto centroid = Vector3f(0, 0, 0);
+    foreach(point; points)
+        centroid += point;
+    centroid /= cast(float) points.length;
+
+    auto direction = (a + b) * 0.5f - centroid;
+
+    if(direction.lengthsqr < 1e-12f)
+        direction = Vector3f(1, 0, 0);
+
+    GjkVertex[4] simplex;
+    simplex[0] = supportSegmentHull(a, b, points, direction);
+
+    auto projection = projectSimplex(simplex, 1);
+
+    foreach(iteration; 0 .. 32)
+    {
+        const v = projection.w;
+        const distanceSquared = projection.distanceSquared;
+
+        if(distanceSquared <= 1e-12f)
+        {
+            closestA = (a + b) * 0.5f;
+            closestB = closestA;
+            return 0.0f;
+        }
+
+        const support = supportSegmentHull(a, b, points, -v);
+
+        // The current closest point already supports its own direction
+        if(dot(support.w, v) >= distanceSquared - 1e-7f * max(1.0f, distanceSquared))
+            break;
+
+        bool duplicate;
+
+        foreach(i; 0 .. projection.count)
+            if((support.w - projection.vertices[i].w).lengthsqr < 1e-12f)
+            {
+                duplicate = true;
+                break;
+            }
+
+        if(duplicate)
+            break;
+
+        // The projection kept a compacted simplex, so rebuild it before growing
+        foreach(i; 0 .. projection.count)
+            simplex[i] = projection.vertices[i];
+
+        simplex[projection.count] = support;
+        projection = projectSimplex(simplex, projection.count + 1);
+    }
+
+    closestA = Vector3f(0, 0, 0);
+    closestB = Vector3f(0, 0, 0);
+
+    foreach(i; 0 .. projection.count)
+    {
+        closestA += projection.vertices[i].a * projection.weights[i];
+        closestB += projection.vertices[i].b * projection.weights[i];
+    }
+
+    return projection.distanceSquared;
 }
 
 private Vector3f triangleNormal(in Vector3f a, in Vector3f b, in Vector3f c, in Vector3f motion)
@@ -651,6 +995,101 @@ bool sweepCapsuleBox(
     return false;
 }
 
+/// Moving capsule against a convex hull of `points`, conservative advancement
+bool sweepCapsuleConvex(
+    in Vector3f a,
+    in Vector3f b,
+    float radius,
+    in Vector3f motion,
+    in Matrix4x4f transform,
+    in Vector3f[] points,
+    float margin,
+    out float fraction,
+    out Vector3f point,
+    out Vector3f normal,
+)
+{
+    const inverse = transform.inverse;
+    const localA = transformPoint(a, inverse);
+    const localB = transformPoint(b, inverse);
+    const localMotion = transformDirection(motion, inverse);
+    const motionLength = localMotion.length;
+
+    auto centroid = Vector3f(0, 0, 0);
+    foreach(vertex; points)
+        centroid += vertex;
+    centroid /= cast(float) points.length;
+
+    if(motionLength < 1e-8f)
+    {
+        Vector3f closestA;
+        Vector3f closestB;
+        const distance = sqrt(segmentConvexDistanceSquared(
+            localA, localB, points, closestA, closestB));
+
+        if(distance > radius + margin + contactEpsilon)
+            return false;
+
+        fraction = 0.0f;
+        const localNormal = distance > 1e-6f
+            ? (closestA - closestB).normalized
+            : ((localA + localB) * 0.5f - centroid).normalized;
+        normal = transformDirection(localNormal, transform).normalized;
+        point = transformPoint(closestB, transform);
+
+        return true;
+    }
+
+    float t = 0.0f;
+    Vector3f lastNormal;
+    Vector3f lastHullPoint;
+    bool hasContact;
+
+    foreach(iteration; 0 .. 16)
+    {
+        Vector3f closestA;
+        Vector3f closestB;
+        const distance = sqrt(segmentConvexDistanceSquared(
+            localA + localMotion * t, localB + localMotion * t,
+            points, closestA, closestB));
+        const gap = distance - radius - margin;
+
+        if(gap <= contactEpsilon)
+        {
+            fraction = t;
+            // The last separated step holds the surface normal when the
+            // contact lands exactly on the hull and GJK sees no separation
+            const localNormal = distance > 1e-6f
+                ? (closestA - closestB).normalized
+                : hasContact ? lastNormal : ((closestA + closestB) * 0.5f - centroid).normalized;
+            normal = transformDirection(localNormal, transform).normalized;
+            point = transformPoint(distance > 1e-6f || !hasContact ? closestB : lastHullPoint,
+                transform);
+
+            return true;
+        }
+
+        if(distance > 1e-6f)
+        {
+            lastNormal = (closestA - closestB).normalized;
+            lastHullPoint = closestB;
+            hasContact = true;
+        }
+
+        const advance = gap / motionLength;
+
+        if(advance <= 1e-6f)
+            break;
+
+        t += advance;
+
+        if(t > 1.0f)
+            break;
+    }
+
+    return false;
+}
+
 unittest
 {
     const floor = Aabb(Vector3f(-10, -1, -10), Vector3f(10, 0, 10));
@@ -695,4 +1134,93 @@ unittest
         0.001f, t, closestA, normal));
     assert(t > 0.2f && t < 0.3f);
     assert(normal.y > 0.9f);
+}
+
+unittest
+{
+    import std.math: sqrt;
+
+    // A cube as a convex hull, with its points in no useful order
+    const Vector3f[] cube = [
+        Vector3f(-1, -1, -1), Vector3f(1, -1, -1), Vector3f(1, 1, -1), Vector3f(-1, 1, -1),
+        Vector3f(-1, -1, 1), Vector3f(1, -1, 1), Vector3f(1, 1, 1), Vector3f(-1, 1, 1),
+    ];
+
+    Vector3f closestA;
+    Vector3f closestB;
+
+    // A segment above the top face
+    const above = segmentConvexDistanceSquared(
+        Vector3f(0, 3, 0), Vector3f(1, 3, 0), cube, closestA, closestB);
+    assert(abs(sqrt(above) - 2.0f) < 1e-3f);
+    assert(abs(closestB.y - 1.0f) < 1e-3f);
+    assert(abs(closestA.y - 3.0f) < 1e-3f);
+
+    // Beside a vertical face: the closest feature is that face
+    const beside = segmentConvexDistanceSquared(
+        Vector3f(2, 0, 0), Vector3f(2, 0.5f, 0), cube, closestA, closestB);
+    assert(abs(sqrt(beside) - 1.0f) < 1e-3f);
+    assert(abs(closestB.x - 1.0f) < 1e-3f);
+    assert(closestB.y >= -1e-3f && closestB.y <= 0.5f + 1e-3f);
+
+    // Beside a corner: the closest feature is that vertex
+    const corner = segmentConvexDistanceSquared(
+        Vector3f(3, 3, 3), Vector3f(3, 4, 3), cube, closestA, closestB);
+    assert(abs(sqrt(corner) - sqrt(12.0f)) < 2e-3f);
+    assert(abs(closestB.x - 1.0f) < 2e-3f);
+    assert(abs(closestB.y - 1.0f) < 2e-3f);
+    assert(abs(closestB.z - 1.0f) < 2e-3f);
+
+    // GJK agrees with the box fast path for the same cube
+    const Vector3f[] samples = [
+        Vector3f(0, 3, 0), Vector3f(2, 2, 0), Vector3f(3, 3, 3),
+        Vector3f(-2, 0.5f, 0.5f), Vector3f(0.5f, 0.5f, 2),
+        Vector3f(2, 0.25f, -1.5f), Vector3f(-3, -3, -3),
+    ];
+
+    foreach(sample; samples)
+    {
+        Vector3f boxA;
+        Vector3f boxB;
+        const boxDistance = segmentAabbDistanceSquared(
+            sample, sample + Vector3f(0, 1, 0), Vector3f(1, 1, 1), boxA, boxB);
+        const hullDistance = segmentConvexDistanceSquared(
+            sample, sample + Vector3f(0, 1, 0), cube, closestA, closestB);
+
+        assert(abs(boxDistance - hullDistance) < 1e-4f * max(1.0f, boxDistance));
+    }
+
+    float t;
+    Vector3f point;
+    Vector3f normal;
+
+    assert(sweepCapsuleConvex(
+        Vector3f(0, 3, 0), Vector3f(0, 4, 0), 0.5f, Vector3f(0, -4, 0),
+        Matrix4x4f.identity, cube, 0.001f, t, point, normal));
+    assert(abs(t - 0.375f) < 0.02f);
+    assert(normal.y > 0.9f);
+
+    assert(sweepCapsuleConvex(
+        Vector3f(-3, 0, 0), Vector3f(-3, 1, 0), 0.5f, Vector3f(4, 0, 0),
+        Matrix4x4f.identity, cube, 0.001f, t, point, normal));
+    assert(abs(t - 0.375f) < 0.02f);
+    assert(normal.x < -0.9f);
+
+    // A moved hull still reports its contact in world space
+    import dlib.math: translationMatrix;
+
+    const transform = translationMatrix(Vector3f(5, 6, 0));
+
+    assert(sweepCapsuleConvex(
+        Vector3f(5, 9, 0), Vector3f(5, 10, 0), 0.5f, Vector3f(0, -4, 0),
+        transform, cube, 0.001f, t, point, normal));
+    assert(normal.y > 0.9f);
+    assert(abs(point.y - 7.0f) < 0.05f);
+
+    // A segment inside the hull is a contact with no separation
+    assert(sweepCapsuleConvex(
+        Vector3f(0, 0, 0), Vector3f(0, 0.5f, 0), 0.5f, Vector3f(0, 0, 0),
+        Matrix4x4f.identity, cube, 0.001f, t, point, normal));
+    assert(t == 0.0f, "inside fraction");
+    assert(normal.length > 0.9f, "inside normal");
 }
