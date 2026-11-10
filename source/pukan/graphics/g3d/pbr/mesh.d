@@ -9,6 +9,7 @@ import pukan.graphics.g3d.pbr.accessor;
 import pukan.graphics.g3d.pbr.culling: CullBatch, currentCullFrame;
 import pukan.graphics.g3d.pbr.instancing: InstanceBatch, currentInstanceArena;
 import pukan.graphics.g3d.stats: countDraw, triangleCount;
+import pukan.graphics.g3d.tree: Walk, walkTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.descriptors: bufferWriteDescriptor, imageWriteDescriptor;
 import pukan.vulkan.logical_device: LogicalDevice;
@@ -72,17 +73,14 @@ alias Vector4us = Vector!(ushort, 4);
 /// Sets the front face of every mesh below a node, from the accumulated transform.
 /// `counterClockwise` is the winding the source stores its triangles with; nothing
 /// else changes: no vertices, indices, normals or camera are touched.
-void applyWinding(N, Child)(N node, Matrix4x4f trans, bool counterClockwise, scope Matrix4x4f delegate(N) localOf)
+void applyWinding(N)(N node, bool counterClockwise, scope Matrix4x4f delegate(N) localOf)
 {
-    trans *= localOf(node);
+    walkTree!N(node, Matrix4x4f.identity, localOf, (n, world, local) {
+        foreach(mesh; n.meshes)
+            mesh.applyFrontFace(world.mirrors, counterClockwise);
 
-    const mirrored = trans.mirrors;
-
-    foreach(mesh; node.meshes)
-        mesh.applyFrontFace(mirrored, counterClockwise);
-
-    foreach(child; node.children)
-        applyWinding!(N, Child)(cast(N) child, trans, counterClockwise, localOf);
+        return Walk.descend;
+    });
 }
 
 /// One authored or generated index list of a geometry

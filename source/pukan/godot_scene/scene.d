@@ -15,6 +15,7 @@ import pukan.graphics.g3d.pbr.culling: CullBatch, CullFrame, CullInstance, curre
 import pukan.graphics.g3d.pbr.lod: clipDepth, generateLevels, lodThresholds, pickLevel;
 import pukan.graphics.g3d.pbr.mesh: IndicesDescr, MeshGeometry, MeshStreams, PbrMesh;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
+import pukan.graphics.g3d.tree: Walk, walkTree;
 import pukan.physics.shapes: Collider, CollisionShape;
 import pukan.physics.world: CollisionWorld;
 import pukan.vulkan.bindings;
@@ -386,23 +387,31 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         return findSpawn(root, Matrix4x4f.identity, position);
     }
 
-    private static bool findSpawn(GodotNode node, Matrix4x4f trans, out Vector3f position)
+    private static bool findSpawn(GodotNode node, Matrix4x4f parent, out Vector3f position)
     {
-        trans *= node.local;
+        Vector3f found;
 
-        if(node.type == "Marker3D" || node.type == "CharacterBody3D")
+        const result = walkTree!GodotNode(node, parent, n => n.local, (n, world, local) {
+            if(n.type == "Marker3D" || n.type == "CharacterBody3D")
+            {
+                found = Vector3f(world.a14, world.a24, world.a34);
+
+                return Walk.stop;
+            }
+
+            if(auto scene = cast(GodotScene) n.instance)
+                if(scene.findSpawn(scene.root, world, found))
+                    return Walk.stop;
+
+            return Walk.descend;
+        });
+
+        if(result == Walk.stop)
         {
-            position = Vector3f(trans.a14, trans.a24, trans.a34);
+            position = found;
+
             return true;
         }
-
-        if(auto scene = cast(GodotScene) node.instance)
-            if(scene.findSpawn(scene.root, trans, position))
-                return true;
-
-        foreach(child; node.children)
-            if(findSpawn(child, trans, position))
-                return true;
 
         return false;
     }
@@ -414,18 +423,17 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         world.build();
     }
 
-    private void collectColliders(GodotNode node, Matrix4x4f trans, CollisionWorld world)
+    private void collectColliders(GodotNode node, Matrix4x4f parent, CollisionWorld world)
     {
-        trans *= node.local;
+        walkTree!GodotNode(node, parent, n => n.local, (n, trans, local) {
+            foreach(collider; n.colliders)
+                world.add(Collider(collider.shape, trans * collider.local, collider.layer, collider.mask));
 
-        foreach(collider; node.colliders)
-            world.add(Collider(collider.shape, trans * collider.local, collider.layer, collider.mask));
+            if(auto scene = cast(GodotScene) n.instance)
+                scene.collectColliders(scene.root, trans, world);
 
-        if(auto scene = cast(GodotScene) node.instance)
-            scene.collectColliders(scene.root, trans, world);
-
-        foreach(child; node.children)
-            collectColliders(child, trans, world);
+            return Walk.descend;
+        });
     }
 
     void uploadToGPUImmediate(
@@ -472,28 +480,23 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         if(partsRegistered)
             return;
 
-        void collect(Matrix4x4f trans, GodotNode node, bool mirrored)
-        {
-            if(!node.visible)
-                return;
+        walkTree!GodotNode(root, Matrix4x4f.identity, n => n.local, (n, trans, local) {
+            if(!n.visible)
+                return Walk.skip;
 
-            trans *= node.local;
-
-            debug mirrored = mirrored != node.local.mirrors;
-
-            foreach(mesh; node.meshes)
+            foreach(mesh; n.meshes)
             {
-                debug assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
+                debug assert(mesh.mirrored == trans.mirrors, "mesh winding does not match its transform");
 
                 parts ~= PartRecord(mesh, null, wholePart, trans, trans, mesh.localAABB);
             }
 
-            if(node.instance !is null)
+            if(n.instance !is null)
             {
-                if(auto perPart = cast(PartDrawable) node.instance)
+                if(auto perPart = cast(PartDrawable) n.instance)
                     perPart.eachPart((in Part part) {
                         parts ~= PartRecord(
-                            nested: node.instance,
+                            nested: n.instance,
                             nestedKey: part.key,
                             world: trans * part.local,
                             base: trans,
@@ -502,10 +505,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                     });
                 else
                 {
-                    auto bounded = cast(Bounded) node.instance;
+                    auto bounded = cast(Bounded) n.instance;
 
                     parts ~= PartRecord(
-                        nested: node.instance,
+                        nested: n.instance,
                         nestedKey: wholePart,
                         world: trans,
                         base: trans,
@@ -514,11 +517,8 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 }
             }
 
-            foreach(child; node.children)
-                collect(trans, child, mirrored);
-        }
-
-        collect(Matrix4x4f.identity, root, false);
+            return Walk.descend;
+        });
 
         pieceNodes.length = gpuBuffs.length;
         foreach(i, piece; gpuBuffs)
