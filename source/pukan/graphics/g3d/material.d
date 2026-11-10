@@ -5,7 +5,7 @@ import core.sync.mutex: Mutex;
 import dlib.math: Vector3f, Vector4f, Vector4i;
 import pukan.vulkan.bindings;
 import pukan.vulkan.logical_device: LogicalDevice;
-import pukan.vulkan.memory: MemoryBufferMappedToCPU;
+import pukan.vulkan.memory: MemoryBufferMappedToCPU, TransferBuffer;
 import std.typecons: BitFlags;
 
 enum MaterialMode: uint
