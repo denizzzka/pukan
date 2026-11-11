@@ -1,10 +1,10 @@
 #version 460
 
-#include "frame.glsl"
+layout(location = 0) out vec2 vNdc;
 
 void main()
 {
-    // Fullscreen triangle at the section plane's depth
     const vec2 p = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
-    gl_Position = vec4(p * 2.0 - 1.0, frameUbo.frame.sectionParams.x, 1.0);
+    vNdc = p * 2.0 - 1.0;
+    gl_Position = vec4(vNdc, 0.0, 1.0);
 }

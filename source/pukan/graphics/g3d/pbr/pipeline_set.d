@@ -302,8 +302,9 @@ private struct PbrPipelineBuilder
         FixedState stencilState = FixedState(
             cullMode: VK_CULL_MODE_NONE,
             frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            depthTestEnable: VK_FALSE,
+            depthTestEnable: VK_TRUE,
             depthWriteEnable: VK_FALSE,
+            depthCompareOp: VK_COMPARE_OP_GREATER_OR_EQUAL,
             colorWriteMask: 0,
             stencilTestEnable: VK_TRUE,
             frontStencil: VkStencilOpState(

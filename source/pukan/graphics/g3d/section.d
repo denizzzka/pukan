@@ -10,10 +10,11 @@ import pukan.vulkan.renderpass: RenderPass;
 /// pipeline variants, which only exist while the cut is on.
 final class Section
 {
-    /// The rest of the section state, the plane and its depth, is in the scene
+    /// The rest of the section state, the shape and its mode, is in the scene
     bool enabled;
 
     private LazyPipeline cap;
+    private LazyPipeline sphereDepth;
 
     this(PipelineFactory factory, RenderPass pass)
     {
@@ -49,13 +50,59 @@ final class Section
                 backStencil: capStencil,
             ),
         )), pass, 1);
+
+        // Writes the sphere's far surface into depth, so the stencil pass can
+        // count only the solid up to that surface
+        sphereDepth = LazyPipeline(factory, factory.declare(RenderTechnique(
+            name: "section sphere depth",
+            stages: [vertex, fragment],
+            state: FixedState(
+                cullMode: VK_CULL_MODE_NONE,
+                depthTestEnable: VK_FALSE,
+                depthWriteEnable: VK_TRUE,
+                colorWriteMask: 0,
+            ),
+        )), pass, 1);
     }
 
     /// Clears the stencil the section count writes, inside the 3D subpass
     void clearStencil(VkCommandBuffer cmd, VkExtent2D extent)
     {
+        clear(cmd, extent, VK_IMAGE_ASPECT_STENCIL_BIT);
+    }
+
+    /// Clears the depth the sphere surface wrote, keeping the stencil
+    void clearDepth(VkCommandBuffer cmd, VkExtent2D extent)
+    {
+        clear(cmd, extent, VK_IMAGE_ASPECT_DEPTH_BIT);
+    }
+
+    /// Writes the sphere's far surface depth for the stencil count
+    void drawSphereDepth(VkCommandBuffer cmd, VkDescriptorSet frameSet)
+    {
+        auto cfg = sphereDepth.get("section sphere depth");
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cfg.graphicsPipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cfg.pipelineLayout,
+            1, 1, &frameSet, 0, null);
+        vkCmdDraw(cmd, 3, 1, 0, 0);
+    }
+
+    /// Fills the cut with the hatch or the solid colour
+    void drawCap(VkCommandBuffer cmd, VkDescriptorSet frameSet)
+    {
+        auto cfg = cap.get("section cap");
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cfg.graphicsPipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cfg.pipelineLayout,
+            1, 1, &frameSet, 0, null);
+        vkCmdDraw(cmd, 3, 1, 0, 0);
+    }
+
+    private void clear(VkCommandBuffer cmd, VkExtent2D extent, VkImageAspectFlags aspect)
+    {
         VkClearAttachment attachment = {
-            aspectMask: VK_IMAGE_ASPECT_STENCIL_BIT,
+            aspectMask: aspect,
             colorAttachment: 0,
             clearValue: VkClearValue(depthStencil: VkClearDepthStencilValue(0, 0)),
         };
@@ -67,16 +114,5 @@ final class Section
         };
 
         vkCmdClearAttachments(cmd, 1, &attachment, 1, &rect);
-    }
-
-    /// Fills the cut with the hatch where the stencil counted solid
-    void drawCap(VkCommandBuffer cmd, VkDescriptorSet frameSet)
-    {
-        auto cfg = cap.get("section cap");
-
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cfg.graphicsPipeline);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cfg.pipelineLayout,
-            1, 1, &frameSet, 0, null);
-        vkCmdDraw(cmd, 3, 1, 0, 0);
     }
 }

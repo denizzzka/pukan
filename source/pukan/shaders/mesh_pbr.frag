@@ -131,7 +131,13 @@ void main()
 #ifdef SECTION
     // Only the section pipeline defines SECTION, so the normal pipelines
     // compile the test out entirely
-    if(dot(fragPosition, frameUbo.frame.sectionPlane.xyz) + frameUbo.frame.sectionPlane.w < 0.0)
+    if(frameUbo.frame.sectionParams.z > 0.5)
+    {
+        const vec3 offset = fragPosition - frameUbo.frame.sectionShape.xyz;
+        if(dot(offset, offset) < frameUbo.frame.sectionShape.w * frameUbo.frame.sectionShape.w)
+            discard;
+    }
+    else if(dot(fragPosition, frameUbo.frame.sectionShape.xyz) + frameUbo.frame.sectionShape.w < 0.0)
         discard;
 #endif
 

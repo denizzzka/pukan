@@ -5,12 +5,16 @@
 layout(location = 3) in vec3 fragPosition;
 layout(location = 0) out vec4 outColor;
 
-// Counts the solid in front of the section plane: the main pass cuts this
-// part away, so only its front and back faces contribute to the stencil.
+// Counts the solid up to the cut surface. The plane keeps its near part;
+// the sphere keeps whatever the depth test against the sphere surface
+// lets through, which counts the solid up to that surface.
 void main()
 {
-    if(dot(fragPosition, frameUbo.frame.sectionPlane.xyz) + frameUbo.frame.sectionPlane.w >= 0.0)
-        discard;
+    if(frameUbo.frame.sectionParams.z <= 0.5)
+    {
+        if(dot(fragPosition, frameUbo.frame.sectionShape.xyz) + frameUbo.frame.sectionShape.w >= 0.0)
+            discard;
+    }
 
     outColor = vec4(0.0);
 }
