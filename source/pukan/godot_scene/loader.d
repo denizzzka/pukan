@@ -25,6 +25,7 @@ import pukan.graphics.g3d.pbr.factory: PbrFactory;
 import pukan.graphics.g3d.pbr.lod: generateLevels;
 import pukan.graphics.g3d.pbr.mesh: IndicesDescr, MeshGeometry, MeshStreams, PbrGeometry, PbrMesh, Vector4us, applyWinding;
 import pukan.graphics.g3d.pbr.pipelines: PbrPipelines;
+import pukan.graphics.g3d.tree: Walk, walkTree;
 import pukan.physics.shapes: CollisionShape;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
@@ -407,10 +408,10 @@ private final class GodotLoader
         GodotLight[] lights;
         GodotCamera camera;
         bool hasCamera;
-        collectSceneNodes(root, Matrix4x4f.identity(), lights, camera, hasCamera);
+        collectSceneNodes(root, lights, camera, hasCamera);
 
         // Godot stores clockwise triangles in its meshes and primitives
-        applyWinding!(GodotNode, GodotNode)(root, Matrix4x4f.identity(), false, node => node.local);
+        applyWinding!GodotNode(root, false, node => node.local);
 
         auto scene = new GodotScene(
             pipelines,
@@ -466,38 +467,36 @@ private final class GodotLoader
 
     private static void collectSceneNodes(
         GodotNode node,
-        Matrix4x4f parent,
         ref GodotLight[] lights,
         ref GodotCamera camera,
         ref bool hasCamera,
     )
     {
-        if(!node.visible)
-            return;
+        walkTree!GodotNode(node, Matrix4x4f.identity, n => n.local, (n, world, local) {
+            if(!n.visible)
+                return Walk.skip;
 
-        const world = parent * node.local;
+            if(n.hasLight)
+            {
+                GodotLight light = n.light;
+                light.position = Vector3f(world.a14, world.a24, world.a34);
 
-        if(node.hasLight)
-        {
-            GodotLight light = node.light;
-            light.position = Vector3f(world.a14, world.a24, world.a34);
+                const zAxis = Vector3f(world.a13, world.a23, world.a33).normalized;
+                light.direction = light.kind == GodotLightKind.directional ? zAxis : -zAxis;
+                lights ~= light;
+            }
 
-            const zAxis = Vector3f(world.a13, world.a23, world.a33).normalized;
-            light.direction = light.kind == GodotLightKind.directional ? zAxis : -zAxis;
-            lights ~= light;
-        }
+            if(n.hasCamera && !hasCamera)
+            {
+                camera.view = world.inverse;
+                camera.fov = n.camera.fov;
+                camera.nearPlane = n.camera.nearPlane;
+                camera.farPlane = n.camera.farPlane;
+                hasCamera = true;
+            }
 
-        if(node.hasCamera && !hasCamera)
-        {
-            camera.view = world.inverse;
-            camera.fov = node.camera.fov;
-            camera.nearPlane = node.camera.nearPlane;
-            camera.farPlane = node.camera.farPlane;
-            hasCamera = true;
-        }
-
-        foreach(child; node.children)
-            collectSceneNodes(child, world, lights, camera, hasCamera);
+            return Walk.descend;
+        });
     }
 
     private GodotNode buildTree(ref GodotTextDocument document)

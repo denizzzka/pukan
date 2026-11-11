@@ -15,7 +15,7 @@ import pukan.graphics.g3d.pbr.accessor;
 import pukan.graphics.g3d.pbr.lod: generateLevels;
 import pukan.graphics.g3d.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
 import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
-import pukan.graphics.g3d.tree: BaseNode = Node;
+import pukan.graphics.g3d.tree: BaseNode = Node, Walk, walkTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
@@ -157,25 +157,11 @@ class Node : BaseNode
     /// For correct result must be called on root node only
     package void refreshTransFromRootValues()
     {
-        import std.math;
-        import std;
+        walkTree!Node(this, Matrix4x4f.identity, n => n.trans.calcMatrix, (n, world, local) {
+            if(n.transFromRoot !is null)
+                *n.transFromRoot = world;
 
-        traversal((node){
-            // is root scene node?
-            if(node.transFromRoot is null)
-                return; // just ignore - root scene doesn't have assigned transFromRoot pointer
-
-            assert(node.parent !is null);
-            auto parentTransFromRoot = (cast(Node) node.parent).transFromRoot;
-
-            // parent is root scene node?
-            if(parentTransFromRoot is null)
-                *node.transFromRoot = node.trans.calcMatrix;
-            else
-            {
-                assert(!(*parentTransFromRoot)[0].isNaN);
-                *node.transFromRoot = *parentTransFromRoot * node.trans.calcMatrix;
-            }
+            return Walk.descend;
         });
     }
 }
@@ -187,33 +173,27 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
     {
         bool skinned;
 
-        void check(Node node)
-        {
-            foreach(mesh; node.meshes)
+        walkTree!Node(rootSceneNode, Matrix4x4f.identity, n => n.trans.calcMatrix, (n, world, local) {
+            foreach(mesh; n.meshes)
                 if(mesh.hasSkin)
+                {
                     skinned = true;
 
-            foreach(child; node.children)
-                check(cast(Node) child);
-        }
+                    return Walk.stop;
+                }
 
-        check(rootSceneNode);
+            return Walk.descend;
+        });
 
         if(skinned)
             return false;
 
-        void walk(in Matrix4x4f parent, Node node)
-        {
-            const placed = parent * node.trans.calcMatrix;
+        walkTree!Node(rootSceneNode, Matrix4x4f.identity, n => n.trans.calcMatrix, (n, world, local) {
+            foreach(mesh; n.meshes)
+                sink(mesh, world);
 
-            foreach(mesh; node.meshes)
-                sink(mesh, placed);
-
-            foreach(child; node.children)
-                walk(placed, cast(Node) child);
-        }
-
-        walk(Matrix4x4f.identity, rootSceneNode);
+            return Walk.descend;
+        });
 
         return true;
     }
@@ -369,12 +349,7 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
         });
 
         // Raw glTF indices keep the counter-clockwise winding of the file
-        applyWinding!(Node, BaseNode)(
-            cast(Node) rootSceneNode,
-            Matrix4x4f.identity,
-            true,
-            node => node.trans.calcMatrix,
-        );
+        applyWinding!Node(cast(Node) rootSceneNode, true, node => node.trans.calcMatrix);
     }
 
     protected void initJointMatricesBuffer(LogicalDevice device, LoaderNode[] nodes)
@@ -560,20 +535,12 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
     {
         Boxf result;
 
-        void collect(Node node, Matrix4x4f trans)
-        {
-            assert(node.trans !is null);
+        walkTree!Node(rootSceneNode, Matrix4x4f.identity, n => n.trans.calcMatrix, (n, world, local) {
+            foreach(mesh; n.meshes)
+                mergePartAabb(result, mesh.localAABB, world, byOrigin);
 
-            trans *= node.trans.calcMatrix;
-
-            foreach(mesh; node.meshes)
-                mergePartAabb(result, mesh.localAABB, trans, byOrigin);
-
-            foreach(child; node.children)
-                collect(cast(Node) child, trans);
-        }
-
-        collect(rootSceneNode, Matrix4x4f.identity);
+            return Walk.descend;
+        });
 
         return result;
     }
@@ -1136,38 +1103,28 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
             float depth;
         }
 
-        //TODO: not need to call this recursive - just call it in row and use fromSkinRootNodeTranslations to get coords
-        void collectDraws(Matrix4x4f trans, Node node, ref MeshDraw[] draws, bool mirrored)
-        {
-            assert(node.trans !is null);
+        MeshDraw[] draws;
+        // The node chain is what `applyWinding` baked into `mesh.mirrored`
+        const placedMirror = trans.mirrors;
 
-            const local = node.trans.calcMatrix;
-            trans *= local;
-
+        walkTree!Node(rootSceneNode, trans, n => n.trans.calcMatrix, (n, world, local) {
             debug
-            {
-                mirrored = mirrored != local.mirrors;
+                foreach(mesh; n.meshes)
+                    assert(mesh.mirrored == (world.mirrors != placedMirror),
+                        "mesh winding does not match its transform");
 
-                foreach(mesh; node.meshes)
-                    assert(mesh.mirrored == mirrored, "mesh winding does not match its transform");
-            }
-
-            foreach(mesh; node.meshes)
+            foreach(mesh; n.meshes)
             {
                 //TODO: cull skinned meshes by their posed bounds
-                if(!mesh.hasSkin && !isVisible(mesh.localAABB, trans))
+                if(!mesh.hasSkin && !isVisible(mesh.localAABB, world))
                     continue;
 
-                const clip = Vector4f(0, 0, 0, 1) * trans;
-                draws ~= MeshDraw(mesh, trans, clip.w);
+                const clip = Vector4f(0, 0, 0, 1) * world;
+                draws ~= MeshDraw(mesh, world, clip.w);
             }
 
-            foreach(c; node.children)
-                collectDraws(trans, cast(Node) c, draws, mirrored);
-        }
-
-        MeshDraw[] draws;
-        collectDraws(trans, rootSceneNode, draws, false);
+            return Walk.descend;
+        });
 
         // Back to front only matters for the in-place blend path
         if(phase == DrawPhase.blended)

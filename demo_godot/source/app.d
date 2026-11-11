@@ -1013,6 +1013,8 @@ void main(string[] args)
         scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat, "demo_godot");
     scope(exit) destroy(scene);
 
+    scene.frameRateLimit = offscreen ? 0 : 60;
+
     if((!offscreen || uiOption) && !noUiOption)
     {
         auto ui = scene.enableUi();
@@ -1694,6 +1696,10 @@ void main(string[] args)
                                 cast(int) (life.currentFrame - life.oldestUse));
 
                         ImGui.Checkbox("OIT", &scene.oitEnabled);
+
+                        float fpsCap = cast(float) scene.frameRateLimit;
+                        if(ImGui.SliderFloat("FPS cap", &fpsCap, 0.0f, 240.0f, "%.0f fps"))
+                            scene.frameRateLimit = fpsCap;
                     }
 
                     if(ImGui.CollapsingHeader("Streaming", ImGuiTreeNodeFlags.DefaultOpen))

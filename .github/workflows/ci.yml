@@ -71,3 +71,62 @@ jobs:
             echo "Vulkan validation errors detected"
             exit 1
           fi
+
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-latest
+
+      - name: Install Vulkan and X11 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libvulkan-dev \
+            libwebp-dev \
+            libzstd-dev \
+            libglfw3 \
+            libglfw3-dev \
+            mesa-vulkan-drivers \
+            xvfb
+
+      - name: Use lavapipe
+        run: |
+          ICD=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1)
+          test -n "$ICD"
+          echo "VK_ICD_FILENAMES=$ICD" >> "$GITHUB_ENV"
+          echo "VK_DRIVER_FILES=$ICD" >> "$GITHUB_ENV"
+
+      - name: Build library
+        run: dub build -b release
+
+      - name: Build demo
+        working-directory: demo
+        run: dub build -b release
+
+      - name: Build compute demo
+        working-directory: demo_compute
+        run: dub build -b release
+
+      - name: Build godot demo
+        working-directory: demo_godot
+        run: dub build -b release
+
+      - name: Run compute demo
+        run: |
+          set -euo pipefail
+          timeout 120 ./demo_compute/demo_compute 2>&1 | tee compute-release.log
+          grep -q "PASS" compute-release.log
+
+      - name: Run demo under Xvfb
+        run: |
+          set -euo pipefail
+          timeout 180 xvfb-run -a -s "-screen 0 1280x1024x24" \
+            ./demo/demo --frames 30 2>&1 | tee demo-release.log
+

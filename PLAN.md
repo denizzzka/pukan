@@ -1016,6 +1016,22 @@ against the plain version it replaces.
     the shader only needs the result. This item waits until there is a
     volumetric or absorptive effect in the scene to measure it on.
 
+- **One flat part list per drawable**
+  - [ ] Give glTF the model `GodotScene` already uses: `registerParts` runs
+        once and a frame draws from a flat list, while glTF walks its node tree
+        in `drawingBufferFilling` every frame (`collectDraws`), recomputes a
+        matrix per node and rebuilds `MeshDraw[]`.
+  - [ ] Register parts once with the node index and the base and world
+        matrices; per frame, refresh the world of the parts below animated
+        nodes only, and keep GPU skinning unchanged.
+  - [ ] Acceptance: no tree walk and no `MeshDraw[]` allocation in a frame
+        where nothing moves, the same draw order and blending, and a measured
+        drop in record time on the fixed scene with the 11 glTF samples.
+  - The debug bench puts the whole frame at 74-76 ms on llvmpipe, where the
+    walk is noise, so judge this with a timer around record and a release
+    build. Release is blocked today by `material.d`, which uses
+    `TransferBuffer` only when assertions are on.
+
 ### Frame loop
 
 - [ ] After archetype storage: split update, upload and record into explicit
@@ -1303,6 +1319,18 @@ surface bounds it, and cycles the frame index over the images it got back.
       display server.
 - [ ] Put the swapchain and the offscreen target behind one interface instead
       of the `SwapChain` mode flag.
+
+## Scene and render targets
+
+`Scene` owns the window's swapchain, its present mode and its frame pacing, so
+one scene cannot feed two targets, and a target cannot outlive the scene that
+built it.
+
+- [ ] Keep the content in the scene and move the images, the present mode and
+      `frameRateLimit` into a target that both the swapchain and the offscreen
+      path implement.
+- [ ] Draw one scene from several viewpoints into several targets, for example
+      two windows, or a mirror plus a screenshot pass.
 
 ## OpenXR
 

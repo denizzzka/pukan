@@ -6,7 +6,7 @@ import std.algorithm: sort;
 import pukan.graphics.common.misc: Boxf, hasBounds, transformAabb;
 import pukan.graphics.g3d.cell_index: CellIndex, DrawItem, DrawStats, placeDrawable;
 import pukan.graphics.g3d.cells: CellCoord, CellGrid;
-import pukan.graphics.g3d.tree: BaseNode = Node;
+import pukan.graphics.g3d.tree: BaseNode = Node, Walk, walkTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
 import pukan.vulkan.logical_device: LogicalDevice;
@@ -49,18 +49,20 @@ class DrawableTree(Payload) : DrawableByVulkan, PipelineWarmup
     {
         auto index = new CellIndex!DrawItem(grid);
 
-        void walk(Node node, Matrix4x4f trans)
+        Matrix4x4f localOf(Node node)
         {
-            if(node.payload.type == typeid(DrawableByVulkan))
-                placeDrawable(index, *node.payload.peek!DrawableByVulkan, trans);
-            else if(node.payload.type == typeid(Bone))
-                trans *= node.payload.peek!Bone.mat;
+            if(node.payload.type == typeid(Bone))
+                return (*node.payload.peek!Bone).mat;
 
-            foreach(ref c; node.children)
-                walk(cast(Node) c, trans);
+            return Matrix4x4f.identity;
         }
 
-        walk(root, Matrix4x4f.identity);
+        walkTree!Node(root, Matrix4x4f.identity, &localOf, (n, world, local) {
+            if(n.payload.type == typeid(DrawableByVulkan))
+                placeDrawable(index, *n.payload.peek!DrawableByVulkan, world);
+
+            return Walk.descend;
+        });
 
         cellIndex = index;
     }
