@@ -639,6 +639,63 @@ Because the goal is vague here, the questions below decide the scope:
   the same render pass?
 - Are pipelines created at scene setup or on first use?
 
+## Custom pass API for scene effects
+
+The section view currently lives in the core: a `DrawPhase`, its own pipelines,
+frame-uniform fields and glTF branches. That is convenient for one effect but
+does not scale: every new effect would add another private case to the engine.
+
+Goal: the core provides primitives; effects bring their own shaders, pipelines,
+state and ordering. The section view becomes the first user of the API, not a
+special case in the core.
+
+What stays in the core:
+
+- stencil and depth-stencil attachments;
+- a generic custom phase and the notion of an active pass;
+- a hook that lets a pass choose a pipeline for a mesh;
+- before/after hooks around opaque and transparent draws;
+- per-pass data that does not grow the frame constants;
+- lazy pass resources.
+
+What moves into the pass:
+
+- the section state and its OSD;
+- section shaders and pipelines;
+- stencil and cap passes;
+- plane or sphere parameters;
+- the whole "what to cut and how to fill it" logic.
+
+Key decisions:
+
+- One active pass owns the pipeline override for a mesh. Several passes may
+  have before/after hooks, but one mesh must not be claimed by two overrides.
+- Pass data stays outside the frame constants. A separate UBO or push constants
+  are a better fit than adding fields to `FrameData` for every effect.
+- An off pass does no work: no hooks, no pipelines, no stencil, no cap. The
+  ordinary frame must not change.
+- Pass pipelines and buffers are created on first use, not at scene setup.
+- The section view is the first pass and the stress test for the API. It may
+  stay inside pukan as a custom pass; moving it out is a later, optional step.
+
+Sphere note: a plane has a flat cap, a sphere has a curved one. "There is solid
+inside the sphere" is not the same as "the sphere surface is inside solid".
+A naive stencil fills the whole sphere disk instead of the thin cuts through
+panels. The pass needs an extra depth pass, a depth-bounded stencil and a cap on
+the sphere surface. This is local to the pass, not to the API.
+
+Risks:
+
+- several passes and the priority of the pipeline override;
+- stereo and the separate transmission pass are not covered at first;
+- an external pass must ship its compiled shaders;
+- the owner of pass resources must release them with the scene or app;
+- moving the section out too early makes debugging harder.
+
+Conclusion: the API is needed so the core stops accumulating private effects.
+The section view is the first and most demanding user; if it fits the scheme,
+other effects will too.
+
 ## Materials
 
 The shared `Material` covers unlit/lit shading, glTF metallic-roughness and the
