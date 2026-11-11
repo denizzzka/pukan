@@ -1320,6 +1320,18 @@ surface bounds it, and cycles the frame index over the images it got back.
 - [ ] Put the swapchain and the offscreen target behind one interface instead
       of the `SwapChain` mode flag.
 
+## Scene and render targets
+
+`Scene` owns the window's swapchain, its present mode and its frame pacing, so
+one scene cannot feed two targets, and a target cannot outlive the scene that
+built it.
+
+- [ ] Keep the content in the scene and move the images, the present mode and
+      `frameRateLimit` into a target that both the swapchain and the offscreen
+      path implement.
+- [ ] Draw one scene from several viewpoints into several targets, for example
+      two windows, or a mirror plus a screenshot pass.
+
 ## OpenXR
 
 The most distant item: VR owns the frame shape, so it waits until the renderer
