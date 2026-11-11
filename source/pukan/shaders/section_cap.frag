@@ -5,28 +5,56 @@
 layout(location = 0) in vec2 vNdc;
 layout(location = 0) out vec4 outColor;
 
-// The stencil limits this to where the cut surface passes through solid.
-// The plane writes its constant depth; the sphere finds the far surface
-// along the view ray and writes that depth instead.
+// The stencil limits this to where the cut shape contains solid. The plane
+// writes a constant depth, the sphere its far surface, and the capsule the
+// first boundary along the view ray.
 void main()
 {
+    const vec3 origin = frameUbo.frame.cameraPosition.xyz;
+    const vec4 nearPoint = frameUbo.frame.invViewProj * vec4(vNdc, 1.0, 1.0);
+    const vec3 direction = normalize(nearPoint.xyz / nearPoint.w - origin);
+
     float depth = frameUbo.frame.sectionParams.x;
 
-    if(frameUbo.frame.sectionParams.z > 0.5)
+    if(frameUbo.frame.sectionParams.z > 1.5)
     {
-        const vec3 origin = frameUbo.frame.cameraPosition.xyz;
-        const vec4 nearPoint = frameUbo.frame.invViewProj * vec4(vNdc, 1.0, 1.0);
-        const vec3 direction = normalize(nearPoint.xyz / nearPoint.w - origin);
+        const vec3 b = frameUbo.frame.sectionShape.xyz;
+        const float radius = frameUbo.frame.sectionShape.w;
+        const vec3 ba = b - origin;
+        const float lengthBA = length(ba);
+        const vec3 axis = ba / max(lengthBA, 1e-6);
+        const vec3 dPerp = direction - axis * dot(direction, axis);
+        const float A = dot(dPerp, dPerp);
+        const float tCyl = A > 1e-6 ? radius / sqrt(A) : -1.0;
+        const float axial = dot(direction * tCyl, axis);
+        const bool cylValid = tCyl > 0.0 && axial >= 0.0 && axial <= lengthBA;
+        float t = cylValid ? tCyl : -1.0;
 
-        const vec3 offset = origin - frameUbo.frame.sectionShape.xyz;
-        const float b = dot(offset, direction);
-        const float c = dot(offset, offset) - frameUbo.frame.sectionShape.w * frameUbo.frame.sectionShape.w;
-        const float h = b * b - c;
+        const vec3 oc = -ba;
+        const float bq = dot(oc, direction);
+        const float cq = dot(oc, oc) - radius * radius;
+        const float hq = bq * bq - cq;
+        const float tSphere = hq >= 0.0 ? -bq + sqrt(hq) : -1.0;
+        if(tSphere > 0.0 && (t < 0.0 || tSphere < t))
+            t = tSphere;
 
-        if(h < 0.0)
+        if(t < 0.0)
             discard;
 
-        const float t = -b + sqrt(h);
+        const vec4 clip = frameUbo.frame.viewProj * vec4(origin + direction * t, 1.0);
+        depth = clip.z / clip.w;
+    }
+    else if(frameUbo.frame.sectionParams.z > 0.5)
+    {
+        const vec3 oc = origin - frameUbo.frame.sectionShape.xyz;
+        const float bq = dot(oc, direction);
+        const float cq = dot(oc, oc) - frameUbo.frame.sectionShape.w * frameUbo.frame.sectionShape.w;
+        const float hq = bq * bq - cq;
+
+        if(hq < 0.0)
+            discard;
+
+        const float t = -bq + sqrt(hq);
         if(t < 0.0)
             discard;
 

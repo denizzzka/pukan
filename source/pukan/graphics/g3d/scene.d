@@ -115,8 +115,8 @@ class SceneWith(Modules...)
     float sectionNdcZ = 0.0f;
     /// 0 draws the cap hatched, 1 fills it with a solid colour
     float sectionFill = 0.0f;
-    /// False cuts with a plane, true with a sphere
-    bool sectionSphere;
+    /// 0 cuts with a plane, 1 with a sphere, 2 with a capsule from the camera
+    uint sectionMode;
     /// Godot tonemap mode: linear, Reinhard, Filmic, ACES, AgX
     uint tonemapMode = 3;
     float tonemapWhite = 1.0f;
@@ -784,7 +784,7 @@ class SceneWith(Modules...)
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
         data.sectionShape = sectionShape;
-        data.sectionParams = Vector4f(sectionNdcZ, sectionFill, sectionSphere ? 1.0f : 0.0f, 0);
+        data.sectionParams = Vector4f(sectionNdcZ, sectionFill, cast(float) sectionMode, 0);
         selectLights(camera, wtb.proj, swapChain.imageExtent.height);
         background.tonemapMode = tonemapMode;
         background.white = tonemapWhite;

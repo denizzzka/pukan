@@ -24,8 +24,8 @@ struct FrameData
     vec4 localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     vec4 ambientParams;  // rgb = ambient tint, a = ambient energy
     vec4 tonemapParams;  // x = mode, y = white
-    vec4 sectionShape;   // plane: xyz = normal, w = -dot(point, normal); sphere: xyz = centre, w = radius
-    vec4 sectionParams;  // x = plane NDC depth, y = fill (0 hatch, 1 colour), z = shape (0 plane, 1 sphere)
+    vec4 sectionShape;   // plane: xyz = normal, w = -dot(point, normal); sphere and capsule: xyz = centre, w = radius
+    vec4 sectionParams;  // x = plane NDC depth, y = fill (0 hatch, 1 colour), z = shape (0 plane, 1 sphere, 2 capsule)
 };
 
 #include "frame_bindings.h"
