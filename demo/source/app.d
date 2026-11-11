@@ -12,7 +12,7 @@ import pukan.graphics.g3d.primitives_tree.sphere: SphereGroup, SphereInstance, S
 import pukan.vulkan.bindings;
 import pukan.vulkan.core: FlightRecorder, LayerSettings;
 import pukan.vulkan.textures: Texture;
-import core.time: MonoTime;
+import core.time: Duration, MonoTime;
 import glfw3.api;
 import std.algorithm: sort;
 import std.datetime.stopwatch;
@@ -67,6 +67,7 @@ void main(string[] args) {
     bool core;
     bool noShadows;
     bool offscreen;
+    double maxFps = 60;
     string materialMode = "authored";
     string[] sampleNames;
     string screenshotPath;
@@ -80,6 +81,7 @@ void main(string[] args) {
         "core", "ignore the KHR material extensions", &core,
         "no-shadows", "do not cast shadows", &noShadows,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
+        "max-fps", "cap frames per second, 0 = only vsync", &maxFps,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
         "screenshot", "save the captured frame to this PNG", &screenshotPath,
@@ -103,6 +105,7 @@ void main(string[] args) {
 
         sceneYaw = 0;
         scenePitch = 0;
+        maxFps = 0;
     }
 
     if(offscreen && frames == 0)
@@ -288,6 +291,8 @@ void main(string[] args) {
             benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
         );
     scope(exit) destroy(scene);
+
+    scene.frameRateLimit = maxFps;
 
     shadowsOn = !noShadows;
     scene.gltfFactory.preloadShadows = shadowsOn;
@@ -654,17 +659,12 @@ void main(string[] args) {
 
         if(!offscreen && !benchMode)
         {
-            import core.thread.osthread: Thread;
-            import core.time;
-
             static size_t frameNum;
             static size_t fps;
 
             frameNum++;
             write("\rFPS: ", fps, ", frame: ", frameNum, ", currentFrameIdx: ", scene.swapChain.currentFrameIdx, ", ");
 
-            enum targetFPS = 80;
-            enum frameDuration = dur!"nsecs"(1_000_000_000 / targetFPS);
             static Duration prevTime;
             const now = sw.peek;
 
@@ -674,11 +674,6 @@ void main(string[] args) {
                 fps = frameNum - prevSecondFrameNum;
                 prevSecondFrameNum = frameNum;
             }
-
-            auto remaining = frameDuration - (now - prevTime);
-
-            //~ if(!remaining.isNegative)
-                //~ Thread.sleep(remaining);
 
             prevTime = now;
         }

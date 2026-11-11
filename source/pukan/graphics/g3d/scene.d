@@ -3,6 +3,7 @@ module pukan.graphics.g3d.scene;
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.graphics.common.frame_bindings: frameBindings, frameSetBindings;
+import pukan.graphics.common.frame_pacer: FramePacer;
 import pukan.graphics.g3d.cells: CellGrid;
 import pukan.graphics.common.screenshot: Screenshot;
 import pukan.graphics.g2d.ui: Ui;
@@ -48,6 +49,11 @@ class SceneWith(Modules...)
     /// Coarse depth of the last frame, when the occlusion grid is on
     private OcclusionDepth occlusionDepth;
     VkPresentModeKHR presentMode;
+
+    /// Upper bound on frames per second; zero leaves pacing to the present mode
+    @property double frameRateLimit() const => pacer.fps;
+    /// A new rate restarts the schedule, so the next frame starts without delay
+    @property void frameRateLimit(double value) => pacer.fps = value;
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -97,6 +103,7 @@ class SceneWith(Modules...)
     private ResourceOwner!false oitOwner;
     /// Set after the first frame has waited for the preload queue
     private bool pipelinesReady;
+    private FramePacer pacer;
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
@@ -1387,6 +1394,8 @@ class SceneWith(Modules...)
     void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
     {
         import pukan.exceptions: PukanExceptionWithCode;
+
+        pacer.waitNextFrame();
 
         static if(pipelineWarmupEnabled)
         {
