@@ -109,6 +109,12 @@ class SceneWith(Modules...)
     float iblIntensity = 1.0f;
     /// Ambient tint and energy applied to the IBL term
     Vector4f ambientLight = Vector4f(1, 1, 1, 1);
+    /// Section cut in world space: xyz = normal, w = -dot(point, normal)
+    Vector4f sectionPlane = Vector4f(0, 0, 0, 1);
+    /// NDC depth of the section plane, for the stencil cap
+    float sectionNdcZ = 0.0f;
+    /// 0 draws the cap hatched, 1 fills it with a solid colour
+    float sectionFill = 0.0f;
     /// Godot tonemap mode: linear, Reinhard, Filmic, ACES, AgX
     uint tonemapMode = 3;
     float tonemapWhite = 1.0f;
@@ -775,6 +781,8 @@ class SceneWith(Modules...)
         );
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
+        data.sectionPlane = sectionPlane;
+        data.sectionParams = Vector4f(sectionNdcZ, sectionFill, 0, 0);
         selectLights(camera, wtb.proj, swapChain.imageExtent.height);
         background.tonemapMode = tonemapMode;
         background.white = tonemapWhite;
@@ -1512,6 +1520,8 @@ struct FrameUniforms
     Vector4f localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     Vector4f ambientParams;  // rgb = ambient tint, a = ambient energy
     Vector4f tonemapParams;  // x = mode, y = white
+    Vector4f sectionPlane;   // section cut: xyz = normal, w = -dot(point, normal)
+    Vector4f sectionParams;  // x = NDC depth of the cut plane
 }
 
 ///

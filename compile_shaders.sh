@@ -18,6 +18,9 @@ glslc ${TGT} ${INCLUDES} -DSHADOW -fshader-stage=vertex source/pukan/shaders/mes
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_shadow.frag -o compiled_shaders/mesh_shadow_frag.spv
 glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_shadow_mask.frag -o compiled_shaders/mesh_shadow_mask_frag.spv
 glslc ${TGT} ${INCLUDES} -DGODOT_MATERIAL -fshader-stage=frag source/pukan/shaders/mesh_shadow_mask.frag -o compiled_shaders/mesh_shadow_mask_frag_godot.spv
+glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/mesh_section_stencil.frag -o compiled_shaders/mesh_section_stencil_frag.spv
+glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/section_cap.vert -o compiled_shaders/section_cap_vert.spv
+glslc ${TGT} ${INCLUDES} -fshader-stage=frag source/pukan/shaders/section_cap.frag -o compiled_shaders/section_cap_frag.spv
 
 pbr_frag() {
     local name="$1"
@@ -51,6 +54,10 @@ for flavor in gltf godot; do
     pbr_frag "mesh_pbr_frag_lit_oit${suffix}" $define -DLIT -DOIT
     pbr_frag "mesh_pbr_frag_unlit_oit${suffix}" $define -DUNLIT -DOIT
 done
+
+# The section cut keeps the normal shader intact and adds a variant with the
+# plane test, so the ordinary pipelines compile the test out
+pbr_frag "mesh_pbr_frag_section" -DSECTION
 
 glslc ${TGT} ${INCLUDES} -fshader-stage=vertex source/pukan/shaders/fullscreen.vert -o compiled_shaders/fullscreen_vert.spv
 glslc ${TGT} ${INCLUDES} -DOIT_READ_ONLY -fshader-stage=frag source/pukan/shaders/oit_resolve.frag -o compiled_shaders/oit_resolve_frag.spv

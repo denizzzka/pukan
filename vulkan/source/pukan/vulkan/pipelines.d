@@ -220,6 +220,10 @@ struct FixedState
     VkBool32 depthBiasEnable = VK_FALSE;
     float depthBiasConstantFactor = 0.0f;
     float depthBiasSlopeFactor = 0.0f;
+    /// Stencil test and the operations for front and back faces
+    VkBool32 stencilTestEnable = VK_FALSE;
+    VkStencilOpState frontStencil;
+    VkStencilOpState backStencil;
 }
 
 struct RenderTechnique
@@ -1200,7 +1204,9 @@ final class PipelineFactory
             depthWriteEnable: state.depthWriteEnable,
             depthCompareOp: state.depthCompareOp,
             depthBoundsTestEnable: VK_FALSE,
-            stencilTestEnable: VK_FALSE,
+            stencilTestEnable: state.stencilTestEnable,
+            front: state.frontStencil,
+            back: state.backStencil,
         };
 
         VkPipelineColorBlendAttachmentState colorBlendAttachment = {

@@ -24,6 +24,8 @@ struct FrameData
     vec4 localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     vec4 ambientParams;  // rgb = ambient tint, a = ambient energy
     vec4 tonemapParams;  // x = mode, y = white
+    vec4 sectionPlane;   // section cut: xyz = normal, w = -dot(point, normal)
+    vec4 sectionParams;  // x = NDC depth of the cut plane
 };
 
 #include "frame_bindings.h"

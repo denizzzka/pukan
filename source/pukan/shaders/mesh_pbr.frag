@@ -128,6 +128,13 @@ float materialChannel(sampler2D map, vec2 uv, int channel)
 
 void main()
 {
+#ifdef SECTION
+    // Only the section pipeline defines SECTION, so the normal pipelines
+    // compile the test out entirely
+    if(dot(fragPosition, frameUbo.frame.sectionPlane.xyz) + frameUbo.frame.sectionPlane.w < 0.0)
+        discard;
+#endif
+
     const Material material = ubo.material;
     const uint flags = materialFlags(material);
 

@@ -14,7 +14,7 @@ import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor;
 import pukan.graphics.g3d.pbr.lod: generateLevels;
 import pukan.graphics.g3d.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
-import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
+import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, sectionPass, transmissionPass;
 import pukan.graphics.g3d.tree: BaseNode = Node, Walk, walkTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
@@ -1182,6 +1182,11 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
             return !blended && !transmissive &&
                 (mesh.alphaMode == AlphaMode.opaque || mesh.alphaMode == AlphaMode.mask);
 
+        if(phase == DrawPhase.section)
+            return !plainShading && !blended && !ownPass
+                && mesh.alphaMode == AlphaMode.opaque
+                && mesh.material.mode == MaterialMode.pbr;
+
         return !blended && !ownPass;
     }
 
@@ -1196,6 +1201,16 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
             return mesh.alphaMode == AlphaMode.mask
                 ? (mesh.hasSkin ? &pipelines.skinnedMaskShadow : &pipelines.unskinnedMaskShadow)
                 : (mesh.hasSkin ? &pipelines.skinnedShadow : &pipelines.unskinnedShadow);
+
+        if(phase == DrawPhase.section)
+            return mesh.hasSkin ? &pipelines.section.skinnedStencil : &pipelines.section.unskinnedStencil;
+
+        if(sectionPass && phase == DrawPhase.surface && !plainShading
+            && mesh.alphaMode == AlphaMode.opaque
+            && mesh.material.mode == MaterialMode.pbr)
+            return mesh.hasSkin
+                ? (mesh.doubleSided ? &pipelines.section.skinnedDoubleSided : &pipelines.section.skinnedOpaque)
+                : (mesh.doubleSided ? &pipelines.section.unskinnedDoubleSided : &pipelines.section.unskinnedOpaque);
 
         auto modes = mesh.hasSkin ? &pipelines.skinned : &pipelines.unskinned;
 

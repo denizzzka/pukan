@@ -183,11 +183,26 @@ bool oitPass = true;
 /// Draw-time switch: every surface uses the plain lit pipeline as opaque
 bool plainShading;
 
+/// Draw-time switch: opaque PBR surfaces use the section pipelines
+bool sectionPass;
+
 struct PbrSkyPipelines
 {
     PbrPipelineVariants ibl;
     PbrPipelineVariants analytic;
     PbrPipelineVariants none;
+}
+
+/// Pipelines of the section cut; the first cut builds them, so an off section
+/// costs no pipeline, no draw and no shader work
+struct PbrSectionPipelines
+{
+    LazyPipeline unskinnedOpaque;
+    LazyPipeline unskinnedDoubleSided;
+    LazyPipeline skinnedOpaque;
+    LazyPipeline skinnedDoubleSided;
+    LazyPipeline unskinnedStencil;
+    LazyPipeline skinnedStencil;
 }
 
 /// One shader per material mode; the mode is fixed when the file is loaded
@@ -207,6 +222,8 @@ final class PbrPipelines
 
     PbrModePipelines skinned;
     PbrModePipelines unskinned;
+    /// Created on the first section cut, never touched while it is off
+    PbrSectionPipelines section;
     LazyPipeline skinnedShadow;
     LazyPipeline unskinnedShadow;
     /// Alpha-tested variants for masked cutouts
@@ -224,7 +241,7 @@ final class PbrPipelines
     {
         static foreach(member; FieldNameTuple!PbrPipelines)
         {
-            static if(member != "factory")
+            static if(member != "factory" && member != "section")
                 warmKeyField(__traits(getMember, this, member), keys);
         }
     }
@@ -236,7 +253,7 @@ final class PbrPipelines
 
         static foreach(member; FieldNameTuple!PbrPipelines)
         {
-            static if(member != "factory")
+            static if(member != "factory" && member != "section")
                 collectKeys(__traits(getMember, this, member), result);
         }
 
@@ -319,7 +336,7 @@ final class PbrPipelines
     {
         static foreach(member; FieldNameTuple!PbrPipelines)
         {
-            static if(member != "factory")
+            static if(member != "factory" && member != "section")
                 validateField(__traits(getMember, this, member));
         }
     }
