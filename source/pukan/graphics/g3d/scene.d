@@ -1356,7 +1356,7 @@ class SceneWith(Modules...)
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT,
-            0, 1, VK_IMAGE_ASPECT_DEPTH_BIT,
+            0, 1, depthStencilAspect,
         );
 
         depthResolve.pass.record(cb, oit.renderedSceneDepthFrameBuffer, swapChain.imageExtent, (ref VkCommandBuffer buf) {

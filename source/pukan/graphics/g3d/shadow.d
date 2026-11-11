@@ -6,7 +6,7 @@ import pukan.graphics.g3d.camera: cameraView;
 import pukan.vulkan.bindings;
 import pukan.vulkan.frame_builder: DepthBuf;
 import pukan.vulkan.helpers: vkCall, vkCheck;
-import pukan.vulkan.image: ImageMemory;
+import pukan.vulkan.image: ImageMemory, depthStencilAspect;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.resources.vkobj: VkObj;
 import pukan.vulkan.renderpass: RenderPass;
@@ -249,7 +249,7 @@ final class ShadowMap
                     srcAccessMask: 0,
                     dstAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                     subresourceRange: VkImageSubresourceRange(
-                        aspectMask: VK_IMAGE_ASPECT_DEPTH_BIT,
+                        aspectMask: depthStencilAspect,
                         baseMipLevel: 0,
                         levelCount: 1,
                         baseArrayLayer: 0,

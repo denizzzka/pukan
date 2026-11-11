@@ -434,6 +434,9 @@ enum identityComponentMapping = VkComponentMapping(
     a: VK_COMPONENT_SWIZZLE_IDENTITY,
 );
 
+/// Both aspects: a depth-stencil barrier has to cover them while separate layouts stay off
+enum depthStencilAspect = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
 /// Transitions one image subresource between layouts
 void transitionImageLayout(
     VkCommandBuffer buf,
