@@ -68,6 +68,7 @@ void main(string[] args) {
     bool noShadows;
     bool offscreen;
     double maxFps = 60;
+    string presentModeOption;
     string materialMode = "authored";
     string[] sampleNames;
     string screenshotPath;
@@ -82,6 +83,7 @@ void main(string[] args) {
         "no-shadows", "do not cast shadows", &noShadows,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
         "max-fps", "cap frames per second, 0 = only vsync", &maxFps,
+        "present-mode", "fifo, mailbox or immediate (default: fifo, bench: immediate)", &presentModeOption,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
         "screenshot", "save the captured frame to this PNG", &screenshotPath,
@@ -110,6 +112,9 @@ void main(string[] args) {
 
     if(offscreen && frames == 0)
         frames = 1;
+
+    if(presentModeOption.length == 0)
+        presentModeOption = benchMode ? "immediate" : "fifo";
 
     version(linux)
     version(DigitalMars)
@@ -288,7 +293,7 @@ void main(string[] args) {
             &windowSizeChanged,
             surfaceFormat,
             "demo",
-            benchMode ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR,
+            parsePresentMode(presentModeOption),
         );
     scope(exit) destroy(scene);
 
@@ -683,6 +688,19 @@ void main(string[] args) {
 
     if(benchMode)
         printBench(device, scene, benchFrameNs, benchUpdateNs, startupStats, startupWallNs);
+}
+
+private VkPresentModeKHR parsePresentMode(string name)
+{
+    switch(name)
+    {
+        case "fifo": return VK_PRESENT_MODE_FIFO_KHR;
+        case "mailbox": return VK_PRESENT_MODE_MAILBOX_KHR;
+        case "immediate": return VK_PRESENT_MODE_IMMEDIATE_KHR;
+        default:
+            enforce(false, "unknown present mode: " ~ name ~ " (fifo, mailbox, immediate)");
+            assert(false);
+    }
 }
 
 private string presentModeName(VkPresentModeKHR mode)
