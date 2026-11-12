@@ -18,6 +18,8 @@ layout(push_constant) uniform Push
 {
     uint gridWidth;
     uint gridHeight;
+    uint texOffsetX;
+    uint texOffsetY;
     uint texWidth;
     uint texHeight;
     uint samples;
@@ -39,7 +41,10 @@ void main()
     for(uint y = 0; y < blockHeight; ++y)
         for(uint x = 0; x < blockWidth; ++x)
         {
-            const ivec2 p = ivec2(cell.x * blockWidth + x, cell.y * blockHeight + y);
+            const ivec2 p = ivec2(
+                pc.texOffsetX + cell.x * blockWidth + x,
+                pc.texOffsetY + cell.y * blockHeight + y
+            );
 
             for(uint s = 0; s < pc.samples; ++s)
                 depth = max(depth, texelFetch(depthImage, p, int(s)).r);

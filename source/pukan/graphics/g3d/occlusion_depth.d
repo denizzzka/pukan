@@ -17,6 +17,10 @@ import pukan.vulkan.resources.vkobj: VkObj;
     sample and `vkCmdResolveImage` takes colour only. A compute pass samples it
     instead, one nearest depth per grid cell, and the CPU reads that buffer a
     frame later.
+
+    One grid serves one view: stereo keeps a grid per eye, each built from its
+    own rectangle of the depth image and sampled in that view's normalized
+    coordinates.
 */
 final class OcclusionDepth
 {
@@ -28,33 +32,38 @@ final class OcclusionDepth
     private VkPipeline pipeline;
     private VkObj!VkDescriptorPool pool;
     private VkSampler sampler;
-    private MemoryBufferMappedToCPU buffer;
-    /// The same grid as an image, for the cull kernel to sample
-    private ImageMemory grid;
-    private VkObj!VkImageView gridViewObj;
 
-    /// Cells per row and column of the grid
+    /// One view's coarse grid and its readback buffer
+    private static struct Grid
+    {
+        MemoryBufferMappedToCPU buffer;
+        ImageMemory image;
+        VkObj!VkImageView viewObj;
+        /// Sets by depth view, because the frames in flight each own one
+        VkDescriptorSet[VkImageView] sets;
+        bool filled;
+    }
+
+    private Grid[] grids;
+
+    /// Cells per row and column of each grid
     int columns;
     int rows;
-    /// Extent the last grid was read at; zero until the first frame
-    VkExtent2D extent;
-    /// Whether a grid has been written and can be read
-    private bool filled;
 
     private static struct Push
     {
         uint gridWidth;
         uint gridHeight;
+        uint texOffsetX;
+        uint texOffsetY;
         uint texWidth;
         uint texHeight;
         uint samples;
     }
 
-    /// Sets by depth view, because the frames in flight each own one
-    private VkDescriptorSet[VkImageView] sets;
-
-    this(LogicalDevice device, PipelineFactory pipelines, int columns, int rows)
+    this(LogicalDevice device, PipelineFactory pipelines, int columns, int rows, size_t viewCount = 1)
     in(columns > 0 && rows > 0)
+    in(viewCount > 0)
     {
         this.device = device;
         this.pipelines = pipelines;
@@ -90,7 +99,7 @@ final class OcclusionDepth
         key = declared.key;
         layout = declared.pipelineLayout;
         setLayout = declared.setLayout;
-        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 8), device.releaseQueue);
+        pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, cast(uint) (8 * viewCount)), device.releaseQueue);
 
         VkSamplerCreateInfo samplerInfo = {
             sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -106,11 +115,6 @@ final class OcclusionDepth
         };
         vkCreateSampler(device.device, &samplerInfo, device.alloc, &sampler).vkCheck;
 
-        buffer = device.create!MemoryBufferMappedToCPU(
-            cast(size_t) columns * rows * float.sizeof,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        );
-
         VkImageCreateInfo gridInfo = {
             sType: VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
             imageType: VK_IMAGE_TYPE_2D,
@@ -123,67 +127,101 @@ final class OcclusionDepth
             usage: VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             sharingMode: VK_SHARING_MODE_EXCLUSIVE,
         };
-        grid = device.create!ImageMemory(gridInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        VkImageViewCreateInfo viewInfo = {
-            sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            viewType: VK_IMAGE_VIEW_TYPE_2D,
-            format: VK_FORMAT_R32_SFLOAT,
-            subresourceRange: VkImageSubresourceRange(
-                aspectMask: VK_IMAGE_ASPECT_COLOR_BIT,
-                baseMipLevel: 0,
-                levelCount: 1,
-                baseArrayLayer: 0,
-                layerCount: 1,
-            ),
-            image: grid.image,
-        };
-        gridViewObj = VkObj!VkImageView(device.releaseQueue, viewInfo);
+        grids.length = viewCount;
 
-        // The kernel writes it and the cull kernel samples it, so it stays general
+        foreach(ref grid; grids)
+        {
+            grid.buffer = device.create!MemoryBufferMappedToCPU(
+                cast(size_t) columns * rows * float.sizeof,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            );
+            grid.image = device.create!ImageMemory(gridInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+            VkImageViewCreateInfo viewInfo = {
+                sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                viewType: VK_IMAGE_VIEW_TYPE_2D,
+                format: VK_FORMAT_R32_SFLOAT,
+                subresourceRange: VkImageSubresourceRange(
+                    aspectMask: VK_IMAGE_ASPECT_COLOR_BIT,
+                    baseMipLevel: 0,
+                    levelCount: 1,
+                    baseArrayLayer: 0,
+                    layerCount: 1,
+                ),
+                image: grid.image.image,
+            };
+            grid.viewObj = VkObj!VkImageView(device.releaseQueue, viewInfo);
+        }
+
+        // The kernel writes them and the cull kernel samples them, so they stay general
         auto commandPool = device.createCommandPool();
         auto buffers = commandPool.allocateBuffers(1);
         commandPool.recordOneTimeAndSubmit(buffers[0], (VkCommandBuffer buf) {
-            transitionImageLayout(
-                buf, grid.image,
-                VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                0,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_ACCESS_SHADER_WRITE_BIT,
-                0u, 1u,
-                VK_IMAGE_ASPECT_COLOR_BIT,
-            );
+            foreach(ref grid; grids)
+                transitionImageLayout(
+                    buf, grid.image.image,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_GENERAL,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    0,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_ACCESS_SHADER_WRITE_BIT,
+                    0u, 1u,
+                    VK_IMAGE_ASPECT_COLOR_BIT,
+                );
         });
         destroy(commandPool);
     }
 
     ~this()
     {
-        if(buffer)
-            destroy(buffer);
+        foreach(ref grid; grids)
+        {
+            if(grid.buffer)
+            {
+                destroy(grid.buffer);
+                grid.buffer = null;
+            }
 
-        if(grid)
-            destroy(grid);
+            if(grid.viewObj.isAlive())
+                destroy(grid.viewObj);
+
+            if(grid.image)
+            {
+                destroy(grid.image);
+                grid.image = null;
+            }
+        }
 
         if(sampler)
+        {
             vkDestroySampler(device, sampler, device.alloc);
+            sampler = null;
+        }
     }
 
-    /// Records the downsample of the depth image; the view feeds the sampler
+    /// Records the downsample of one view's rectangle of the depth image
     void record(
         VkCommandBuffer buf,
         VkImage depthImage,
         VkImageView depth,
         VkExtent2D size,
         uint samples,
+        size_t view = 0,
+        VkRect2D area = VkRect2D.init,
     )
     {
-        if(size.width == 0 || size.height == 0)
+        if(view >= grids.length)
             return;
 
-        if(columns > size.width || rows > size.height)
+        if(area.extent.width == 0 || area.extent.height == 0)
+            area = VkRect2D(offset: VkOffset2D(0, 0), extent: size);
+
+        if(area.extent.width == 0 || area.extent.height == 0)
+            return;
+
+        if(columns > area.extent.width || rows > area.extent.height)
             return;
 
         if(pipeline is null)
@@ -193,13 +231,14 @@ final class OcclusionDepth
             layout = cfg.pipelineLayout;
         }
 
-        auto found = depth in sets;
+        auto grid = &grids[view];
+        auto found = depth in grid.sets;
 
         if(found is null)
         {
             auto created = device.allocateDescriptorSet(pool.vk, setLayout);
 
-            VkDescriptorBufferInfo info = VkDescriptorBufferInfo(buffer.buf, 0, VK_WHOLE_SIZE);
+            VkDescriptorBufferInfo info = VkDescriptorBufferInfo(grid.buffer.buf, 0, VK_WHOLE_SIZE);
             VkDescriptorImageInfo image = VkDescriptorImageInfo(
                 imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 imageView: depth,
@@ -207,7 +246,7 @@ final class OcclusionDepth
             );
             VkDescriptorImageInfo target = VkDescriptorImageInfo(
                 imageLayout: VK_IMAGE_LAYOUT_GENERAL,
-                imageView: gridViewObj.vk,
+                imageView: grid.viewObj.vk,
             );
 
             scope VkWriteDescriptorSet[] writes = [
@@ -218,8 +257,8 @@ final class OcclusionDepth
 
             device.updateDescriptorSets(writes);
 
-            sets[depth] = created;
-            found = depth in sets;
+            grid.sets[depth] = created;
+            found = depth in grid.sets;
         }
 
         VkDescriptorSet set = *found;
@@ -250,8 +289,10 @@ final class OcclusionDepth
         const push = Push(
             gridWidth: cast(uint) columns,
             gridHeight: cast(uint) rows,
-            texWidth: size.width,
-            texHeight: size.height,
+            texOffsetX: cast(uint) area.offset.x,
+            texOffsetY: cast(uint) area.offset.y,
+            texWidth: area.extent.width,
+            texHeight: area.extent.height,
             samples: samples,
         );
         vkCmdPushConstants(buf, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, push.sizeof, &push);
@@ -266,7 +307,7 @@ final class OcclusionDepth
                 dstAccessMask: VK_ACCESS_HOST_READ_BIT,
                 srcQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
                 dstQueueFamilyIndex: VK_QUEUE_FAMILY_IGNORED,
-                buffer: buffer.buf,
+                buffer: grid.buffer.buf,
                 offset: 0,
                 size: VK_WHOLE_SIZE,
             ),
@@ -288,23 +329,28 @@ final class OcclusionDepth
             depthStencilAspect,
         );
 
-        extent = size;
-        filled = true;
+        grid.filled = true;
     }
 
-    /// The grid as an image, for a kernel that samples it
-    VkImageView view() => gridViewObj.vk;
+    /// The grid of one view as an image, for a kernel that samples it
+    VkImageView view(size_t view = 0)
+    {
+        assert(view < grids.length);
+        return grids[view].viewObj.vk;
+    }
 
-    /// Sampler that reads the grid without filtering
+    /// Sampler that reads a grid without filtering
     VkSampler readSampler() => sampler;
 
-    /// Copies the last grid into `cells`; false when no frame has written one
-    bool read(float[] cells) const
+    /// Copies one view's last grid into `cells`; false when no frame wrote it
+    bool read(float[] cells, size_t view = 0) const
     {
-        if(!filled || cells.length < columns * rows)
+        assert(view < grids.length);
+
+        if(!grids[view].filled || cells.length < columns * rows)
             return false;
 
-        const values = cast(const(float)[]) buffer.cpuBuf;
+        const values = cast(const(float)[]) grids[view].buffer.cpuBuf;
         cells[0 .. columns * rows] = values[0 .. columns * rows];
 
         return true;

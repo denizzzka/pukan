@@ -68,6 +68,7 @@ void main(string[] args) {
     bool core;
     bool noShadows;
     bool offscreen;
+    bool occlusion;
     bool section;
     string sectionShapeOption = "plane";
     bool sectionFillSolid;
@@ -88,6 +89,7 @@ void main(string[] args) {
         "core", "ignore the KHR material extensions", &core,
         "no-shadows", "do not cast shadows", &noShadows,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
+        "occlusion", "build the coarse occlusion grid", &occlusion,
         "section", "cut the scene with a section on the first frame", &section,
         "section-shape", "plane, sphere or capsule (default: plane)", &sectionShapeOption,
         "section-fill", "fill the cut with a solid colour instead of a hatch", &sectionFillSolid,
@@ -313,6 +315,9 @@ void main(string[] args) {
 
     scene.frameRateLimit = maxFps;
 
+    if(occlusion)
+        scene.enableOcclusionDepth(192, 144);
+
     RenderTarget secondTargetHandle;
     if(secondTarget)
     {
@@ -526,36 +531,6 @@ void main(string[] args) {
         );
         entityUpdateNs += cast(ulong) (sw.peek - updateStart).total!"nsecs";
 
-        const transl = wtb.proj * wtb.view * wtb.model;
-
-        const sphereViewModel = wtb.view * wtb.model * Vector3f(0, 0, sceneDepth).translationMatrix;
-        const aspect = cast(float) scene.swapChain.imageExtent.width / scene.swapChain.imageExtent.height;
-
-        scene.sphereRenderer.setCamera(
-            sphereViewModel,
-            camera.fov,
-            aspect,
-            scene.swapChain.imageExtent.height,
-            cameraNear,
-            cameraFar,
-        );
-        const cylinderViewModel = wtb.view * wtb.model;
-
-        scene.cylinderRenderer.setCamera(
-            cylinderViewModel,
-            camera.fov,
-            aspect,
-            scene.swapChain.imageExtent.height,
-            cameraNear,
-            cameraFar,
-        );
-
-        extendedLine.setViewport(scene.swapChain.imageExtent);
-        overlayLine.setViewport(scene.swapChain.imageExtent);
-
-        if(!stereo)
-            tree.root.payload = Bone(transl);
-
         if(skyChanged)
         {
             skyChanged = false;
@@ -580,31 +555,6 @@ void main(string[] args) {
                 sectionPass.fill > 0.5f ? "solid" : "hatch",
                 sectionRadius,
             );
-        }
-
-        if(sectionPass !is null && sectionPass.enabled)
-        {
-            // The focus point is the middle of the arena, in world space
-            const focus4 = Vector4f(0, 0, 0, 1) * wtb.model;
-            const focus = Vector3f(
-                cast(float) focus4.x,
-                cast(float) focus4.y,
-                cast(float) focus4.z,
-            );
-
-            const forward = camera.forward;
-
-            if(sectionPass.mode == 0)
-            {
-                // A plane facing the camera, so it cuts what lies in front
-                const offset = -(forward.x * focus.x + forward.y * focus.y + forward.z * focus.z);
-                sectionPass.shape = Vector4f(forward.x, forward.y, forward.z, offset);
-            }
-            else
-                sectionPass.shape = Vector4f(focus.x, focus.y, focus.z, sectionRadius);
-
-            const clip = Vector4f(focus.x, focus.y, focus.z, 1) * (wtb.proj * wtb.view);
-            sectionPass.ndcZ = cast(float) (clip.z / clip.w);
         }
 
         static if(runtimeMaterialOverride)
@@ -642,6 +592,66 @@ void main(string[] args) {
 
             auto cb = frame.commandBuffer;
             const firstTarget = renderTarget is scene.targets[0];
+
+            // A second target looks at the arena from its own camera
+            WorldTransformation targetWtb = wtb;
+            Vector3f targetForward = camera.forward;
+
+            if(!firstTarget)
+            {
+                const eye = Vector3f(3.0f, 1.2f, -2.5f);
+                const focus = Vector3f(0, 0.2f, 0);
+                const aspect = cast(float) renderTarget.extent.width / renderTarget.extent.height;
+
+                targetWtb.view = cameraView(eye, focus, camera.up);
+                targetWtb.proj = vulkanPerspectiveMatrix(camera.fov, aspect, cameraNear, cameraFar);
+                targetForward = (focus - eye).normalized;
+            }
+
+            const targetTransl = targetWtb.proj * targetWtb.view * targetWtb.model;
+            const targetAspect = cast(float) renderTarget.extent.width / renderTarget.extent.height;
+
+            scene.sphereRenderer.setCamera(
+                targetWtb.view * targetWtb.model * Vector3f(0, 0, sceneDepth).translationMatrix,
+                camera.fov,
+                targetAspect,
+                renderTarget.extent.height,
+                cameraNear,
+                cameraFar,
+            );
+
+            scene.cylinderRenderer.setCamera(
+                targetWtb.view * targetWtb.model,
+                camera.fov,
+                targetAspect,
+                renderTarget.extent.height,
+                cameraNear,
+                cameraFar,
+            );
+
+            extendedLine.setViewport(renderTarget.extent);
+            overlayLine.setViewport(renderTarget.extent);
+
+            if(sectionPass !is null && sectionPass.enabled)
+            {
+                const focus4 = Vector4f(0, 0, 0, 1) * targetWtb.model;
+                const focus = Vector3f(
+                    cast(float) focus4.x,
+                    cast(float) focus4.y,
+                    cast(float) focus4.z,
+                );
+
+                if(sectionPass.mode == 0)
+                {
+                    const offset = -(targetForward.x * focus.x + targetForward.y * focus.y + targetForward.z * focus.z);
+                    sectionPass.shape = Vector4f(targetForward.x, targetForward.y, targetForward.z, offset);
+                }
+                else
+                    sectionPass.shape = Vector4f(focus.x, focus.y, focus.z, sectionRadius);
+
+                const clip = Vector4f(focus.x, focus.y, focus.z, 1) * (targetWtb.proj * targetWtb.view);
+                sectionPass.ndcZ = cast(float) (clip.z / clip.w);
+            }
 
             if(firstTarget)
             {
@@ -690,20 +700,20 @@ void main(string[] args) {
             }
             else
             {
-                scene.updateFrameUniforms(frame, 0, wtb);
+                scene.updateFrameUniforms(frame, 0, targetWtb);
 
                 scene.recordCommandBuffer(
                     frame,
                     (buf, view, layout, phase) {
-                        tree.root.payload = Bone(transl);
+                        tree.root.payload = Bone(targetTransl);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
                     (buf, view, layout, phase) {
-                        tree.root.payload = Bone(transl);
+                        tree.root.payload = Bone(targetTransl);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
                     (buf, cascade) {
-                        tree.root.payload = Bone(scene.sunShadow.cascades.viewProj[cascade] * wtb.model);
+                        tree.root.payload = Bone(scene.sunShadow.cascades.viewProj[cascade] * targetWtb.model);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, DrawPhase.shadow);
                     },
                 );

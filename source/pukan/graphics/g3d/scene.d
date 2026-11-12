@@ -465,6 +465,8 @@ class SceneWith(Modules...)
 
             destroy(sceneOwner);
         }
+
+        occlusionDepth = null;
     }
 
     /// Assigns shadow map slots and builds the frames of every target. Add
@@ -1126,12 +1128,11 @@ class SceneWith(Modules...)
             currentCullFrame = target.cullFrames[frameIndex(frame)];
             currentCullFrame.reset();
 
-            // The grid is built from the whole target, so with several views or
-            // targets it describes none of them; the kernel keeps frustum and
-            // LOD only until every view has its own grid
-            auto grid = (views.length == 1 && target is targets[0]) ? occlusionDepth : null;
+            // Each view keeps its own grid; the kernel starts on view 0 and a
+            // multi-view caller switches with `useOcclusionView`
+            auto grid = target is targets[0] ? occlusionDepth : null;
             currentCullFrame.setOcclusion(
-                grid !is null ? grid.view : null,
+                grid !is null ? grid.view(0) : null,
                 grid !is null ? grid.readSampler : VkSampler.init,
                 grid !is null ? cast(uint) grid.columns : 0,
                 grid !is null ? cast(uint) grid.rows : 0,
@@ -1188,14 +1189,17 @@ class SceneWith(Modules...)
 
         activeCustomPass = null;
 
-        if(occlusionDepth !is null && views.length == 1 && target is targets[0])
-            occlusionDepth.record(
-                commandBuffer,
-                frame.depthBuf.depthImage.image,
-                frame.depthBuf.depthView,
-                extent,
-                cast(uint) renderPass.samples,
-            );
+        if(occlusionDepth !is null && target is targets[0])
+            foreach(i, view; views)
+                occlusionDepth.record(
+                    commandBuffer,
+                    frame.depthBuf.depthImage.image,
+                    frame.depthBuf.depthView,
+                    extent,
+                    cast(uint) renderPass.samples,
+                    i,
+                    view.area,
+                );
 
         if(oitEnabled)
             resolveOit(frame, false);
@@ -1258,7 +1262,24 @@ class SceneWith(Modules...)
     void enableOcclusionDepth(int columns, int rows)
     {
         if(occlusionDepth is null)
-            occlusionDepth = new OcclusionDepth(device, pipelineFactory, columns, rows);
+        {
+            occlusionDepth = new OcclusionDepth(device, pipelineFactory, columns, rows, 2);
+            sceneOwner.own(occlusionDepth);
+        }
+    }
+
+    /// Points the next cull dispatch at one view's occlusion grid
+    void useOcclusionView(size_t view)
+    {
+        if(occlusionDepth is null || currentCullFrame is null)
+            return;
+
+        currentCullFrame.setOcclusion(
+            occlusionDepth.view(view),
+            occlusionDepth.readSampler,
+            cast(uint) occlusionDepth.columns,
+            cast(uint) occlusionDepth.rows,
+        );
     }
 
     /// Instances the last frame's grid dropped from the camera's view
@@ -1267,10 +1288,10 @@ class SceneWith(Modules...)
         return currentCullFrame !is null ? currentCullFrame.occlusionRejections : 0;
     }
 
-    /// Copies the last grid into `cells`; false while no frame has written one
-    bool readOcclusionDepths(float[] cells)
+    /// Copies one view's last grid into `cells`; false while no frame has written one
+    bool readOcclusionDepths(float[] cells, size_t view = 0)
     {
-        return occlusionDepth !is null && occlusionDepth.read(cells);
+        return occlusionDepth !is null && occlusionDepth.read(cells, view);
     }
 
     private RenderTarget targetOf(ref Frame frame)

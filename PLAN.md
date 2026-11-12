@@ -923,9 +923,11 @@ Before each slice, read the matching reference named in
         for the camera's view only: applying it to the shadow pass would drop
         casters the camera cannot see but the sun can. A shadow grid has to be
         built from the sun's depth to cull there.
-  - [ ] One grid per view: the grid is built from the whole target, so the view
-        loop leaves it off while several views draw. Stereo needs a grid per
-        eye before the kernel can cull there.
+  - [x] One grid per view: `OcclusionDepth` keeps a grid per view, records
+        each view's rectangle and the cull kernel switches with
+        `useOcclusionView`.
+  - [ ] A per-view `prepare` hook, so a stereo caller gathers each eye against
+        its own grid.
   - [ ] With glass on, sample the resolved depth instead of the multisampled
         one: the same compute, a `sampler2D` instead of a `sampler2DMS`, and
         the pass recorded after `resolveDepth`. That drops the extra read the
@@ -1397,10 +1399,9 @@ every frame set.
 - [x] Keep the content in the scene and move the images, the present mode and
       `frameRateLimit` into a target that both the swapchain and the offscreen
       path implement.
-- [ ] Draw one scene from several viewpoints into several targets, for example
-      two windows, or a mirror plus a screenshot pass. The loop and
-      `--second-target` are in, but the second target still draws the first
-      view; a mirror or a second window sets its own camera.
+- [x] Draw one scene from several viewpoints into several targets. The demo's
+      `--second-target` draws an offscreen target from its own camera and
+      `--second-screenshot` saves it.
 
 ## OpenXR
 

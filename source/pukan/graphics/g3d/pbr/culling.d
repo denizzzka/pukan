@@ -81,7 +81,10 @@ final class CullFrame
     /// installs one, so the binding always holds an image
     private ImageMemory grid;
     private VkObj!VkImageView gridViewObj;
+    /// Owned sampler of the placeholder grid
     private VkSampler gridSampler;
+    /// Sampler currently installed, borrowed from the scene when a grid is set
+    private VkSampler installedSampler;
     private VkImageView gridView;
     private uint gridWidth;
     private uint gridHeight;
@@ -175,6 +178,7 @@ final class CullFrame
             compareOp: VK_COMPARE_OP_ALWAYS,
         };
         vkCreateSampler(device.device, &gridSamplerInfo, device.alloc, &gridSampler).vkCheck;
+        installedSampler = gridSampler;
 
         // A moved buffer needs a set nobody has bound yet, so the pool keeps room
         pool = VkObj!VkDescriptorPool(device.createDescriptorPool(bindings, 512), device.releaseQueue);
@@ -225,7 +229,7 @@ final class CullFrame
             return;
 
         gridView = view;
-        gridSampler = sampler;
+        installedSampler = sampler;
         gridWidth = width;
         gridHeight = height;
         setDirty = true;
@@ -443,7 +447,7 @@ final class CullFrame
         VkDescriptorImageInfo gridInfo = VkDescriptorImageInfo(
             imageLayout: VK_IMAGE_LAYOUT_GENERAL,
             imageView: gridView,
-            sampler: gridSampler,
+            sampler: installedSampler,
         );
 
         VkWriteDescriptorSet[] writes =
