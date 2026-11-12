@@ -1593,6 +1593,9 @@ class SceneWith(Modules...)
 
         foreach(target; targets)
         {
+            if(target.paused)
+                continue;
+
             target.pacer.waitNextFrame();
             target.swapChain.oldSwapchainsMaintenance();
 
@@ -1629,6 +1632,9 @@ class SceneWith(Modules...)
                 {
                     if(target.windowSizeChanged !is null)
                         target.windowSizeChanged();
+
+                    if(target.paused)
+                        continue;
 
                     recreateSwapChain(target);
                     continue;

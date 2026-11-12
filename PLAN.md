@@ -24,9 +24,8 @@ shows it gone.
 ## Open GitHub issues
 
 - [ ] Resolve the tracker backlog. Discuss each item before starting work.
-  - [ ] #5 Finish `Scene.surfaces`: `Scene.targets` holds a list and
-        `addTarget`/`addOffscreenTarget` create window and offscreen targets,
-        but no app draws a mirror or a second window into one yet.
+  - [x] #5 Add `Scene.surfaces`: `Scene.targets` holds window and offscreen
+        targets, and the demo opens a second window with its own camera.
   - [ ] #6 Wrap `CommandPool` into `ScopedLogicalDeviceTemplateMixin`.
   - [ ] #7 GPU-stored objects tree: keep node transforms, or at least the
         whole-tree matrices, in a GPU buffer. `Bone.translationBufferIdx` is
@@ -1394,20 +1393,21 @@ surface bounds it, and cycles the frame index over the images it got back.
 mode, frame pacing and per-frame images. The content, the render pass and the
 factories stay in the scene, so all targets share one color format and one
 pipeline set. Targets are added before the first frame; a later add rebuilds
-every frame set.
+every frame set. A target pauses while its window has no drawable size.
 
 - [x] Keep the content in the scene and move the images, the present mode and
       `frameRateLimit` into a target that both the swapchain and the offscreen
       path implement.
 - [x] Draw one scene from several viewpoints into several targets. The demo's
-      `--second-target` draws an offscreen target from its own camera and
-      `--second-screenshot` saves it.
+      `--second-target` draws an offscreen target and `--second-window` opens
+      a second window, each from its own camera; `--second-screenshot` saves
+      either.
 
 ## OpenXR
 
 The most distant item: VR owns the frame shape, so it waits until the renderer
-and the scene are settled. The stereo path and `Scene.surfaces` (#5) are the
-groundwork.
+and the scene are settled. The stereo path and `Scene.targets` (#5) are in
+place.
 
 - [ ] Session on the existing Vulkan device, an eye swapchain the compositor
       owns with the window as a mirror, and the per-eye pose and projection from

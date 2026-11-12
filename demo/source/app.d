@@ -79,6 +79,7 @@ void main(string[] args) {
     string screenshotPath;
     string secondScreenshotPath;
     bool secondTarget;
+    bool secondWindow;
     uint screenshotFrame;
     auto getoptResult = getopt(
         args,
@@ -99,6 +100,7 @@ void main(string[] args) {
         "sample", "show only this sample, repeatable", &sampleNames,
         "screenshot", "save the captured frame to this PNG", &screenshotPath,
         "second-target", "draw the scene into a second offscreen target", &secondTarget,
+        "second-window", "open a second window with its own camera", &secondWindow,
         "second-screenshot", "save the second target's frame to this PNG", &secondScreenshotPath,
         "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
     );
@@ -112,8 +114,15 @@ void main(string[] args) {
     if(crossEyed)
         stereo = true;
 
+    if(secondWindow)
+    {
+        enforce(!offscreen, "--second-window needs a display");
+        enforce(!stereo, "--second-window does not combine with --stereo");
+        enforce(!secondTarget, "--second-window does not combine with --second-target");
+    }
+
     if(secondScreenshotPath.length)
-        enforce(secondTarget, "--second-screenshot needs --second-target");
+        enforce(secondTarget || secondWindow, "--second-screenshot needs --second-target or --second-window");
 
     benchMode = bench;
     if(benchMode)
@@ -140,6 +149,8 @@ void main(string[] args) {
     }
 
     immutable name = "D/pukan3D/GLFW project";
+
+    RenderTarget secondTargetHandle;
 
     if(!offscreen)
         enforce(glfwInit());
@@ -176,6 +187,14 @@ void main(string[] args) {
         glfwGetCursorPos(window, &cursorX, &cursorY);
     }
 
+    GLFWwindow* secondWindowHandle;
+    if(secondWindow)
+    {
+        secondWindowHandle = glfwCreateWindow(width, height, "pukan3D second", null, null);
+        enforce(secondWindowHandle, "Cannot create a second window");
+        glfwSetWindowPos(secondWindowHandle, width + 80, 80);
+    }
+
     //~ glfwSetWindowUserPointer(demo.window, demo);
     //~ glfwSetWindowRefreshCallback(demo.window, &demo_refresh_callback);
     //~ glfwSetFramebufferSizeCallback(demo.window, &demo_resize_callback);
@@ -196,6 +215,7 @@ void main(string[] args) {
     //~ vk.printAllAvailableLayers();
 
     VkSurfaceKHR surface;
+    VkSurfaceKHR secondSurface;
     if(!offscreen)
     {
         static import glfw3.internal;
@@ -205,6 +225,14 @@ void main(string[] args) {
             cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
             cast(ulong*) &surface
         );
+
+        if(secondWindowHandle !is null)
+            glfwCreateWindowSurface(
+                vk.instance.vk,
+                secondWindowHandle,
+                cast(glfw3.internal.VkAllocationCallbacks*) vk.allocator,
+                cast(ulong*) &secondSurface
+            );
     }
 
     bool surfaceCheck(ref DeviceContext ctx, out string reason)
@@ -218,20 +246,53 @@ void main(string[] args) {
             if((family.queueFlags & queueFlags) != queueFlags)
                 continue;
 
-            VkBool32 supported;
-            vkGetPhysicalDeviceSurfaceSupportKHR(ctx.device, cast(uint) i, surface, &supported).vkCheck;
+            VkSurfaceFormatKHR chosen;
+            bool haveChosen;
+            bool usable = true;
 
-            if(supported != VK_TRUE)
+            foreach(candidate; [surface, secondSurface])
             {
-                reason = "queue family " ~ i.to!string ~ " does not support presentation";
-                return false;
+                if(candidate == VkSurfaceKHR.init)
+                    continue;
+
+                VkBool32 supported;
+                vkGetPhysicalDeviceSurfaceSupportKHR(ctx.device, cast(uint) i, candidate, &supported).vkCheck;
+
+                if(supported != VK_TRUE)
+                {
+                    reason = "queue family " ~ i.to!string ~ " does not support presentation";
+                    usable = false;
+                    break;
+                }
+
+                const format = chooseSurfaceFormat(ctx.device, candidate, reason);
+                if(format.format == VK_FORMAT_UNDEFINED)
+                {
+                    usable = false;
+                    break;
+                }
+
+                if(!haveChosen)
+                {
+                    chosen = format;
+                    haveChosen = true;
+                }
+                else if(format.format != chosen.format || format.colorSpace != chosen.colorSpace)
+                {
+                    reason = "surfaces need the same swapchain format";
+                    usable = false;
+                    break;
+                }
+
+                if(!surfaceUsable(ctx.device, candidate, format, reason))
+                {
+                    usable = false;
+                    break;
+                }
             }
 
-            const format = chooseSurfaceFormat(ctx.device, surface, reason);
-            if(format.format == VK_FORMAT_UNDEFINED)
-                return false;
-
-            return surfaceUsable(ctx.device, surface, format, reason);
+            if(usable)
+                return true;
         }
 
         reason = "no queue family supports " ~ queueFlags.to!string;
@@ -274,6 +335,19 @@ void main(string[] args) {
 
     //~ vk.printSurfaceFormats(vk.devices[vk.deviceIdx], surface);
     //~ vk.printPresentModes(vk.devices[vk.deviceIdx], surface);
+
+    void secondWindowSizeChanged()
+    {
+        if(secondWindowHandle is null)
+            return;
+
+        int w;
+        int h;
+        glfwGetFramebufferSize(secondWindowHandle, &w, &h);
+
+        if(secondTargetHandle !is null)
+            secondTargetHandle.paused = w == 0 || h == 0;
+    }
 
     void windowSizeChanged()
     {
@@ -318,12 +392,19 @@ void main(string[] args) {
     if(occlusion)
         scene.enableOcclusionDepth(192, 144);
 
-    RenderTarget secondTargetHandle;
     if(secondTarget)
     {
         enforce(!stereo, "--second-target does not combine with --stereo");
         secondTargetHandle = scene.addOffscreenTarget(scene.swapChain.imageExtent);
     }
+
+    if(secondWindow)
+        secondTargetHandle = scene.addTarget(
+            secondSurface,
+            &secondWindowSizeChanged,
+            surfaceFormat,
+            VK_PRESENT_MODE_MAILBOX_KHR,
+        );
 
     sectionPass = new SectionPass(scene.pipelineFactory, scene.renderPass);
     sectionPass.enabled = section;
@@ -437,9 +518,20 @@ void main(string[] args) {
 
     const captureFrame = screenshotFrame ? screenshotFrame : (frames ? frames : 1);
 
+    bool windowsOpen()
+    {
+        if(offscreen)
+            return true;
+
+        if(glfwWindowShouldClose(window))
+            return false;
+
+        return secondWindowHandle is null || !glfwWindowShouldClose(secondWindowHandle);
+    }
+
     // Main loop
     uint frameCount;
-    while ((offscreen ? frameCount < frames : !glfwWindowShouldClose(window)) && (frames == 0 || frameCount < frames))
+    while ((offscreen ? frameCount < frames : windowsOpen()) && (frames == 0 || frameCount < frames))
     {
         frameCount++;
 
@@ -450,6 +542,14 @@ void main(string[] args) {
 
         if(!offscreen)
             glfwPollEvents();
+
+        if(secondWindowHandle !is null && secondTargetHandle !is null)
+        {
+            int w;
+            int h;
+            glfwGetFramebufferSize(secondWindowHandle, &w, &h);
+            secondTargetHandle.paused = w == 0 || h == 0;
+        }
 
         const curr = sw.peek.total!"msecs" * 0.001;
         frameTime = offscreen ? curr : glfwGetTime();

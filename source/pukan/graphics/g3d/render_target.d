@@ -28,6 +28,8 @@ final class RenderTarget
     FramePacer pacer;
     /// Called when the surface reports a new size
     void delegate() windowSizeChanged;
+    /// Skips acquire and present while a window has no drawable size
+    bool paused;
 
     /// Per-frame resources of this target; released before its frames do
     ResourceOwner!false owner;
