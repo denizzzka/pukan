@@ -2453,8 +2453,6 @@ void main(string[] args)
                     if(cellCulling != CellCulling.gpu)
                         return;
 
-                    gatherCells(levelIndex, buf, modelViewProj, nearCells, DrawPhase.surface);
-
                     if(!scene.sunShadow.enabled)
                         return;
 
@@ -2463,6 +2461,12 @@ void main(string[] args)
                             gatherCells(levelIndex, buf,
                                 scene.sunShadow.cascades.viewProj[cascade] * wtb.model,
                                 shadowCells, DrawPhase.shadow, cascade);
+                },
+                (buf, view, layout) {
+                    if(cellCulling != CellCulling.gpu)
+                        return;
+
+                    gatherCells(levelIndex, buf, modelViewProj, nearCells, DrawPhase.surface, view);
                 },
             );
 

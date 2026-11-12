@@ -926,8 +926,8 @@ Before each slice, read the matching reference named in
   - [x] One grid per view: `OcclusionDepth` keeps a grid per view, records
         each view's rectangle and the cull kernel switches with
         `useOcclusionView`.
-  - [ ] A per-view `prepare` hook, so a stereo caller gathers each eye against
-        its own grid.
+  - [x] A per-view `prepare` hook: the scene binds each view's grid before it
+        runs, and demo_godot gathers its surface cull there.
   - [ ] With glass on, sample the resolved depth instead of the multisampled
         one: the same compute, a `sampler2D` instead of a `sampler2DMS`, and
         the pass recorded after `resolveDepth`. That drops the extra read the

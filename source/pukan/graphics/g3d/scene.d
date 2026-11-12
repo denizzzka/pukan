@@ -1085,6 +1085,7 @@ class SceneWith(Modules...)
     }
 
     alias SceneDrawCallback = void delegate(ref VkCommandBuffer, size_t view, SceneView layout, DrawPhase phase);
+    alias ViewPrepareCallback = void delegate(ref VkCommandBuffer, size_t view, SceneView layout);
     alias ShadowDrawCallback = void delegate(ref VkCommandBuffer, size_t cascade);
     alias LocalDrawCallback = void delegate(ref VkCommandBuffer, size_t tile);
 
@@ -1096,10 +1097,11 @@ class SceneWith(Modules...)
         ShadowDrawCallback drawShadow = null,
         LocalDrawCallback drawLocal = null,
         void delegate(ref VkCommandBuffer) prepare = null,
+        ViewPrepareCallback prepareView = null,
     )
     {
         SceneView[1] views = [SceneView.full(targetOf(frame).extent)];
-        recordCommandBuffer(frame, views[], drawScene, drawTransmission, drawShadow, drawLocal, prepare);
+        recordCommandBuffer(frame, views[], drawScene, drawTransmission, drawShadow, drawLocal, prepare, prepareView);
     }
 
     /// Records one frame into every view; a view is a rectangle of the target.
@@ -1112,6 +1114,7 @@ class SceneWith(Modules...)
         ShadowDrawCallback drawShadow = null,
         LocalDrawCallback drawLocal = null,
         void delegate(ref VkCommandBuffer) prepare = null,
+        ViewPrepareCallback prepareView = null,
     )
     in(views.length > 0 && views.length <= frame.frameSets.length)
     {
@@ -1127,22 +1130,21 @@ class SceneWith(Modules...)
         {
             currentCullFrame = target.cullFrames[frameIndex(frame)];
             currentCullFrame.reset();
-
-            // Each view keeps its own grid; the kernel starts on view 0 and a
-            // multi-view caller switches with `useOcclusionView`
-            auto grid = target is targets[0] ? occlusionDepth : null;
-            currentCullFrame.setOcclusion(
-                grid !is null ? grid.view(0) : null,
-                grid !is null ? grid.readSampler : VkSampler.init,
-                grid !is null ? cast(uint) grid.columns : 0,
-                grid !is null ? cast(uint) grid.rows : 0,
-            );
         }
 
-        // Compute work, such as a cull kernel, has to finish before a pass begins.
-        // A multi-view caller prepares every view here.
+        // Compute work, such as a cull kernel, has to finish before a pass begins
         if(prepare !is null)
             prepare(commandBuffer);
+
+        // Each view gathers against its own grid; a caller that culls per view
+        // puts that work here, after `bindOcclusionView` picked the grid
+        foreach(i, view; views)
+        {
+            bindOcclusionView(target, i);
+
+            if(prepareView !is null)
+                prepareView(commandBuffer, i, view);
+        }
 
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;
@@ -1268,11 +1270,24 @@ class SceneWith(Modules...)
         }
     }
 
-    /// Points the next cull dispatch at one view's occlusion grid
+    /// Points the cull kernel at one view's grid on the main target
     void useOcclusionView(size_t view)
     {
-        if(occlusionDepth is null || currentCullFrame is null)
+        if(targets.length)
+            bindOcclusionView(targets[0], view);
+    }
+
+    /// Installs one view's grid, or the placeholder when the target has none
+    private void bindOcclusionView(RenderTarget target, size_t view)
+    {
+        if(currentCullFrame is null)
             return;
+
+        if(target !is targets[0] || occlusionDepth is null)
+        {
+            currentCullFrame.setOcclusion(null, VkSampler.init, 0, 0);
+            return;
+        }
 
         currentCullFrame.setOcclusion(
             occlusionDepth.view(view),
