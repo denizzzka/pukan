@@ -2365,7 +2365,7 @@ void main(string[] args)
 
             scene.recordCommandBuffer(
                 frame,
-                (buf, phase) {
+                (buf, view, layout, phase) {
                     // The ring split is a surface matter; the other phases draw all
                     const measure = phase == DrawPhase.surface && frameIndex > warmup;
                     auto ringStart = drawStats();

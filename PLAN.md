@@ -687,7 +687,6 @@ the sphere surface. This is local to the pass, not to the API.
 Risks:
 
 - several passes and the priority of the pipeline override;
-- stereo and the separate transmission pass are not covered at first;
 - an external pass must ship its compiled shaders;
 - the owner of pass resources must release them with the scene or app;
 - moving the section out too early makes debugging harder.
@@ -699,13 +698,9 @@ other effects will too.
 Status: `CustomPass` and the scene hooks are in `custom_pass.d`, `SectionPass`
 is the first pass, and the demo toggles it with `X`. The section shaders read
 their data from push constants, and no effect fields remain in the frame
-constants. Stereo and the transmission pass still ignore custom passes.
-
-Future alternative: a single view loop instead of the mono and stereo recording
-paths. Mono is one view and stereo two, so `begin` runs once per frame while the
-custom draws, `end` and the blended hooks run per view with that view's frame
-set. Cleaner than threading hooks through `drawStereoEyes`, but it touches both
-paths at once.
+constants. One view loop records mono and stereo alike: `begin` runs once per
+frame, while the custom draws, `end`, the blended hooks and the transmission
+pass run per view with that view's frame set.
 
 ## Materials
 
@@ -928,6 +923,9 @@ Before each slice, read the matching reference named in
         for the camera's view only: applying it to the shadow pass would drop
         casters the camera cannot see but the sun can. A shadow grid has to be
         built from the sun's depth to cull there.
+  - [ ] One grid per view: the grid is built from the whole target, so the view
+        loop leaves it off while several views draw. Stereo needs a grid per
+        eye before the kernel can cull there.
   - [ ] With glass on, sample the resolved depth instead of the multisampled
         one: the same compute, a `sampler2D` instead of a `sampler2DMS`, and
         the pass recorded after `resolveDepth`. That drops the extra read the

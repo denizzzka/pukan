@@ -29,6 +29,59 @@ import pukan.vulkan.resources.ownership: ResourceOwner;
 import pukan.vulkan.resources.vkobj: VkObj;
 import std.uuid: UUID;
 
+/// One view of a frame: the rectangle it draws into and the frame set whose
+/// uniforms and descriptors it binds
+struct SceneView
+{
+    VkRect2D area;
+    size_t frameSet;
+
+    /// The whole target as one view
+    static SceneView full(VkExtent2D extent)
+    {
+        return SceneView(VkRect2D(offset: VkOffset2D(0, 0), extent: extent), 0);
+    }
+
+    /// Parallel stereo: left eye in the left half, right eye in the right.
+    /// `crossEyed` swaps which half shows which eye.
+    static SceneView[2] stereo(VkExtent2D extent, bool crossEyed = false)
+    {
+        const leftWidth = extent.width / 2;
+
+        return [
+            SceneView(
+                VkRect2D(offset: VkOffset2D(0, 0), extent: VkExtent2D(leftWidth, extent.height)),
+                crossEyed ? 1 : 0,
+            ),
+            SceneView(
+                VkRect2D(
+                    offset: VkOffset2D(cast(int) leftWidth, 0),
+                    extent: VkExtent2D(extent.width - leftWidth, extent.height),
+                ),
+                crossEyed ? 0 : 1,
+            ),
+        ];
+    }
+}
+
+unittest
+{
+    VkExtent2D extent = { width: 101, height: 60 };
+
+    auto mono = SceneView.full(extent);
+    assert(mono.area.offset.x == 0 && mono.area.offset.y == 0);
+    assert(mono.area.extent.width == 101 && mono.area.extent.height == 60);
+    assert(mono.frameSet == 0);
+
+    auto views = SceneView.stereo(extent);
+    assert(views[0].area.offset.x == 0 && views[0].area.extent.width == 50);
+    assert(views[1].area.offset.x == 50 && views[1].area.extent.width == 51);
+    assert(views[0].frameSet == 0 && views[1].frameSet == 1);
+
+    auto swapped = SceneView.stereo(extent, true);
+    assert(swapped[0].frameSet == 1 && swapped[1].frameSet == 0);
+}
+
 class SceneWith(Modules...)
 {
     alias PipelineVariants = Variants!Modules;
@@ -741,7 +794,9 @@ class SceneWith(Modules...)
         );
     }
 
-    void updateFrameUniforms(ref Frame frame, size_t eye, in WorldTransformation wtb)
+    /// Writes the uniforms of one view. Only the first view of a frame updates
+    /// the sun's cascades, so every view draws with the map the shadow pass filled.
+    void updateFrameUniforms(ref Frame frame, size_t eye, in WorldTransformation wtb, bool updateShadows = true)
     {
         const viewProj = wtb.proj * wtb.view;
         const camera = translation(wtb.view.inverse);
@@ -752,7 +807,7 @@ class SceneWith(Modules...)
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
 
         // The light matrices are only needed while the shadow pass runs
-        if(sunShadow.enabled)
+        if(updateShadows && sunShadow.enabled)
         {
             const sun = Vector3f(
                 lights[0].positionRadius.x,
@@ -760,10 +815,11 @@ class SceneWith(Modules...)
                 lights[0].positionRadius.z,
             );
             sunShadow.update(sun, camera, data.invViewProj);
+        }
 
+        if(sunShadow.enabled)
             foreach(cascade; 0 .. sunCascadeCount)
                 data.shadowViewProj[cascade] = sunShadow.cascades.viewProj[cascade];
-        }
 
         data.shadowParams = Vector4f(
             sunShadow.enabled ? 1 : 0,
@@ -1005,6 +1061,11 @@ class SceneWith(Modules...)
         return ups[face];
     }
 
+    alias SceneDrawCallback = void delegate(ref VkCommandBuffer, size_t view, SceneView layout, DrawPhase phase);
+    alias ShadowDrawCallback = void delegate(ref VkCommandBuffer, size_t cascade);
+    alias LocalDrawCallback = void delegate(ref VkCommandBuffer, size_t tile);
+
+    /// Records the scene once across the whole target
     void recordCommandBuffer(
         ref Frame frame,
         SceneDrawCallback drawScene,
@@ -1013,6 +1074,23 @@ class SceneWith(Modules...)
         LocalDrawCallback drawLocal = null,
         void delegate(ref VkCommandBuffer) prepare = null,
     )
+    {
+        SceneView[1] views = [SceneView.full(swapChain.imageExtent)];
+        recordCommandBuffer(frame, views[], drawScene, drawTransmission, drawShadow, drawLocal, prepare);
+    }
+
+    /// Records one frame into every view; a view is a rectangle of the target.
+    /// Frame-wide work runs once, draws and custom pass hooks run per view.
+    void recordCommandBuffer(
+        ref Frame frame,
+        SceneView[] views,
+        SceneDrawCallback drawScene,
+        SceneDrawCallback drawTransmission = null,
+        ShadowDrawCallback drawShadow = null,
+        LocalDrawCallback drawLocal = null,
+        void delegate(ref VkCommandBuffer) prepare = null,
+    )
+    in(views.length > 0 && views.length <= frame.frameSets.length)
     {
         auto commandBuffer = frame.commandBuffer;
 
@@ -1025,16 +1103,19 @@ class SceneWith(Modules...)
             currentCullFrame = cullFrames[frameIndex(frame)];
             currentCullFrame.reset();
 
-            // The last frame's grid is what this frame's kernel tests against
+            // The grid is built from the whole target, so with several views it
+            // describes none of them; the kernel then keeps frustum and LOD only
+            auto grid = views.length == 1 ? occlusionDepth : null;
             currentCullFrame.setOcclusion(
-                occlusionDepth !is null ? occlusionDepth.view : null,
-                occlusionDepth !is null ? occlusionDepth.readSampler : VkSampler.init,
-                occlusionDepth !is null ? cast(uint) occlusionDepth.columns : 0,
-                occlusionDepth !is null ? cast(uint) occlusionDepth.rows : 0,
+                grid !is null ? grid.view : null,
+                grid !is null ? grid.readSampler : VkSampler.init,
+                grid !is null ? cast(uint) grid.columns : 0,
+                grid !is null ? cast(uint) grid.rows : 0,
             );
         }
 
-        // Compute work, such as a cull kernel, has to finish before a pass begins
+        // Compute work, such as a cull kernel, has to finish before a pass begins.
+        // A multi-view caller prepares every view here.
         if(prepare !is null)
             prepare(commandBuffer);
 
@@ -1053,32 +1134,37 @@ class SceneWith(Modules...)
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf, swapChain.imageExtent); },
             (ref VkCommandBuffer buf) {
-                auto frameSet = frame.frameSets[0].descriptorSet;
-
                 if(pass !is null)
-                    pass.begin(buf, frameSet, swapChain.imageExtent);
+                    pass.begin(buf, frame.frameSets[views[0].frameSet].descriptorSet, swapChain.imageExtent);
 
-                if(pass !is null && pass.drawsCustomPhase)
-                    drawScene(buf, DrawPhase.custom);
+                foreach(i, view; views)
+                {
+                    setView(buf, view);
 
-                drawScene(buf, DrawPhase.surface);
+                    auto frameSet = frame.frameSets[view.frameSet].descriptorSet;
 
-                if(pass !is null)
-                    pass.end(buf, frameSet);
+                    if(pass !is null && pass.drawsCustomPhase)
+                        drawScene(buf, i, view, DrawPhase.custom);
 
-                if(pass !is null)
-                    pass.beforeBlended(buf, frameSet);
+                    drawScene(buf, i, view, DrawPhase.surface);
 
-                drawScene(buf, DrawPhase.blended);
+                    if(pass !is null)
+                        pass.end(buf, frameSet);
 
-                if(pass !is null)
-                    pass.afterBlended(buf, frameSet);
+                    if(pass !is null)
+                        pass.beforeBlended(buf, frameSet);
+
+                    drawScene(buf, i, view, DrawPhase.blended);
+
+                    if(pass !is null)
+                        pass.afterBlended(buf, frameSet);
+                }
             },
         );
 
         activeCustomPass = null;
 
-        if(occlusionDepth !is null)
+        if(occlusionDepth !is null && views.length == 1)
             occlusionDepth.record(
                 commandBuffer,
                 frame.depthBuf.depthImage.image,
@@ -1092,13 +1178,19 @@ class SceneWith(Modules...)
 
         if(transmissionPassEnabled)
         {
+            // One copy serves every view: the fragment coordinate carries the
+            // viewport offset, so it lands in that view's rectangle
             copySceneColor(frame);
 
             renderPass.recordTransmissionCommandBuffer(
                 commandBuffer,
                 (ref VkCommandBuffer buf) {
                     if(drawTransmission !is null)
-                        drawTransmission(buf, DrawPhase.transmission);
+                        foreach(i, view; views)
+                        {
+                            setView(buf, view);
+                            drawTransmission(buf, i, view, DrawPhase.transmission);
+                        }
                 },
             );
 
@@ -1121,6 +1213,23 @@ class SceneWith(Modules...)
         device.flushRetired(cast(uint) swapChain.frames.length);
     }
 
+    /// Points the rasterizer at one view's rectangle
+    private static void setView(VkCommandBuffer buf, in SceneView view)
+    {
+        VkViewport viewport = {
+            x: cast(float) view.area.offset.x,
+            y: cast(float) view.area.offset.y,
+            width: cast(float) view.area.extent.width,
+            height: cast(float) view.area.extent.height,
+            minDepth: 0,
+            maxDepth: 1,
+        };
+        VkRect2D scissor = view.area;
+
+        vkCmdSetViewport(buf, 0, 1, &viewport);
+        vkCmdSetScissor(buf, 0, 1, &scissor);
+    }
+
     /// Starts feeding the coarse depth grid from this scene's frames
     void enableOcclusionDepth(int columns, int rows)
     {
@@ -1138,114 +1247,6 @@ class SceneWith(Modules...)
     bool readOcclusionDepths(float[] cells)
     {
         return occlusionDepth !is null && occlusionDepth.read(cells);
-    }
-
-    alias SceneDrawCallback = void delegate(ref VkCommandBuffer, DrawPhase phase);
-    alias StereoDrawCallback = void delegate(ref VkCommandBuffer, size_t eye, VkExtent2D eyeExtent, DrawPhase phase);
-    alias ShadowDrawCallback = void delegate(ref VkCommandBuffer, size_t cascade);
-    alias LocalDrawCallback = void delegate(ref VkCommandBuffer, size_t tile);
-
-    private void drawStereoEyes(VkCommandBuffer buf, StereoDrawCallback drawScene, bool transmission = false)
-    {
-        const extent = swapChain.imageExtent;
-        const leftWidth = extent.width / 2;
-        const rightWidth = extent.width - leftWidth;
-
-        foreach(size_t eye; 0 .. 2)
-        {
-            const width = eye == 0 ? leftWidth : rightWidth;
-            const x = eye == 0 ? 0 : leftWidth;
-            VkExtent2D eyeExtent = { width: width, height: extent.height };
-
-            VkViewport viewport = {
-                x: cast(float) x,
-                y: 0,
-                width: cast(float) width,
-                height: cast(float) extent.height,
-                minDepth: 0,
-                maxDepth: 1,
-            };
-            VkRect2D scissor = {
-                offset: VkOffset2D(x: cast(int) x, y: 0),
-                extent: eyeExtent,
-            };
-
-            vkCmdSetViewport(buf, 0, 1, &viewport);
-            vkCmdSetScissor(buf, 0, 1, &scissor);
-
-            if(transmission)
-                drawScene(buf, eye, eyeExtent, DrawPhase.transmission);
-            else
-            {
-                drawScene(buf, eye, eyeExtent, DrawPhase.surface);
-                drawScene(buf, eye, eyeExtent, DrawPhase.blended);
-            }
-        }
-    }
-
-    /// Parallel stereo: left eye in the left half, right eye in the right half.
-    /// Cross-eyed viewing needs the halves swapped.
-    void recordStereoCommandBuffer(
-        ref Frame frame,
-        StereoDrawCallback drawScene,
-        StereoDrawCallback drawTransmission = null,
-        ShadowDrawCallback drawShadow = null,
-        LocalDrawCallback drawLocal = null,
-    )
-    {
-        auto commandBuffer = frame.commandBuffer;
-
-        currentInstanceArena = instanceArenas[frameIndex(frame)];
-        currentInstanceArena.reset();
-        currentViewportHeight = cast(float) swapChain.imageExtent.height;
-        // Each eye has its own frustum, so this path gathers nothing for the kernel
-        currentCullFrame = null;
-
-        transmissionPass = transmissionPassEnabled;
-        oitPass = oitEnabled;
-        // A stereo frame has two viewports and its own uniforms, so a custom
-        // pass does not apply to it yet
-        activeCustomPass = null;
-
-        recordShadow(frame, drawShadow);
-
-        clearOit(frame);
-
-        renderPass.recordCommandBuffer(
-            commandBuffer,
-            (ref VkCommandBuffer buf) { background.draw(buf, swapChain.imageExtent); },
-            (ref VkCommandBuffer buf) { drawStereoEyes(buf, drawScene); },
-        );
-
-        if(oitEnabled)
-            resolveOit(frame, false);
-
-        if(transmissionPassEnabled)
-        {
-            // One copy serves both eyes: the fragment coordinate already carries
-            // the viewport offset, so it lands in that eye's half
-            copySceneColor(frame);
-
-            renderPass.recordTransmissionCommandBuffer(
-                commandBuffer,
-                (ref VkCommandBuffer buf) {
-                    if(drawTransmission !is null)
-                        drawStereoEyes(buf, drawTransmission, true);
-                },
-            );
-
-            if(oitEnabled)
-            {
-                resolveDepth(frame);
-                resolveOit(frame, true);
-            }
-        }
-
-        if(ui !is null)
-            ui.record(commandBuffer, frame.imageView, cast(uint) frameIndex(frame), swapChain.imageExtent);
-
-        recordPendingScreenshot(frame);
-        presentColor(frame);
     }
 
     private size_t frameIndex(ref Frame frame)

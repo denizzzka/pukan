@@ -242,9 +242,10 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         GatheredNested[] nested;
     }
 
-    /// Cascades of one phase keep one list each
+    /// One gather list per phase and view; shadow cascades are the views
     private enum gatherViews = 3;
-    private GatherPhase[gatherViews][4] gatherPhases;
+    private enum gatherPhaseCount = cast(uint) DrawPhase.shadow + 1;
+    private GatherPhase[gatherViews][gatherPhaseCount] gatherPhases;
 
     package(pukan) this(
         PbrPipelines pipelines,

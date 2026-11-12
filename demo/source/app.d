@@ -634,27 +634,32 @@ void main(string[] args) {
 
             if(stereo)
             {
-                scene.recordStereoCommandBuffer(
-                    frame,
-                    (buf, eye, eyeExtent, phase) {
-                        const view = crossEyed ? 1 - eye : eye;
+                // The sun's cascades come from the base view, so every eye
+                // draws with the map the shadow pass filled
+                scene.updateFrameUniforms(frame, 0, wtb);
 
-                        // Both phases of an eye share the view and the uniform
-                        if(phase == DrawPhase.surface)
+                SceneView[2] views = SceneView.stereo(scene.swapChain.imageExtent, crossEyed);
+                bool[2] uniformsSet;
+
+                scene.recordCommandBuffer(
+                    frame,
+                    views[],
+                    (buf, view, layout, phase) {
+                        auto stereoWtb = calculateStereoWTB(layout.area.extent);
+                        tree.root.payload = Bone(stereoWtb[layout.frameSet].proj * stereoWtb[layout.frameSet].view * stereoWtb[layout.frameSet].model);
+
+                        if(!uniformsSet[layout.frameSet])
                         {
-                            auto stereoWtb = calculateStereoWTB(eyeExtent);
-                            tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
-                            scene.updateFrameUniforms(frame, view, stereoWtb[view]);
+                            uniformsSet[layout.frameSet] = true;
+                            scene.updateFrameUniforms(frame, layout.frameSet, stereoWtb[layout.frameSet], false);
                         }
 
-                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[layout.frameSet].descriptorSet, phase);
                     },
-                    (buf, eye, eyeExtent, phase) {
-                        const view = crossEyed ? 1 - eye : eye;
-                        auto stereoWtb = calculateStereoWTB(eyeExtent);
-                        tree.root.payload = Bone(stereoWtb[view].proj * stereoWtb[view].view * stereoWtb[view].model);
-                        scene.updateFrameUniforms(frame, view, stereoWtb[view]);
-                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[view].descriptorSet, phase);
+                    (buf, view, layout, phase) {
+                        auto stereoWtb = calculateStereoWTB(layout.area.extent);
+                        tree.root.payload = Bone(stereoWtb[layout.frameSet].proj * stereoWtb[layout.frameSet].view * stereoWtb[layout.frameSet].model);
+                        tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[layout.frameSet].descriptorSet, phase);
                     },
                     (buf, cascade) {
                         tree.root.payload = Bone(scene.sunShadow.cascades.viewProj[cascade] * wtb.model);
@@ -668,11 +673,11 @@ void main(string[] args) {
 
                 scene.recordCommandBuffer(
                     frame,
-                    (buf, phase) {
+                    (buf, view, layout, phase) {
                         tree.root.payload = Bone(transl);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
-                    (buf, phase) {
+                    (buf, view, layout, phase) {
                         tree.root.payload = Bone(transl);
                         tree.drawingBufferFilling(buf, Matrix4x4f.identity, frame.frameSets[0].descriptorSet, phase);
                     },
