@@ -1409,6 +1409,11 @@ The most distant item: VR owns the frame shape, so it waits until the renderer
 and the scene are settled. The stereo path and `Scene.targets` (#5) are in
 place.
 
+- [ ] Multiview stereo: one draw into two array layers, with the per-eye
+      matrices selected by `gl_ViewIndex`. `VK_KHR_multiview` is core since
+      Vulkan 1.1, so it is a device feature, not an extension; the side-by-side
+      window path keeps two draws because its viewports differ. Measure it
+      against the current two-view loop on the fixed scene.
 - [ ] Session on the existing Vulkan device, an eye swapchain the compositor
       owns with the window as a mirror, and the per-eye pose and projection from
       `XrView` instead of the demo's fixed stereo views.
