@@ -21,6 +21,7 @@ public import pukan.graphics.g3d.primitives_tree;
 public import pukan.graphics.g3d.primitives_tree.mesh;
 public import pukan.graphics.g3d.primitives_tree.tree;
 public import pukan.graphics.g3d.residency;
+public import pukan.graphics.g3d.render_target;
 public import pukan.graphics.g3d.scene;
 public import pukan.graphics.g3d.section;
 public import pukan.graphics.g3d.stereo;

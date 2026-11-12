@@ -3,7 +3,6 @@ module pukan.graphics.g3d.scene;
 import dlib.math: translation, Matrix4x4f, Vector3f, Vector4f;
 import pukan;
 import pukan.graphics.common.frame_bindings: frameBindings, frameSetBindings;
-import pukan.graphics.common.frame_pacer: FramePacer;
 import pukan.graphics.g3d.cells: CellGrid;
 import pukan.graphics.common.screenshot: Screenshot;
 import pukan.graphics.g3d.custom_pass: CustomPass, activeCustomPass;
@@ -21,6 +20,7 @@ import pukan.graphics.g3d.pbr.pipelines: oitPass, transmissionPass, pipelineWarm
 import pukan.graphics.g3d.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActive;
 import pukan.graphics.g3d.primitives_tree.cylinder: CylinderRenderer;
 import pukan.graphics.g3d.primitives_tree.sphere: SphereRenderer;
+import pukan.graphics.g3d.render_target: RenderTarget;
 import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
 import pukan.graphics.g3d.shadow: LocalShadow, SunCascades, SunShadow, localShadowCount, localTileSize, localTilesPerAxis, sunCascadeCount;
 import pukan.vulkan.bindings;
@@ -90,24 +90,27 @@ class SceneWith(Modules...)
     Axis up = Axis.y;
 
     LogicalDevice device;
-    VkSurfaceKHR surface;
     VkSurfaceFormatKHR surfaceFormat;
 
     alias WindowSizeChangeDetectedCallback = void delegate();
-    WindowSizeChangeDetectedCallback windowSizeChanged;
 
-    SwapChain swapChain;
+    /// Everything the scene draws into; the first target is the window or
+    /// offscreen target a single-target app uses
+    RenderTarget[] targets = [];
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
     Background background;
     /// Coarse depth of the last frame, when the occlusion grid is on
     private OcclusionDepth occlusionDepth;
-    VkPresentModeKHR presentMode;
 
     /// Upper bound on frames per second; zero leaves pacing to the present mode
-    @property double frameRateLimit() const => pacer.fps;
-    /// A new rate restarts the schedule, so the next frame starts without delay
-    @property void frameRateLimit(double value) => pacer.fps = value;
+    @property double frameRateLimit() const => targets[0].pacer.fps;
+    /// Applies to every target, so a second window keeps the same rate
+    @property void frameRateLimit(double value)
+    {
+        foreach(target; targets)
+            target.pacer.fps = value;
+    }
 
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -136,8 +139,6 @@ class SceneWith(Modules...)
     /// Blended draws store their fragments in per-pixel lists this resolves
     bool oitEnabled = true;
 
-    private Screenshot pendingScreenshot;
-    private string pendingScreenshotPath;
     /// Path of the frame saved by the last `captureFrame` call
     string lastScreenshotPath;
 
@@ -151,13 +152,12 @@ class SceneWith(Modules...)
     private VkObj!VkSampler resolveSampler;
     private OitResolve oitResolve;
     private DepthResolve depthResolve;
-    /// OIT images of the current swapchain, indexed like its frames
-    private OitFrame[] oitFrames;
-    /// OIT images of the current swapchain; released before its frame sets go
-    private ResourceOwner!false oitOwner;
     /// Set after the first frame has waited for the preload queue
     private bool pipelinesReady;
-    private FramePacer pacer;
+    /// Frame slots the targets take in the shared shadow maps
+    private size_t shadowSlots;
+    /// Frames handed to the pipeline cache, for its use stamps
+    private ulong drawnFrames;
 
     float exposure = 1.0f;
     float iblIntensity = 1.0f;
@@ -177,14 +177,9 @@ class SceneWith(Modules...)
     /// Uploaded with the frame; the first entry is the sun
     private Light[maxLights] lights;
     private uint lightCount;
-    private MemoryBufferMappedToCPU[] lightBufs;
-    private InstanceArena[] instanceArenas;
-    private CullFrame[] cullFrames;
 
     /// Scene-lifetime resources; it destroys what it took newest first
     private ResourceOwner!false sceneOwner;
-    /// What a swapchain rebuild replaces: lists, cull frames, OIT images
-    private ResourceOwner!false screenOwner;
 
     void addPointLight(Vector3f position, Vector3f color, float radius)
     {
@@ -303,10 +298,7 @@ class SceneWith(Modules...)
     )
     {
         device = dev;
-        surface = surf;
-        windowSizeChanged = wsc;
         this.surfaceFormat = surfaceFormat;
-        this.presentMode = presentMode;
 
         sceneOwner = new ResourceOwner!false("scene", device.rootOwner.releaseQueue);
 
@@ -317,9 +309,6 @@ class SceneWith(Modules...)
             Vector4f(1, 1, 1, 1),
             Vector4f(cast(float) LightType.directional, 0, 0, 0),
         );
-
-        if(surface)
-            device.physicalDevice.instance.useSurface(surface);
 
         renderPass = device.create!DefaultRenderPass(surfaceFormat.format);
 
@@ -372,10 +361,13 @@ class SceneWith(Modules...)
         }
 
         frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
-        swapChain = offscreen
-            ? new SwapChain(device, frameBuilder, offscreenExtent, surfaceFormat.format, renderPass)
-            : new SwapChain(device, frameBuilder, surface, renderPass, null, surfaceFormat.colorSpace, presentMode);
-        createFrameSets();
+
+        if(offscreen)
+            targets ~= new RenderTarget(device, frameBuilder, renderPass, offscreenExtent, "main", surfaceFormat.format);
+        else
+            targets ~= new RenderTarget(device, frameBuilder, renderPass, surf, "main", surfaceFormat, presentMode, wsc);
+
+        assignTargetSlots();
 
         coloredMeshFactory = PrimitivesFactory!ColoredMesh(device, pipelineFactory, meshResources,
             renderPass, sunShadow.pass);
@@ -439,7 +431,10 @@ class SceneWith(Modules...)
             sceneOwner.own(godotFactory);
 
         sceneOwner.own(frameBuilder);
-        sceneOwner.own(swapChain);
+
+        foreach(target; targets)
+            sceneOwner.own(target);
+
         sceneOwner.own(oitResolve);
         sceneOwner.own(depthResolve);
         sceneOwner.own(sunShadow);
@@ -456,18 +451,12 @@ class SceneWith(Modules...)
             if(pipelineFactory)
                 pipelineFactory.waitForRequests();
 
-        if(pendingScreenshot)
-            destroy(pendingScreenshot);
-
         if(ui)
             destroy(ui);
 
         // Asset sets live in the factory pools, so they go before them
         if(gltfFactory)
             gltfFactory.destroyAssets();
-
-        if(screenOwner)
-            destroy(screenOwner);
 
         if(sceneOwner)
         {
@@ -478,7 +467,30 @@ class SceneWith(Modules...)
         }
     }
 
-    private void createFrameSets()
+    /// Assigns shadow map slots and builds the frames of every target. Add
+    /// targets before the first frame; a later add rebuilds every frame set.
+    private void assignTargetSlots()
+    {
+        size_t total;
+
+        foreach(target; targets)
+        {
+            target.slotBase = total;
+            total += target.swapChain.frames.length;
+        }
+
+        if(total != shadowSlots)
+        {
+            shadowSlots = total;
+            sunShadow.recreate(total);
+            localShadow.recreate(total);
+        }
+
+        foreach(target; targets)
+            createTargetFrames(target);
+    }
+
+    private void createTargetFrames(RenderTarget target)
     {
         VkDescriptorImageInfo imageInfo(Texture texture)
         {
@@ -493,66 +505,61 @@ class SceneWith(Modules...)
         auto prefiltered = imageInfo(ibl.prefiltered);
         auto brdfLut = imageInfo(ibl.brdfLut);
 
-        // The device queue keeps the OIT images of a replaced chain for its
-        // frames in flight, so everything here can go at once
-        oitOwner = null;
+        // The release queue holds the images of a replaced chain for its frames
+        // in flight, so everything here can go at once
+        if(target.owner)
+            destroy(target.owner);
 
-        if(screenOwner)
-            destroy(screenOwner);
-        screenOwner = new ResourceOwner!false("screen", sceneOwner.releaseQueue);
+        target.owner = new ResourceOwner!false(target.name, sceneOwner.releaseQueue);
+        target.oitOwner = new ResourceOwner!false("oit", target.owner.releaseQueue);
+        target.owner.own(target.oitOwner);
 
-        oitOwner = new ResourceOwner!false("oit", screenOwner.releaseQueue);
-        screenOwner.own(oitOwner);
+        const frames = target.swapChain.frames.length;
 
-        lightBufs.length = swapChain.frames.length;
+        target.lightBufs.length = frames;
+        target.instanceArenas.length = frames;
+        target.cullFrames.length = frames;
+        target.oitFrames.length = frames;
 
-        instanceArenas.length = swapChain.frames.length;
-        foreach(i; 0 .. instanceArenas.length)
+        foreach(i; 0 .. frames)
         {
-            instanceArenas[i] = new InstanceArena(device);
-            screenOwner.own(instanceArenas[i]);
+            target.instanceArenas[i] = new InstanceArena(device);
+            target.owner.own(target.instanceArenas[i]);
+
+            target.cullFrames[i] = new CullFrame(device, pipelineFactory);
+            target.owner.own(target.cullFrames[i]);
         }
 
-        cullFrames.length = swapChain.frames.length;
-        foreach(i; 0 .. cullFrames.length)
+        foreach(i, ref frame; target.swapChain.frames)
         {
-            cullFrames[i] = new CullFrame(device, pipelineFactory);
-            screenOwner.own(cullFrames[i]);
-        }
+            if(frame.sceneColor)
+                destroy(frame.sceneColor);
 
-        sunShadow.recreate(swapChain.frames.length);
-        localShadow.recreate(swapChain.frames.length);
+            frame.sceneColor = createSceneColorTexture(target.format.format, target.extent);
 
-        foreach(ref frame; swapChain.frames)
-            frame.sceneColor = createSceneColorTexture(swapChain.imageExtent);
-
-        oitFrames = null;
-        oitFrames.length = swapChain.frames.length;
-
-        foreach(i, ref frame; swapChain.frames)
-        {
             auto sceneColor = imageInfo(frame.sceneColor);
 
-            lightBufs[i] = device.create!MemoryBufferMappedToCPU(maxLights * Light.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-            screenOwner.own(lightBufs[i]);
+            target.lightBufs[i] = device.create!MemoryBufferMappedToCPU(maxLights * Light.sizeof, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            target.owner.own(target.lightBufs[i]);
 
-            auto shadowInfo0 = sunShadow.imageInfo(i, 0);
-            auto shadowInfo1 = sunShadow.imageInfo(i, 1);
-            auto shadowInfo2 = sunShadow.imageInfo(i, 2);
-            auto localInfo = localShadow.imageInfo(i);
+            const slot = target.frameSlot(i);
+            auto shadowInfo0 = sunShadow.imageInfo(slot, 0);
+            auto shadowInfo1 = sunShadow.imageInfo(slot, 1);
+            auto shadowInfo2 = sunShadow.imageInfo(slot, 2);
+            auto localInfo = localShadow.imageInfo(slot);
             auto lightInfo = VkDescriptorBufferInfo(
-                buffer: lightBufs[i].buf,
+                buffer: target.lightBufs[i].buf,
                 offset: 0,
                 range: maxLights * Light.sizeof,
             );
 
-            oitFrames[i] = new OitFrame(device, oitResolve.pass, depthResolve.pass, frame.imageView, swapChain.imageExtent);
-            oitOwner.own(oitFrames[i]);
+            target.oitFrames[i] = new OitFrame(device, oitResolve.pass, depthResolve.pass, frame.imageView, target.extent);
+            target.oitOwner.own(target.oitFrames[i]);
 
-            auto oitHeads = oitFrames[i].headsImageInfo;
-            auto oitFragments = oitFrames[i].fragmentsInfo;
-            auto oitCounter = oitFrames[i].counterInfo;
-            auto sceneDepth = oitFrames[i].sceneDepthInfo();
+            auto oitHeads = target.oitFrames[i].headsImageInfo;
+            auto oitFragments = target.oitFrames[i].fragmentsInfo;
+            auto oitCounter = target.oitFrames[i].counterInfo;
+            auto sceneDepth = target.oitFrames[i].sceneDepthInfo();
             sceneDepth.sampler = resolveSampler.vk;
 
             auto depthMS = VkDescriptorImageInfo(
@@ -562,6 +569,10 @@ class SceneWith(Modules...)
             );
 
             foreach(eye; 0 .. 2)
+            {
+                if(frame.frameSets[eye])
+                    destroy(frame.frameSets[eye]);
+
                 frame.frameSets[eye] = new FrameSet(
                     device,
                     frameAllocator,
@@ -582,11 +593,12 @@ class SceneWith(Modules...)
                     depthMS,
                     localInfo,
                 );
+            }
         }
     }
 
     /// Copy of the colour the first pass leaves, sampled by transmissive draws
-    private Texture createSceneColorTexture(VkExtent2D extent)
+    private Texture createSceneColorTexture(VkFormat format, VkExtent2D extent)
     {
         import std.algorithm: max;
 
@@ -596,7 +608,7 @@ class SceneWith(Modules...)
 
         VkImageCreateInfo cinf = {
             imageType: VK_IMAGE_TYPE_2D,
-            format: surfaceFormat.format,
+            format: format,
             tiling: VK_IMAGE_TILING_OPTIMAL,
             extent: VkExtent3D(extent.width, extent.height, 1),
             mipLevels: mipLevels,
@@ -675,7 +687,7 @@ class SceneWith(Modules...)
     private void presentColor(ref Frame frame)
     {
         // An offscreen image has no presentation layout
-        if(swapChain.isOffscreen())
+        if(targetOf(frame).offscreen())
             return;
 
         imageBarrier(
@@ -693,7 +705,7 @@ class SceneWith(Modules...)
 
         auto cb = frame.commandBuffer;
         auto color = frame.sceneColor.textureImageMemory;
-        const extent = swapChain.imageExtent;
+        const extent = targetOf(frame).extent;
 
         imageBarrier(
             cb, frame.image,
@@ -800,6 +812,7 @@ class SceneWith(Modules...)
     {
         const viewProj = wtb.proj * wtb.view;
         const camera = translation(wtb.view.inverse);
+        auto target = targetOf(frame);
 
         FrameUniforms data;
         data.invViewProj = viewProj.inverse;
@@ -854,10 +867,10 @@ class SceneWith(Modules...)
 
         if(updateLighting)
         {
-            selectLights(camera, wtb.proj, swapChain.imageExtent.height);
+            selectLights(camera, wtb.proj, target.extent.height);
             assignLocalShadows(data, camera);
 
-            auto lightBuffer = lightBufs[frameIndex(frame)];
+            auto lightBuffer = target.lightBufs[frameIndex(frame)];
             const lightBytes = lightCount * Light.sizeof;
             (cast(Light[]) lightBuffer.cpuBuf[0 .. lightBytes])[] = lights[0 .. lightCount];
         }
@@ -1083,7 +1096,7 @@ class SceneWith(Modules...)
         void delegate(ref VkCommandBuffer) prepare = null,
     )
     {
-        SceneView[1] views = [SceneView.full(swapChain.imageExtent)];
+        SceneView[1] views = [SceneView.full(targetOf(frame).extent)];
         recordCommandBuffer(frame, views[], drawScene, drawTransmission, drawShadow, drawLocal, prepare);
     }
 
@@ -1101,19 +1114,22 @@ class SceneWith(Modules...)
     in(views.length > 0 && views.length <= frame.frameSets.length)
     {
         auto commandBuffer = frame.commandBuffer;
+        auto target = targetOf(frame);
+        const extent = target.extent;
 
-        currentInstanceArena = instanceArenas[frameIndex(frame)];
+        currentInstanceArena = target.instanceArenas[frameIndex(frame)];
         currentInstanceArena.reset();
-        currentViewportHeight = cast(float) swapChain.imageExtent.height;
+        currentViewportHeight = cast(float) extent.height;
 
-        if(cullFrames.length)
+        if(target.cullFrames.length)
         {
-            currentCullFrame = cullFrames[frameIndex(frame)];
+            currentCullFrame = target.cullFrames[frameIndex(frame)];
             currentCullFrame.reset();
 
-            // The grid is built from the whole target, so with several views it
-            // describes none of them; the kernel then keeps frustum and LOD only
-            auto grid = views.length == 1 ? occlusionDepth : null;
+            // The grid is built from the whole target, so with several views or
+            // targets it describes none of them; the kernel keeps frustum and
+            // LOD only until every view has its own grid
+            auto grid = (views.length == 1 && target is targets[0]) ? occlusionDepth : null;
             currentCullFrame.setOcclusion(
                 grid !is null ? grid.view : null,
                 grid !is null ? grid.readSampler : VkSampler.init,
@@ -1140,10 +1156,10 @@ class SceneWith(Modules...)
 
         renderPass.recordCommandBuffer(
             commandBuffer,
-            (ref VkCommandBuffer buf) { background.draw(buf, swapChain.imageExtent); },
+            (ref VkCommandBuffer buf) { background.draw(buf, extent); },
             (ref VkCommandBuffer buf) {
                 if(pass !is null)
-                    pass.begin(buf, frame.frameSets[views[0].frameSet].descriptorSet, swapChain.imageExtent);
+                    pass.begin(buf, frame.frameSets[views[0].frameSet].descriptorSet, extent);
 
                 foreach(i, view; views)
                 {
@@ -1172,12 +1188,12 @@ class SceneWith(Modules...)
 
         activeCustomPass = null;
 
-        if(occlusionDepth !is null && views.length == 1)
+        if(occlusionDepth !is null && views.length == 1 && target is targets[0])
             occlusionDepth.record(
                 commandBuffer,
                 frame.depthBuf.depthImage.image,
                 frame.depthBuf.depthView,
-                swapChain.imageExtent,
+                extent,
                 cast(uint) renderPass.samples,
             );
 
@@ -1210,15 +1226,15 @@ class SceneWith(Modules...)
             }
         }
 
-        if(ui !is null)
-            ui.record(commandBuffer, frame.imageView, cast(uint) frameIndex(frame), swapChain.imageExtent);
+        if(target is targets[0] && ui !is null)
+            ui.record(commandBuffer, frame.imageView, cast(uint) frameIndex(frame), extent);
 
         recordPendingScreenshot(frame);
         presentColor(frame);
 
         // Frees what no frame in flight can still reference
         //TODO: the scene drives this; hang it on frame completion instead
-        device.flushRetired(cast(uint) swapChain.frames.length);
+        device.flushRetired(cast(uint) target.swapChain.frames.length);
     }
 
     /// Points the rasterizer at one view's rectangle
@@ -1257,13 +1273,24 @@ class SceneWith(Modules...)
         return occlusionDepth !is null && occlusionDepth.read(cells);
     }
 
+    private RenderTarget targetOf(ref Frame frame)
+    {
+        foreach(target; targets)
+            foreach(f; target.swapChain.frames)
+                if(f is frame)
+                    return target;
+
+        assert(false, "frame does not belong to any target");
+    }
+
     private size_t frameIndex(ref Frame frame)
     {
-        foreach(i, f; swapChain.frames)
-            if(f is frame)
-                return i;
+        foreach(target; targets)
+            foreach(i, f; target.swapChain.frames)
+                if(f is frame)
+                    return i;
 
-        assert(false, "frame does not belong to the swapchain");
+        assert(false, "frame does not belong to any target");
     }
 
     /// Creates the debug UI; call it before the first frame
@@ -1278,25 +1305,25 @@ class SceneWith(Modules...)
     /// Whether this frame still has to draw the cascade, so it can be culled first
     bool shadowPending(ref Frame frame, size_t cascade)
     {
-        return sunShadow.pending(frameIndex(frame), cascade);
+        return sunShadow.pending(targetOf(frame).frameSlot(frameIndex(frame)), cascade);
     }
 
     /// Whether this frame still has to draw the spots' atlas
     bool localPending(ref Frame frame)
     {
-        return localShadow.pending(frameIndex(frame));
+        return localShadow.pending(targetOf(frame).frameSlot(frameIndex(frame)));
     }
 
     /// Renders the sun's view of the opaque scene before the main pass
     private void recordShadow(ref Frame frame, ShadowDrawCallback drawShadow)
     {
-        sunShadow.record(frameIndex(frame), frame.commandBuffer, drawShadow);
+        sunShadow.record(targetOf(frame).frameSlot(frameIndex(frame)), frame.commandBuffer, drawShadow);
     }
 
     /// Renders the shadowed spots into their atlas tiles before the main pass
     private void recordLocal(ref Frame frame, LocalDrawCallback drawLocal)
     {
-        localShadow.record(frameIndex(frame), frame.commandBuffer, drawLocal);
+        localShadow.record(targetOf(frame).frameSlot(frameIndex(frame)), frame.commandBuffer, drawLocal);
     }
 
     /// Empties the per-pixel lists before the opaque and blended draws fill them
@@ -1305,7 +1332,7 @@ class SceneWith(Modules...)
         if(!oitEnabled)
             return;
 
-        oitFrames[frameIndex(frame)].recordClear(frame.commandBuffer);
+        targetOf(frame).oitFrames[frameIndex(frame)].recordClear(frame.commandBuffer);
     }
 
     /// Blends the fragments each pixel collected, after every other pass wrote colour
@@ -1314,9 +1341,10 @@ class SceneWith(Modules...)
         if(!oitEnabled)
             return;
 
-        auto oit = oitFrames[frameIndex(frame)];
+        auto target = targetOf(frame);
+        auto oit = target.oitFrames[frameIndex(frame)];
         auto cb = frame.commandBuffer;
-        const extent = swapChain.imageExtent;
+        const extent = target.extent;
 
         // Fragments written by the passes above must be visible to the resolve
         VkMemoryBarrier fragmentBarrier = {
@@ -1374,7 +1402,8 @@ class SceneWith(Modules...)
     /// Writes the nearest depth of the multisampled surface, glass included
     private void resolveDepth(ref Frame frame)
     {
-        auto oit = oitFrames[frameIndex(frame)];
+        auto target = targetOf(frame);
+        auto oit = target.oitFrames[frameIndex(frame)];
         auto cb = frame.commandBuffer;
 
         imageBarrier(
@@ -1388,7 +1417,7 @@ class SceneWith(Modules...)
             0, 1, depthStencilAspect,
         );
 
-        depthResolve.pass.record(cb, oit.renderedSceneDepthFrameBuffer, swapChain.imageExtent, (ref VkCommandBuffer buf) {
+        depthResolve.pass.record(cb, oit.renderedSceneDepthFrameBuffer, target.extent, (ref VkCommandBuffer buf) {
             vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, depthResolve.pipeline.graphicsPipeline);
 
             VkDescriptorSet frameSet = frame.frameSets[0].descriptorSet;
@@ -1399,42 +1428,123 @@ class SceneWith(Modules...)
         });
     }
 
+    /// Rebuilds the frames of the main target after its surface changed
     void recreateSwapChain()
     {
-        if(swapChain.isOffscreen())
-            return;
-
-        swapChain = new SwapChain(device, frameBuilder, surface, renderPass, swapChain, surfaceFormat.colorSpace, presentMode);
-        createFrameSets();
+        if(targets.length)
+            recreateSwapChain(targets[0]);
     }
 
-    /// Saves the next rendered frame to a PNG
+    @property SwapChain swapChain() => targets[0].swapChain;
+
+    @property VkSurfaceKHR surface() => targets[0].surfaceHandle;
+
+    @property VkPresentModeKHR presentMode() const => targets[0].presentMode;
+
+    /// Adds a window target; call it before the first frame. Every target
+    /// shares the scene's color format, render pass and pipelines.
+    RenderTarget addTarget(
+        VkSurfaceKHR windowSurface,
+        WindowSizeChangeDetectedCallback wsc,
+        VkSurfaceFormatKHR format,
+        VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR,
+    )
+    {
+        import std.exception: enforce;
+
+        enforce(format.format == surfaceFormat.format, "a target must share the scene's color format");
+        assert(drawnFrames == 0, "add targets before the first frame");
+
+        auto target = new RenderTarget(device, frameBuilder, renderPass, windowSurface, "target", format, presentMode, wsc);
+        targets ~= target;
+        sceneOwner.own(target);
+        assignTargetSlots();
+
+        return target;
+    }
+
+    /// Adds an offscreen target, for a mirror or a capture
+    RenderTarget addOffscreenTarget(VkExtent2D extent, VkFormat format = VK_FORMAT_UNDEFINED)
+    {
+        import std.exception: enforce;
+
+        if(format == VK_FORMAT_UNDEFINED)
+            format = surfaceFormat.format;
+
+        enforce(format == surfaceFormat.format, "a target must share the scene's color format");
+        assert(drawnFrames == 0, "add targets before the first frame");
+
+        auto target = new RenderTarget(device, frameBuilder, renderPass, extent, "offscreen", format);
+        targets ~= target;
+        sceneOwner.own(target);
+        assignTargetSlots();
+
+        return target;
+    }
+
+    /// Rebuilds one target after its surface changed
+    private void recreateSwapChain(RenderTarget target)
+    {
+        if(target.offscreen())
+            return;
+
+        target.swapChain = new SwapChain(
+            device,
+            frameBuilder,
+            target.surfaceHandle,
+            renderPass,
+            target.swapChain,
+            target.format.colorSpace,
+            target.presentMode,
+        );
+
+        size_t total;
+
+        foreach(t; targets)
+            total += t is target ? target.swapChain.frames.length : t.swapChain.frames.length;
+
+        if(total != shadowSlots)
+            assignTargetSlots();
+        else
+            createTargetFrames(target);
+    }
+
+    /// Saves the next frame of the main target to a PNG
     void captureFrame(string path)
     {
-        pendingScreenshotPath = path;
+        captureFrame(targets[0], path);
+    }
+
+    /// Saves the next frame of one target to a PNG
+    void captureFrame(RenderTarget target, string path)
+    {
+        target.pendingScreenshotPath = path;
     }
 
     private void recordPendingScreenshot(ref Frame frame)
     {
-        if(pendingScreenshotPath.length == 0)
+        auto target = targetOf(frame);
+
+        if(target.pendingScreenshotPath.length == 0)
             return;
 
-        if(pendingScreenshot is null)
-            pendingScreenshot = new Screenshot(
+        if(target.pendingScreenshot is null)
+            target.pendingScreenshot = new Screenshot(
                 device,
-                swapChain.imageExtent.width,
-                swapChain.imageExtent.height,
-                swapChain.imageFormat,
+                target.extent.width,
+                target.extent.height,
+                target.swapChain.imageFormat,
             );
 
-        pendingScreenshot.record(frame.commandBuffer, frame.image);
+        target.pendingScreenshot.record(frame.commandBuffer, frame.image);
     }
 
-    void drawNextFrame(void delegate(ref FrameBuilder fb, ref Frame frame) dg)
+    alias FrameRecordCallback = void delegate(ref FrameBuilder fb, ref Frame frame, RenderTarget target);
+
+    /// Draws every target once; the callback sets up the view of the target it gets
+    void drawNextFrame(FrameRecordCallback dg)
     {
         import pukan.exceptions: PukanExceptionWithCode;
-
-        pacer.waitNextFrame();
 
         static if(pipelineWarmupEnabled)
         {
@@ -1445,61 +1555,68 @@ class SceneWith(Modules...)
             }
         }
 
-        swapChain.oldSwapchainsMaintenance();
-
-        uint imageIndex;
-
+        foreach(target; targets)
         {
-            auto ret = swapChain.acquireNextImage(imageIndex);
+            target.pacer.waitNextFrame();
+            target.swapChain.oldSwapchainsMaintenance();
 
-            if(ret == VK_ERROR_OUT_OF_DATE_KHR)
+            uint imageIndex;
+
             {
-                recreateSwapChain();
-                return;
+                auto ret = target.swapChain.acquireNextImage(imageIndex);
+
+                if(ret == VK_ERROR_OUT_OF_DATE_KHR)
+                {
+                    recreateSwapChain(target);
+                    continue;
+                }
+                else
+                {
+                    if(ret != VK_SUCCESS && ret != VK_SUBOPTIMAL_KHR)
+                        throw new PukanExceptionWithCode(ret, "failed to acquire swap chain image");
+                }
             }
-            else
+
+            auto frame = target.swapChain.frames[imageIndex];
+            pipelineFactory.beginFrame(drawnFrames++);
+
+            frame.commandBuffer.beginOneTimeCommandBuffer;
+            dg(frameBuilder, frame, target);
+            frame.commandBuffer.endCommandBuffer;
+
             {
-                if(ret != VK_SUCCESS && ret != VK_SUBOPTIMAL_KHR)
-                    throw new PukanExceptionWithCode(ret, "failed to acquire swap chain image");
+                frameBuilder.placeDrawnFrameToGraphicsQueue(frame, !target.offscreen());
+
+                auto ret = target.swapChain.queueImageForPresentation(frame, imageIndex);
+
+                if(ret == VK_ERROR_OUT_OF_DATE_KHR || ret == VK_SUBOPTIMAL_KHR)
+                {
+                    if(target.windowSizeChanged !is null)
+                        target.windowSizeChanged();
+
+                    recreateSwapChain(target);
+                    continue;
+                }
+                else
+                {
+                    if(ret != VK_SUCCESS)
+                        throw new PukanExceptionWithCode(ret, "failed to queue image for presentation");
+                }
             }
+
+            if(target.pendingScreenshot !is null)
+            {
+                vkDeviceWaitIdle(device.device);
+                target.pendingScreenshot.save(target.pendingScreenshotPath);
+                target.lastScreenshotPath = target.pendingScreenshotPath;
+                lastScreenshotPath = target.pendingScreenshotPath;
+                target.pendingScreenshotPath = null;
+                destroy(target.pendingScreenshot);
+                target.pendingScreenshot = null;
+            }
+
+            target.swapChain.toNextFrame();
         }
-
-        auto frame = swapChain.frames[imageIndex];
-        pipelineFactory.beginFrame(frameIndex(frame));
-
-        frame.commandBuffer.beginOneTimeCommandBuffer;
-        dg(frameBuilder, frame);
-        frame.commandBuffer.endCommandBuffer;
-
-        {
-            frameBuilder.placeDrawnFrameToGraphicsQueue(frame, !swapChain.isOffscreen());
-
-            auto ret = swapChain.queueImageForPresentation(frame, imageIndex);
-
-            if (ret == VK_ERROR_OUT_OF_DATE_KHR || ret == VK_SUBOPTIMAL_KHR)
-            {
-                windowSizeChanged();
-                recreateSwapChain();
-                return;
-            }
-            else
-            {
-                if(ret != VK_SUCCESS)
-                    throw new PukanExceptionWithCode(ret, "failed to queue image for presentation");
-            }
-        }
-
-        if(pendingScreenshot !is null)
-        {
-            vkDeviceWaitIdle(device.device);
-            pendingScreenshot.save(pendingScreenshotPath);
-            lastScreenshotPath = pendingScreenshotPath;
-            pendingScreenshotPath = null;
-            destroy(pendingScreenshot);
-            pendingScreenshot = null;
-        }
-
-        swapChain.toNextFrame();
     }
 }
 

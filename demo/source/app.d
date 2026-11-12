@@ -76,6 +76,8 @@ void main(string[] args) {
     string materialMode = "authored";
     string[] sampleNames;
     string screenshotPath;
+    string secondScreenshotPath;
+    bool secondTarget;
     uint screenshotFrame;
     auto getoptResult = getopt(
         args,
@@ -94,6 +96,8 @@ void main(string[] args) {
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
         "screenshot", "save the captured frame to this PNG", &screenshotPath,
+        "second-target", "draw the scene into a second offscreen target", &secondTarget,
+        "second-screenshot", "save the second target's frame to this PNG", &secondScreenshotPath,
         "screenshot-frame", "frame to capture (default: the last frame)", &screenshotFrame,
     );
 
@@ -105,6 +109,9 @@ void main(string[] args) {
 
     if(crossEyed)
         stereo = true;
+
+    if(secondScreenshotPath.length)
+        enforce(secondTarget, "--second-screenshot needs --second-target");
 
     benchMode = bench;
     if(benchMode)
@@ -305,6 +312,13 @@ void main(string[] args) {
     scope(exit) destroy(scene);
 
     scene.frameRateLimit = maxFps;
+
+    RenderTarget secondTargetHandle;
+    if(secondTarget)
+    {
+        enforce(!stereo, "--second-target does not combine with --stereo");
+        secondTargetHandle = scene.addOffscreenTarget(scene.swapChain.imageExtent);
+    }
 
     sectionPass = new SectionPass(scene.pipelineFactory, scene.renderPass);
     sectionPass.enabled = section;
@@ -614,23 +628,30 @@ void main(string[] args) {
         if(screenshotPath.length && frameCount == captureFrame)
             scene.captureFrame(screenshotPath);
 
-        scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
+        if(secondScreenshotPath.length && frameCount == captureFrame)
+            scene.captureFrame(secondTargetHandle, secondScreenshotPath);
+
+        scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame, RenderTarget renderTarget) {
 
             {
                 DefaultRenderPass.VariableData renderData;
-                renderData.common.imageExtent = scene.swapChain.imageExtent;
+                renderData.common.imageExtent = renderTarget.extent;
                 renderData.common.frameBuffer = frame.frameBuffer;
                 scene.renderPass.updateData(renderData);
             }
 
             auto cb = frame.commandBuffer;
+            const firstTarget = renderTarget is scene.targets[0];
 
-            scene.sphereRenderer.prepare(cb);
-            scene.cylinderRenderer.prepare(cb);
+            if(firstTarget)
+            {
+                scene.sphereRenderer.prepare(cb);
+                scene.cylinderRenderer.prepare(cb);
 
-            const entityStart = sw.peek;
-            tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
-            entityUpdateNs += cast(ulong) (sw.peek - entityStart).total!"nsecs";
+                const entityStart = sw.peek;
+                tree.forEachDrawablePayload((d) => d.refreshBuffers(cb));
+                entityUpdateNs += cast(ulong) (sw.peek - entityStart).total!"nsecs";
+            }
 
             if(stereo)
             {

@@ -67,6 +67,8 @@ class SwapChain
 
     LogicalDevice device;
     VkSwapchainKHR swapchain;
+    /// Surface this chain presents into; null for an offscreen target
+    VkSurfaceKHR surface;
     VkPresentModeKHR presentMode;
     private SwapChain oldSwapChain;
     FrameBuilder frameBuilder;
@@ -99,13 +101,14 @@ class SwapChain
         auto physDev = device.physicalDevice;
         const capab = physDev.instance.getSurfaceCapabilities(physDev.physicalDevice, surface);
 
-        this(device, fb, capab, renderPass, old, imageColorSpace, preferredPresentMode);
+        this(device, fb, capab, surface, renderPass, old, imageColorSpace, preferredPresentMode);
     }
 
     this(
         LogicalDevice device,
         FrameBuilder fb,
         VkSurfaceCapabilitiesKHR capabilities,
+        VkSurfaceKHR surface,
         RenderPass renderPass,
         SwapChain old,
         VkColorSpaceKHR imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
@@ -128,7 +131,6 @@ class SwapChain
             : min(wantedImageCount, cap.maxImageCount);
         enforce(imageCount > 0);
 
-        auto surface = device.physicalDevice.instance.surface.vk;
         string reason;
         enforce(surfaceUsable(device.physicalDevice.physicalDevice, surface,
                 VkSurfaceFormatKHR(renderPass.imageFormat, imageColorSpace), reason),
@@ -154,7 +156,7 @@ class SwapChain
 
         VkSwapchainCreateInfoKHR cinf = {
             sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            surface: device.physicalDevice.instance.surface.vk,
+            surface: surface,
             imageFormat: renderPass.imageFormat,
             imageColorSpace: imageColorSpace,
             imageExtent: capabilities.currentExtent,
@@ -181,6 +183,7 @@ class SwapChain
         imageFormat = cinf.imageFormat;
         imageExtent = cinf.imageExtent;
         presentMode = cinf.presentMode;
+        surface = cinf.surface;
 
         debug
         {
@@ -214,6 +217,7 @@ class SwapChain
     {
         this.device = device;
         frameBuilder = fb;
+        surface = null;
         imageFormat = format;
         imageExtent = extent;
         presentMode = VK_PRESENT_MODE_FIFO_KHR;

@@ -48,9 +48,6 @@ class Instance
     InstanceObj instance;
     VkAllocationCallbacks* allocator = null;
 
-    // non-dispatcheable handles, so placing it here
-    VkObj!VkSurfaceKHR surface;
-
     private PhysicalDevice selectedPhysicalDevice;
 
     /// Enabled instance extensions (for optional requirement checks)
@@ -138,11 +135,6 @@ class Instance
     }
 
     mixin SurfaceMethods;
-
-    void useSurface(VkSurfaceKHR s) @live
-    {
-        surface = VkObj!VkSurfaceKHR(s, instance.vk, allocator);
-    }
 
     void printAllAvailableLayers()
     {

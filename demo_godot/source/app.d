@@ -2114,10 +2114,10 @@ void main(string[] args)
             farPlane,
         );
 
-        scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame) {
+        scene.drawNextFrame((ref FrameBuilder fb, ref Frame frame, RenderTarget renderTarget) {
             {
                 DefaultRenderPass.VariableData renderData;
-                renderData.common.imageExtent = scene.swapChain.imageExtent;
+                renderData.common.imageExtent = renderTarget.extent;
                 renderData.common.frameBuffer = frame.frameBuffer;
                 scene.renderPass.updateData(renderData);
             }

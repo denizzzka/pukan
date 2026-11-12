@@ -24,9 +24,9 @@ shows it gone.
 ## Open GitHub issues
 
 - [ ] Resolve the tracker backlog. Discuss each item before starting work.
-  - [ ] #5 Add `Scene.surfaces`: support more than one surface for stereo and
-        mirrors. `Scene` currently holds one `surface`; stereo uses two
-        viewports on it.
+  - [ ] #5 Finish `Scene.surfaces`: `Scene.targets` holds a list and
+        `addTarget`/`addOffscreenTarget` create window and offscreen targets,
+        but no app draws a mirror or a second window into one yet.
   - [ ] #6 Wrap `CommandPool` into `ScopedLogicalDeviceTemplateMixin`.
   - [ ] #7 GPU-stored objects tree: keep node transforms, or at least the
         whole-tree matrices, in a GPU buffer. `Bone.translationBufferIdx` is
@@ -1388,15 +1388,19 @@ surface bounds it, and cycles the frame index over the images it got back.
 
 ## Scene and render targets
 
-`Scene` owns the window's swapchain, its present mode and its frame pacing, so
-one scene cannot feed two targets, and a target cannot outlive the scene that
-built it.
+`Scene` owns its targets; each target owns its surface, swapchain, present
+mode, frame pacing and per-frame images. The content, the render pass and the
+factories stay in the scene, so all targets share one color format and one
+pipeline set. Targets are added before the first frame; a later add rebuilds
+every frame set.
 
-- [ ] Keep the content in the scene and move the images, the present mode and
+- [x] Keep the content in the scene and move the images, the present mode and
       `frameRateLimit` into a target that both the swapchain and the offscreen
       path implement.
 - [ ] Draw one scene from several viewpoints into several targets, for example
-      two windows, or a mirror plus a screenshot pass.
+      two windows, or a mirror plus a screenshot pass. The loop and
+      `--second-target` are in, but the second target still draws the first
+      view; a mirror or a second window sets its own camera.
 
 ## OpenXR
 
