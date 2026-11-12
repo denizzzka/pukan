@@ -93,6 +93,18 @@ Vector3f parseVector(string text)
     return Vector3f(values[0], values[1], values[2]);
 }
 
+private DepthFormat parseDepthFormat(string name)
+{
+    switch(name)
+    {
+        case "32": return DepthFormat.float32Stencil;
+        case "24": return DepthFormat.unorm24Stencil;
+        default:
+            enforce(false, "unknown depth buffer: " ~ name ~ " (24 or 32)");
+            assert(false);
+    }
+}
+
 /// First surface below the top of the level, in the middle of the scene: what a level
 /// without a spawn marker offers
 Vector3f levelSpawn(CollisionWorld world, in Boxf bounds, in Vector3f up)
@@ -762,6 +774,7 @@ void main(string[] args)
     float nearOption = cameraNear;
     float farOption = cameraFar;
     float speedOption = cameraSpeed;
+    string depthOption = "32";
     float cellRange = 128.0f;
     bool noCells;
     bool noGpuCull;
@@ -851,6 +864,7 @@ void main(string[] args)
         "near", "near clipping distance", &nearOption,
         "far", "far clipping distance", &farOption,
         "speed", "camera movement speed in units per second", &speedOption,
+        "depth", "depth buffer: 32 (float, default) or 24 (unorm)", &depthOption,
     );
 
     if(getoptResult.helpWanted)
@@ -888,6 +902,8 @@ void main(string[] args)
 
     if(plainShading)
         writeln("plain shading: on");
+
+    const depthFormat = parseDepthFormat(depthOption);
 
     if(!offscreen)
         enforce(glfwInit());
@@ -1008,11 +1024,12 @@ void main(string[] args)
     Scene scene;
     if(offscreen)
         scene = new Scene(device, VkExtent2D(widthOption, heightOption),
-            VK_FORMAT_R8G8B8A8_SRGB, "demo_godot");
+            VK_FORMAT_R8G8B8A8_SRGB, "demo_godot", depthFormat);
     else
-        scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat, "demo_godot");
+        scene = new Scene(device, surface, &windowSizeChanged, surfaceFormat, "demo_godot", depthFormat);
     scope(exit) destroy(scene);
 
+    writeln("depth: ", scene.renderPass.depthFormat);
     scene.frameRateLimit = offscreen ? 0 : 60;
 
     if((!offscreen || uiOption) && !noUiOption)

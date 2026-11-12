@@ -99,6 +99,8 @@ class SceneWith(Modules...)
     RenderTarget[] targets = [];
     FrameBuilder frameBuilder;
     DefaultRenderPass renderPass; //TODO: replace by RenderPass base?
+    /// Depth attachment the scene was created with
+    DepthFormat depthFormat;
     Background background;
     /// Coarse depth of the last frame, when the occlusion grid is on
     private OcclusionDepth occlusionDepth;
@@ -260,7 +262,24 @@ class SceneWith(Modules...)
         PipelineCacheStore pipelineCacheStore = null,
     )
     {
-        this(dev, surf, wsc, surfaceFormat, appName, presentMode, pipelineCacheStore, false, VkExtent2D.init);
+        this(dev, surf, wsc, surfaceFormat, appName, presentMode, pipelineCacheStore, false,
+            VkExtent2D.init, DepthFormat.float32Stencil);
+    }
+
+    /// A windowed scene with the depth format chosen before it starts
+    this(
+        LogicalDevice dev,
+        VkSurfaceKHR surf,
+        WindowSizeChangeDetectedCallback wsc,
+        VkSurfaceFormatKHR surfaceFormat,
+        string appName,
+        DepthFormat depthFormat,
+        VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR,
+        PipelineCacheStore pipelineCacheStore = null,
+    )
+    {
+        this(dev, surf, wsc, surfaceFormat, appName, presentMode, pipelineCacheStore, false,
+            VkExtent2D.init, depthFormat);
     }
 
     /// Renders into owned images without a surface or a window
@@ -282,6 +301,31 @@ class SceneWith(Modules...)
             pipelineCacheStore,
             true,
             extent,
+            DepthFormat.float32Stencil,
+        );
+    }
+
+    /// An offscreen scene with the depth format chosen before it starts
+    this(
+        LogicalDevice dev,
+        VkExtent2D extent,
+        VkFormat format,
+        string appName,
+        DepthFormat depthFormat,
+        PipelineCacheStore pipelineCacheStore = null,
+    )
+    {
+        this(
+            dev,
+            null,
+            null,
+            VkSurfaceFormatKHR(format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR),
+            appName,
+            VK_PRESENT_MODE_FIFO_KHR,
+            pipelineCacheStore,
+            true,
+            extent,
+            depthFormat,
         );
     }
 
@@ -295,10 +339,12 @@ class SceneWith(Modules...)
         PipelineCacheStore pipelineCacheStore,
         bool offscreen,
         VkExtent2D offscreenExtent,
+        DepthFormat depthFormat,
     )
     {
         device = dev;
         this.surfaceFormat = surfaceFormat;
+        this.depthFormat = depthFormat;
 
         sceneOwner = new ResourceOwner!false("scene", device.rootOwner.releaseQueue);
 
@@ -310,7 +356,7 @@ class SceneWith(Modules...)
             Vector4f(cast(float) LightType.directional, 0, 0, 0),
         );
 
-        renderPass = device.create!DefaultRenderPass(surfaceFormat.format);
+        renderPass = device.create!DefaultRenderPass(surfaceFormat.format, depthFormat.vkFormat);
 
         if(pipelineCacheStore)
             this.pipelineCacheStore = pipelineCacheStore;
@@ -360,7 +406,7 @@ class SceneWith(Modules...)
             resolveSampler = VkObj!VkSampler(device.releaseQueue, samplerInfo);
         }
 
-        frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof);
+        frameBuilder = device.create!FrameBuilder(WorldTransformation.sizeof, depthFormat.vkFormat);
 
         if(offscreen)
             targets ~= new RenderTarget(device, frameBuilder, renderPass, offscreenExtent, "main", surfaceFormat.format);

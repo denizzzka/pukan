@@ -142,7 +142,7 @@ final class Impostors
         msaa = device.create!ImageMemory(msaaInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         msaaView = createImageView(device, colorFormat, msaa.image);
 
-        depth = DepthBuf(device, VkExtent2D(size, size), pass.samples);
+        depth = DepthBuf(device, VkExtent2D(size, size), pass.depthFormat, pass.samples);
     }
 
     ~this()

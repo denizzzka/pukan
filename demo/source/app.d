@@ -74,6 +74,7 @@ void main(string[] args) {
     bool sectionFillSolid;
     double maxFps = 60;
     string presentModeOption;
+    string depthOption = "32";
     string materialMode = "authored";
     string[] sampleNames;
     string screenshotPath;
@@ -96,6 +97,7 @@ void main(string[] args) {
         "section-fill", "fill the cut with a solid colour instead of a hatch", &sectionFillSolid,
         "max-fps", "cap frames per second, 0 = only vsync", &maxFps,
         "present-mode", "fifo, mailbox or immediate (default: fifo, bench: immediate)", &presentModeOption,
+        "depth", "depth buffer: 32 (float, default) or 24 (unorm)", &depthOption,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
         "sample", "show only this sample, repeatable", &sampleNames,
         "screenshot", "save the captured frame to this PNG", &screenshotPath,
@@ -140,6 +142,8 @@ void main(string[] args) {
 
     if(presentModeOption.length == 0)
         presentModeOption = benchMode ? "immediate" : "fifo";
+
+    const depthFormat = parseDepthFormat(depthOption);
 
     version(linux)
     version(DigitalMars)
@@ -375,7 +379,8 @@ void main(string[] args) {
 
     Scene scene;
     if(offscreen)
-        scene = new Scene(device, VkExtent2D(stereo ? width * 2 : width, height), VK_FORMAT_R8G8B8A8_SRGB, "demo");
+        scene = new Scene(device, VkExtent2D(stereo ? width * 2 : width, height), VK_FORMAT_R8G8B8A8_SRGB,
+            "demo", depthFormat);
     else
         scene = new Scene(
             device,
@@ -383,10 +388,12 @@ void main(string[] args) {
             &windowSizeChanged,
             surfaceFormat,
             "demo",
+            depthFormat,
             parsePresentMode(presentModeOption),
         );
     scope(exit) destroy(scene);
 
+    writefln("depth: %s", scene.renderPass.depthFormat);
     scene.frameRateLimit = maxFps;
 
     if(occlusion)
@@ -899,6 +906,18 @@ private uint parseSectionShape(string name)
         case "capsule": return 2;
         default:
             enforce(false, "unknown section shape: " ~ name ~ " (plane, sphere, capsule)");
+            assert(false);
+    }
+}
+
+private DepthFormat parseDepthFormat(string name)
+{
+    switch(name)
+    {
+        case "32": return DepthFormat.float32Stencil;
+        case "24": return DepthFormat.unorm24Stencil;
+        default:
+            enforce(false, "unknown depth buffer: " ~ name ~ " (24 or 32)");
             assert(false);
     }
 }

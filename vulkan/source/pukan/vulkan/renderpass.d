@@ -2,7 +2,6 @@ module pukan.vulkan.renderpass;
 
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
-import pukan.vulkan.frame_builder: DepthBuf;
 import pukan.vulkan.helpers;
 import pukan.vulkan.logical_device: LogicalDevice;
 
@@ -27,11 +26,12 @@ class DefaultRenderPass : RenderPass
     VariableData data;
     alias this = data;
 
-    this(LogicalDevice dev, VkFormat imageFormat)
+    this(LogicalDevice dev, VkFormat imageFormat,
+        VkFormat depthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT)
     {
         device = dev;
         this.imageFormat = imageFormat;
-        depthFormat = DepthBuf.format;
+        this.depthFormat = depthFormat;
 
         samples = VK_SAMPLE_COUNT_4_BIT;
 

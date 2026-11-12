@@ -17,6 +17,31 @@ import pukan.vulkan.queue;
 import pukan.vulkan.resources.vkobj: VkObj;
 import std.meta: AliasSeq;
 
+/// Depth attachment format the app picks before it creates the scene
+enum DepthFormat
+{
+    /// 32-bit float depth with stencil, reverse Z keeps far surfaces stable
+    float32Stencil,
+    /// 24-bit unorm depth with stencil, half the depth memory
+    unorm24Stencil,
+}
+
+/// Vulkan format of a depth choice
+VkFormat vkFormat(DepthFormat format) nothrow @nogc
+{
+    final switch(format)
+    {
+        case DepthFormat.float32Stencil: return VK_FORMAT_D32_SFLOAT_S8_UINT;
+        case DepthFormat.unorm24Stencil: return VK_FORMAT_D24_UNORM_S8_UINT;
+    }
+}
+
+unittest
+{
+    assert(DepthFormat.float32Stencil.vkFormat == VK_FORMAT_D32_SFLOAT_S8_UINT);
+    assert(DepthFormat.unorm24Stencil.vkFormat == VK_FORMAT_D24_UNORM_S8_UINT);
+}
+
 // This class should gradually become shared thread-safe
 class FrameBuilder
 {
@@ -26,6 +51,13 @@ class FrameBuilder
         ImageFormatRequirement!(VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TYPE_2D,
             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             0, VkExtent3D(1, 1, 1), 1, 1, VK_SAMPLE_COUNT_4_BIT),
+        ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT),
+        ImageFormatRequirement!(VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            0, VkExtent3D(1, 1, 1), 1, 1, VK_SAMPLE_COUNT_4_BIT),
+        ImageFormatRequirement!(VK_FORMAT_D32_SFLOAT, VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT),
         ImageFormatRequirement!(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TYPE_2D,
             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             0, VkExtent3D(1, 1, 1), 1, 1, VK_SAMPLE_COUNT_4_BIT),
@@ -35,12 +67,16 @@ class FrameBuilder
     );
 
     LogicalDevice device;
+    /// Depth and stencil format every frame of this builder creates
+    VkFormat depthFormat;
     private Queue graphicsQueue;
     /* TODO:private */ CommandPool commandPool;
 
-    this(LogicalDevice dev, size_t uniformBufferSize)
+    this(LogicalDevice dev, size_t uniformBufferSize,
+        VkFormat depthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT)
     {
         device = dev;
+        this.depthFormat = depthFormat;
         //TODO: implement method to acquire graphics queue
         graphicsQueue = device.createSyncQueue;
         commandPool = device.createCommandPool();
@@ -185,7 +221,7 @@ class Frame
         );
 
         imageViewObj = createImageView(fb.device, imageFormat, image);
-        depthBuf = DepthBuf(fb.device, imageExtent, samples);
+        depthBuf = DepthBuf(fb.device, imageExtent, fb.depthFormat, samples);
 
         if(samples != VK_SAMPLE_COUNT_1_BIT)
         {
@@ -305,13 +341,20 @@ struct DepthBuf
     @property ref VkImageView depthView() => depthViewObj.vk;
     /// Depth and stencil, for the pass that runs stencil tests
     @property ref VkImageView depthStencilView() => depthStencilViewObj.vk;
-    /// The stencil the section needs costs no depth precision: reverse Z
-    /// stays on a 32-bit float instead of the 24-bit unorm
-    enum format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+    /// The format this buffer was created with
+    VkFormat format;
 
-    this(LogicalDevice dev, VkExtent2D imageExtent, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT)
+    this(
+        LogicalDevice dev,
+        VkExtent2D imageExtent,
+        VkFormat format,
+        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+    )
+    in(format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT,
+        "depth buffer needs a depth-stencil format")
     {
         device = dev;
+        this.format = format;
 
         VkImageCreateInfo imageInfo = {
             imageType: VK_IMAGE_TYPE_2D,

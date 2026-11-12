@@ -4,9 +4,8 @@ import dlib.math: Matrix4x4f, Vector3f, Vector4f;
 import pukan.graphics.common.misc: Boxf, vulkanOrthographicMatrix;
 import pukan.graphics.g3d.camera: cameraView;
 import pukan.vulkan.bindings;
-import pukan.vulkan.frame_builder: DepthBuf;
 import pukan.vulkan.helpers: vkCall, vkCheck;
-import pukan.vulkan.image: ImageMemory, depthStencilAspect;
+import pukan.vulkan.image: ImageMemory;
 import pukan.vulkan.logical_device: LogicalDevice;
 import pukan.vulkan.resources.vkobj: VkObj;
 import pukan.vulkan.renderpass: RenderPass;
@@ -249,7 +248,7 @@ final class ShadowMap
                     srcAccessMask: 0,
                     dstAccessMask: VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                     subresourceRange: VkImageSubresourceRange(
-                        aspectMask: depthStencilAspect,
+                        aspectMask: VK_IMAGE_ASPECT_DEPTH_BIT,
                         baseMipLevel: 0,
                         levelCount: 1,
                         baseArrayLayer: 0,
@@ -561,7 +560,7 @@ final class SunShadow
         this.device = device;
         this.mapSize = mapSize;
         cascades = SunCascades(mapSize);
-        pass = new ShadowPass(device, DepthBuf.format);
+        pass = new ShadowPass(device, VK_FORMAT_D32_SFLOAT);
 
         VkSamplerCreateInfo info = {
             sType: VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -703,7 +702,7 @@ final class LocalShadow
     this(LogicalDevice device)
     {
         this.device = device;
-        pass = new ShadowPass(device, DepthBuf.format);
+        pass = new ShadowPass(device, VK_FORMAT_D32_SFLOAT);
 
         foreach(ref matrix; viewProj)
             matrix = Matrix4x4f.identity;
