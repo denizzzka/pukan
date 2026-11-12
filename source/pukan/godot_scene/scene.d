@@ -14,7 +14,8 @@ import pukan.graphics.g3d.pbr.accessor: BufAccess, BufferPieceOnGPU;
 import pukan.graphics.g3d.pbr.culling: CullBatch, CullFrame, CullInstance, currentCullFrame;
 import pukan.graphics.g3d.pbr.lod: clipDepth, generateLevels, lodThresholds, pickLevel;
 import pukan.graphics.g3d.pbr.mesh: IndicesDescr, MeshGeometry, MeshStreams, PbrMesh;
-import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, lightingMode, oitPass, plainShading, transmissionPass;
+import pukan.graphics.g3d.custom_pass: DrawSubject, activeCustomPass, passDataOffset;
+import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, LightingMode, PbrPipelineVariants, PbrPipelines, PbrProfile, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.graphics.g3d.tree: Walk, walkTree;
 import pukan.physics.shapes: Collider, CollisionShape;
 import pukan.physics.world: CollisionWorld;
@@ -639,7 +640,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
                 //TODO: batch skinned meshes that share a pose
                 if(draw.mesh.hasSkin)
                 {
-                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase, buf), draw.trans, frameSet);
                     continue;
                 }
 
@@ -667,13 +668,13 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             }
 
             foreach(batch; batches)
-                batch.mesh.drawBatch(buf, selectPipeline(batch.mesh, phase),
+                batch.mesh.drawBatch(buf, selectPipeline(batch.mesh, phase, buf),
                     batch.transforms, frameSet, batch.level);
         }
         else
             foreach(draw; draws)
                 if(matchesPhase(draw.mesh, phase))
-                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase, buf), draw.trans, frameSet);
 
         foreach(group; groups)
             if(auto perPart = cast(PartDrawable) group.drawable)
@@ -815,11 +816,11 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         assert(gathered.started, "drawing a phase that was never gathered");
 
         foreach(draw; gathered.draws)
-            draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+            draw.mesh.draw(buf, selectPipeline(draw.mesh, phase, buf), draw.trans, frameSet);
 
         foreach(gatheredMesh; gathered.meshes)
             foreach(level, batch; gatheredMesh.batches)
-                gatheredMesh.mesh.drawCulled(buf, selectPipeline(gatheredMesh.mesh, phase),
+                gatheredMesh.mesh.drawCulled(buf, selectPipeline(gatheredMesh.mesh, phase, buf),
                     batch, frameSet, level);
 
         foreach(group; gathered.nested)
@@ -1198,7 +1199,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             if(!isVisible(mesh.localAABB, viewProj))
                 continue;
 
-            mesh.drawBatch(buf, selectPipeline(mesh, phase), [placement], frameSet);
+            mesh.drawBatch(buf, selectPipeline(mesh, phase, buf), [placement], frameSet);
         }
 
         return true;
@@ -1444,11 +1445,31 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
             destroy(scene);
     }
 
+    private static DrawSubject drawSubject(const PbrMesh mesh, DrawPhase phase)
+    {
+        const blended = !plainShading && mesh.alphaMode == AlphaMode.blend;
+        const transmissive = !plainShading && mesh.material.transmission.x > 0.0f;
+        const ownPass = transmissive && transmissionPass;
+
+        return DrawSubject(
+            phase,
+            PbrProfile.godot,
+            mesh.alphaMode,
+            !blended && !ownPass,
+            mesh.doubleSided,
+            mesh.hasSkin,
+            !plainShading && mesh.material.mode == MaterialMode.pbr,
+        );
+    }
+
     private static bool matchesPhase(const PbrMesh mesh, DrawPhase phase)
     {
         const blended = !plainShading && mesh.alphaMode == AlphaMode.blend;
         const transmissive = !plainShading && mesh.material.transmission.x > 0.0f;
         const ownPass = transmissive && transmissionPass;
+
+        if(phase == DrawPhase.custom)
+            return activeCustomPass !is null && activeCustomPass.claims(drawSubject(mesh, phase));
 
         if(phase == DrawPhase.shadow)
             return mesh.castShadow && !blended && !transmissive &&
@@ -1511,8 +1532,26 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
         return mesh.doubleSided ? &variants.doubleSided : &variants.opaque;
     }
 
-    private GraphicsPipelineCfg selectPipeline(const PbrMesh mesh, DrawPhase phase)
+    /// Resolves the pipeline of one draw; an active pass may claim it and
+    /// leaves its data in the command buffer for the draw that follows
+    private GraphicsPipelineCfg selectPipeline(const PbrMesh mesh, DrawPhase phase, VkCommandBuffer buf)
     {
+        if(activeCustomPass !is null)
+        {
+            auto over = activeCustomPass.overridePipeline(drawSubject(mesh, phase));
+
+            if(over.claimed)
+            {
+                auto cfg = over.pipeline.get(mesh.name);
+
+                if(over.data.length)
+                    vkCmdPushConstants(buf, cfg.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                        passDataOffset, cast(uint) over.data.length, cast(void*) over.data.ptr);
+
+                return cfg;
+            }
+        }
+
         return selectPipelineSlot(mesh, phase).get(mesh.name);
     }
 

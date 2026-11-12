@@ -6,6 +6,7 @@ import pukan.graphics.common.frame_bindings: frameBindings, frameSetBindings;
 import pukan.graphics.common.frame_pacer: FramePacer;
 import pukan.graphics.g3d.cells: CellGrid;
 import pukan.graphics.common.screenshot: Screenshot;
+import pukan.graphics.g3d.custom_pass: CustomPass, activeCustomPass;
 import pukan.graphics.g2d.ui: Ui;
 import pukan.graphics.g3d.axes: Axis;
 import pukan.graphics.g3d.ibl: createIblTextures, IblTextures;
@@ -109,19 +110,14 @@ class SceneWith(Modules...)
     float iblIntensity = 1.0f;
     /// Ambient tint and energy applied to the IBL term
     Vector4f ambientLight = Vector4f(1, 1, 1, 1);
-    /// Section cut in world space: plane normal/offset or sphere centre/radius
-    Vector4f sectionShape = Vector4f(0, 0, 0, 1);
-    /// NDC depth of the plane section, for its cap
-    float sectionNdcZ = 0.0f;
-    /// 0 draws the cap hatched, 1 fills it with a solid colour
-    float sectionFill = 0.0f;
-    /// 0 cuts with a plane, 1 with a sphere, 2 with a capsule from the camera
-    uint sectionMode;
     /// Godot tonemap mode: linear, Reinhard, Filmic, ACES, AgX
     uint tonemapMode = 3;
     float tonemapWhite = 1.0f;
     /// Partition of the world that cells and streaming work from
     CellGrid cellGrid;
+
+    /// Effect pass the scene records; null leaves every draw ordinary
+    CustomPass customPass;
 
     /// Every light the level added, the sun first
     private Light[] candidates;
@@ -783,8 +779,6 @@ class SceneWith(Modules...)
         );
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
-        data.sectionShape = sectionShape;
-        data.sectionParams = Vector4f(sectionNdcZ, sectionFill, cast(float) sectionMode, 0);
         selectLights(camera, wtb.proj, swapChain.imageExtent.height);
         background.tonemapMode = tonemapMode;
         background.white = tonemapWhite;
@@ -1052,14 +1046,37 @@ class SceneWith(Modules...)
 
         clearOit(frame);
 
+        auto pass = customPass !is null && customPass.active ? customPass : null;
+        activeCustomPass = pass;
+
         renderPass.recordCommandBuffer(
             commandBuffer,
             (ref VkCommandBuffer buf) { background.draw(buf, swapChain.imageExtent); },
             (ref VkCommandBuffer buf) {
+                auto frameSet = frame.frameSets[0].descriptorSet;
+
+                if(pass !is null)
+                    pass.begin(buf, frameSet, swapChain.imageExtent);
+
+                if(pass !is null && pass.drawsCustomPhase)
+                    drawScene(buf, DrawPhase.custom);
+
                 drawScene(buf, DrawPhase.surface);
+
+                if(pass !is null)
+                    pass.end(buf, frameSet);
+
+                if(pass !is null)
+                    pass.beforeBlended(buf, frameSet);
+
                 drawScene(buf, DrawPhase.blended);
+
+                if(pass !is null)
+                    pass.afterBlended(buf, frameSet);
             },
         );
+
+        activeCustomPass = null;
 
         if(occlusionDepth !is null)
             occlusionDepth.record(
@@ -1186,6 +1203,9 @@ class SceneWith(Modules...)
 
         transmissionPass = transmissionPassEnabled;
         oitPass = oitEnabled;
+        // A stereo frame has two viewports and its own uniforms, so a custom
+        // pass does not apply to it yet
+        activeCustomPass = null;
 
         recordShadow(frame, drawShadow);
 
@@ -1522,8 +1542,6 @@ struct FrameUniforms
     Vector4f localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     Vector4f ambientParams;  // rgb = ambient tint, a = ambient energy
     Vector4f tonemapParams;  // x = mode, y = white
-    Vector4f sectionShape;   // plane: xyz = normal, w = -dot(point, normal); sphere: xyz = centre, w = radius
-    Vector4f sectionParams;  // x = plane NDC depth, y = fill, z = shape
 }
 
 ///

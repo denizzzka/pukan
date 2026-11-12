@@ -696,6 +696,11 @@ Conclusion: the API is needed so the core stops accumulating private effects.
 The section view is the first and most demanding user; if it fits the scheme,
 other effects will too.
 
+Status: `CustomPass` and the scene hooks are in `custom_pass.d`, `SectionPass`
+is the first pass, and the demo toggles it with `X`. The section shaders read
+their data from push constants, and no effect fields remain in the frame
+constants. Stereo and the transmission pass still ignore custom passes.
+
 ## Materials
 
 The shared `Material` covers unlit/lit shading, glTF metallic-roughness and the

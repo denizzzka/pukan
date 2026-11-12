@@ -1,6 +1,8 @@
 #version 460
 
+#define SECTION_PUSH_OFFSET 0
 #include "frame.glsl"
+#include "section.glsl"
 
 layout(location = 0) in vec2 vNdc;
 layout(location = 0) out vec4 outColor;
@@ -14,12 +16,12 @@ void main()
     const vec4 nearPoint = frameUbo.frame.invViewProj * vec4(vNdc, 1.0, 1.0);
     const vec3 direction = normalize(nearPoint.xyz / nearPoint.w - origin);
 
-    float depth = frameUbo.frame.sectionParams.x;
+    float depth = sectionParams.x;
 
-    if(frameUbo.frame.sectionParams.z > 1.5)
+    if(sectionParams.z > 1.5)
     {
-        const vec3 b = frameUbo.frame.sectionShape.xyz;
-        const float radius = frameUbo.frame.sectionShape.w;
+        const vec3 b = sectionShape.xyz;
+        const float radius = sectionShape.w;
         const vec3 ba = b - origin;
         const float lengthBA = length(ba);
         const vec3 axis = ba / max(lengthBA, 1e-6);
@@ -44,11 +46,11 @@ void main()
         const vec4 clip = frameUbo.frame.viewProj * vec4(origin + direction * t, 1.0);
         depth = clip.z / clip.w;
     }
-    else if(frameUbo.frame.sectionParams.z > 0.5)
+    else if(sectionParams.z > 0.5)
     {
-        const vec3 oc = origin - frameUbo.frame.sectionShape.xyz;
+        const vec3 oc = origin - sectionShape.xyz;
         const float bq = dot(oc, direction);
-        const float cq = dot(oc, oc) - frameUbo.frame.sectionShape.w * frameUbo.frame.sectionShape.w;
+        const float cq = dot(oc, oc) - sectionShape.w * sectionShape.w;
         const float hq = bq * bq - cq;
 
         if(hq < 0.0)
@@ -64,7 +66,7 @@ void main()
 
     gl_FragDepth = depth;
 
-    if(frameUbo.frame.sectionParams.y > 0.5)
+    if(sectionParams.y > 0.5)
     {
         outColor = vec4(0.20, 0.185, 0.17, 1.0);
         return;

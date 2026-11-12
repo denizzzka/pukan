@@ -319,8 +319,8 @@ enum DrawPhase : uint
     blended,
     /// Draws that sample the copy of the colour the surface phase left
     transmission,
-    /// Stencil-only pass that counts the solid in front of the section plane
-    section,
+    /// Draws a custom pass claims for its own geometry; off unless a pass is active
+    custom,
     /// Depth-only pass that fills the shadow map
     shadow,
 }

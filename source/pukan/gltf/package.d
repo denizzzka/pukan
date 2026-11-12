@@ -14,7 +14,8 @@ import pukan.graphics.g3d.mesh: mirrors;
 import pukan.graphics.g3d.pbr.accessor;
 import pukan.graphics.g3d.pbr.lod: generateLevels;
 import pukan.graphics.g3d.pbr.mesh: PbrMesh, MeshClass = PbrMesh, IndicesDescr, MeshStreams, applyWinding;
-import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, LightingMode, lightingMode, oitPass, plainShading, sectionPass, transmissionPass;
+import pukan.graphics.g3d.custom_pass: DrawSubject, activeCustomPass, passDataOffset;
+import pukan.graphics.g3d.pbr.pipelines: LazyPipeline, PbrPipelineVariants, PbrPipelines, PbrProfile, LightingMode, lightingMode, oitPass, plainShading, transmissionPass;
 import pukan.graphics.g3d.tree: BaseNode = Node, Walk, walkTree;
 import pukan.vulkan.bindings;
 import pukan.vulkan.commands: CommandPool;
@@ -1130,7 +1131,7 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
         if(phase == DrawPhase.blended)
             draws.sort!((a, b) => a.depth > b.depth);
 
-        if(phase == DrawPhase.surface || phase == DrawPhase.shadow)
+        if(phase == DrawPhase.surface || phase == DrawPhase.shadow || phase == DrawPhase.custom)
         {
             MeshClass[] order;
             Matrix4x4f[][MeshClass] groups;
@@ -1143,7 +1144,7 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
                 //TODO: batch skinned meshes that share a pose
                 if(draw.mesh.hasSkin)
                 {
-                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase, buf), draw.trans, frameSet);
                     continue;
                 }
 
@@ -1157,12 +1158,29 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
             }
 
             foreach(mesh; order)
-                mesh.drawBatch(buf, selectPipeline(mesh, phase), groups[mesh], frameSet);
+                mesh.drawBatch(buf, selectPipeline(mesh, phase, buf), groups[mesh], frameSet);
         }
         else
             foreach(draw; draws)
                 if(matchesPhase(draw.mesh, phase))
-                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase), draw.trans, frameSet);
+                    draw.mesh.draw(buf, selectPipeline(draw.mesh, phase, buf), draw.trans, frameSet);
+    }
+
+    private static DrawSubject drawSubject(const MeshClass mesh, DrawPhase phase)
+    {
+        const blended = !plainShading && mesh.alphaMode == AlphaMode.blend;
+        const transmissive = !plainShading && mesh.material.transmission.x > 0.0f;
+        const ownPass = transmissive && transmissionPass;
+
+        return DrawSubject(
+            phase,
+            PbrProfile.gltf,
+            mesh.alphaMode,
+            !blended && !ownPass,
+            mesh.doubleSided,
+            mesh.hasSkin,
+            !plainShading && mesh.material.mode == MaterialMode.pbr,
+        );
     }
 
     private static bool matchesPhase(const MeshClass mesh, DrawPhase phase)
@@ -1171,6 +1189,9 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
         const transmissive = !plainShading && mesh.material.transmission.x > 0.0f;
         // Without its own pass, a transmissive mesh draws where the opaque ones do
         const ownPass = transmissive && transmissionPass;
+
+        if(phase == DrawPhase.custom)
+            return activeCustomPass !is null && activeCustomPass.claims(drawSubject(mesh, phase));
 
         if(phase == DrawPhase.transmission)
             return transmissive;
@@ -1181,11 +1202,6 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
         if(phase == DrawPhase.shadow)
             return !blended && !transmissive &&
                 (mesh.alphaMode == AlphaMode.opaque || mesh.alphaMode == AlphaMode.mask);
-
-        if(phase == DrawPhase.section)
-            return !plainShading && !blended && !ownPass
-                && mesh.alphaMode == AlphaMode.opaque
-                && mesh.material.mode == MaterialMode.pbr;
 
         return !blended && !ownPass;
     }
@@ -1201,16 +1217,6 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
             return mesh.alphaMode == AlphaMode.mask
                 ? (mesh.hasSkin ? &pipelines.skinnedMaskShadow : &pipelines.unskinnedMaskShadow)
                 : (mesh.hasSkin ? &pipelines.skinnedShadow : &pipelines.unskinnedShadow);
-
-        if(phase == DrawPhase.section)
-            return mesh.hasSkin ? &pipelines.section.skinnedStencil : &pipelines.section.unskinnedStencil;
-
-        if(sectionPass && phase == DrawPhase.surface && !plainShading
-            && mesh.alphaMode == AlphaMode.opaque
-            && mesh.material.mode == MaterialMode.pbr)
-            return mesh.hasSkin
-                ? (mesh.doubleSided ? &pipelines.section.skinnedDoubleSided : &pipelines.section.skinnedOpaque)
-                : (mesh.doubleSided ? &pipelines.section.unskinnedDoubleSided : &pipelines.section.unskinnedOpaque);
 
         auto modes = mesh.hasSkin ? &pipelines.skinned : &pipelines.unskinned;
 
@@ -1245,8 +1251,26 @@ class GlTF : DrawableByVulkan, Blended, Bounded, PipelineWarmup, MeshParts
         return mesh.doubleSided ? &variants.doubleSided : &variants.opaque;
     }
 
-    private GraphicsPipelineCfg selectPipeline(const MeshClass mesh, DrawPhase phase)
+    /// Resolves the pipeline of one draw; an active pass may claim it and
+    /// leaves its data in the command buffer for the draw that follows
+    private GraphicsPipelineCfg selectPipeline(const MeshClass mesh, DrawPhase phase, VkCommandBuffer buf)
     {
+        if(activeCustomPass !is null)
+        {
+            auto over = activeCustomPass.overridePipeline(drawSubject(mesh, phase));
+
+            if(over.claimed)
+            {
+                auto cfg = over.pipeline.get(mesh.name);
+
+                if(over.data.length)
+                    vkCmdPushConstants(buf, cfg.pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                        passDataOffset, cast(uint) over.data.length, cast(void*) over.data.ptr);
+
+                return cfg;
+            }
+        }
+
         return selectPipelineSlot(mesh, phase).get(mesh.name);
     }
 

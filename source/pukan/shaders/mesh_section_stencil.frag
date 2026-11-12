@@ -1,6 +1,7 @@
 #version 460
 
 #include "frame.glsl"
+#include "section.glsl"
 
 layout(location = 3) in vec3 fragPosition;
 layout(location = 0) out vec4 outColor;
@@ -9,23 +10,23 @@ layout(location = 0) out vec4 outColor;
 // surface of that shape where the count is not zero.
 void main()
 {
-    if(frameUbo.frame.sectionParams.z > 1.5)
+    if(sectionParams.z > 1.5)
     {
         const vec3 a = frameUbo.frame.cameraPosition.xyz;
-        const vec3 b = frameUbo.frame.sectionShape.xyz;
+        const vec3 b = sectionShape.xyz;
         const vec3 pa = fragPosition - a;
         const vec3 ba = b - a;
         const float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
-        if(length(pa - ba * h) >= frameUbo.frame.sectionShape.w)
+        if(length(pa - ba * h) >= sectionShape.w)
             discard;
     }
-    else if(frameUbo.frame.sectionParams.z > 0.5)
+    else if(sectionParams.z > 0.5)
     {
-        const vec3 offset = fragPosition - frameUbo.frame.sectionShape.xyz;
-        if(dot(offset, offset) >= frameUbo.frame.sectionShape.w * frameUbo.frame.sectionShape.w)
+        const vec3 offset = fragPosition - sectionShape.xyz;
+        if(dot(offset, offset) >= sectionShape.w * sectionShape.w)
             discard;
     }
-    else if(dot(fragPosition, frameUbo.frame.sectionShape.xyz) + frameUbo.frame.sectionShape.w >= 0.0)
+    else if(dot(fragPosition, sectionShape.xyz) + sectionShape.w >= 0.0)
         discard;
 
     outColor = vec4(0.0);

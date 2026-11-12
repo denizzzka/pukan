@@ -6,6 +6,7 @@ import pukan.vulkan.renderpass: DrawPhase;
 import pukan.graphics.g3d.material: runtimeMaterialOverride;
 import pukan.graphics.g3d.pbr.pipelines: LightingMode, lightingMode;
 import pukan.graphics.g3d.scene_tree;
+import pukan.graphics.g3d.section: SectionPass;
 import pukan.graphics.g3d.primitives_tree.cylinder: CylinderGroup, CylinderGroupFlag, CylinderGroupFlags, CylinderInstance, CylinderRenderer;
 import pukan.graphics.g3d.primitives_tree.mesh: LitVertex;
 import pukan.graphics.g3d.primitives_tree.sphere: SphereGroup, SphereInstance, SphereRenderer;
@@ -67,6 +68,9 @@ void main(string[] args) {
     bool core;
     bool noShadows;
     bool offscreen;
+    bool section;
+    string sectionShapeOption = "plane";
+    bool sectionFillSolid;
     double maxFps = 60;
     string presentModeOption;
     string materialMode = "authored";
@@ -82,6 +86,9 @@ void main(string[] args) {
         "core", "ignore the KHR material extensions", &core,
         "no-shadows", "do not cast shadows", &noShadows,
         "offscreen", "render without a window, for screenshots and benchmarks", &offscreen,
+        "section", "cut the scene with a section on the first frame", &section,
+        "section-shape", "plane, sphere or capsule (default: plane)", &sectionShapeOption,
+        "section-fill", "fill the cut with a solid colour instead of a hatch", &sectionFillSolid,
         "max-fps", "cap frames per second, 0 = only vsync", &maxFps,
         "present-mode", "fifo, mailbox or immediate (default: fifo, bench: immediate)", &presentModeOption,
         "material-mode", "authored, pbr, lit or unlit", &materialMode,
@@ -299,6 +306,13 @@ void main(string[] args) {
 
     scene.frameRateLimit = maxFps;
 
+    sectionPass = new SectionPass(scene.pipelineFactory, scene.renderPass);
+    sectionPass.enabled = section;
+    sectionPass.mode = parseSectionShape(sectionShapeOption);
+    sectionPass.fill = sectionFillSolid ? 1.0f : 0.0f;
+    scene.customPass = sectionPass;
+    sectionChanged = section && !benchMode && !offscreen;
+
     shadowsOn = !noShadows;
     scene.gltfFactory.preloadShadows = shadowsOn;
 
@@ -311,7 +325,10 @@ void main(string[] args) {
     camera.speed = 1.0f;
 
     if(!benchMode && !offscreen)
+    {
         writeln("camera: WASD move, right mouse look, middle mouse pan, wheel zoom, Q/E roll, R reset roll, H look axis (horizontal)");
+        writeln("section: X toggle, C shape, F fill, [ ] radius");
+    }
 
     scene.addPointLight(Vector3f(0.9f, 0.35f, 1.1f), Vector3f(1.0f, 0.25f, 0.15f) * 6.0f, 4.0f);
     scene.addPointLight(Vector3f(-0.8f, 0.4f, 0.8f), Vector3f(0.15f, 0.45f, 1.0f) * 6.0f, 4.0f);
@@ -539,6 +556,43 @@ void main(string[] args) {
             writefln("shadows: %s", shadowsOn ? "on" : "off");
         }
 
+        if(sectionChanged)
+        {
+            sectionChanged = false;
+            writefln(
+                "section: %s, shape: %s, fill: %s, radius: %.2f",
+                sectionPass.enabled ? "on" : "off",
+                sectionShapeName(sectionPass.mode),
+                sectionPass.fill > 0.5f ? "solid" : "hatch",
+                sectionRadius,
+            );
+        }
+
+        if(sectionPass !is null && sectionPass.enabled)
+        {
+            // The focus point is the middle of the arena, in world space
+            const focus4 = Vector4f(0, 0, 0, 1) * wtb.model;
+            const focus = Vector3f(
+                cast(float) focus4.x,
+                cast(float) focus4.y,
+                cast(float) focus4.z,
+            );
+
+            const forward = camera.forward;
+
+            if(sectionPass.mode == 0)
+            {
+                // A plane facing the camera, so it cuts what lies in front
+                const offset = -(forward.x * focus.x + forward.y * focus.y + forward.z * focus.z);
+                sectionPass.shape = Vector4f(forward.x, forward.y, forward.z, offset);
+            }
+            else
+                sectionPass.shape = Vector4f(focus.x, focus.y, focus.z, sectionRadius);
+
+            const clip = Vector4f(focus.x, focus.y, focus.z, 1) * (wtb.proj * wtb.view);
+            sectionPass.ndcZ = cast(float) (clip.z / clip.w);
+        }
+
         static if(runtimeMaterialOverride)
         {
             if(overrideChanged)
@@ -690,6 +744,29 @@ void main(string[] args) {
         printBench(device, scene, benchFrameNs, benchUpdateNs, startupStats, startupWallNs);
 }
 
+private string sectionShapeName(uint mode)
+{
+    switch(mode)
+    {
+        case 1: return "sphere";
+        case 2: return "capsule";
+        default: return "plane";
+    }
+}
+
+private uint parseSectionShape(string name)
+{
+    switch(name)
+    {
+        case "plane": return 0;
+        case "sphere": return 1;
+        case "capsule": return 2;
+        default:
+            enforce(false, "unknown section shape: " ~ name ~ " (plane, sphere, capsule)");
+            assert(false);
+    }
+}
+
 private VkPresentModeKHR parsePresentMode(string name)
 {
     switch(name)
@@ -815,6 +892,10 @@ bool skyChanged;
 bool shadowsOn = true;
 bool shadowsChanged;
 
+SectionPass sectionPass;
+bool sectionChanged;
+float sectionRadius = 0.55f;
+
 static if(runtimeMaterialOverride)
 {
     bool materialOverridden;
@@ -851,6 +932,35 @@ extern(C) void onKey(GLFWwindow*, int key, int, int action, int) nothrow @nogc
         {
             shadowsOn = !shadowsOn;
             shadowsChanged = true;
+        }
+
+        if(sectionPass !is null)
+        {
+            if(key == GLFW_KEY_X)
+            {
+                sectionPass.enabled = !sectionPass.enabled;
+                sectionChanged = true;
+            }
+            else if(key == GLFW_KEY_C)
+            {
+                sectionPass.mode = (sectionPass.mode + 1) % 3;
+                sectionChanged = true;
+            }
+            else if(key == GLFW_KEY_F)
+            {
+                sectionPass.fill = sectionPass.fill > 0.5f ? 0.0f : 1.0f;
+                sectionChanged = true;
+            }
+            else if(key == GLFW_KEY_LEFT_BRACKET)
+            {
+                sectionRadius = sectionRadius > 0.05f ? sectionRadius - 0.05f : 0.05f;
+                sectionChanged = true;
+            }
+            else if(key == GLFW_KEY_RIGHT_BRACKET)
+            {
+                sectionRadius = sectionRadius < 1.0f ? sectionRadius + 0.05f : 1.0f;
+                sectionChanged = true;
+            }
         }
     }
 }

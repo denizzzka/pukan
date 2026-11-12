@@ -2,6 +2,9 @@
 
 #include "material.glsl"
 #include "material_bindings.h"
+#ifdef SECTION
+#include "section.glsl"
+#endif
 #ifdef OIT
 #include "oit.glsl"
 // The list is a side effect: without this, occluded fragments still record
@@ -131,24 +134,24 @@ void main()
 #ifdef SECTION
     // Only the section pipeline defines SECTION, so the normal pipelines
     // compile the test out entirely
-    if(frameUbo.frame.sectionParams.z > 1.5)
+    if(sectionParams.z > 1.5)
     {
         // Capsule from the camera to the far centre
         const vec3 a = frameUbo.frame.cameraPosition.xyz;
-        const vec3 b = frameUbo.frame.sectionShape.xyz;
+        const vec3 b = sectionShape.xyz;
         const vec3 pa = fragPosition - a;
         const vec3 ba = b - a;
         const float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
-        if(length(pa - ba * h) < frameUbo.frame.sectionShape.w)
+        if(length(pa - ba * h) < sectionShape.w)
             discard;
     }
-    else if(frameUbo.frame.sectionParams.z > 0.5)
+    else if(sectionParams.z > 0.5)
     {
-        const vec3 offset = fragPosition - frameUbo.frame.sectionShape.xyz;
-        if(dot(offset, offset) < frameUbo.frame.sectionShape.w * frameUbo.frame.sectionShape.w)
+        const vec3 offset = fragPosition - sectionShape.xyz;
+        if(dot(offset, offset) < sectionShape.w * sectionShape.w)
             discard;
     }
-    else if(dot(fragPosition, frameUbo.frame.sectionShape.xyz) + frameUbo.frame.sectionShape.w < 0.0)
+    else if(dot(fragPosition, sectionShape.xyz) + sectionShape.w < 0.0)
         discard;
 #endif
 

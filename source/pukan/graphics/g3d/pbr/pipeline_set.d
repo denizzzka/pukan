@@ -277,79 +277,7 @@ private struct PbrPipelineBuilder
         result.unskinned.unlit = createVariants("PBR static unlit", staticShaderStages!"mesh_pbr_frag_unlit.spv"(), staticShaderStages!"mesh_pbr_frag_unlit_oit.spv"(), renderPass);
 
         createShadows!""(result, "PBR", shadowPass);
-        createSectionPipelines(result, renderPass);
         return result;
-    }
-
-    /// Declares the cut and stencil pipelines; none of them is built until a
-    /// section draw asks for it
-    private void createSectionPipelines(PbrPipelines target, RenderPass renderPass)
-    {
-        VkDynamicState[] dynamicStates = [VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE, VK_DYNAMIC_STATE_FRONT_FACE];
-
-        auto skinnedSection = shaderStages!"mesh_pbr_frag_section.spv"();
-        auto staticSection = staticShaderStages!"mesh_pbr_frag_section.spv"();
-        auto skinnedStencil = shaderStages!"mesh_section_stencil_frag.spv"();
-        auto staticStencil = staticShaderStages!"mesh_section_stencil_frag.spv"();
-
-        FixedState sectionState = FixedState(
-            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            alphaToCoverage: VK_TRUE,
-        );
-        FixedState sectionDoubleSidedState = sectionState;
-        sectionDoubleSidedState.cullMode = VK_CULL_MODE_NONE;
-
-        FixedState stencilState = FixedState(
-            cullMode: VK_CULL_MODE_NONE,
-            frontFace: VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            depthTestEnable: VK_TRUE,
-            depthWriteEnable: VK_FALSE,
-            depthCompareOp: VK_COMPARE_OP_GREATER_OR_EQUAL,
-            colorWriteMask: 0,
-            stencilTestEnable: VK_TRUE,
-            frontStencil: VkStencilOpState(
-                failOp: VK_STENCIL_OP_KEEP,
-                passOp: VK_STENCIL_OP_INCREMENT_AND_WRAP,
-                depthFailOp: VK_STENCIL_OP_KEEP,
-                compareOp: VK_COMPARE_OP_ALWAYS,
-                compareMask: 0xFF,
-                writeMask: 0xFF,
-                reference: 0,
-            ),
-            backStencil: VkStencilOpState(
-                failOp: VK_STENCIL_OP_KEEP,
-                passOp: VK_STENCIL_OP_DECREMENT_AND_WRAP,
-                depthFailOp: VK_STENCIL_OP_KEEP,
-                compareOp: VK_COMPARE_OP_ALWAYS,
-                compareMask: 0xFF,
-                writeMask: 0xFF,
-                reference: 0,
-            ),
-        );
-
-        PipelineKey declare(string suffix, ShaderDecl[] stages, FixedState state)
-        {
-            return pipelines.declare(RenderTechnique(
-                name: "section " ~ suffix,
-                stages: stages,
-                state: state,
-                dynamicStates: dynamicStates,
-            ), 20);
-        }
-
-        target.section.unskinnedOpaque = LazyPipeline(pipelines,
-            declare("static", staticSection, sectionState), renderPass, 1);
-        target.section.unskinnedDoubleSided = LazyPipeline(pipelines,
-            declare("static double sided", staticSection, sectionDoubleSidedState), renderPass, 1);
-        target.section.skinnedOpaque = LazyPipeline(pipelines,
-            declare("skinned", skinnedSection, sectionState), renderPass, 1);
-        target.section.skinnedDoubleSided = LazyPipeline(pipelines,
-            declare("skinned double sided", skinnedSection, sectionDoubleSidedState), renderPass, 1);
-
-        target.section.unskinnedStencil = LazyPipeline(pipelines,
-            declare("static stencil", staticStencil, stencilState), renderPass, 1);
-        target.section.skinnedStencil = LazyPipeline(pipelines,
-            declare("skinned stencil", skinnedStencil, stencilState), renderPass, 1);
     }
 
     private PbrPipelines createGodotPipelines(RenderPass renderPass, RenderPass shadowPass)
@@ -527,58 +455,62 @@ private struct PbrPipelineBuilder
         return result;
     }
 
-    private static ShaderDecl[] shaderStages(string fragmentSpv)()
-    {
-        return [
-            shaderStage!"mesh_pbr_vert.spv"(
-                VK_SHADER_STAGE_VERTEX_BIT,
-                [
-                    VkDescriptorSetLayoutBinding(
-                        binding: MATERIAL_JOINTS,
-                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                    ),
-                ],
-                VkPushConstantRange(
-                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                    offset: 0,
-                    size: Matrix4x4f.sizeof,
-                ),
-                vertexInput(),
-            ),
-            fragmentStage!fragmentSpv(),
-        ];
-    }
-
-    private static ShaderDecl[] staticShaderStages(string fragmentSpv)()
-    {
-        return [
-            shaderStage!"mesh_pbr_static_vert.spv"(
-                VK_SHADER_STAGE_VERTEX_BIT,
-                [
-                    VkDescriptorSetLayoutBinding(
-                        binding: MATERIAL_JOINTS,
-                        descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        descriptorCount: 1,
-                        stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                    ),
-                ],
-                vertexInput: staticVertexInput(),
-            ),
-            fragmentStage!fragmentSpv(),
-        ];
-    }
-
-    private static ShaderDecl fragmentStage(string fragmentSpv)()
-    {
-        return shaderStage!fragmentSpv(
-            VK_SHADER_STAGE_FRAGMENT_BIT,
-            fragmentBindings(),
-        );
-    }
-
     /// Queues every variant of both families, for the all warmup policy
+}
+
+/// Stages of a skinned mesh pipeline; `fragmentPush` is the pass data its
+/// fragment shader reads after the model matrix
+package(pukan) ShaderDecl[] shaderStages(string fragmentSpv)(VkPushConstantRange fragmentPush = VkPushConstantRange.init)
+{
+    return [
+        shaderStage!"mesh_pbr_vert.spv"(
+            VK_SHADER_STAGE_VERTEX_BIT,
+            [
+                VkDescriptorSetLayoutBinding(
+                    binding: MATERIAL_JOINTS,
+                    descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    descriptorCount: 1,
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                ),
+            ],
+            VkPushConstantRange(
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                offset: 0,
+                size: Matrix4x4f.sizeof,
+            ),
+            vertexInput(),
+        ),
+        fragmentStage!fragmentSpv(fragmentPush),
+    ];
+}
+
+/// Stages of a static mesh pipeline
+package(pukan) ShaderDecl[] staticShaderStages(string fragmentSpv)(VkPushConstantRange fragmentPush = VkPushConstantRange.init)
+{
+    return [
+        shaderStage!"mesh_pbr_static_vert.spv"(
+            VK_SHADER_STAGE_VERTEX_BIT,
+            [
+                VkDescriptorSetLayoutBinding(
+                    binding: MATERIAL_JOINTS,
+                    descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    descriptorCount: 1,
+                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+                ),
+            ],
+            vertexInput: staticVertexInput(),
+        ),
+        fragmentStage!fragmentSpv(fragmentPush),
+    ];
+}
+
+package(pukan) ShaderDecl fragmentStage(string fragmentSpv)(VkPushConstantRange push = VkPushConstantRange.init)
+{
+    return shaderStage!fragmentSpv(
+        VK_SHADER_STAGE_FRAGMENT_BIT,
+        fragmentBindings(),
+        push,
+    );
 }
 
 /// Pipeline declarations the loader factories share
@@ -650,7 +582,7 @@ PbrPipelineSet createPbrPipelineSet(
 
     result.materialLayout = pipelines.declare(RenderTechnique(
         name: "PBR descriptor layout",
-        stages: builder.shaderStages!"mesh_pbr_frag.spv"(),
+        stages: shaderStages!"mesh_pbr_frag.spv"(),
     ), 20);
 
     static if(pbrGltfActive)
