@@ -794,9 +794,9 @@ class SceneWith(Modules...)
         );
     }
 
-    /// Writes the uniforms of one view. Only the first view of a frame updates
-    /// the sun's cascades, so every view draws with the map the shadow pass filled.
-    void updateFrameUniforms(ref Frame frame, size_t eye, in WorldTransformation wtb, bool updateShadows = true)
+    /// Writes the uniforms of one view. The first view of a frame also updates
+    /// the sun, the local light assignment and the shared light buffer.
+    void updateFrameUniforms(ref Frame frame, size_t eye, in WorldTransformation wtb, bool updateLighting = true)
     {
         const viewProj = wtb.proj * wtb.view;
         const camera = translation(wtb.view.inverse);
@@ -807,7 +807,7 @@ class SceneWith(Modules...)
         data.cameraPosition = Vector4f(camera.x, camera.y, camera.z, 1);
 
         // The light matrices are only needed while the shadow pass runs
-        if(updateShadows && sunShadow.enabled)
+        if(updateLighting && sunShadow.enabled)
         {
             const sun = Vector3f(
                 lights[0].positionRadius.x,
@@ -835,11 +835,9 @@ class SceneWith(Modules...)
         );
         data.ambientParams = ambientLight;
         data.tonemapParams = Vector4f(cast(float) tonemapMode, tonemapWhite, 0, 0);
-        selectLights(camera, wtb.proj, swapChain.imageExtent.height);
         background.tonemapMode = tonemapMode;
         background.white = tonemapWhite;
         background.exposure = exposure;
-
 
         data.exposureParams = Vector4f(
             exposure,
@@ -847,12 +845,22 @@ class SceneWith(Modules...)
             transmissionPassEnabled ? 1 : 0,
             cast(float) lightCount,
         );
+        data.localShadowParams = Vector4f(
+            1.0f / localTilesPerAxis,
+            cast(float) localTilesPerAxis,
+            1.0f / localTileSize,
+            localShadow.enabled ? 1 : 0,
+        );
 
-        assignLocalShadows(data, camera);
+        if(updateLighting)
+        {
+            selectLights(camera, wtb.proj, swapChain.imageExtent.height);
+            assignLocalShadows(data, camera);
 
-        auto lightBuffer = lightBufs[frameIndex(frame)];
-        const lightBytes = lightCount * Light.sizeof;
-        (cast(Light[]) lightBuffer.cpuBuf[0 .. lightBytes])[] = lights[0 .. lightCount];
+            auto lightBuffer = lightBufs[frameIndex(frame)];
+            const lightBytes = lightCount * Light.sizeof;
+            (cast(Light[]) lightBuffer.cpuBuf[0 .. lightBytes])[] = lights[0 .. lightCount];
+        }
 
         frame.frameSets[eye].update(data);
     }
