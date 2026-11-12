@@ -701,6 +701,12 @@ is the first pass, and the demo toggles it with `X`. The section shaders read
 their data from push constants, and no effect fields remain in the frame
 constants. Stereo and the transmission pass still ignore custom passes.
 
+Future alternative: a single view loop instead of the mono and stereo recording
+paths. Mono is one view and stereo two, so `begin` runs once per frame while the
+custom draws, `end` and the blended hooks run per view with that view's frame
+set. Cleaner than threading hooks through `drawStereoEyes`, but it touches both
+paths at once.
+
 ## Materials
 
 The shared `Material` covers unlit/lit shading, glTF metallic-roughness and the
