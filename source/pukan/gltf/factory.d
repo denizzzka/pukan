@@ -9,6 +9,8 @@ import pukan.vulkan.requirements: FormatRequirement, ImageFormatRequirement, Req
 import std.conv: to;
 import std.meta: AliasSeq;
 
+/// Caches parsed glTF assets and creates instances from them. An instance is
+/// owned by the caller; the factory owns only the shared asset.
 class GltfFactory
 {
     import pukan.gltf.skin_matrices: SkinMatrices;
@@ -47,6 +49,8 @@ class GltfFactory
         this.computeJointsOnGPU = computeJointsOnGPU;
     }
 
+    /// Creates an instance the caller owns. It has its own allocator and joint
+    /// buffers, so destroy it before the device; the factory caches only the asset.
     auto create(string filename)
     {
         assert(pbr.device);
@@ -94,7 +98,8 @@ class GltfFactory
     /// Number of parsed glTF files currently shared by instances
     size_t cachedAssetCount() const => assetCache.length;
 
-    /// Releases cached file content before the device is destroyed
+    /// Releases cached file content before the device is destroyed. Live
+    /// instances still reference it, so destroy them first.
     void destroyAssets()
     {
         foreach(ref asset; assetCache)
