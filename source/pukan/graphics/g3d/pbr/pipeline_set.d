@@ -458,28 +458,51 @@ private struct PbrPipelineBuilder
     /// Queues every variant of both families, for the all warmup policy
 }
 
+/// Vertex stage of a skinned mesh pipeline, without the fragment part
+package(pukan) ShaderDecl skinnedPbrVertexStage()
+{
+    return shaderStage!"mesh_pbr_vert.spv"(
+        VK_SHADER_STAGE_VERTEX_BIT,
+        [
+            VkDescriptorSetLayoutBinding(
+                binding: MATERIAL_JOINTS,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            ),
+        ],
+        VkPushConstantRange(
+            stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            offset: 0,
+            size: Matrix4x4f.sizeof,
+        ),
+        vertexInput(),
+    );
+}
+
+/// Vertex stage of a static mesh pipeline, without the fragment part
+package(pukan) ShaderDecl staticPbrVertexStage()
+{
+    return shaderStage!"mesh_pbr_static_vert.spv"(
+        VK_SHADER_STAGE_VERTEX_BIT,
+        [
+            VkDescriptorSetLayoutBinding(
+                binding: MATERIAL_JOINTS,
+                descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                descriptorCount: 1,
+                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
+            ),
+        ],
+        vertexInput: staticVertexInput(),
+    );
+}
+
 /// Stages of a skinned mesh pipeline; `fragmentPush` is the pass data its
 /// fragment shader reads after the model matrix
 package(pukan) ShaderDecl[] shaderStages(string fragmentSpv)(VkPushConstantRange fragmentPush = VkPushConstantRange.init)
 {
     return [
-        shaderStage!"mesh_pbr_vert.spv"(
-            VK_SHADER_STAGE_VERTEX_BIT,
-            [
-                VkDescriptorSetLayoutBinding(
-                    binding: MATERIAL_JOINTS,
-                    descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                    descriptorCount: 1,
-                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                ),
-            ],
-            VkPushConstantRange(
-                stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                offset: 0,
-                size: Matrix4x4f.sizeof,
-            ),
-            vertexInput(),
-        ),
+        skinnedPbrVertexStage(),
         fragmentStage!fragmentSpv(fragmentPush),
     ];
 }
@@ -488,20 +511,62 @@ package(pukan) ShaderDecl[] shaderStages(string fragmentSpv)(VkPushConstantRange
 package(pukan) ShaderDecl[] staticShaderStages(string fragmentSpv)(VkPushConstantRange fragmentPush = VkPushConstantRange.init)
 {
     return [
-        shaderStage!"mesh_pbr_static_vert.spv"(
-            VK_SHADER_STAGE_VERTEX_BIT,
-            [
-                VkDescriptorSetLayoutBinding(
-                    binding: MATERIAL_JOINTS,
-                    descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                    descriptorCount: 1,
-                    stageFlags: VK_SHADER_STAGE_VERTEX_BIT,
-                ),
-            ],
-            vertexInput: staticVertexInput(),
-        ),
+        staticPbrVertexStage(),
         fragmentStage!fragmentSpv(fragmentPush),
     ];
+}
+
+/// One pipeline family a client can combine with its own fragment stage.
+/// The bindings are the fragment side of the family's pipeline layout.
+struct PipelineFamily
+{
+    string name;
+    ShaderDecl[] vertexStages;
+    VkDescriptorSetLayoutBinding[] fragmentBindings;
+}
+
+/// Static PBR geometry and material bindings, for a custom fragment
+PipelineFamily pbrStaticFamily()
+{
+    return PipelineFamily("PBR static", [staticPbrVertexStage()],
+        fragmentBindings());
+}
+
+/// Skinned PBR geometry and material bindings, for a custom fragment
+PipelineFamily pbrSkinnedFamily()
+{
+    return PipelineFamily("PBR skinned", [skinnedPbrVertexStage()],
+        fragmentBindings());
+}
+
+/// Builds a pipeline from a family's vertex stages and a client fragment.
+/// `variants` is the number of pipeline slots the line may use.
+LazyPipeline customPipeline(
+    PipelineFactory factory,
+    RenderPass pass,
+    string name,
+    PipelineFamily family,
+    ShaderDecl fragment,
+    FixedState state,
+    uint variants = 1,
+)
+{
+    VkDynamicState[] dynamicStates = [
+        VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE,
+        VK_DYNAMIC_STATE_FRONT_FACE,
+    ];
+
+    return LazyPipeline(
+        factory,
+        factory.declare(RenderTechnique(
+            name: name,
+            stages: family.vertexStages ~ fragment,
+            state: state,
+            dynamicStates: dynamicStates,
+        ), variants),
+        pass,
+        1,
+    );
 }
 
 package(pukan) ShaderDecl fragmentStage(string fragmentSpv)(VkPushConstantRange push = VkPushConstantRange.init)
