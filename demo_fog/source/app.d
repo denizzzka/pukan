@@ -107,7 +107,6 @@ void main(string[] args)
     if(noVolumetric)
         fogOn = false;
     enforce(look == "mist" || look == "rich", "unknown look: " ~ look ~ " (mist, rich)");
-    fogDensity = density;
 
     if(offscreen && frames == 0)
         frames = 1;
