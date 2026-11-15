@@ -261,21 +261,21 @@ void main(string[] args)
     // A dense cloud between the columns, hanging under the lantern
     scene.fogVolumes ~= FogVolume(
         FogVolumeShape.ellipsoid,
-        Vector3f(-1.0f, 1.6f, 1.0f),
-        Vector3f(2.4f, 1.6f, 2.4f),
+        Vector3f(-1.0f, 2.0f, 1.0f),
+        Vector3f(3.2f, 2.2f, 3.2f),
         2.2f,
-        Vector3f(0.45f, 0.46f, 0.48f),
+        Vector3f(0.40f, 0.44f, 0.50f),
         Vector3f(0.0f, 0.0f, 0.0f),
         0.0f,
         0.6f,
     );
     scene.fogVolumes[$ - 1].noise = 1.0f;
-    scene.fogVolumes[$ - 1].noiseScale = 0.9f;
+    scene.fogVolumes[$ - 1].noiseScale = 0.55f;
 
     scene.addSpotLight(
-        Vector3f(-2.4f, 4.2f, 1.8f),
+        Vector3f(-2.4f, 4.6f, 1.8f),
         Vector3f(0.45f, -1.0f, -0.25f),
-        Vector3f(1.0f, 0.72f, 0.40f) * 22.0f,
+        Vector3f(0.62f, 0.78f, 1.0f) * 9.0f,
         14.0f,
         20f.degtorad,
         34f.degtorad,
@@ -297,15 +297,15 @@ void main(string[] args)
         fogDensity = 0.02;
         scene.volumetricFog.density = cast(float) fogDensity;
         scene.volumetricFog.albedo = Vector3f(1.0f, 0.80f, 0.55f);
-        scene.volumetricFog.anisotropy = 0.5f;
+        scene.volumetricFog.anisotropy = 0.25f;
 
         scene.heightFog.density = 0.02f;
         scene.heightFog.falloff = 0.6f;
         scene.heightFog.color = Vector3f(0.08f, 0.16f, 0.28f);
 
         // The dense cool fog dims what the cloud scatters, so it darkens too
-        scene.fogVolumes[$ - 1].density = 3.2f;
-        scene.fogVolumes[$ - 1].albedo = Vector3f(0.30f, 0.31f, 0.34f);
+        scene.fogVolumes[$ - 1].density = 4.2f;
+        scene.fogVolumes[$ - 1].albedo = Vector3f(0.16f, 0.23f, 0.38f);
     }
 
     // An explicit density wins over the preset's choice
