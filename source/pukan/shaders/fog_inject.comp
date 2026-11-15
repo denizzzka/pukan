@@ -107,10 +107,10 @@ void main()
 
         float volumeDensity = volume.halfExtentsDensity.w * weight;
 
-        // A cloudy volume drifts with time, so its billows move
+        // A cloudy volume drifts up and with the wind, so its billows move
         if(volume.noiseScale.x > 0.0)
         {
-            const vec3 wind = vec3(0.06, 0.015, 0.03) * pc.time;
+            const vec3 wind = vec3(0.05, 0.18, 0.02) * pc.time;
             const float cloud = fogCloud((position + wind) * max(volume.noiseScale.y, 1e-3));
 
             volumeDensity *= mix(1.0, cloud * 1.7, clamp(volume.noiseScale.x, 0.0, 1.0));

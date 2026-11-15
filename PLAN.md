@@ -815,10 +815,12 @@ Open work, one commit each:
       ray already covers all the fog before the sky and needs no continuation;
       `skyAffect` now blends the fogged sky with the plain one, and defaults to
       1 as in Godot.
-- [ ] `demo_fog`: the cloud around the lantern reads as a glowing ball. Make it
-      a dense billowing vapour, lit by the lantern instead of emitting.
-- [ ] `demo_fog`: confirm the cloud animation over a frame sequence after the
-      sky change, and capture the demonstration screenshot from it.
+- [x] `demo_fog`: the cloud around the lantern read as a glowing ball. It is
+      now a dense billowing vapour with no emission: four folded noise octaves
+      give it round lobes and torn edges, a rising wind drifts them, and the
+      lantern hangs above it so the sun and the lantern light the shape.
+- [x] `demo_fog`: the cloud animation is confirmed between frames 4 and 90, and
+      the demonstration screenshot comes from the verified sequence.
 
 ## Depth buffer
 

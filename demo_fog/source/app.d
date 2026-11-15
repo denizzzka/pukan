@@ -259,7 +259,7 @@ void main(string[] args)
     scene.heightFog.falloff = 0.7f;
     scene.heightFog.color = Vector3f(0.30f, 0.36f, 0.46f);
 
-    // A warm pocket of fog around the lantern, so the local shape shows
+    // A dense cloud between the columns, hanging under the lantern
     scene.fogVolumes ~= FogVolume(
         FogVolumeShape.ellipsoid,
         Vector3f(-1.0f, 1.6f, 1.0f),
@@ -271,15 +271,15 @@ void main(string[] args)
         0.35f,
     );
     scene.fogVolumes[$ - 1].noise = 1.0f;
-    scene.fogVolumes[$ - 1].noiseScale = 1.2f;
+    scene.fogVolumes[$ - 1].noiseScale = 0.9f;
 
     scene.addSpotLight(
-        Vector3f(-3.2f, 3.6f, -2.6f),
-        Vector3f(0.0f, -1.0f, 0.0f),
+        Vector3f(-2.4f, 4.2f, 1.8f),
+        Vector3f(0.45f, -1.0f, -0.25f),
         Vector3f(1.0f, 0.72f, 0.40f) * 22.0f,
         14.0f,
-        16f.degtorad,
-        30f.degtorad,
+        20f.degtorad,
+        34f.degtorad,
     );
 
     if(look == "rich")
@@ -304,10 +304,10 @@ void main(string[] args)
         scene.heightFog.falloff = 0.6f;
         scene.heightFog.color = Vector3f(0.08f, 0.16f, 0.28f);
 
-        scene.fogVolumes[$ - 1].density = 1.4f;
-        scene.fogVolumes[$ - 1].albedo = Vector3f(0.95f, 0.80f, 0.65f);
-        scene.fogVolumes[$ - 1].emission = Vector3f(1.0f, 0.35f, 0.08f);
-        scene.fogVolumes[$ - 1].emissionEnergy = 0.25f;
+        scene.fogVolumes[$ - 1].density = 3.2f;
+        scene.fogVolumes[$ - 1].albedo = Vector3f(0.30f, 0.31f, 0.34f);
+        scene.fogVolumes[$ - 1].edgeFade = 0.6f;
+        scene.fogVolumes[$ - 1].emissionEnergy = 0.0f;
     }
 
     // An explicit density wins over the preset's choice

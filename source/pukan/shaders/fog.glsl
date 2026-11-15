@@ -114,20 +114,20 @@ float fogValueNoise(vec3 point)
     return mix(bottom, top, blend.z);
 }
 
-/// Three octaves remapped so the volume keeps dense hearts and thin gaps
+/// Billowing smoke: folded octaves leave round lobes with torn edges
 float fogCloud(vec3 point)
 {
     float total = 0.0;
     float amplitude = 0.5;
 
-    for(uint i = 0u; i < 3u; ++i)
+    for(uint i = 0u; i < 4u; ++i)
     {
-        total += amplitude * fogValueNoise(point);
+        total += amplitude * abs(fogValueNoise(point) * 2.0 - 1.0);
         point *= 2.03;
         amplitude *= 0.5;
     }
 
-    return smoothstep(0.42, 0.72, total);
+    return smoothstep(0.22, 0.60, total);
 }
 
 /// Interleaved gradient noise, hiding the slice steps of a still image
