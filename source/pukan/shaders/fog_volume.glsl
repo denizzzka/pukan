@@ -15,7 +15,13 @@ vec4 sampleFog(vec3 position)
 
     // Dither by one slice, so neighbouring pixels read neighbouring slices
     const float width = 1.0 / float(FOG_SLICE_COUNT);
-    const float jitter = (fogDither(gl_FragCoord.xy) - 0.5) * width;
+    const float transmittance = texture(fogVolume, vec3(uv, slice)).a;
+    const float next = texture(fogVolume, vec3(uv, min(slice + width, 1.0))).a;
+
+    // A dense cloud already differs between slices, and the jitter would only
+    // turn its noise into grain; a thin medium keeps the dither
+    const float even = 1.0 - smoothstep(0.005, 0.05, abs(next - transmittance));
+    const float jitter = (fogDither(gl_FragCoord.xy) - 0.5) * width * even;
 
     return texture(fogVolume, vec3(uv, clamp(slice + jitter, 0.0, 1.0)));
 }

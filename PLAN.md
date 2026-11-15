@@ -806,9 +806,10 @@ volumetric fog earns its pass only where a light has to show a pocket of air.
 
 Open work, one commit each:
 
-- [ ] `fog`: the dither that hides slice steps speckles dense volumes, and the
-      crate faces in `demo_fog` show pixel grain. Scale the jitter with the
-      transmittance change across a slice instead of applying it everywhere.
+- [x] `fog`: the dither that hides slice steps speckled dense volumes, and the
+      crate faces in `demo_fog` showed pixel grain. The jitter now fades out as
+      the transmittance change across a slice grows, so a dense cloud keeps its
+      smooth noise and a thin medium keeps the dither.
 - [ ] `fog`: the sky reads the last slice at the fog's length and stops there.
       Continue the ray past that point, and let `skyAffect` blend the fogged sky
       with the plain one.
