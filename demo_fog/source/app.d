@@ -263,11 +263,11 @@ void main(string[] args)
         FogVolumeShape.ellipsoid,
         Vector3f(-1.0f, 1.6f, 1.0f),
         Vector3f(2.4f, 1.6f, 2.4f),
-        1.6f,
-        Vector3f(1.0f, 0.72f, 0.40f),
-        Vector3f(0.50f, 0.24f, 0.10f),
-        1.6f,
-        0.35f,
+        2.2f,
+        Vector3f(0.45f, 0.46f, 0.48f),
+        Vector3f(0.0f, 0.0f, 0.0f),
+        0.0f,
+        0.6f,
     );
     scene.fogVolumes[$ - 1].noise = 1.0f;
     scene.fogVolumes[$ - 1].noiseScale = 0.9f;
@@ -303,10 +303,9 @@ void main(string[] args)
         scene.heightFog.falloff = 0.6f;
         scene.heightFog.color = Vector3f(0.08f, 0.16f, 0.28f);
 
+        // The dense cool fog dims what the cloud scatters, so it darkens too
         scene.fogVolumes[$ - 1].density = 3.2f;
         scene.fogVolumes[$ - 1].albedo = Vector3f(0.30f, 0.31f, 0.34f);
-        scene.fogVolumes[$ - 1].edgeFade = 0.6f;
-        scene.fogVolumes[$ - 1].emissionEnergy = 0.0f;
     }
 
     // An explicit density wins over the preset's choice
