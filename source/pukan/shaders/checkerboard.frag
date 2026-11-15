@@ -44,12 +44,15 @@ void main()
         color *= params.z;
     }
 
-    // The sky sits at infinity, so it takes the fog accumulated over the whole view ray
+    // The sky sits at the fog's length, the far edge of the medium, so the
+    // accumulated ray already covers all the fog in front of it
     if(frameUbo.frame.fogParams.x >= 0.5)
     {
         const vec2 uv = gl_FragCoord.xy * frameUbo.frame.fogScreen.xy;
         const vec4 fog = texture(fogVolume, vec3(uv, 1.0));
-        color = color * fog.a + fog.rgb;
+        const vec3 covered = color * fog.a + fog.rgb;
+
+        color = mix(color, covered, clamp(frameUbo.frame.fogEmission.a, 0.0, 1.0));
     }
 
     color *= tonemap.z;

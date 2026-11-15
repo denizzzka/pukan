@@ -38,8 +38,8 @@ struct VolumetricFogSettings
     float anisotropy = 0.0f;
     /// Farthest distance the slices cover
     float length = 64.0f;
-    /// How much of the sky the fog covers; not applied yet
-    float skyAffect = 0.0f;
+    /// Fraction of the plain sky the fog replaces
+    float skyAffect = 1.0f;
     /// Seconds the cloud noise drifts with; the host advances it
     float animationTime = 0.0f;
 }

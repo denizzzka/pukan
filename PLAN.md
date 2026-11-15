@@ -810,9 +810,11 @@ Open work, one commit each:
       crate faces in `demo_fog` showed pixel grain. The jitter now fades out as
       the transmittance change across a slice grows, so a dense cloud keeps its
       smooth noise and a thin medium keeps the dither.
-- [ ] `fog`: the sky reads the last slice at the fog's length and stops there.
-      Continue the ray past that point, and let `skyAffect` blend the fogged sky
-      with the plain one.
+- [x] `fog`: the background always fogged the sky while `skyAffect` was never
+      read. The fog's length is the far edge of the medium, so the accumulated
+      ray already covers all the fog before the sky and needs no continuation;
+      `skyAffect` now blends the fogged sky with the plain one, and defaults to
+      1 as in Godot.
 - [ ] `demo_fog`: the cloud around the lantern reads as a glowing ball. Make it
       a dense billowing vapour, lit by the lantern instead of emitting.
 - [ ] `demo_fog`: confirm the cloud animation over a frame sequence after the

@@ -44,7 +44,7 @@ struct GodotFog
     float density = 0.01f;
     float height = 0.0f;
     float heightDensity = 0.0f;
-    float skyAffect = 0.0f;
+    float skyAffect = 1.0f;
 }
 
 /// Godot's Environment.volumetric_fog_*
@@ -59,7 +59,8 @@ struct GodotVolumetricFog
     float anisotropy = 0.0f;
     /// Farthest distance the fog covers
     float length = 64.0f;
-    float skyAffect = 0.0f;
+    /// Fraction of the plain sky the fog replaces
+    float skyAffect = 1.0f;
 }
 
 /// Environment state read from a Godot Environment resource
@@ -111,7 +112,7 @@ GodotEnvironment readGodotEnvironment(string type, in GodotVariant[string] prope
     result.fog.density = cast(float) propertyDouble(properties, "fog_density", 0.01);
     result.fog.height = cast(float) propertyDouble(properties, "fog_height", 0.0);
     result.fog.heightDensity = cast(float) propertyDouble(properties, "fog_height_density", 0.0);
-    result.fog.skyAffect = cast(float) propertyDouble(properties, "fog_sky_affect", 0.0);
+    result.fog.skyAffect = cast(float) propertyDouble(properties, "fog_sky_affect", 1.0);
 
     result.volumetricFog.enabled = propertyBool(properties, "volumetric_fog_enabled", false);
     result.volumetricFog.density = cast(float) propertyDouble(properties, "volumetric_fog_density", 0.05);
@@ -120,7 +121,7 @@ GodotEnvironment readGodotEnvironment(string type, in GodotVariant[string] prope
     result.volumetricFog.emissionEnergy = cast(float) propertyDouble(properties, "volumetric_fog_emission_energy", 0.0);
     result.volumetricFog.anisotropy = cast(float) propertyDouble(properties, "volumetric_fog_anisotropy", 0.0);
     result.volumetricFog.length = cast(float) propertyDouble(properties, "volumetric_fog_length", 64.0);
-    result.volumetricFog.skyAffect = cast(float) propertyDouble(properties, "volumetric_fog_sky_affect", 0.0);
+    result.volumetricFog.skyAffect = cast(float) propertyDouble(properties, "volumetric_fog_sky_affect", 1.0);
 
     return result;
 }
