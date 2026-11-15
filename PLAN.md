@@ -804,7 +804,7 @@ point and spot lights a torch adds still light the fog around them. The cheapest
 dungeon fog is `heightFog` alone with `volumetricFog.enabled` left false; the
 volumetric fog earns its pass only where a light has to show a pocket of air.
 
-Open work, one commit each:
+Settled after the first commit, one commit each:
 
 - [x] `fog`: the dither that hides slice steps speckled dense volumes, and the
       crate faces in `demo_fog` showed pixel grain. The jitter now fades out as
