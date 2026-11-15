@@ -1,0 +1,148 @@
+#version 460
+
+// Fills the froxel volume with the light each cell scatters and the density it
+// holds; fog_integrate.comp turns that into light and transmittance per slice
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "frame.glsl"
+#include "fog.glsl"
+#include "shadow.glsl"
+
+/// Ambient the scene's probe holds, so dense fog does not turn darker than the sky
+layout(set = 1, binding = FRAME_IRRADIANCE) uniform sampler2D irradianceMap;
+
+layout(set = 0, binding = 0, rgba16f) writeonly uniform image3D fogInjection;
+
+layout(set = 0, binding = 1) readonly buffer FogVolumeBuffer
+{
+    FogVolume volumes[];
+};
+
+layout(push_constant) uniform Push
+{
+    uvec3 froxels;
+    uint volumeCount;
+    float time;
+} pc;
+
+/// Light a local light sends towards a cell, without the phase term
+vec3 localLightRadiance(in Light light, vec3 position, vec3 viewDirection)
+{
+    const uint kind = uint(light.params.x);
+    const vec3 toLight = light.positionRadius.xyz - position;
+    const float distance = length(toLight);
+
+    const float radius = max(light.positionRadius.w, 0.001);
+    const float ratio = distance / radius;
+
+    if(ratio >= 1.0)
+        return vec3(0.0);
+
+    const vec3 L = toLight / max(distance, 0.001);
+
+    float attenuation = pow(clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0), 2.0)
+        / (distance * distance + 1.0);
+
+    float shadow = 1.0;
+
+    if(kind == LIGHT_SPOT)
+    {
+        const float cosAngle = dot(normalize(light.directionOuterCos.xyz), -L);
+        attenuation *= clamp(
+            (cosAngle - light.directionOuterCos.w) / max(light.params.y - light.directionOuterCos.w, 1e-4),
+            0.0, 1.0);
+
+        if(light.params.z >= 0.0 && attenuation > 0.0)
+            shadow = localShadowFactor(light, position, L);
+    }
+    else if(kind == LIGHT_POINT && light.params.z >= 0.0 && attenuation > 0.0)
+        shadow = pointShadowFactor(light, position, L);
+
+    if(attenuation <= 0.0)
+        return vec3(0.0);
+
+    return light.colorIntensity.rgb * attenuation * shadow * fogPhase(dot(viewDirection, L));
+}
+
+void main()
+{
+    const ivec3 cell = ivec3(gl_GlobalInvocationID);
+
+    if(any(greaterThanEqual(cell, ivec3(pc.froxels))))
+        return;
+
+    const vec3 origin = frameUbo.frame.cameraPosition.xyz;
+
+    // The centre of the cell picks the ray the whole cell shares
+    const vec2 uv = (vec2(cell.xy) + 0.5) / vec2(pc.froxels.xy);
+    const vec2 ndc = uv * 2.0 - 1.0;
+    // Reverse Z: the near plane is at depth 1, the far plane at 0
+    const vec4 nearPoint = frameUbo.frame.invViewProj * vec4(ndc, 1.0, 1.0);
+    const vec4 farPoint = frameUbo.frame.invViewProj * vec4(ndc, 0.0, 1.0);
+    const vec3 direction = normalize(farPoint.xyz / farPoint.w - nearPoint.xyz / nearPoint.w);
+
+    const float slice = (float(cell.z) + 0.5) / float(pc.froxels.z);
+    const vec3 position = origin + direction * fogDepthOfSlice(slice);
+
+    // The global medium, then every local volume the cell falls in
+    float density = frameUbo.frame.fogParams.y;
+    vec3 albedo = frameUbo.frame.fogAlbedo.rgb * density;
+    vec3 emission = frameUbo.frame.fogEmission.rgb * frameUbo.frame.fogAlbedo.a;
+
+    for(uint i = 0u; i < pc.volumeCount; ++i)
+    {
+        const FogVolume volume = volumes[i];
+
+        const vec3 local = (position - volume.centerShape.xyz) / max(volume.halfExtentsDensity.xyz, vec3(1e-4));
+        const float shape = volume.centerShape.w < 0.5
+            ? max(abs(local.x), max(abs(local.y), abs(local.z)))
+            : length(local);
+
+        const float edge = max(volume.emissionEdge.a, 1e-4);
+        const float weight = clamp((1.0 - shape) / edge, 0.0, 1.0);
+
+        if(weight <= 0.0)
+            continue;
+
+        float volumeDensity = volume.halfExtentsDensity.w * weight;
+
+        // A cloudy volume drifts with time, so its billows move
+        if(volume.noiseScale.x > 0.0)
+        {
+            const vec3 wind = vec3(0.06, 0.015, 0.03) * pc.time;
+            const float cloud = fogCloud((position + wind) * max(volume.noiseScale.y, 1e-3));
+
+            volumeDensity *= mix(1.0, cloud * 1.7, clamp(volume.noiseScale.x, 0.0, 1.0));
+        }
+
+        density += volumeDensity;
+        albedo += volume.albedoEmission.rgb * volumeDensity;
+        emission += volume.emissionEdge.rgb * volume.albedoEmission.a * volumeDensity;
+    }
+
+    vec3 radiance = vec3(0.0);
+
+    // The sun, attenuated by the cascades the cell falls in
+    const uint lightCount = uint(frameUbo.frame.exposureParams.w);
+    const vec3 sun = sunDirection();
+    radiance += lights[0].colorIntensity.rgb
+        * shadowFactor(position, sun)
+        * fogPhase(dot(direction, sun));
+
+    for(uint i = 1u; i < lightCount; ++i)
+        radiance += localLightRadiance(lights[i], position, direction);
+
+    // The probe's sky and ground, averaged, keeps the fog in shadow from going black
+    const vec3 sky = texture(irradianceMap, fogEquirectUv(vec3(0.0, 1.0, 0.0))).rgb;
+    const vec3 ground = texture(irradianceMap, fogEquirectUv(vec3(0.0, -1.0, 0.0))).rgb;
+
+    radiance += 0.5 * (sky + ground)
+        * frameUbo.frame.exposureParams.y
+        * frameUbo.frame.ambientParams.rgb
+        * frameUbo.frame.ambientParams.a;
+
+    const vec3 scattering = radiance * (density * albedo) + emission;
+
+    imageStore(fogInjection, cell, vec4(scattering, density));
+}

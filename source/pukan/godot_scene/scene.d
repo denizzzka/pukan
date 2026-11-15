@@ -72,6 +72,20 @@ struct GodotLight
     float outerAngle;
 }
 
+/// A FogVolume node as a box in world space, with its material
+struct GodotFogVolume
+{
+    Vector3f center;
+    Vector3f halfExtents = Vector3f(1.0f, 1.0f, 1.0f);
+    /// Extinction per metre
+    float density = 0.05f;
+    Vector3f albedo = Vector3f(1.0f, 1.0f, 1.0f);
+    Vector3f emission = Vector3f(0.0f, 0.0f, 0.0f);
+    float emissionEnergy = 0.0f;
+    /// Fraction of the shape the density fades over at the edge
+    float edgeFade = 0.1f;
+}
+
 struct GodotCamera
 {
     /// Inverse of the camera node's world transform
@@ -107,6 +121,8 @@ class GodotNode
     bool hasLight;
     GodotCamera camera;
     bool hasCamera;
+    GodotFogVolume fogVolume;
+    bool hasFogVolume;
     DrawableByVulkan instance;
     GodotSkeleton skeleton;
     bool hasSkeleton;
@@ -146,6 +162,7 @@ final class GodotScene : DrawableByVulkan, Blended, Bounded, PartDrawable, Culle
     GodotLight[] lights;
     GodotCamera camera;
     bool hasCamera;
+    GodotFogVolume[] fogVolumes;
     GodotEnvironment environment;
     private DrawableByVulkan[] instances;
     private GodotSkin[] skins;

@@ -34,6 +34,34 @@ struct GodotSky
     float energy = 1.0f;
 }
 
+/// Godot's Environment.fog_*: a distance fog with an optional ground layer
+struct GodotFog
+{
+    bool enabled;
+    Vector3f lightColor = Vector3f(0.5f, 0.6f, 0.7f);
+    float lightEnergy = 1.0f;
+    /// Extinction per metre
+    float density = 0.01f;
+    float height = 0.0f;
+    float heightDensity = 0.0f;
+    float skyAffect = 0.0f;
+}
+
+/// Godot's Environment.volumetric_fog_*
+struct GodotVolumetricFog
+{
+    bool enabled;
+    /// Extinction per metre
+    float density = 0.05f;
+    Vector3f albedo = Vector3f(1.0f, 1.0f, 1.0f);
+    Vector3f emission = Vector3f(0.0f, 0.0f, 0.0f);
+    float emissionEnergy = 0.0f;
+    float anisotropy = 0.0f;
+    /// Farthest distance the fog covers
+    float length = 64.0f;
+    float skyAffect = 0.0f;
+}
+
 /// Environment state read from a Godot Environment resource
 struct GodotEnvironment
 {
@@ -51,6 +79,9 @@ struct GodotEnvironment
     uint tonemapMode = 0;
     float exposure = 1.0f;
     float white = 1.0f;
+
+    GodotFog fog;
+    GodotVolumetricFog volumetricFog;
 }
 
 /// Reads an Environment resource; other types return an absent result
@@ -73,6 +104,23 @@ GodotEnvironment readGodotEnvironment(string type, in GodotVariant[string] prope
     result.tonemapMode = cast(uint) propertyLong(properties, "tonemap_mode", 0);
     result.exposure = cast(float) propertyDouble(properties, "tonemap_exposure", 1.0);
     result.white = cast(float) propertyDouble(properties, "tonemap_white", 1.0);
+
+    result.fog.enabled = propertyBool(properties, "fog_enabled", false);
+    result.fog.lightColor = propertyColor(properties, "fog_light_color", result.fog.lightColor);
+    result.fog.lightEnergy = cast(float) propertyDouble(properties, "fog_light_energy", 1.0);
+    result.fog.density = cast(float) propertyDouble(properties, "fog_density", 0.01);
+    result.fog.height = cast(float) propertyDouble(properties, "fog_height", 0.0);
+    result.fog.heightDensity = cast(float) propertyDouble(properties, "fog_height_density", 0.0);
+    result.fog.skyAffect = cast(float) propertyDouble(properties, "fog_sky_affect", 0.0);
+
+    result.volumetricFog.enabled = propertyBool(properties, "volumetric_fog_enabled", false);
+    result.volumetricFog.density = cast(float) propertyDouble(properties, "volumetric_fog_density", 0.05);
+    result.volumetricFog.albedo = propertyColor(properties, "volumetric_fog_albedo", result.volumetricFog.albedo);
+    result.volumetricFog.emission = propertyColor(properties, "volumetric_fog_emission", result.volumetricFog.emission);
+    result.volumetricFog.emissionEnergy = cast(float) propertyDouble(properties, "volumetric_fog_emission_energy", 0.0);
+    result.volumetricFog.anisotropy = cast(float) propertyDouble(properties, "volumetric_fog_anisotropy", 0.0);
+    result.volumetricFog.length = cast(float) propertyDouble(properties, "volumetric_fog_length", 64.0);
+    result.volumetricFog.skyAffect = cast(float) propertyDouble(properties, "volumetric_fog_sky_affect", 0.0);
 
     return result;
 }
@@ -115,6 +163,12 @@ private Vector3f propertyColor(in GodotVariant[string] properties, string name, 
     return Vector3f(color.x, color.y, color.z);
 }
 
+private bool propertyBool(in GodotVariant[string] properties, string name, bool defaultValue)
+{
+    auto value = name in properties;
+    return value is null ? defaultValue : asBool(*value, name);
+}
+
 private double propertyDouble(in GodotVariant[string] properties, string name, double defaultValue)
 {
     auto value = name in properties;
@@ -139,6 +193,28 @@ unittest
     assert(environment.backgroundMode == GodotBackgroundMode.sky);
     assert(environment.backgroundEnergy == 0.5f);
     assert(environment.tonemapMode == 4);
+    assert(!environment.fog.enabled);
+    assert(environment.fog.density == 0.01f);
+    assert(!environment.volumetricFog.enabled);
+    assert(environment.volumetricFog.length == 64.0f);
 
     assert(!readGodotEnvironment("NotEnvironment", properties).present);
+
+    properties["fog_enabled"] = GodotVariant(true);
+    properties["fog_density"] = GodotVariant(0.04);
+    properties["fog_height"] = GodotVariant(1.5);
+    properties["fog_height_density"] = GodotVariant(0.6);
+
+    properties["volumetric_fog_enabled"] = GodotVariant(true);
+    properties["volumetric_fog_density"] = GodotVariant(0.25);
+    properties["volumetric_fog_anisotropy"] = GodotVariant(0.4);
+
+    const fogged = readGodotEnvironment("Environment", properties);
+    assert(fogged.fog.enabled);
+    assert(fogged.fog.density == 0.04f);
+    assert(fogged.fog.height == 1.5f);
+    assert(fogged.fog.heightDensity == 0.6f);
+    assert(fogged.volumetricFog.enabled);
+    assert(fogged.volumetricFog.density == 0.25f);
+    assert(fogged.volumetricFog.anisotropy == 0.4f);
 }

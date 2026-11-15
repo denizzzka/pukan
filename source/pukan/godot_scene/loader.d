@@ -14,7 +14,7 @@ import pukan.godot_scene.mesh: GodotArraySurface, GodotPrimitive, decodeArrayMes
 import pukan.godot_scene.paths: normalizeResourcePath;
 import pukan.godot_scene.primitives: decodePrimitiveMesh, isPrimitiveMesh;
 import pukan.godot_scene.remap: resolveGodotPath;
-import pukan.godot_scene.scene: GodotBone, GodotCamera, GodotCollider, GodotLight, GodotLightKind, GodotNode, GodotScene, GodotSkin, GodotSkeleton;
+import pukan.godot_scene.scene: GodotBone, GodotCamera, GodotCollider, GodotFogVolume, GodotLight, GodotLightKind, GodotNode, GodotScene, GodotSkin, GodotSkeleton;
 import pukan.godot_scene.source: DirectorySource, GodotSource;
 import pukan.godot_scene.text: GodotTextDocument, GodotTextExternal, GodotTextNode, GodotTextResource, parseGodotTextFile;
 import pukan.godot_scene.value;
@@ -408,7 +408,8 @@ private final class GodotLoader
         GodotLight[] lights;
         GodotCamera camera;
         bool hasCamera;
-        collectSceneNodes(root, lights, camera, hasCamera);
+        GodotFogVolume[] fogVolumes;
+        collectSceneNodes(root, lights, camera, hasCamera, fogVolumes);
 
         // Godot stores clockwise triangles in its meshes and primitives
         applyWinding!GodotNode(root, false, node => node.local);
@@ -437,6 +438,7 @@ private final class GodotLoader
         scene.lights = lights;
         scene.camera = camera;
         scene.hasCamera = hasCamera;
+        scene.fogVolumes = fogVolumes;
         return scene;
     }
 
@@ -470,11 +472,31 @@ private final class GodotLoader
         ref GodotLight[] lights,
         ref GodotCamera camera,
         ref bool hasCamera,
+        ref GodotFogVolume[] fogVolumes,
     )
     {
         walkTree!GodotNode(node, Matrix4x4f.identity, n => n.local, (n, world, local) {
             if(!n.visible)
                 return Walk.skip;
+
+            if(n.hasFogVolume)
+            {
+                GodotFogVolume volume = n.fogVolume;
+                volume.center = Vector3f(world.a14, world.a24, world.a34);
+
+                // The box follows the world scale; a rotated volume stays axis aligned
+                const scaleX = Vector3f(world.a11, world.a21, world.a31).length;
+                const scaleY = Vector3f(world.a12, world.a22, world.a32).length;
+                const scaleZ = Vector3f(world.a13, world.a23, world.a33).length;
+
+                volume.halfExtents = Vector3f(
+                    volume.halfExtents.x * scaleX,
+                    volume.halfExtents.y * scaleY,
+                    volume.halfExtents.z * scaleZ,
+                );
+
+                fogVolumes ~= volume;
+            }
 
             if(n.hasLight)
             {
@@ -757,6 +779,11 @@ private final class GodotLoader
                 readEnvironmentNode(document, properties);
                 break;
 
+            case "FogVolume":
+                node.hasFogVolume = true;
+                node.fogVolume = readFogVolume(document, properties);
+                break;
+
             default:
                 break;
         }
@@ -840,6 +867,44 @@ private final class GodotLoader
         }
 
         return node;
+    }
+
+    /// A FogVolume node as a box with the FogMaterial it carries
+    private GodotFogVolume readFogVolume(
+        ref GodotTextDocument document,
+        in GodotVariant[string] properties,
+    )
+    {
+        GodotFogVolume volume;
+
+        if(auto value = "size" in properties)
+            volume.halfExtents = as!(Vector3f)(*value, "size") * 0.5f;
+
+        auto materialValue = "material" in properties;
+
+        if(materialValue is null)
+            return volume;
+
+        string type;
+        GodotVariant[string] material;
+        string path;
+
+        if(!resolveResource(document, asObjectRef(*materialValue, "material"), type, material, path))
+            return volume;
+
+        if(type != "FogMaterial")
+            return volume;
+
+        const albedo = propertyColor(material, "albedo", GodotColor(1, 1, 1, 1)).toVector4;
+        const emission = propertyColor(material, "emission", GodotColor(0, 0, 0, 1)).toVector4;
+
+        volume.density = cast(float) propertyDouble(material, "density", 0.05);
+        volume.albedo = Vector3f(albedo.x, albedo.y, albedo.z);
+        volume.emission = Vector3f(emission.x, emission.y, emission.z);
+        volume.emissionEnergy = cast(float) propertyDouble(material, "emission_energy", 0.0);
+        volume.edgeFade = cast(float) propertyDouble(material, "edge_fade", 0.1);
+
+        return volume;
     }
 
     private static bool isCollisionBody(string type)
@@ -1037,7 +1102,6 @@ private final class GodotLoader
             case "ReflectionProbe":
             case "LightmapGI":
             case "VoxelGI":
-            case "FogVolume":
             case "Decal":
             case "MultiMeshInstance3D":
             case "GPUParticles3D":

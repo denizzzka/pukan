@@ -1,6 +1,7 @@
 
 #include "material.glsl"
 #include "material_bindings.h"
+#include "fog_volume.glsl"
 #ifdef SECTION
 #include "section.glsl"
 #endif
@@ -417,9 +418,15 @@ void pukanPbrMain()
 #endif
 
         color = shadePbr(surface);
+        color = applyFog(color, fragPosition);
         color = toneMap(color * frameUbo.frame.exposureParams.x,
             uint(frameUbo.frame.tonemapParams.x), frameUbo.frame.tonemapParams.y);
     }
+#endif
+
+#if defined(UNLIT) || defined(LIT)
+    // These paths stop at display colour, so fog blends in after the shading
+    color = applyFog(color, fragPosition);
 #endif
 
 #ifdef OIT

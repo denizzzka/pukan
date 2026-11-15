@@ -1,0 +1,45 @@
+#version 460
+
+// Walking each view ray once, adds up what the medium scatters before every
+// slice and how much of a surface's light survives to it
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "frame.glsl"
+#include "fog.glsl"
+
+layout(set = 0, binding = 0, rgba16f) uniform image3D fogVolume;
+
+layout(push_constant) uniform Push
+{
+    uvec2 froxels;
+    uint slices;
+} pc;
+
+void main()
+{
+    const ivec2 cell = ivec2(gl_GlobalInvocationID.xy);
+
+    if(any(greaterThanEqual(cell, ivec2(pc.froxels))))
+        return;
+
+    const float count = float(pc.slices);
+
+    float transmittance = 1.0;
+    vec3 inscatter = vec3(0.0);
+
+    for(uint z = 0u; z < pc.slices; ++z)
+    {
+        const float start = float(z) / count;
+        const float end = float(z + 1u) / count;
+        const float step = fogDepthOfSlice(end) - fogDepthOfSlice(start);
+
+        const vec4 medium = imageLoad(fogVolume, ivec3(cell, int(z)));
+
+        // rgb arrives as the scattered light density, a as the extinction
+        inscatter += transmittance * medium.rgb * step;
+        transmittance *= exp(-medium.a * step);
+
+        imageStore(fogVolume, ivec3(cell, int(z)), vec4(inscatter, transmittance));
+    }
+}

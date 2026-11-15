@@ -19,4 +19,5 @@ struct FrameBindings
     uint sceneDepth = uint.max;
     uint depthMS = uint.max;
     uint localShadows = uint.max;
+    uint fogVolume = uint.max;
 }

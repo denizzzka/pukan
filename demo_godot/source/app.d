@@ -1397,7 +1397,36 @@ void main(string[] args)
         scene.exposure = environment.exposure;
         scene.tonemapMode = environment.tonemapMode;
         scene.tonemapWhite = environment.white;
+
+        scene.heightFog.enabled = environment.fog.enabled;
+        scene.heightFog.density = environment.fog.density;
+        scene.heightFog.height = environment.fog.height;
+        scene.heightFog.falloff = environment.fog.heightDensity > 0.0f
+            ? environment.fog.heightDensity
+            : scene.heightFog.falloff;
+        scene.heightFog.color = environment.fog.lightColor * environment.fog.lightEnergy;
+
+        scene.volumetricFog.enabled = environment.volumetricFog.enabled;
+        scene.volumetricFog.density = environment.volumetricFog.density;
+        scene.volumetricFog.albedo = environment.volumetricFog.albedo;
+        scene.volumetricFog.emission = environment.volumetricFog.emission;
+        scene.volumetricFog.emissionEnergy = environment.volumetricFog.emissionEnergy;
+        scene.volumetricFog.anisotropy = environment.volumetricFog.anisotropy;
+        scene.volumetricFog.length = environment.volumetricFog.length;
+        scene.volumetricFog.skyAffect = environment.volumetricFog.skyAffect;
     }
+
+    foreach(volume; godotScene.fogVolumes)
+        scene.fogVolumes ~= FogVolume(
+            FogVolumeShape.box,
+            volume.center,
+            volume.halfExtents,
+            volume.density,
+            volume.albedo,
+            volume.emission,
+            volume.emissionEnergy,
+            volume.edgeFade,
+        );
 
     Vector3f eye = Vector3f(0, 3.0f, -8.0f);
     Vector3f target = Vector3f(0, 1.5f, 0);

@@ -1110,8 +1110,9 @@ final class PipelineFactory
 
         auto layoutObj = VkObj!VkPipelineLayout(device.releaseQueue,
             VkPipelineLayoutCreateInfo(
-                setLayoutCount: 1,
-                pSetLayouts: &setLayout,
+                // The frame set is always set 1, so a kernel can read it like a draw does
+                setLayoutCount: 2,
+                pSetLayouts: [setLayout, frameSetLayout.layout.vk].ptr,
                 pushConstantRangeCount: cast(uint) pushConstants.length,
                 pPushConstantRanges: pushConstants.ptr,
             ));

@@ -1,6 +1,7 @@
 #version 460
 
 #include "material.glsl"
+#include "fog_volume.glsl"
 
 layout(binding = 0) uniform MaterialBlock
 {
@@ -32,5 +33,7 @@ void main()
     const vec3 normal = normalize(cross(dFdx(fragPosition), dFdy(fragPosition)));
 #endif
 
-    outColor = vec4(shadeMaterial(material, albedo, normal, fragPosition), 1.0);
+    const vec3 color = shadeMaterial(material, albedo, normal, fragPosition);
+
+    outColor = vec4(applyFog(color, fragPosition), 1.0);
 }

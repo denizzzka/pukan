@@ -76,7 +76,7 @@ class Background
         this.energy = energy;
     }
 
-    void draw(VkCommandBuffer commandBuffer, VkExtent2D extent)
+    void draw(VkCommandBuffer commandBuffer, VkExtent2D extent, VkDescriptorSet frameSet)
     {
         const data = BackgroundData(
             top,
@@ -88,6 +88,8 @@ class Background
         );
 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.graphicsPipeline);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout,
+            1, 1, &frameSet, 0, null);
         vkCmdPushConstants(
             commandBuffer,
             pipeline.pipelineLayout,

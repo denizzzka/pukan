@@ -8,6 +8,7 @@ import pukan.graphics.common.screenshot: Screenshot;
 import pukan.graphics.g3d.custom_pass: CustomPass, activeCustomPass;
 import pukan.graphics.g2d.ui: Ui;
 import pukan.graphics.g3d.axes: Axis;
+import pukan.graphics.g3d.height_fog: HeightFog;
 import pukan.graphics.g3d.ibl: createIblTextures, IblTextures;
 import pukan.graphics.g3d.mesh: MeshResources;
 import pukan.graphics.g3d.occlusion_depth: OcclusionDepth;
@@ -21,6 +22,7 @@ import pukan.graphics.g3d.pbr.pipelines: PbrProfile, pbrGltfActive, pbrGodotActi
 import pukan.graphics.g3d.primitives_tree.cylinder: CylinderRenderer;
 import pukan.graphics.g3d.primitives_tree.sphere: SphereRenderer;
 import pukan.graphics.g3d.render_target: RenderTarget;
+import pukan.graphics.g3d.volumetric_fog: FogVolume, VolumetricFog, VolumetricFogSettings, fogNear;
 import pukan.graphics.g3d.camera: cameraView, vulkanPerspectiveMatrix;
 import pukan.graphics.g3d.shadow: LocalShadow, SunCascades, SunShadow, localShadowCount, localTileSize, localTilesPerAxis, sunCascadeCount;
 import pukan.vulkan.bindings;
@@ -154,6 +156,7 @@ class SceneWith(Modules...)
     private VkObj!VkSampler resolveSampler;
     private OitResolve oitResolve;
     private DepthResolve depthResolve;
+    private VolumetricFog volumetricFogPass;
     /// Set after the first frame has waited for the preload queue
     private bool pipelinesReady;
     /// Frame slots the targets take in the shared shadow maps
@@ -168,6 +171,12 @@ class SceneWith(Modules...)
     /// Godot tonemap mode: linear, Reinhard, Filmic, ACES, AgX
     uint tonemapMode = 3;
     float tonemapWhite = 1.0f;
+    /// Fog that scatters the scene's lights; off until a level enables it
+    VolumetricFogSettings volumetricFog;
+    /// Denser fog the volumetric fog adds inside boxes and ellipsoids
+    FogVolume[] fogVolumes;
+    /// Analytic layer hugging the ground, independent of the volumetric fog
+    HeightFog heightFog;
     /// Partition of the world that cells and streaming work from
     CellGrid cellGrid;
 
@@ -387,6 +396,7 @@ class SceneWith(Modules...)
 
         oitResolve = new OitResolve(device, pipelineFactory, surfaceFormat.format);
         depthResolve = new DepthResolve(device, pipelineFactory);
+        volumetricFogPass = new VolumetricFog(device, pipelineFactory);
 
         sunShadow = new SunShadow(device);
         localShadow = new LocalShadow(device);
@@ -483,6 +493,7 @@ class SceneWith(Modules...)
 
         sceneOwner.own(oitResolve);
         sceneOwner.own(depthResolve);
+        sceneOwner.own(volumetricFogPass);
         sceneOwner.own(sunShadow);
         sceneOwner.own(localShadow);
         sceneOwner.own(background);
@@ -568,6 +579,7 @@ class SceneWith(Modules...)
         target.instanceArenas.length = frames;
         target.cullFrames.length = frames;
         target.oitFrames.length = frames;
+        target.fogFrames.length = frames;
 
         foreach(i; 0 .. frames)
         {
@@ -576,6 +588,9 @@ class SceneWith(Modules...)
 
             target.cullFrames[i] = new CullFrame(device, pipelineFactory);
             target.owner.own(target.cullFrames[i]);
+
+            target.fogFrames[i] = volumetricFogPass.createFrame();
+            target.owner.own(target.fogFrames[i]);
         }
 
         foreach(i, ref frame; target.swapChain.frames)
@@ -616,6 +631,9 @@ class SceneWith(Modules...)
                 sampler: resolveSampler.vk,
             );
 
+            auto fogVolume = target.fogFrames[i].imageInfo();
+            fogVolume.sampler = volumetricFogPass.readSampler;
+
             foreach(eye; 0 .. 2)
             {
                 if(frame.frameSets[eye])
@@ -640,6 +658,7 @@ class SceneWith(Modules...)
                     sceneDepth,
                     depthMS,
                     localInfo,
+                    fogVolume,
                 );
             }
         }
@@ -912,6 +931,53 @@ class SceneWith(Modules...)
             1.0f / localTileSize,
             localShadow.enabled ? 1 : 0,
         );
+
+        {
+            import std.math: log2;
+            import std.algorithm: max;
+
+            const extent = targetOf(frame).extent;
+            const far = max(volumetricFog.length, fogNear * 2.0f);
+            const span = log2(far) - log2(fogNear);
+
+            data.fogParams = Vector4f(
+                volumetricFog.enabled ? 1 : 0,
+                volumetricFog.density,
+                volumetricFog.anisotropy,
+                far,
+            );
+            data.fogAlbedo = Vector4f(
+                volumetricFog.albedo.x,
+                volumetricFog.albedo.y,
+                volumetricFog.albedo.z,
+                volumetricFog.emissionEnergy,
+            );
+            data.fogEmission = Vector4f(
+                volumetricFog.emission.x,
+                volumetricFog.emission.y,
+                volumetricFog.emission.z,
+                volumetricFog.skyAffect,
+            );
+            data.fogDepth = Vector4f(fogNear, far, log2(fogNear), 1.0f / span);
+            data.fogScreen = Vector4f(
+                extent.width ? 1.0f / extent.width : 0.0f,
+                extent.height ? 1.0f / extent.height : 0.0f,
+                cast(float) extent.width,
+                cast(float) extent.height,
+            );
+            data.heightFogParams = Vector4f(
+                heightFog.enabled ? 1 : 0,
+                heightFog.density,
+                heightFog.height,
+                heightFog.falloff,
+            );
+            data.heightFogColor = Vector4f(
+                heightFog.color.x,
+                heightFog.color.y,
+                heightFog.color.z,
+                0,
+            );
+        }
 
         if(updateLighting)
         {
@@ -1197,6 +1263,7 @@ class SceneWith(Modules...)
 
         recordShadow(frame, drawShadow);
         recordLocal(frame, drawLocal);
+        recordFog(frame, views[0].frameSet);
 
         clearOit(frame);
 
@@ -1205,7 +1272,7 @@ class SceneWith(Modules...)
 
         renderPass.recordCommandBuffer(
             commandBuffer,
-            (ref VkCommandBuffer buf) { background.draw(buf, extent); },
+            (ref VkCommandBuffer buf) { background.draw(buf, extent, frame.frameSets[views[0].frameSet].descriptorSet); },
             (ref VkCommandBuffer buf) {
                 if(pass !is null)
                     pass.begin(buf, frame.frameSets[views[0].frameSet].descriptorSet, extent);
@@ -1406,6 +1473,27 @@ class SceneWith(Modules...)
     private void recordLocal(ref Frame frame, LocalDrawCallback drawLocal)
     {
         localShadow.record(targetOf(frame).frameSlot(frameIndex(frame)), frame.commandBuffer, drawLocal);
+    }
+
+    /// Fills the fog volume every view samples in the main pass
+    private void recordFog(ref Frame frame, size_t eye)
+    {
+        if(!volumetricFog.enabled || volumetricFogPass is null)
+            return;
+
+        auto target = targetOf(frame);
+        const slot = frameIndex(frame);
+
+        if(slot >= target.fogFrames.length)
+            return;
+
+        volumetricFogPass.record(
+            frame.commandBuffer,
+            target.fogFrames[slot],
+            frame.frameSets[eye].descriptorSet,
+            volumetricFog,
+            fogVolumes,
+        );
     }
 
     /// Empties the per-pixel lists before the opaque and blended draws fill them
@@ -1756,6 +1844,13 @@ struct FrameUniforms
     Vector4f localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     Vector4f ambientParams;  // rgb = ambient tint, a = ambient energy
     Vector4f tonemapParams;  // x = mode, y = white
+    Vector4f fogParams;      // x = 1 while the fog runs, y = density, z = anisotropy, w = length
+    Vector4f fogAlbedo;      // rgb = albedo, a = emission energy
+    Vector4f fogEmission;    // rgb = emission colour, a = sky affect
+    Vector4f fogDepth;       // x = near, y = far, z = log2 near, w = 1/(log2 far - log2 near)
+    Vector4f fogScreen;      // xy = 1/target size, zw = target size
+    Vector4f heightFogParams; // x = enabled, y = density, z = base height, w = falloff
+    Vector4f heightFogColor;  // rgb = the light the layer adds
 }
 
 ///

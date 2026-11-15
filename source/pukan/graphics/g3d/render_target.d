@@ -5,6 +5,7 @@ import pukan.graphics.common.screenshot: Screenshot;
 import pukan.graphics.g3d.oit: OitFrame;
 import pukan.graphics.g3d.pbr.culling: CullFrame;
 import pukan.graphics.g3d.pbr.instancing: InstanceArena;
+import pukan.graphics.g3d.volumetric_fog: VolumetricFogFrame;
 import pukan.vulkan.bindings;
 import pukan.vulkan.frame_builder: FrameBuilder;
 import pukan.vulkan.logical_device: LogicalDevice;
@@ -38,6 +39,7 @@ final class RenderTarget
     CullFrame[] cullFrames;
     MemoryBufferMappedToCPU[] lightBufs;
     OitFrame[] oitFrames;
+    VolumetricFogFrame[] fogFrames;
 
     /// First frame slot this target takes in the scene's shadow maps
     size_t slotBase;

@@ -4,97 +4,107 @@ import pukan.frame_bindings;
 import pukan.vulkan.bindings;
 import pukan.vulkan.frame_bindings: FrameBindings;
 
+/// Stages that read the frame data: every graphics stage and the fog kernels
+private enum frameStageFlags =
+    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+
 /// The frame descriptor set layout, in the binding order the shaders declare
 enum frameSetBindings = [
     VkDescriptorSetLayoutBinding(
         binding: FRAME_UNIFORM,
         descriptorType: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_IRRADIANCE,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_PREFILTERED,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_BRDF_LUT,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_SCENE_COLOR,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_OIT_HEADS,
         descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_OIT_FRAGMENTS,
         descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_OIT_COUNTER,
         descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_LIGHTS,
         descriptorType: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_SHADOW_MAP,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_SHADOW_MAP1,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_SHADOW_MAP2,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_LOCAL_SHADOWS,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_SCENE_DEPTH,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
     ),
     VkDescriptorSetLayoutBinding(
         binding: FRAME_DEPTH_MS,
         descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         descriptorCount: 1,
-        stageFlags: VK_SHADER_STAGE_FRAGMENT_BIT,
+        stageFlags: frameStageFlags,
+    ),
+    VkDescriptorSetLayoutBinding(
+        binding: FRAME_FOG_VOLUME,
+        descriptorType: VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        descriptorCount: 1,
+        stageFlags: frameStageFlags,
     ),
 ];
 
@@ -115,4 +125,5 @@ enum frameBindings = FrameBindings(
     sceneDepth: FRAME_SCENE_DEPTH,
     depthMS: FRAME_DEPTH_MS,
     localShadows: FRAME_LOCAL_SHADOWS,
+    fogVolume: FRAME_FOG_VOLUME,
 );

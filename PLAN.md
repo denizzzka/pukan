@@ -183,8 +183,9 @@ assert that a mesh is never shared between two different handedness values.
       Before production support is called done, enumerate every type used by
       the supported projects and either implement it or record why it is
       dropped. Remove the silent skip at that point.
-- [ ] `ShaderMaterial`, CSG, particles, decals, GI probes, fog volumes,
-      SkeletonIK and custom scripts stay out until a project needs them.
+- [ ] `ShaderMaterial`, CSG, particles, decals, GI probes, SkeletonIK and
+      custom scripts stay out until a project needs them.
+- [x] Fog volumes are imported as `Scene.fogVolumes`; see `## Fog`.
 - [ ] Encrypted `.pck` archives stay out.
 
 #### Fixtures
@@ -778,6 +779,43 @@ last cascade stops at the level's bounds. Missing:
 
 - [ ] Import the shadowmask from a Godot `LightmapGI` bake instead of a
       material's occlusion map, with the bake's UV2 and its per-light channels.
+
+## Fog
+
+`Scene.volumetricFog` scatters the scene's lights through a froxel volume:
+160x90x64 RGBA16F cells, sliced exponentially from 0.1 m to the fog's length.
+`fog_inject.comp` lights every cell with the sun's cascades, the point and spot
+lights and the ambient probe; `fog_integrate.comp` walks each view ray once and
+turns the cells into light and transmittance per slice. Every opaque, blended and
+OIT fragment samples that volume at its own depth, so the fog covers geometry at
+any distance, and the background shader samples the last slice for the sky.
+
+`Scene.fogVolumes` adds denser fog inside boxes and ellipsoids. A volume that
+sets `noise` and `noiseScale` breaks its shape into billows that drift with
+`volumetricFog.animationTime`, which the host advances.
+
+`Scene.heightFog` is a separate analytic layer over the ground: `applyFog`
+darkens the scene with distance and height without reading the volume, so it
+costs no compute pass.
+
+A level without a sun, a dungeon for instance, needs no separate shader: with
+`sunShadow.enabled` off the injection kernel skips the cascade lookup, and the
+point and spot lights a torch adds still light the fog around them. The cheapest
+dungeon fog is `heightFog` alone with `volumetricFog.enabled` left false; the
+volumetric fog earns its pass only where a light has to show a pocket of air.
+
+Open work, one commit each:
+
+- [ ] `fog`: the dither that hides slice steps speckles dense volumes, and the
+      crate faces in `demo_fog` show pixel grain. Scale the jitter with the
+      transmittance change across a slice instead of applying it everywhere.
+- [ ] `fog`: the sky reads the last slice at the fog's length and stops there.
+      Continue the ray past that point, and let `skyAffect` blend the fogged sky
+      with the plain one.
+- [ ] `demo_fog`: the cloud around the lantern reads as a glowing ball. Make it
+      a dense billowing vapour, lit by the lantern instead of emitting.
+- [ ] `demo_fog`: confirm the cloud animation over a frame sequence after the
+      sky change, and capture the demonstration screenshot from it.
 
 ## Depth buffer
 

@@ -24,6 +24,13 @@ struct FrameData
     vec4 localShadowParams; // x = 1/tiles, y = tiles, z = 1/tile size
     vec4 ambientParams;  // rgb = ambient tint, a = ambient energy
     vec4 tonemapParams;  // x = mode, y = white
+    vec4 fogParams;      // x = 1 while the fog runs, y = density, z = anisotropy, w = length
+    vec4 fogAlbedo;      // rgb = albedo, a = emission energy
+    vec4 fogEmission;    // rgb = emission colour, a = sky affect
+    vec4 fogDepth;       // x = near, y = far, z = log2 near, w = 1/(log2 far - log2 near)
+    vec4 fogScreen;      // xy = 1/target size, zw = target size
+    vec4 heightFogParams; // x = enabled, y = density, z = base height, w = falloff per metre
+    vec4 heightFogColor;  // rgb = the light the layer adds
 };
 
 #include "frame_bindings.h"

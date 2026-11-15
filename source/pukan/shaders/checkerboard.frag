@@ -1,6 +1,8 @@
 #version 460
 
 #include "tonemap.glsl"
+#include "frame.glsl"
+#include "fog_volume.glsl"
 
 layout(push_constant) uniform BackgroundData
 {
@@ -40,6 +42,14 @@ void main()
             color = mix(groundBottom.rgb, groundHorizon.rgb, smoothstep(0.0, 0.25, t));
 
         color *= params.z;
+    }
+
+    // The sky sits at infinity, so it takes the fog accumulated over the whole view ray
+    if(frameUbo.frame.fogParams.x >= 0.5)
+    {
+        const vec2 uv = gl_FragCoord.xy * frameUbo.frame.fogScreen.xy;
+        const vec4 fog = texture(fogVolume, vec3(uv, 1.0));
+        color = color * fog.a + fog.rgb;
     }
 
     color *= tonemap.z;

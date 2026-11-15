@@ -142,6 +142,7 @@ final class FrameSet
         VkDescriptorImageInfo sceneDepth,
         VkDescriptorImageInfo depthMS,
         VkDescriptorImageInfo localShadows,
+        VkDescriptorImageInfo fogVolume,
     )
     {
         buffer = device.create!MemoryBufferMappedToCPU(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -164,6 +165,7 @@ final class FrameSet
             imageWriteDescriptor(descriptorSet, bindings.sceneDepth, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sceneDepth),
             imageWriteDescriptor(descriptorSet, bindings.depthMS, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, depthMS),
             imageWriteDescriptor(descriptorSet, bindings.localShadows, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, localShadows),
+            imageWriteDescriptor(descriptorSet, bindings.fogVolume, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, fogVolume),
         ];
         device.updateDescriptorSets(writes);
     }

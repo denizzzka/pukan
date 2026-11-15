@@ -250,6 +250,12 @@ class VertexMesh(VertexT) : Mesh, DrawablePrimitive
         indexCount = cast(uint) indices.length;
     }
 
+    /// Rebinds the material descriptor after `setMaterial`
+    void applyMaterial(LogicalDevice device)
+    {
+        updateDescriptorSets(device, imageInfo(resources.fakeTexture));
+    }
+
     void drawingBufferFilling(VkCommandBuffer buf, GraphicsPipelineCfg pipeline, Matrix4x4f trans, VkDescriptorSet frameSet)
     {
         draw(buf, pipeline, trans, frameSet);
@@ -325,6 +331,11 @@ class TexturedMesh : ColoredMesh
         material.mode = MaterialMode.unlit;
         material.flags = MaterialFlags(MaterialFlag.baseColorTexture);
         writeMaterial();
+        updateDescriptorSets(device, imageInfo(texture));
+    }
+
+    override void applyMaterial(LogicalDevice device)
+    {
         updateDescriptorSets(device, imageInfo(texture));
     }
 
