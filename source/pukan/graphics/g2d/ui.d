@@ -230,6 +230,26 @@ final class Ui
         ImGui.GetIO().AddInputCharactersUTF8(value);
     }
 
+    /// Descriptor set for an image the UI may show with `ImGui.Image`. The
+    /// caller keeps the image in `VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL`
+    /// while the UI draws it.
+    ImTextureID addTexture(VkImageView view)
+    {
+        if(!atlasBuilt)
+            buildAtlas();
+
+        auto set = pipelines.descriptorAllocator(technique).allocate();
+        VkDescriptorImageInfo imageInfo = {
+            sampler: fontSampler.vk,
+            imageView: view,
+            imageLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
+        auto writes = [imageWriteDescriptor(set, 0,
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, imageInfo)];
+        device.updateDescriptorSets(writes);
+        return cast(ImTextureID) set;
+    }
+
     /// Starts the frame; windows are built between this and the render pass
     void beginFrame(float deltaSeconds, VkExtent2D extent)
     {
@@ -327,6 +347,9 @@ final class Ui
             vkCmdPushConstants(cb, pipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                 0, uint(transform.sizeof), &transform);
 
+            // The binding survives between draw lists, so the bound set is
+            // tracked across them, not reset per list.
+            VkDescriptorSet boundSet = fontSet;
             foreach(i; 0 .. cast(uint) data.CmdListsCount)
             {
                 auto list = data.CmdLists[i];
@@ -342,6 +365,17 @@ final class Ui
                 {
                     if(command.UserCallback !is null)
                         continue;
+
+                    // Fonts and user images live in different descriptor sets
+                    VkDescriptorSet textureSet = cast(VkDescriptorSet)
+                        cast(ulong) command.TextureId;
+                    if(textureSet != boundSet)
+                    {
+                        vkCmdBindDescriptorSets(cb,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipeline.pipelineLayout, 0, 1, &textureSet, 0, null);
+                        boundSet = textureSet;
+                    }
 
                     const clip = command.ClipRect;
                     const left = cast(int) max(0.0f, clip.x);
